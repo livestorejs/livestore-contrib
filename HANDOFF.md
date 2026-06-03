@@ -42,9 +42,10 @@ mr fetch --apply
 mr status
 ```
 
-Use `mr fetch --apply` when the intent file should resolve fresh upstream refs
-and update `megarepo.lock`. Use `mr apply` when the workspace should be
-materialized from the existing lock without changing it.
+Use `mr fetch --apply` when unpinned refs should advance and
+`megarepo.lock` should update. Use `mr apply` when the workspace should be
+materialized from the existing lock without advancing unpinned refs. Pinned
+members require an explicit pin change.
 
 Do not edit files in materialized `repos/` checkouts as part of this repository's
 bootstrap docs/config work.
