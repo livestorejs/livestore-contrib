@@ -1,9 +1,4 @@
-import {
-  baseOxlintCategories,
-  baseOxlintIgnorePatterns,
-  baseOxlintPlugins,
-  oxlintConfig,
-} from './genie/repo.ts'
+import { baseOxlintCategories, baseOxlintIgnorePatterns, baseOxlintPlugins, oxlintConfig } from './genie/repo.ts'
 import { baseOxlintOverrides, baseOxlintRules } from './repos/effect-utils/genie/oxlint-base.ts'
 
 export default oxlintConfig({

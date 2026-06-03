@@ -1,5 +1,14 @@
-import { catalog as coreCatalog, defineCatalog, type WorkspaceIdentity } from './repo.ts'
-import { contribPackageNames } from './internal.ts'
+import {
+  catalog as effectUtilsCatalog,
+  defineCatalog,
+  type WorkspaceIdentity,
+} from '../repos/effect-utils/genie/external.ts'
+import { livestoreOnlyCatalog } from '../repos/livestore/genie/external.ts'
+import { coreOwnedPackageNames, contribPackageNames } from './internal.ts'
+
+export const coreWorkspaceCatalog = Object.fromEntries(
+  coreOwnedPackageNames.map((name) => [`@livestore/${name}`, 'workspace:*']),
+) as Record<`@livestore/${(typeof coreOwnedPackageNames)[number]}`, 'workspace:*'>
 
 export const livestoreContribWorkspaceCatalog = Object.fromEntries(
   contribPackageNames.map((name) => [`@livestore/${name}`, 'workspace:*']),
@@ -8,9 +17,11 @@ export const livestoreContribWorkspaceCatalog = Object.fromEntries(
 export const livestoreContribOnlyCatalog = {} as const
 
 export const catalog = defineCatalog({
-  extends: coreCatalog,
+  extends: effectUtilsCatalog,
   packages: {
+    ...coreWorkspaceCatalog,
     ...livestoreContribWorkspaceCatalog,
+    ...livestoreOnlyCatalog,
     ...livestoreContribOnlyCatalog,
   },
 })

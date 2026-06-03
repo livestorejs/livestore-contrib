@@ -1,4 +1,4 @@
-# `@livestorejs/livestore-contrib`
+# `livestorejs/livestore-contrib`
 
 Community packages for [LiveStore](https://github.com/livestorejs/livestore):
 additional framework integrations, platform adapters, sync providers, devtools,
