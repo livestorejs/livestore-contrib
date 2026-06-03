@@ -1,0 +1,73 @@
+name: Feature Request
+description: Propose a new contrib package feature or enhancement
+title: '[Feature]: '
+labels: ['type:feature']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to propose a feature. Please describe the use case as clearly as possible.
+
+        Before you start, please search existing issues and discussions to see whether the feature has already been requested.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What use case does it address?
+      placeholder: Describe the concrete use case and why current APIs are not enough.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you would like to see.
+      placeholder: |
+        Describe your proposed solution:
+        - What should the API look like?
+        - How should it behave?
+        - What would the developer experience be?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Have you considered alternative approaches or workarounds?
+
+  - type: input
+    id: package
+    attributes:
+      label: Which package(s) would this affect?
+      description: List the affected contrib packages, or specify "New package" or "Documentation"
+      placeholder: e.g. @livestore/svelte, @livestore/sync-electric
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority/Impact
+      description: How important is this feature to you?
+      options:
+        - Nice to have
+        - Would be helpful
+        - Important for my use case
+        - Critical/blocking
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, examples, or links about the feature request here.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and discussions to ensure this feature has not already been requested
+          required: true
+        - label: I have clearly described the problem this feature would solve
+          required: true

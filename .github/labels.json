@@ -1,0 +1,159 @@
+{
+  "labels": [
+    {
+      "name": "area:adapter",
+      "color": "1d76db",
+      "description": "Runtime adapters such as Node and Expo · Set: manual"
+    },
+    {
+      "name": "area:ci",
+      "color": "1d76db",
+      "description": "CI workflows, runners, and pipeline configuration · Set: manual"
+    },
+    {
+      "name": "area:cli",
+      "color": "1d76db",
+      "description": "Contrib command-line package and related workflows · Set: manual"
+    },
+    {
+      "name": "area:devenv",
+      "color": "1d76db",
+      "description": "devenv tasks, inputs, and environment configuration · Set: manual"
+    },
+    {
+      "name": "area:devtools",
+      "color": "1d76db",
+      "description": "Devtools packages and shared devtools UI code · Set: manual"
+    },
+    {
+      "name": "area:effect",
+      "color": "1d76db",
+      "description": "Effect framework usage · Set: manual"
+    },
+    {
+      "name": "area:examples",
+      "color": "1d76db",
+      "description": "Example applications and reproduction projects · Set: manual"
+    },
+    {
+      "name": "area:framework",
+      "color": "1d76db",
+      "description": "Framework integrations such as Solid and Svelte · Set: manual"
+    },
+    {
+      "name": "area:graphql",
+      "color": "1d76db",
+      "description": "GraphQL integration package · Set: manual"
+    },
+    {
+      "name": "area:nix",
+      "color": "1d76db",
+      "description": "Nix flakes, derivations, FOD hashes, builders · Set: manual"
+    },
+    {
+      "name": "area:release",
+      "color": "1d76db",
+      "description": "Release automation and package publishing · Set: manual"
+    },
+    {
+      "name": "area:storybook",
+      "color": "1d76db",
+      "description": "Storybook configuration and stories · Set: manual"
+    },
+    {
+      "name": "area:sync",
+      "color": "1d76db",
+      "description": "Contrib sync providers such as Electric and S2 · Set: manual"
+    },
+    {
+      "name": "area:tooling",
+      "color": "1d76db",
+      "description": "Developer tooling, scripts, and utilities · Set: manual"
+    },
+    {
+      "name": "area:typescript",
+      "color": "1d76db",
+      "description": "TypeScript code, tsconfig, and type definitions · Set: manual"
+    },
+    {
+      "name": "origin:agent",
+      "color": "a371f7",
+      "description": "Filed or primarily produced by an AI agent · Set: AI agent or manual"
+    },
+    {
+      "name": "origin:janitor",
+      "color": "6f42c1",
+      "description": "Filed by janitor automation · Set: janitor-cli"
+    },
+    {
+      "name": "state:blocked",
+      "color": "e99695",
+      "description": "Blocked on an external dependency or decision · Set: manual"
+    },
+    {
+      "name": "state:needs-research",
+      "color": "1f8fb8",
+      "description": "Needs research / investigation before scope or approach is clear · Set: manual"
+    },
+    {
+      "name": "state:triage",
+      "color": "fbca04",
+      "description": "Needs classification or owner decision · Set: manual"
+    },
+    {
+      "name": "type:agent-tooling",
+      "color": "1f8fb8",
+      "description": "Agent, automation, AI workflow, or developer-agent tooling · Set: manual"
+    },
+    {
+      "name": "type:bug",
+      "color": "d73a4a",
+      "description": "Something broken or a regression · Set: manual"
+    },
+    {
+      "name": "type:chore",
+      "color": "bfd4e2",
+      "description": "Maintenance, cleanup, dependencies, CI, or refactoring · Set: manual"
+    },
+    {
+      "name": "type:docs",
+      "color": "0075ca",
+      "description": "Documentation-only change or documentation task · Set: manual"
+    },
+    {
+      "name": "type:epic",
+      "color": "1d76db",
+      "description": "Large tracking issue with child tasks · Set: manual"
+    },
+    {
+      "name": "type:feature",
+      "color": "0e8a16",
+      "description": "New user-visible or system capability · Set: manual"
+    },
+    {
+      "name": "type:incident",
+      "color": "b60205",
+      "description": "Live or recent operational incident · Set: manual or andon CLI"
+    },
+    {
+      "name": "type:rca",
+      "color": "5319e7",
+      "description": "Root-cause analysis or investigation record · Set: manual"
+    }
+  ],
+  "deprecated": ["bug", "documentation", "duplicate", "enhancement", "invalid", "question", "wontfix"],
+  "legacyMigrations": [
+    {
+      "from": "bug",
+      "to": "type:bug"
+    },
+    {
+      "from": "documentation",
+      "to": "type:docs"
+    },
+    {
+      "from": "enhancement",
+      "to": "type:feature"
+    }
+  ]
+}
