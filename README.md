@@ -1,16 +1,31 @@
 # `@livestorejs/livestore-contrib`
 
-Community packages for [LiveStore](https://github.com/livestorejs/livestore) —
-framework integrations, additional platform adapters, additional sync
-providers, and devtools.
+Community packages for [LiveStore](https://github.com/livestorejs/livestore):
+additional framework integrations, platform adapters, sync providers, devtools,
+GraphQL integration, and CLI tooling.
 
 ## Status: bootstrap in progress
 
-This repository is being bootstrapped from
-[`livestorejs/livestore`](https://github.com/livestorejs/livestore). Execution
-is tracked in [livestorejs/livestore#1265](https://github.com/livestorejs/livestore/issues/1265).
+This repository is being bootstrapped as the contrib companion to
+[`livestorejs/livestore`](https://github.com/livestorejs/livestore).
 
-Design intent (vision, requirements, spec, ADR) lives in
-[`livestorejs/livestore` at `context/repo-split/`](https://github.com/livestorejs/livestore/tree/dev/context/repo-split).
+The architecture source of truth lives in
+[`livestorejs/livestore` at `context/repo-architecture/`](https://github.com/livestorejs/livestore/tree/main/context/repo-architecture).
 
-This README will be replaced once the bootstrap PR lands.
+## Megarepo composition
+
+This repo is composed with:
+
+- `livestorejs/livestore`, pinned, for deterministic contrib development and CI.
+- `overengineeringstudio/effect-utils`, pinned, for shared tooling.
+- `effect-ts/effect`, unpinned, matching core's shared dependency contract.
+
+Run:
+
+```bash
+mr fetch --apply
+mr status
+```
+
+The materialized repositories are symlinked under `repos/`, which is not
+committed.

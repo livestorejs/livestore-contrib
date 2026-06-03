@@ -1,0 +1,50 @@
+node_modules
+.node_modules
+.pnpm-home
+.idea/
+.DS_Store
+
+test-results
+playwright-report
+.playwright-mcp
+
+# Vite cache
+.vite
+
+# Process IDs
+*.pid
+
+.envrc.*
+
+tmp*
+dist
+
+*.tsbuildinfo
+
+*.log
+*.db
+
+.direnv
+.pnpm-store/
+repos/
+
+# Codex project-local config
+.codex
+
+.wrangler
+.vercel
+.netlify
+
+_tmp*
+.tmp*
+
+.nitro
+.tanstack
+.output
+
+.devenv*
+.pre-commit-config.yaml
+
+# Task context files
+/tasks/
+.claude/settings.local.json
