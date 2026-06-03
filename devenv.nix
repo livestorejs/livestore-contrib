@@ -120,7 +120,12 @@ in
         '.oxfmtrc.json',
       ]
 
-      const forbidden = ['effect-playwright', '@livestore/effect-playwright']
+      const forbidden = [
+        'devtools-web-common',
+        '@livestore/devtools-web-common',
+        'effect-playwright',
+        '@livestore/effect-playwright',
+      ]
       for (const file of generatedFiles) {
         const text = fs.readFileSync(file, 'utf8')
         for (const token of forbidden) {

@@ -17,7 +17,6 @@ packages:
   - packages/@livestore/adapter-node
   - packages/@livestore/cli
   - packages/@livestore/devtools-expo
-  - packages/@livestore/devtools-web-common
   - packages/@livestore/graphql
   - packages/@livestore/solid
   - packages/@livestore/svelte
