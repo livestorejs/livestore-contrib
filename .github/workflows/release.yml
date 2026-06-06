@@ -45,18 +45,6 @@ jobs:
             extra-substituters = https://cache.nixos.org
             extra-trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
           summarize: true
-      - name: Provide cachix CLI from nixpkgs
-        shell: bash
-        run: |
-          set -euo pipefail
-          out=$(nix build --no-link --print-out-paths nixpkgs#cachix)
-          echo "$out/bin" >> "$GITHUB_PATH"
-      - name: Enable Cachix cache
-        uses: cachix/cachix-action@v17
-        with:
-          name: livestore-contrib
-          authToken: ${{ env.CACHIX_AUTH_TOKEN }}
-          skipPush: true
       - name: Sync megarepo dependencies
         env:
           MEGAREPO_STORE: '${{ runner.temp }}/megarepo-store/${{ github.run_id }}/${{ github.run_attempt }}/${{ github.job }}'

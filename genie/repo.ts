@@ -10,8 +10,6 @@
 
 import {
   applyMegarepoLockStep,
-  cachixCliBuildStep,
-  cachixStep,
   checkoutStep,
   installNixStep,
   livestorePackageDefaults as coreLivestorePackageDefaults,
@@ -78,11 +76,6 @@ export const livestoreContribSetupStepsAfterCheckout = [
     extraConf:
       'extra-substituters = https://cache.nixos.org\nextra-trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=',
   }),
-  cachixCliBuildStep,
-  (() => {
-    const base = cachixStep({ name: 'livestore-contrib', authToken: '${{ env.CACHIX_AUTH_TOKEN }}' })
-    return { ...base, with: { ...base.with, skipPush: true } }
-  })(),
   applyMegarepoLockStep(),
   preparePinnedDevenvStep,
   pnpmStateSetupStep,
