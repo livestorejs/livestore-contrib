@@ -80,7 +80,7 @@ export const livestoreContribSetupStepsAfterCheckout = [
   }),
   cachixCliBuildStep,
   (() => {
-    const base = cachixStep({ name: 'livestore', authToken: '${{ env.CACHIX_AUTH_TOKEN }}' })
+    const base = cachixStep({ name: 'livestore-contrib', authToken: '${{ env.CACHIX_AUTH_TOKEN }}' })
     return { ...base, with: { ...base.with, skipPush: true } }
   })(),
   applyMegarepoLockStep(),

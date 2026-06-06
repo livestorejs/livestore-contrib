@@ -416,7 +416,7 @@ jobs:
       - name: Enable Cachix cache
         uses: cachix/cachix-action@v17
         with:
-          name: livestore
+          name: livestore-contrib
           authToken: ${{ env.CACHIX_AUTH_TOKEN }}
           skipPush: true
       - name: Sync megarepo dependencies

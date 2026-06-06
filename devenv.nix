@@ -253,12 +253,38 @@ in
         .readdirSync('packages/@livestore')
         .map((name) => `packages/@livestore/''${name}/package.json`)
       const coreMemberSet = new Set(coreMembers)
+      const expectedCoreMembers = new Set()
       for (const manifestPath of packageManifests) {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
         for (const path of manifest.$genie?.workspaceClosureDirs ?? []) {
-          if (path.startsWith('repos/livestore/packages/@livestore/') && !coreMemberSet.has(path)) {
-            throw new Error('core closure member is missing from root workspace: ' + path)
+          if (path.startsWith('repos/livestore/packages/@livestore/')) {
+            expectedCoreMembers.add(path)
           }
+        }
+      }
+
+      const corePackageNames = new Set(packageJson.$genie.coreOwnedPackageNames.map((name) => `@livestore/''${name}`))
+      const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies']
+      for (const memberPath of contribMembers.filter((path) => path.startsWith('examples/'))) {
+        const manifest = JSON.parse(fs.readFileSync(`''${memberPath}/package.json`, 'utf8'))
+        for (const section of dependencySections) {
+          for (const name of Object.keys(manifest[section] ?? {})) {
+            if (corePackageNames.has(name)) {
+              expectedCoreMembers.add(`repos/livestore/packages/@livestore/''${name.slice('@livestore/'.length)}`)
+            }
+          }
+        }
+      }
+
+      const expectedCoreMemberSet = new Set(expectedCoreMembers)
+      for (const path of expectedCoreMemberSet) {
+        if (!coreMemberSet.has(path)) {
+          throw new Error('expected core workspace member is missing from root workspace: ' + path)
+        }
+      }
+      for (const path of coreMemberSet) {
+        if (!expectedCoreMemberSet.has(path)) {
+          throw new Error('unexpected core workspace member in root workspace: ' + path)
         }
       }
       NODE

@@ -1,7 +1,6 @@
 import { catalog } from './genie/external.ts'
-import { rootWorkspaceExtraMembers } from './genie/internal.ts'
 import { commonPnpmPolicySettings, pnpmWorkspaceYaml, repoPnpmAllowBuilds } from './genie/repo.ts'
-import { rootWorkspacePackages } from './package.json.genie.ts'
+import { rootWorkspaceExtraMembers, rootWorkspacePackages } from './package.json.genie.ts'
 
 export default pnpmWorkspaceYaml.root({
   packages: rootWorkspacePackages,

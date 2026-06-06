@@ -44,6 +44,22 @@
   "packageManager": "pnpm@11.3.0",
   "$genie": {
     "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten"
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "coreOwnedPackageNames": [
+      "adapter-cloudflare",
+      "adapter-web",
+      "common",
+      "common-cf",
+      "framework-toolkit",
+      "livestore",
+      "peer-deps",
+      "react",
+      "sqlite-wasm",
+      "sync-cf",
+      "utils",
+      "utils-dev",
+      "wa-sqlite",
+      "webmesh"
+    ]
   }
 }

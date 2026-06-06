@@ -1,4 +1,10 @@
-import { livestoreCorePackageNames, materializedMemberPathsForProjection } from '../repos/livestore/genie/external.ts'
+import { readFileSync } from 'node:fs'
+
+import {
+  livestoreCorePackageNames,
+  packageDirForPackageName,
+  type LivestorePackageName,
+} from '../repos/livestore/genie/external.ts'
 
 export const contribPackageNames = [
   'adapter-expo',
@@ -33,6 +39,40 @@ export const contribWorkspaceMemberPaths = [
   ...contribExampleMembers,
 ] as const
 
-export const materializedCoreWorkspaceMemberPaths = materializedMemberPathsForProjection('core', 'repos/livestore')
+const corePackageNames = new Set<string>(livestoreCorePackageNames)
 
-export const rootWorkspaceExtraMembers = [...contribExampleMembers, ...materializedCoreWorkspaceMemberPaths] as const
+const corePackageNameFromPackageJsonName = (name: string): LivestorePackageName | undefined => {
+  if (!name.startsWith('@livestore/')) return undefined
+
+  const packageName = name.slice('@livestore/'.length)
+  return corePackageNames.has(packageName) ? (packageName as LivestorePackageName) : undefined
+}
+
+const dependenciesForExample = (memberPath: string) => {
+  const manifest = JSON.parse(readFileSync(`${memberPath}/package.json`, 'utf8')) as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
+    peerDependencies?: Record<string, string>
+  }
+
+  return Object.keys({
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+    ...manifest.peerDependencies,
+  })
+}
+
+export const materializedCoreExampleWorkspaceMemberPaths = [
+  ...new Set(
+    contribExampleMembers
+      .flatMap(dependenciesForExample)
+      .map(corePackageNameFromPackageJsonName)
+      .filter((name): name is LivestorePackageName => name !== undefined)
+      .map((name) => `repos/livestore/${packageDirForPackageName(name)}`),
+  ),
+].toSorted()
+
+export const rootWorkspaceExtraMembers = [
+  ...contribExampleMembers,
+  ...materializedCoreExampleWorkspaceMemberPaths,
+] as const

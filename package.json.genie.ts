@@ -1,4 +1,6 @@
-import { rootWorkspaceExtraMembers } from './genie/internal.ts'
+import { readFileSync } from 'node:fs'
+
+import { coreOwnedPackageNames, rootWorkspaceExtraMembers as rootExampleWorkspaceMembers } from './genie/internal.ts'
 import { packageJson } from './genie/repo.ts'
 import adapterExpoPkg from './packages/@livestore/adapter-expo/package.json.genie.ts'
 import adapterNodePkg from './packages/@livestore/adapter-node/package.json.genie.ts'
@@ -20,6 +22,24 @@ export const rootWorkspacePackages = [
   sveltePkg,
   syncElectricPkg,
   syncS2Pkg,
+] as const
+
+const materializedCorePackageClosureMemberPaths = [
+  ...new Set(
+    rootWorkspacePackages.flatMap(
+      (pkg) =>
+        (
+          JSON.parse(
+            readFileSync(`packages/@livestore/${pkg.data.name.slice('@livestore/'.length)}/package.json`, 'utf8'),
+          ) as { $genie?: { workspaceClosureDirs?: readonly string[] } }
+        ).$genie?.workspaceClosureDirs?.filter((path) => path.startsWith('repos/livestore/packages/@livestore/')) ?? [],
+    ),
+  ),
+].toSorted()
+
+export const rootWorkspaceExtraMembers = [
+  ...rootExampleWorkspaceMembers,
+  ...materializedCorePackageClosureMemberPaths,
 ] as const
 
 const rootWorkspace = packageJson.aggregateFromPackages({
@@ -47,6 +67,10 @@ const rootWorkspaceWithScripts = {
     return `${JSON.stringify(
       {
         ...generated,
+        $genie: {
+          ...generated.$genie,
+          coreOwnedPackageNames,
+        },
         scripts: {
           ...generated.scripts,
           ...rootWorkspaceExtraFields.scripts,
