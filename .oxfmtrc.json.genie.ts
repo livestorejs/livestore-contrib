@@ -22,5 +22,9 @@ export default oxfmtConfig({
     '**/tsconfig.json',
     '**/tsconfig.*.json',
     '**/*.mdx',
+    'examples/**',
+    'packages/@livestore/*/src/**',
+    'packages/@livestore/*/test/**',
+    'packages/@livestore/*/tests/**',
   ],
 })

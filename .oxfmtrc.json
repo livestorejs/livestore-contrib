@@ -39,6 +39,10 @@
     "**/package.json",
     "**/tsconfig.json",
     "**/tsconfig.*.json",
-    "**/*.mdx"
+    "**/*.mdx",
+    "examples/**",
+    "packages/@livestore/*/src/**",
+    "packages/@livestore/*/test/**",
+    "packages/@livestore/*/tests/**"
   ]
 }

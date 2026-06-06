@@ -1,17 +1,18 @@
-import { baseOxlintCategories, baseOxlintIgnorePatterns, baseOxlintPlugins, oxlintConfig } from './genie/repo.ts'
-import { baseOxlintOverrides, baseOxlintRules } from './repos/effect-utils/genie/oxlint-base.ts'
+import { oxlintConfig } from './genie/repo.ts'
+import {
+  livestoreOxlintCategories,
+  livestoreOxlintIgnorePatterns,
+  livestoreOxlintOverrides,
+  livestoreOxlintPlugins,
+  livestoreOxlintRules,
+} from './repos/livestore/.oxlintrc.json.genie.ts'
 
 export default oxlintConfig({
-  plugins: baseOxlintPlugins,
-  categories: baseOxlintCategories,
-  rules: {
-    ...baseOxlintRules,
-    'import/no-commonjs': 'error',
-    'typescript/consistent-type-imports': 'warn',
-    'overeng/explicit-boolean-compare': 'warn',
-  },
+  plugins: livestoreOxlintPlugins,
+  categories: livestoreOxlintCategories,
+  rules: livestoreOxlintRules,
   ignorePatterns: [
-    ...baseOxlintIgnorePatterns,
+    ...livestoreOxlintIgnorePatterns,
     '**/node_modules/**',
     '**/.pnpm/**',
     '**/.pnpm-store/**',
@@ -21,24 +22,7 @@ export default oxlintConfig({
     '**/playwright-report/**',
     '**/test-results/**',
     '**/.vite/**',
+    'examples/**',
   ],
-  overrides: [
-    ...baseOxlintOverrides,
-    {
-      files: ['**/vitest.config.ts', '**/vite.config.ts', '**/playwright.config.ts', '**/*.genie.ts'],
-      rules: { 'func-style': 'off' },
-    },
-    {
-      files: ['**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', '**/tests/**'],
-      rules: {
-        'unicorn/no-array-sort': 'off',
-        'unicorn/consistent-function-scoping': 'off',
-        'require-yield': 'off',
-      },
-    },
-    {
-      files: ['**/*.svelte'],
-      rules: { 'import/no-unassigned-import': 'off' },
-    },
-  ],
+  overrides: livestoreOxlintOverrides,
 })

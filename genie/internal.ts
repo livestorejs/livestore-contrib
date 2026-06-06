@@ -35,7 +35,4 @@ export const contribWorkspaceMemberPaths = [
 
 export const materializedCoreWorkspaceMemberPaths = materializedMemberPathsForProjection('core', 'repos/livestore')
 
-export const rootWorkspaceExtraMembers = [
-  ...contribWorkspaceMemberPaths,
-  ...materializedCoreWorkspaceMemberPaths,
-] as const
+export const rootWorkspaceExtraMembers = [...contribExampleMembers, ...materializedCoreWorkspaceMemberPaths] as const

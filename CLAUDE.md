@@ -21,19 +21,23 @@ If tools are not directly available in `$PATH`, enter the dev environment first.
 
 ## Common Checks
 
-During the pre-package-import phase, use:
+Use the full repository check before pushing:
 
 ```bash
-devenv tasks run check:quick --mode before
+devenv tasks run check:all --mode before
 ```
 
-This runs the generated-root checks that are valid before package histories and a real `pnpm-lock.yaml` exist. Do not run or rely on `pnpm install` as a required proof until package manifests have been imported.
+This validates generated files, linting, TypeScript, megarepo source policy,
+the root `pnpm-lock.yaml`, and the contrib/core composed workspace shape.
+`repos/livestore` is dereferenced during bootstrap so pnpm can own the
+materialized core package closure in the lockfile.
 
 Useful focused checks:
 
 ```bash
 devenv tasks run genie:check --mode before
 devenv tasks run mr:check --mode before
+devenv tasks run pnpm:install --mode before
 mr status -o json
 ```
 

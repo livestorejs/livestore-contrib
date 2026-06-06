@@ -40,7 +40,16 @@ in
     (taskModules.ts { tsconfigFile = "tsconfig.dev.json"; })
     (taskModules.clean { packages = pnpmPackages; })
     (taskModules.lint-oxc {
-      lintPaths = [ "." ];
+      lintPaths = [
+        "packages"
+        ".github"
+        "genie"
+        ".oxfmtrc.json"
+        ".oxlintrc.json"
+        "package.json.genie.ts"
+        "pnpm-workspace.yaml.genie.ts"
+        "tsconfig.dev.json.genie.ts"
+      ];
       execIfModifiedPatterns = [
         "*.ts"
         "*.json"
@@ -53,6 +62,7 @@ in
       geniePatterns = [ "**/*.genie.ts" ];
       genieCoverageDirs = [ "." ];
       genieCoverageExcludes = [
+        "examples/"
         "repos/"
         "node_modules/"
       ];
@@ -62,7 +72,8 @@ in
       hasTests = false;
       hasNixCheck = false;
       extraChecks = [
-        "workspace:preimport-check"
+        "lint:check:lockfile"
+        "workspace:shape-check"
         "release:surface:check"
       ];
     })
@@ -88,14 +99,12 @@ in
     pkgs.jq
   ];
 
-  # Pre-package-import phase: contrib-owned package directories are declared in
-  # the generated root workspace before their histories are imported. Until that
-  # import lands, checks must not force a pnpm install over the incomplete graph.
   tasks."lint:check".after = lib.mkForce [
     "lint:check:format"
     "lint:check:oxlint"
     "lint:check:genie"
     "lint:check:genie:coverage"
+    "lint:check:lockfile"
   ];
   # The current mr CLI accepts one --only value per invocation. Keep the
   # bootstrap contract local until the shared effect-utils task module handles
@@ -108,6 +117,17 @@ in
 
     mr apply --only effect-utils
     mr apply --only livestore
+
+    # pnpm omits lockfile importers for workspace members under symlinked
+    # directories. Dereference the pinned core repo after megarepo apply so the
+    # contrib install root can own the materialized core package closure.
+    if [ -L repos/livestore ]; then
+      livestore_target="$(readlink -f repos/livestore)"
+      tmp_dir="$(mktemp -d repos/.livestore-real.XXXXXX)"
+      cp -a --reflink=auto "$livestore_target"/. "$tmp_dir"/ 2>/dev/null || cp -a "$livestore_target"/. "$tmp_dir"/
+      rm repos/livestore
+      mv "$tmp_dir" repos/livestore
+    fi
   '';
   tasks."ts:build".after = lib.mkForce [ "genie:run" ];
   tasks."ts:build-watch".after = lib.mkForce [ "genie:run" ];
@@ -131,16 +151,16 @@ in
       fi
 
       if [ -f release/release-plan.json ]; then
-        echo "Contrib release plans are intentionally disabled before package history import." >&2
+        echo "Contrib release plans are intentionally disabled until publish simulation is added." >&2
         exit 1
       fi
 
       echo "Core version authority available: $core_version"
-      echo "Package publish is intentionally blocked until package histories and publish simulation are added."
+      echo "Package publish is intentionally blocked until publish simulation and release planning are added."
     '';
   };
-  tasks."workspace:preimport-check" = {
-    description = "Validate the pre-package-import contrib workspace shape";
+  tasks."workspace:shape-check" = {
+    description = "Validate the contrib workspace shape";
     after = [
       "genie:run"
       "mr:check"
@@ -148,7 +168,6 @@ in
     exec = ''
       set -euo pipefail
       test ! -e .envrc
-      test ! -e pnpm-lock.yaml
       node <<'NODE'
       const fs = require('node:fs')
 
@@ -212,9 +231,21 @@ in
         }
       }
 
-      for (const path of contribMembers) {
-        if (path.startsWith('repos/')) {
-          throw new Error('contrib workspace member must not be declared under repos/: ' + path)
+      const livestoreStat = fs.lstatSync('repos/livestore')
+      if (livestoreStat.isSymbolicLink()) {
+        throw new Error('repos/livestore must be dereferenced before pnpm owns the install graph')
+      }
+
+      const packageManifests = fs
+        .readdirSync('packages/@livestore')
+        .map((name) => `packages/@livestore/''${name}/package.json`)
+      const coreMemberSet = new Set(coreMembers)
+      for (const manifestPath of packageManifests) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+        for (const path of manifest.$genie?.workspaceClosureDirs ?? []) {
+          if (path.startsWith('repos/livestore/packages/@livestore/') && !coreMemberSet.has(path)) {
+            throw new Error('core closure member is missing from root workspace: ' + path)
+          }
         }
       }
       NODE

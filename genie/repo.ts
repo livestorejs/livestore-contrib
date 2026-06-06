@@ -22,7 +22,7 @@ import {
   validateNixStoreStep,
   type WorkspaceIdentity,
 } from '../repos/livestore/genie/repo.ts'
-import { catalog as contribCatalog } from './external.ts'
+import { catalog as contribCatalog, packageJson as contribPackageJson } from './external.ts'
 
 export * from '../repos/livestore/genie/repo.ts'
 
@@ -39,10 +39,39 @@ export const workspaceMember = (
 
 export const catalog = contribCatalog
 
+export const packageJson = contribPackageJson
+
 export const livestorePackageDefaults = {
   ...coreLivestorePackageDefaults,
   repository: { type: 'git', url: 'git+https://github.com/livestorejs/livestore-contrib.git' },
 }
+
+export const refs = {
+  adapterCloudflare: { path: '../../../repos/livestore/packages/@livestore/adapter-cloudflare' },
+  adapterExpo: { path: '../adapter-expo' },
+  adapterNode: { path: '../adapter-node' },
+  adapterWeb: { path: '../../../repos/livestore/packages/@livestore/adapter-web' },
+  cli: { path: '../cli' },
+  common: { path: '../../../repos/livestore/packages/@livestore/common' },
+  commonCf: { path: '../../../repos/livestore/packages/@livestore/common-cf' },
+  devtoolsExpo: { path: '../devtools-expo' },
+  effectPlaywright: { path: '../../../repos/livestore/packages/@livestore/effect-playwright' },
+  frameworkToolkit: { path: '../../../repos/livestore/packages/@livestore/framework-toolkit' },
+  graphql: { path: '../graphql' },
+  livestore: { path: '../../../repos/livestore/packages/@livestore/livestore' },
+  peerDeps: { path: '../../../repos/livestore/packages/@livestore/peer-deps' },
+  react: { path: '../../../repos/livestore/packages/@livestore/react' },
+  solid: { path: '../solid' },
+  sqliteWasm: { path: '../../../repos/livestore/packages/@livestore/sqlite-wasm' },
+  svelte: { path: '../svelte' },
+  syncCf: { path: '../../../repos/livestore/packages/@livestore/sync-cf' },
+  syncElectric: { path: '../sync-electric' },
+  syncS2: { path: '../sync-s2' },
+  utils: { path: '../../../repos/livestore/packages/@livestore/utils' },
+  utilsDev: { path: '../../../repos/livestore/packages/@livestore/utils-dev' },
+  waSqlite: { path: '../../../repos/livestore/packages/@livestore/wa-sqlite' },
+  webmesh: { path: '../../../repos/livestore/packages/@livestore/webmesh' },
+} as const
 
 export const livestoreContribSetupStepsAfterCheckout = [
   installNixStep({

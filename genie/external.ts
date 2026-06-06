@@ -1,6 +1,7 @@
 import {
   catalog as effectUtilsCatalog,
   defineCatalog,
+  packageJson,
   type WorkspaceIdentity,
 } from '../repos/effect-utils/genie/external.ts'
 import { livestoreOnlyCatalog } from '../repos/livestore/genie/external.ts'
@@ -25,6 +26,8 @@ export const catalog = defineCatalog({
     ...livestoreContribOnlyCatalog,
   },
 })
+
+export { packageJson }
 
 export const contribWorkspaceMember = (memberPath: string): WorkspaceIdentity => ({
   repoName: 'livestore-contrib',
