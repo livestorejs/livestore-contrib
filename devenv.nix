@@ -132,6 +132,16 @@ in
       mv "$tmp_dir" repos/livestore
     fi
   '';
+  tasks."mr:bootstrap".status = lib.mkForce ''
+    set -euo pipefail
+    if [ ! -f ./megarepo.kdl ] && [ ! -f ./megarepo.json ]; then
+      exit 0
+    fi
+
+    test -d repos/effect-utils
+    test -d repos/livestore
+    test ! -L repos/livestore
+  '';
   tasks."ts:build".after = lib.mkForce [ "genie:run" ];
   tasks."ts:build-watch".after = lib.mkForce [ "genie:run" ];
   tasks."ts:check".after = lib.mkForce [ "genie:run" ];
