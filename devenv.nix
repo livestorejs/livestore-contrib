@@ -61,7 +61,10 @@ in
     (taskModules.check {
       hasTests = false;
       hasNixCheck = false;
-      extraChecks = [ "workspace:preimport-check" ];
+      extraChecks = [
+        "workspace:preimport-check"
+        "release:surface:check"
+      ];
     })
     (taskModules.setup {
       requiredTasks = [ ];
@@ -94,11 +97,48 @@ in
     "lint:check:genie"
     "lint:check:genie:coverage"
   ];
+  # The current mr CLI accepts one --only value per invocation. Keep the
+  # bootstrap contract local until the shared effect-utils task module handles
+  # multi-member bootstrap with the current CLI parser.
+  tasks."mr:bootstrap".exec = lib.mkForce ''
+    set -euo pipefail
+    if [ ! -f ./megarepo.kdl ] && [ ! -f ./megarepo.json ]; then
+      exit 0
+    fi
+
+    mr apply --only effect-utils
+    mr apply --only livestore
+  '';
   tasks."ts:build".after = lib.mkForce [ "genie:run" ];
   tasks."ts:build-watch".after = lib.mkForce [ "genie:run" ];
   tasks."ts:check".after = lib.mkForce [ "genie:run" ];
   tasks."ts:check:strict".after = lib.mkForce [ "genie:run" ];
   tasks."ts:emit".after = lib.mkForce [ "genie:run" ];
+  tasks."release:surface:check" = {
+    description = "Validate the contrib release workflow surface";
+    after = [
+      "genie:run"
+      "mr:check"
+    ];
+    exec = ''
+      set -euo pipefail
+
+      core_version="$(jq -r '.version' repos/livestore/release/version.json)"
+      : "$core_version"
+      if [ "$core_version" = "null" ] || [ -z "$core_version" ]; then
+        echo "Missing core version in repos/livestore/release/version.json" >&2
+        exit 1
+      fi
+
+      if [ -f release/release-plan.json ]; then
+        echo "Contrib release plans are intentionally disabled before package history import." >&2
+        exit 1
+      fi
+
+      echo "Core version authority available: $core_version"
+      echo "Package publish is intentionally blocked until package histories and publish simulation are added."
+    '';
+  };
   tasks."workspace:preimport-check" = {
     description = "Validate the pre-package-import contrib workspace shape";
     after = [
