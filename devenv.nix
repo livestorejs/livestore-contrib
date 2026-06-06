@@ -36,7 +36,10 @@ in
         "livestore"
       ];
     })
-    (taskModules.pnpm { packages = pnpmPackages; })
+    (taskModules.pnpm {
+      packages = pnpmPackages;
+      installAfter = [ "mr:bootstrap" ];
+    })
     (taskModules.ts { tsconfigFile = "tsconfig.dev.json"; })
     (taskModules.clean { packages = pnpmPackages; })
     (taskModules.lint-oxc {
