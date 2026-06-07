@@ -8,6 +8,7 @@
  * `../../../genie/repo.ts`.
  */
 
+import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import {
   applyMegarepoLockStep,
   checkoutStep,
@@ -38,6 +39,9 @@ export const workspaceMember = (
 export const catalog = contribCatalog
 
 export const packageJson = contribPackageJson
+
+export const githubRepositorySettings = <const TSettings extends Record<string, unknown>>(settings: TSettings) =>
+  jsonArtifact({ data: settings })
 
 export const livestorePackageDefaults = {
   ...coreLivestorePackageDefaults,

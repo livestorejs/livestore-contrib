@@ -60,3 +60,10 @@ release version and simulates publish-time package manifests so local
 publishable versions before a real release plan can be enabled.
 
 Real publish dispatch remains gated on release-plan generation and approval.
+
+## Repository Settings
+
+GitHub repository settings are generated from `.github/*.genie.ts` sources. The
+checked-in JSON artifacts define repository toggles and the `main-branch-rules`
+ruleset, including the required `source-policy`, `check-all`, and
+`release-surface` checks.
