@@ -29,7 +29,7 @@ devenv tasks run check:all --mode before
 
 This validates generated files, linting, TypeScript, megarepo source policy,
 the root `pnpm-lock.yaml`, and the contrib/core composed workspace shape.
-`repos/livestore` is dereferenced during bootstrap so pnpm can own the
+`repos/livestore` is dereferenced during megarepo bootstrap so pnpm can own the
 materialized core package closure in the lockfile.
 
 Useful focused checks:
@@ -38,12 +38,12 @@ Useful focused checks:
 devenv tasks run genie:check --mode before
 devenv tasks run mr:check --mode before
 devenv tasks run pnpm:install --mode before
+devenv tasks run release:surface:check --mode before
 mr status -o json
 ```
 
 ## GitHub Issues And Pull Requests
 
-- Keep this bootstrap PR in draft until the maintainer decides it is ready.
 - Describe PRs in terms of the problem, approach, validation, trade-offs, and follow-ups.
 - Link relevant work back to `livestorejs/livestore#1265`.
 - Use existing labels only.
