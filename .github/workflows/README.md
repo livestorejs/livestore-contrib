@@ -11,5 +11,6 @@ are `source-policy` and `check-all`.
 ## `release.yml`
 
 Release workflow surface for the package import phase. It validates that
-contrib can read the pinned core version and that package publishing remains
-blocked until publish simulation and release planning are added.
+contrib can read the pinned core version, simulates publish-time package
+manifest rewrites for local core/contrib protocols, and keeps package
+publishing blocked until release planning is added.

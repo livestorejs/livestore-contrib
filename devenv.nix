@@ -47,6 +47,7 @@ in
         "packages"
         ".github"
         "genie"
+        "release"
         ".oxfmtrc.json"
         ".oxlintrc.json"
         "package.json.genie.ts"
@@ -164,12 +165,15 @@ in
       fi
 
       if [ -f release/release-plan.json ]; then
-        echo "Contrib release plans are intentionally disabled until publish simulation is added." >&2
+        echo "Contrib release plans are intentionally disabled until release planning is added." >&2
         exit 1
       fi
 
+      node release/simulate-publish.mjs
+
       echo "Core version authority available: $core_version"
-      echo "Package publish is intentionally blocked until publish simulation and release planning are added."
+      echo "Package publish simulation passed."
+      echo "Package publish is intentionally blocked until release planning is added."
     '';
   };
   tasks."workspace:shape-check" = {
