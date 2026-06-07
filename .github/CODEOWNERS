@@ -1,0 +1,9 @@
+# Release-sensitive repository policy and release automation.
+/.github/ @schickling
+/genie/ @schickling
+/devenv.lock @schickling
+/devenv.nix @schickling
+/devenv.yaml @schickling
+/megarepo.kdl @schickling
+/megarepo.lock @schickling
+/release/ @schickling
