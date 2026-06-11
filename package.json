@@ -26,6 +26,7 @@
     "repos/livestore/packages/@livestore/adapter-web",
     "repos/livestore/packages/@livestore/common",
     "repos/livestore/packages/@livestore/common-cf",
+    "repos/livestore/packages/@livestore/effect-playwright",
     "repos/livestore/packages/@livestore/framework-toolkit",
     "repos/livestore/packages/@livestore/livestore",
     "repos/livestore/packages/@livestore/peer-deps",
@@ -35,7 +36,10 @@
     "repos/livestore/packages/@livestore/utils",
     "repos/livestore/packages/@livestore/utils-dev",
     "repos/livestore/packages/@livestore/wa-sqlite",
-    "repos/livestore/packages/@livestore/webmesh"
+    "repos/livestore/packages/@livestore/webmesh",
+    "tests/integration",
+    "tests/package-common",
+    "tests/sync-provider"
   ],
   "scripts": {
     "format": "oxfmt .",

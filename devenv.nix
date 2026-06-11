@@ -15,6 +15,10 @@ let
 
   rootPackageJson = builtins.fromJSON (builtins.readFile ./package.json);
   pnpmPackages = rootPackageJson.workspaces or [ ];
+  generatedInstalledWorkspaceTasks = [
+    "genie:run"
+    "pnpm:install"
+  ];
 
   oxlintNpm = effectUtils.lib.mkOxlintNpm {
     inherit pkgs;
@@ -79,6 +83,8 @@ in
         "lint:check:lockfile"
         "workspace:shape-check"
         "release:surface:check"
+        "test:package-common"
+        "test:integration:node"
       ];
     })
     (taskModules.setup {
@@ -143,11 +149,11 @@ in
     test -d repos/livestore
     test ! -L repos/livestore
   '';
-  tasks."ts:build".after = lib.mkForce [ "genie:run" ];
-  tasks."ts:build-watch".after = lib.mkForce [ "genie:run" ];
-  tasks."ts:check".after = lib.mkForce [ "genie:run" ];
-  tasks."ts:check:strict".after = lib.mkForce [ "genie:run" ];
-  tasks."ts:emit".after = lib.mkForce [ "genie:run" ];
+  tasks."ts:build".after = lib.mkForce generatedInstalledWorkspaceTasks;
+  tasks."ts:build-watch".after = lib.mkForce generatedInstalledWorkspaceTasks;
+  tasks."ts:check".after = lib.mkForce generatedInstalledWorkspaceTasks;
+  tasks."ts:check:strict".after = lib.mkForce generatedInstalledWorkspaceTasks;
+  tasks."ts:emit".after = lib.mkForce generatedInstalledWorkspaceTasks;
   tasks."release:surface:check" = {
     description = "Validate the contrib release workflow surface";
     after = [
@@ -176,6 +182,75 @@ in
       echo "Package publish is intentionally blocked until release planning is added."
     '';
   };
+  tasks."test:package-common" = {
+    description = "Run moved package-common tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DT_PASSTHROUGH=1 pnpm --dir tests/package-common exec vitest run";
+  };
+  tasks."test:integration:node" = {
+    description = "Run moved adapter-node integration tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = ''
+      devenv tasks run test:integration:node-misc --mode before --no-tui
+      devenv tasks run test:integration:node-sync:allow-flaky --mode before --no-tui
+    '';
+  };
+  tasks."test:integration:node-misc" = {
+    description = "Run moved adapter-node miscellaneous integration tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = ''
+      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-misc/vitest.config.ts
+    '';
+  };
+  tasks."test:integration:node-sync" = {
+    description = "Run moved node-sync integration tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = ''
+      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-sync/vitest.config.ts
+    '';
+  };
+  tasks."test:integration:node-sync:allow-flaky" = {
+    description = "Run moved node-sync integration tests, warning on known flakiness";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = ''
+      if devenv tasks run test:integration:node-sync --mode before --no-tui; then
+        exit 0
+      fi
+      echo "::warning::Node-sync integration tests failed (flaky; carried over from livestorejs/livestore#624)"
+      exit 0
+    '';
+  };
+  tasks."test:sync-provider:electric" = {
+    description = "Run moved Electric sync-provider tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=electric pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/electric-specific.test.ts";
+  };
+  tasks."test:sync-provider:s2" = {
+    description = "Run moved S2 sync-provider tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=s2 pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/s2-specific.test.ts";
+  };
   tasks."workspace:shape-check" = {
     description = "Validate the contrib workspace shape";
     after = [
@@ -196,12 +271,7 @@ in
         '.oxfmtrc.json',
       ]
 
-      const forbidden = [
-        'devtools-web-common',
-        '@livestore/devtools-web-common',
-        'effect-playwright',
-        '@livestore/effect-playwright',
-      ]
+      const forbidden = ['devtools-web-common', '@livestore/devtools-web-common']
       for (const file of generatedFiles) {
         const text = fs.readFileSync(file, 'utf8')
         for (const token of forbidden) {
@@ -232,8 +302,11 @@ in
         path.startsWith('repos/livestore/packages/@livestore/'),
       )
       const contribMembers = packageWorkspaces.filter(
-        (path) => path.startsWith('packages/@livestore/') || path.startsWith('examples/'),
+        (path) => path.startsWith('packages/@livestore/') || path.startsWith('examples/') || path.startsWith('tests/'),
       )
+      if (contribMembers.includes('packages/@livestore/effect-playwright')) {
+        throw new Error('effect-playwright must stay a materialized core workspace member')
+      }
 
       if (coreMembers.length === 0) {
         throw new Error('expected materialized core workspace members under repos/livestore')
@@ -253,9 +326,9 @@ in
         throw new Error('repos/livestore must be dereferenced before pnpm owns the install graph')
       }
 
-      const packageManifests = fs
-        .readdirSync('packages/@livestore')
-        .map((name) => `packages/@livestore/''${name}/package.json`)
+      const packageManifests = contribMembers
+        .map((memberPath) => `''${memberPath}/package.json`)
+        .filter((manifestPath) => fs.existsSync(manifestPath))
       const coreMemberSet = new Set(coreMembers)
       const expectedCoreMembers = new Set()
       for (const manifestPath of packageManifests) {

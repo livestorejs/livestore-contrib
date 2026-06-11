@@ -3,5 +3,15 @@
 {
   "compilerOptions": {},
   "include": [],
-  "references": []
+  "references": [
+    {
+      "path": "./tests/integration"
+    },
+    {
+      "path": "./tests/package-common"
+    },
+    {
+      "path": "./tests/sync-provider"
+    }
+  ]
 }

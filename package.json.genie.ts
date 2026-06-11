@@ -11,6 +11,9 @@ import solidPkg from './packages/@livestore/solid/package.json.genie.ts'
 import sveltePkg from './packages/@livestore/svelte/package.json.genie.ts'
 import syncElectricPkg from './packages/@livestore/sync-electric/package.json.genie.ts'
 import syncS2Pkg from './packages/@livestore/sync-s2/package.json.genie.ts'
+import testsIntegrationPkg from './tests/integration/package.json.genie.ts'
+import testsPackageCommonPkg from './tests/package-common/package.json.genie.ts'
+import testsSyncProviderPkg from './tests/sync-provider/package.json.genie.ts'
 
 export const rootWorkspacePackages = [
   adapterExpoPkg,
@@ -22,6 +25,9 @@ export const rootWorkspacePackages = [
   sveltePkg,
   syncElectricPkg,
   syncS2Pkg,
+  testsIntegrationPkg,
+  testsPackageCommonPkg,
+  testsSyncProviderPkg,
 ] as const
 
 const materializedCorePackageClosureMemberPaths = [
@@ -29,9 +35,9 @@ const materializedCorePackageClosureMemberPaths = [
     rootWorkspacePackages.flatMap(
       (pkg) =>
         (
-          JSON.parse(
-            readFileSync(`packages/@livestore/${pkg.data.name.slice('@livestore/'.length)}/package.json`, 'utf8'),
-          ) as { $genie?: { workspaceClosureDirs?: readonly string[] } }
+          JSON.parse(readFileSync(`${pkg.meta.workspace.memberPath}/package.json`, 'utf8')) as {
+            $genie?: { workspaceClosureDirs?: readonly string[] }
+          }
         ).$genie?.workspaceClosureDirs?.filter((path) => path.startsWith('repos/livestore/packages/@livestore/')) ?? [],
     ),
   ),
