@@ -13,8 +13,15 @@ are `source-policy`, `pr/quality`, `pr/types`, `pr/packages`,
 
 Release workflow surface for contrib packages. It validates that contrib can
 read the pinned core version, simulates publish-time package manifest rewrites
-for local core/contrib protocols, and keeps package publishing blocked until
-release planning is added.
+for local core/contrib protocols, and publishes snapshot packages after a
+successful `ci.yml` run on `main` or explicit `mode=publish-snapshot` dispatch.
+Snapshot publishing uses npm trusted publishing from this workflow file. Package
+snapshot versions include both the pinned core commit and the contrib commit,
+while core dependency rewrites use the pinned core snapshot from
+`megarepo.lock`.
+
+Stable release publishing remains blocked until release-plan generation and
+approval are added.
 
 ## Repository Settings
 

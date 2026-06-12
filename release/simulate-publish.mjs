@@ -1,12 +1,35 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
 
 const readJson = (path) => JSON.parse(readFileSync(join(rootDir, path), 'utf8'))
+const writeJson = (path, value) => writeFileSync(join(rootDir, path), `${JSON.stringify(value, null, 2)}\n`)
+
+const args = process.argv.slice(2)
+const readArg = (name) => {
+  const index = args.indexOf(name)
+  return index === -1 ? undefined : args[index + 1]
+}
+const hasArg = (name) => args.includes(name)
+
+const gitSha = readArg('--git-sha')
+const explicitVersion = readArg('--version')
+const explicitCoreVersion = readArg('--core-version') ?? process.env.LIVESTORE_CORE_RELEASE_VERSION
+const releaseVersion = explicitVersion ?? (gitSha === undefined ? undefined : `0.0.0-snapshot-${gitSha}`)
+const publish = hasArg('--publish')
+const dryRun = hasArg('--dry-run')
+const verifyCore = hasArg('--verify-core')
+
+if (publish === true && dryRun === true) {
+  console.error('--publish and --dry-run are mutually exclusive')
+  process.exit(1)
+}
 
 const errors = []
 const addError = (message) => errors.push(message)
@@ -15,6 +38,7 @@ const coreVersion = readJson('repos/livestore/release/version.json').version
 if (typeof coreVersion !== 'string' || coreVersion.length === 0) {
   addError('repos/livestore/release/version.json must contain a non-empty version string')
 }
+const coreReleaseVersion = explicitCoreVersion ?? coreVersion
 
 const rootManifest = readJson('package.json')
 const coreOwnedPackageNames = rootManifest.$genie?.coreOwnedPackageNames
@@ -38,6 +62,7 @@ const publishablePackages = packages.filter(
   ({ manifest }) => manifest.private !== true && manifest.publishConfig?.access === 'public',
 )
 const contribPackageNames = new Set(publishablePackages.map(({ manifest }) => manifest.name))
+const requiredCorePackages = new Set()
 
 const cloneJson = (value) => JSON.parse(JSON.stringify(value))
 const isLocalProtocol = (spec) =>
@@ -55,7 +80,8 @@ const rewriteDependency = ({ packageName, section, dependencyName, spec }) => {
       addError(`${packageName} ${section}.${dependencyName} uses unsupported core link path ${spec}`)
       return spec
     }
-    return coreVersion
+    requiredCorePackages.add(dependencyName)
+    return coreReleaseVersion
   }
 
   if (spec.startsWith('workspace:')) {
@@ -65,7 +91,7 @@ const rewriteDependency = ({ packageName, section, dependencyName, spec }) => {
       )
       return spec
     }
-    return coreVersion
+    return releaseVersion ?? coreVersion
   }
 
   if (spec.startsWith('file:')) {
@@ -76,7 +102,7 @@ const rewriteDependency = ({ packageName, section, dependencyName, spec }) => {
 }
 
 const plan = {
-  coreVersion,
+  coreVersion: coreReleaseVersion,
   packageCount: publishablePackages.length,
   packages: [],
 }
@@ -86,8 +112,9 @@ for (const { path, manifest } of publishablePackages) {
     addError(`${path} must have a package name`)
     continue
   }
-  if (manifest.version !== coreVersion) {
-    addError(`${manifest.name} version ${manifest.version} does not match core version ${coreVersion}`)
+  const expectedVersion = releaseVersion ?? coreVersion
+  if (manifest.version !== expectedVersion) {
+    addError(`${manifest.name} version ${manifest.version} does not match release version ${expectedVersion}`)
   }
 
   const simulatedManifest = cloneJson(manifest)
@@ -152,6 +179,102 @@ if (errors.length > 0) {
   process.exit(1)
 }
 
+const run = (command, args, options = {}) =>
+  execFileSync(command, args, {
+    cwd: rootDir,
+    env: { ...process.env, DT_PASSTHROUGH: '1' },
+    stdio: 'inherit',
+    ...options,
+  })
+
+const npmViewExists = (name, version) => {
+  try {
+    execFileSync('npm', ['view', `${name}@${version}`, 'version'], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+const packPackage = (pkg) => {
+  const packageDir = dirname(join(rootDir, pkg.path))
+  const packDir = mkdtempSync(join(tmpdir(), 'livestore-contrib-pack-'))
+  run('pnpm', ['--dir', packageDir, 'pack', '--pack-destination', packDir])
+  const tarballs = readdirSync(packDir).filter((name) => name.endsWith('.tgz'))
+  if (tarballs.length !== 1) {
+    throw new Error(`Expected one tarball for ${pkg.name}, found ${tarballs.length}`)
+  }
+  return { packDir, tarballPath: join(packDir, tarballs[0]) }
+}
+
+const buildPackages = () => {
+  for (const pkg of plan.packages) {
+    const packageDir = dirname(join(rootDir, pkg.path))
+    run('pnpm', ['--dir', packageDir, 'exec', 'tsc', '--build', 'tsconfig.json', '--noCheck'])
+  }
+}
+
+const originalManifestContents = new Map(
+  plan.packages.map((pkg) => [pkg.path, readFileSync(join(rootDir, pkg.path), 'utf8')]),
+)
+
+const applyManifestRewrites = () => {
+  for (const pkg of plan.packages) {
+    writeJson(pkg.path, pkg.manifest)
+  }
+}
+
+const restoreManifestRewrites = () => {
+  for (const [path, content] of originalManifestContents) {
+    writeFileSync(join(rootDir, path), content)
+  }
+}
+
+const restoreGeneratedFiles = () => {
+  const env = { ...process.env, DT_PASSTHROUGH: '1' }
+  delete env.LIVESTORE_RELEASE_VERSION
+  execFileSync('genie', ['--writeable'], {
+    cwd: rootDir,
+    env,
+    stdio: 'inherit',
+  })
+}
+
+const verifyRequiredCorePackages = () => {
+  if (verifyCore === false) return
+  for (const packageName of [...requiredCorePackages].sort()) {
+    if (npmViewExists(packageName, plan.coreVersion) === false) {
+      throw new Error(`Required core package is not visible on npm: ${packageName}@${plan.coreVersion}`)
+    }
+  }
+}
+
+const smokeInstallPackedTarballs = (packed) => {
+  if (verifyCore === false) return
+
+  const smokeDir = mkdtempSync(join(tmpdir(), 'livestore-contrib-install-smoke-'))
+  try {
+    const smokeManifest = {
+      private: true,
+      dependencies: Object.fromEntries(packed.map(({ pkg, tarballPath }) => [pkg.name, `file:${tarballPath}`])),
+    }
+    writeFileSync(join(smokeDir, 'package.json'), `${JSON.stringify(smokeManifest, null, 2)}\n`)
+    run('pnpm', ['install', '--ignore-scripts'], { cwd: smokeDir })
+
+    for (const { pkg } of packed) {
+      const installedManifest = join(smokeDir, 'node_modules', ...pkg.name.split('/'), 'package.json')
+      if (existsSync(installedManifest) === false) {
+        throw new Error(`Install smoke did not materialize ${pkg.name}`)
+      }
+    }
+  } finally {
+    rmSync(smokeDir, { recursive: true, force: true })
+  }
+}
+
 if (outPath !== undefined) {
   const absoluteOutPath = isAbsolute(outPath) ? outPath : join(rootDir, outPath)
   mkdirSync(dirname(absoluteOutPath), { recursive: true })
@@ -165,4 +288,48 @@ console.log(
 for (const pkg of plan.packages) {
   const packagePath = relative(rootDir, join(rootDir, pkg.path))
   console.log(`- ${pkg.name}: ${pkg.rewrites.length} rewrites (${packagePath})`)
+}
+
+if (dryRun === true || publish === true) {
+  verifyRequiredCorePackages()
+
+  const packed = []
+  try {
+    applyManifestRewrites()
+    buildPackages()
+
+    for (const pkg of plan.packages) {
+      const { packDir, tarballPath } = packPackage(pkg)
+      packed.push({ pkg, packDir, tarballPath })
+    }
+
+    smokeInstallPackedTarballs(packed)
+
+    for (const { pkg, tarballPath } of packed) {
+      const existing = npmViewExists(pkg.name, pkg.version)
+      if (existing === true && publish === true) {
+        console.log(`${pkg.name}@${pkg.version} already published, skipping`)
+        continue
+      }
+
+      const publishArgs = ['publish', tarballPath, '--tag=snapshot', '--access=public', '--ignore-scripts']
+      if (dryRun === true) publishArgs.push('--dry-run')
+      run('npm', publishArgs)
+      console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
+    }
+
+    if (publish === true) {
+      for (const pkg of plan.packages) {
+        if (npmViewExists(pkg.name, pkg.version) === false) {
+          throw new Error(`${pkg.name}@${pkg.version} is not visible on npm after publish`)
+        }
+      }
+    }
+  } finally {
+    restoreManifestRewrites()
+    restoreGeneratedFiles()
+    for (const { packDir } of packed) {
+      rmSync(packDir, { recursive: true, force: true })
+    }
+  }
 }
