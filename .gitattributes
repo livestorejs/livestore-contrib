@@ -1,0 +1,23 @@
+# Genie-generated files - collapse in GitHub PR diffs
+# These files are generated from *.genie.ts sources
+package.json linguist-generated=true
+**/package.json linguist-generated=true
+tsconfig.json linguist-generated=true
+**/tsconfig.json linguist-generated=true
+tsconfig.*.json linguist-generated=true
+pnpm-workspace.yaml linguist-generated=true
+**/pnpm-workspace.yaml linguist-generated=true
+.oxlintrc.json linguist-generated=true
+**/.oxlintrc.json linguist-generated=true
+.oxfmtrc.json linguist-generated=true
+**/.oxfmtrc.json linguist-generated=true
+.github/*.json linguist-generated=true
+.github/workflows/*.yml linguist-generated=true
+
+# Lock files - collapse in GitHub PR diffs
+*.lock linguist-generated=true
+**/*.lock linguist-generated=true
+*.lockb linguist-generated=true
+**/*.lockb linguist-generated=true
+pnpm-lock.yaml linguist-generated=true
+**/pnpm-lock.yaml linguist-generated=true
