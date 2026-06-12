@@ -29,7 +29,19 @@
             "context": "source-policy"
           },
           {
-            "context": "check-all"
+            "context": "pr/quality"
+          },
+          {
+            "context": "pr/types"
+          },
+          {
+            "context": "pr/packages"
+          },
+          {
+            "context": "pr/examples-build"
+          },
+          {
+            "context": "pr/node"
           },
           {
             "context": "release-surface"

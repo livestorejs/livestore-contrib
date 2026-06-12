@@ -9,6 +9,8 @@
     "examples/node-effect-cli",
     "examples/node-todomvc-sync-cf",
     "examples/web-multi-store",
+    "examples/web-todomvc-custom-elements",
+    "examples/web-todomvc-experimental",
     "examples/web-todomvc-solid",
     "examples/web-todomvc-svelte",
     "examples/web-todomvc-sync-electric",
@@ -26,6 +28,7 @@
     "repos/livestore/packages/@livestore/adapter-web",
     "repos/livestore/packages/@livestore/common",
     "repos/livestore/packages/@livestore/common-cf",
+    "repos/livestore/packages/@livestore/effect-playwright",
     "repos/livestore/packages/@livestore/framework-toolkit",
     "repos/livestore/packages/@livestore/livestore",
     "repos/livestore/packages/@livestore/peer-deps",
@@ -35,7 +38,9 @@
     "repos/livestore/packages/@livestore/utils",
     "repos/livestore/packages/@livestore/utils-dev",
     "repos/livestore/packages/@livestore/wa-sqlite",
-    "repos/livestore/packages/@livestore/webmesh"
+    "repos/livestore/packages/@livestore/webmesh",
+    "tests/integration",
+    "tests/sync-provider"
   ],
   "scripts": {
     "format": "oxfmt .",

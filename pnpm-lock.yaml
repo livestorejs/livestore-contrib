@@ -480,6 +480,137 @@ importers:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.9.3)(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  examples/web-todomvc-custom-elements:
+    dependencies:
+      '@livestore/adapter-web':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/adapter-web
+      '@livestore/livestore':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/livestore
+      '@livestore/peer-deps':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/peer-deps
+      '@livestore/sync-cf':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/sync-cf
+      '@livestore/wa-sqlite':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/wa-sqlite
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      react-dom:
+        specifier: 19.2.3
+        version: 19.2.3(react@19.2.3)
+      todomvc-app-css:
+        specifier: 2.4.3
+        version: 2.4.3
+    devDependencies:
+      '@cloudflare/vite-plugin':
+        specifier: 1.13.12
+        version: 1.13.12(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(workerd@1.20251008.0)(wrangler@4.42.2(@cloudflare/workers-types@4.20251118.0))
+      '@cloudflare/workers-types':
+        specifier: 4.20251118.0
+        version: 4.20251118.0
+      '@livestore/devtools-vite':
+        specifier: 0.4.0-dev.25
+        version: 0.4.0-dev.25(ff9707caf09df3d0dd66803a83816c0a)
+      '@playwright/test':
+        specifier: 1.59.1
+        version: 1.59.1
+      '@tailwindcss/vite':
+        specifier: 4.1.18
+        version: 4.1.18(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      '@types/react':
+        specifier: 19.2.7
+        version: 19.2.7
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.7)
+      '@vitejs/plugin-react':
+        specifier: 5.1.2
+        version: 5.1.2(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      tailwindcss:
+        specifier: 4.1.18
+        version: 4.1.18
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 7.3.1
+        version: 7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      wrangler:
+        specifier: 4.42.2
+        version: 4.42.2(@cloudflare/workers-types@4.20251118.0)
+
+  examples/web-todomvc-experimental:
+    dependencies:
+      '@livestore/adapter-web':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/adapter-web
+      '@livestore/livestore':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/livestore
+      '@livestore/peer-deps':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/peer-deps
+      '@livestore/react':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/react
+      '@livestore/sync-cf':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/sync-cf
+      '@livestore/wa-sqlite':
+        specifier: 0.4.0
+        version: link:../../repos/livestore/packages/@livestore/wa-sqlite
+      '@overengineering/fps-meter':
+        specifier: 0.2.4
+        version: 0.2.4(react@19.2.3)
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      react-dom:
+        specifier: 19.2.3
+        version: 19.2.3(react@19.2.3)
+      react-error-boundary:
+        specifier: 6.1.1
+        version: 6.1.1(react@19.2.3)
+      todomvc-app-css:
+        specifier: 2.4.3
+        version: 2.4.3
+    devDependencies:
+      '@cloudflare/vite-plugin':
+        specifier: 1.13.12
+        version: 1.13.12(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(workerd@1.20251008.0)(wrangler@4.42.2(@cloudflare/workers-types@4.20251118.0))
+      '@cloudflare/workers-types':
+        specifier: 4.20251118.0
+        version: 4.20251118.0
+      '@livestore/devtools-vite':
+        specifier: 0.4.0-dev.25
+        version: 0.4.0-dev.25(ff9707caf09df3d0dd66803a83816c0a)
+      '@playwright/test':
+        specifier: 1.59.1
+        version: 1.59.1
+      '@types/react':
+        specifier: 19.2.7
+        version: 19.2.7
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.7)
+      '@vitejs/plugin-react':
+        specifier: 5.1.2
+        version: 5.1.2(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 7.3.1
+        version: 7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      wrangler:
+        specifier: 4.42.2
+        version: 4.42.2(@cloudflare/workers-types@4.20251118.0)
+
   examples/web-todomvc-solid:
     dependencies:
       '@livestore/adapter-web':
@@ -1835,6 +1966,76 @@ importers:
         specifier: 4.42.2
         version: 4.42.2(@cloudflare/workers-types@4.20251118.0)
 
+  repos/livestore/packages/@livestore/effect-playwright:
+    dependencies:
+      '@livestore/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@effect/ai':
+        specifier: 0.35.0
+        version: 0.35.0(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/cli':
+        specifier: 0.75.1
+        version: 0.75.1(@effect/platform@0.96.1(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/cluster':
+        specifier: 0.58.2
+        version: 0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/experimental':
+        specifier: 0.60.0
+        version: 0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/opentelemetry':
+        specifier: 0.63.0
+        version: 0.63.0(@effect/platform@0.96.1(effect@3.21.2))(@opentelemetry/api@1.9.0)(@opentelemetry/resources@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.208.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.41.1)(effect@3.21.2)
+      '@effect/platform':
+        specifier: 0.96.1
+        version: 0.96.1(effect@3.21.2)
+      '@effect/platform-browser':
+        specifier: 0.76.0
+        version: 0.76.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/platform-bun':
+        specifier: 0.89.0
+        version: 0.89.0(@effect/cluster@0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/platform-node':
+        specifier: 0.106.0
+        version: 0.106.0(@effect/cluster@0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/printer':
+        specifier: 0.49.0
+        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/printer-ansi':
+        specifier: 0.49.0
+        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/rpc':
+        specifier: 0.75.1
+        version: 0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/sql':
+        specifier: 0.51.1
+        version: 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/typeclass':
+        specifier: 0.40.0
+        version: 0.40.0(effect@3.21.2)
+      '@effect/vitest':
+        specifier: 0.29.0
+        version: 0.29.0(effect@3.21.2)(vitest@3.2.4(@types/node@25.3.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      '@opentelemetry/api':
+        specifier: 1.9.0
+        version: 1.9.0
+      '@opentelemetry/resources':
+        specifier: 2.2.0
+        version: 2.2.0(@opentelemetry/api@1.9.0)
+      '@playwright/test':
+        specifier: 1.59.1
+        version: 1.59.1
+      '@standard-schema/spec':
+        specifier: 1.1.0
+        version: 1.1.0
+      '@types/node':
+        specifier: 25.3.3
+        version: 25.3.3
+      effect:
+        specifier: 3.21.2
+        version: 3.21.2
+
   repos/livestore/packages/@livestore/framework-toolkit:
     dependencies:
       '@effect/ai':
@@ -2624,6 +2825,203 @@ importers:
       '@standard-schema/spec':
         specifier: 1.1.0
         version: 1.1.0
+      effect:
+        specifier: 3.21.2
+        version: 3.21.2
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@25.3.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+
+  tests/integration:
+    dependencies:
+      '@livestore/adapter-node':
+        specifier: workspace:^
+        version: link:../../packages/@livestore/adapter-node
+      '@livestore/common':
+        specifier: link:../../repos/livestore/packages/@livestore/common
+        version: link:../../repos/livestore/packages/@livestore/common
+      '@livestore/devtools-vite':
+        specifier: 0.4.0-dev.25
+        version: 0.4.0-dev.25(05e4d45b10ead56e20bcbad2bfe3456d)
+      '@livestore/effect-playwright':
+        specifier: link:../../repos/livestore/packages/@livestore/effect-playwright
+        version: link:../../repos/livestore/packages/@livestore/effect-playwright
+      '@livestore/livestore':
+        specifier: link:../../repos/livestore/packages/@livestore/livestore
+        version: link:../../repos/livestore/packages/@livestore/livestore
+      '@livestore/sync-cf':
+        specifier: link:../../repos/livestore/packages/@livestore/sync-cf
+        version: link:../../repos/livestore/packages/@livestore/sync-cf
+      '@livestore/utils':
+        specifier: link:../../repos/livestore/packages/@livestore/utils
+        version: link:../../repos/livestore/packages/@livestore/utils
+      '@livestore/utils-dev':
+        specifier: link:../../repos/livestore/packages/@livestore/utils-dev
+        version: link:../../repos/livestore/packages/@livestore/utils-dev
+    devDependencies:
+      '@effect/ai':
+        specifier: 0.35.0
+        version: 0.35.0(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/cli':
+        specifier: 0.75.1
+        version: 0.75.1(@effect/platform@0.96.1(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/cluster':
+        specifier: 0.58.2
+        version: 0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/experimental':
+        specifier: 0.60.0
+        version: 0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/opentelemetry':
+        specifier: 0.63.0
+        version: 0.63.0(@effect/platform@0.96.1(effect@3.21.2))(@opentelemetry/api@1.9.0)(@opentelemetry/resources@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.208.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.41.1)(effect@3.21.2)
+      '@effect/platform':
+        specifier: 0.96.1
+        version: 0.96.1(effect@3.21.2)
+      '@effect/platform-browser':
+        specifier: 0.76.0
+        version: 0.76.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/platform-bun':
+        specifier: 0.89.0
+        version: 0.89.0(@effect/cluster@0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/platform-node':
+        specifier: 0.106.0
+        version: 0.106.0(@effect/cluster@0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/printer':
+        specifier: 0.49.0
+        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/printer-ansi':
+        specifier: 0.49.0
+        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/rpc':
+        specifier: 0.75.1
+        version: 0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/sql':
+        specifier: 0.51.1
+        version: 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/typeclass':
+        specifier: 0.40.0
+        version: 0.40.0(effect@3.21.2)
+      '@effect/vitest':
+        specifier: 0.29.0
+        version: 0.29.0(effect@3.21.2)(vitest@3.2.4(@types/node@25.3.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      '@opentelemetry/api':
+        specifier: 1.9.0
+        version: 1.9.0
+      '@opentelemetry/resources':
+        specifier: 2.2.0
+        version: 2.2.0(@opentelemetry/api@1.9.0)
+      '@playwright/test':
+        specifier: 1.59.1
+        version: 1.59.1
+      '@standard-schema/spec':
+        specifier: 1.1.0
+        version: 1.1.0
+      '@types/node':
+        specifier: 25.3.3
+        version: 25.3.3
+      effect:
+        specifier: 3.21.2
+        version: 3.21.2
+      vite:
+        specifier: 7.3.1
+        version: 7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@25.3.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      wrangler:
+        specifier: 4.42.2
+        version: 4.42.2(@cloudflare/workers-types@4.20251118.0)
+
+  tests/sync-provider:
+    dependencies:
+      '@livestore/adapter-node':
+        specifier: workspace:^
+        version: link:../../packages/@livestore/adapter-node
+      '@livestore/common':
+        specifier: link:../../repos/livestore/packages/@livestore/common
+        version: link:../../repos/livestore/packages/@livestore/common
+      '@livestore/livestore':
+        specifier: link:../../repos/livestore/packages/@livestore/livestore
+        version: link:../../repos/livestore/packages/@livestore/livestore
+      '@livestore/sqlite-wasm':
+        specifier: link:../../repos/livestore/packages/@livestore/sqlite-wasm
+        version: link:../../repos/livestore/packages/@livestore/sqlite-wasm
+      '@livestore/sync-electric':
+        specifier: workspace:^
+        version: link:../../packages/@livestore/sync-electric
+      '@livestore/sync-s2':
+        specifier: workspace:^
+        version: link:../../packages/@livestore/sync-s2
+      '@livestore/utils':
+        specifier: link:../../repos/livestore/packages/@livestore/utils
+        version: link:../../repos/livestore/packages/@livestore/utils
+      postgres:
+        specifier: 3.4.7
+        version: 3.4.7
+    devDependencies:
+      '@effect/ai':
+        specifier: 0.35.0
+        version: 0.35.0(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/cli':
+        specifier: 0.75.1
+        version: 0.75.1(@effect/platform@0.96.1(effect@3.21.2))(@effect/printer-ansi@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(@effect/printer@0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/cluster':
+        specifier: 0.58.2
+        version: 0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/experimental':
+        specifier: 0.60.0
+        version: 0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/opentelemetry':
+        specifier: 0.63.0
+        version: 0.63.0(@effect/platform@0.96.1(effect@3.21.2))(@opentelemetry/api@1.9.0)(@opentelemetry/resources@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.208.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.41.1)(effect@3.21.2)
+      '@effect/platform':
+        specifier: 0.96.1
+        version: 0.96.1(effect@3.21.2)
+      '@effect/platform-browser':
+        specifier: 0.76.0
+        version: 0.76.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/platform-bun':
+        specifier: 0.89.0
+        version: 0.89.0(@effect/cluster@0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/platform-node':
+        specifier: 0.106.0
+        version: 0.106.0(@effect/cluster@0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.2(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
+      '@effect/printer':
+        specifier: 0.49.0
+        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/printer-ansi':
+        specifier: 0.49.0
+        version: 0.49.0(@effect/typeclass@0.40.0(effect@3.21.2))(effect@3.21.2)
+      '@effect/rpc':
+        specifier: 0.75.1
+        version: 0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/sql':
+        specifier: 0.51.1
+        version: 0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2)
+      '@effect/typeclass':
+        specifier: 0.40.0
+        version: 0.40.0(effect@3.21.2)
+      '@effect/vitest':
+        specifier: 0.29.0
+        version: 0.29.0(effect@3.21.2)(vitest@3.2.4(@types/node@25.3.3)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      '@livestore/devtools-vite':
+        specifier: 0.4.0-dev.25
+        version: 0.4.0-dev.25(05e4d45b10ead56e20bcbad2bfe3456d)
+      '@livestore/utils-dev':
+        specifier: link:../../repos/livestore/packages/@livestore/utils-dev
+        version: link:../../repos/livestore/packages/@livestore/utils-dev
+      '@opentelemetry/api':
+        specifier: 1.9.0
+        version: 1.9.0
+      '@opentelemetry/resources':
+        specifier: 2.2.0
+        version: 2.2.0(@opentelemetry/api@1.9.0)
+      '@standard-schema/spec':
+        specifier: 1.1.0
+        version: 1.1.0
+      '@types/node':
+        specifier: 25.3.3
+        version: 25.3.3
       effect:
         specifier: 3.21.2
         version: 3.21.2
