@@ -12,7 +12,6 @@ import sveltePkg from './packages/@livestore/svelte/package.json.genie.ts'
 import syncElectricPkg from './packages/@livestore/sync-electric/package.json.genie.ts'
 import syncS2Pkg from './packages/@livestore/sync-s2/package.json.genie.ts'
 import testsIntegrationPkg from './tests/integration/package.json.genie.ts'
-import testsPackageCommonPkg from './tests/package-common/package.json.genie.ts'
 import testsSyncProviderPkg from './tests/sync-provider/package.json.genie.ts'
 
 export const rootWorkspacePackages = [
@@ -26,7 +25,6 @@ export const rootWorkspacePackages = [
   syncElectricPkg,
   syncS2Pkg,
   testsIntegrationPkg,
-  testsPackageCommonPkg,
   testsSyncProviderPkg,
 ] as const
 

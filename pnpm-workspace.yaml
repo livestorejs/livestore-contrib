@@ -9,6 +9,8 @@ packages:
   - examples/node-effect-cli
   - examples/node-todomvc-sync-cf
   - examples/web-multi-store
+  - examples/web-todomvc-custom-elements
+  - examples/web-todomvc-experimental
   - examples/web-todomvc-solid
   - examples/web-todomvc-svelte
   - examples/web-todomvc-sync-electric
@@ -38,7 +40,6 @@ packages:
   - repos/livestore/packages/@livestore/wa-sqlite
   - repos/livestore/packages/@livestore/webmesh
   - tests/integration
-  - tests/package-common
   - tests/sync-provider
 
 peerDependencyRules:

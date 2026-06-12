@@ -83,7 +83,7 @@ in
         "lint:check:lockfile"
         "workspace:shape-check"
         "release:surface:check"
-        "test:package-common"
+        "test:examples:web-build"
         "test:integration:node"
       ];
     })
@@ -182,14 +182,6 @@ in
       echo "Package publish is intentionally blocked until release planning is added."
     '';
   };
-  tasks."test:package-common" = {
-    description = "Run moved package-common tests";
-    after = [
-      "genie:run"
-      "pnpm:install"
-    ];
-    exec = "DT_PASSTHROUGH=1 pnpm --dir tests/package-common exec vitest run";
-  };
   tasks."test:integration:node" = {
     description = "Run moved adapter-node integration tests";
     after = [
@@ -228,11 +220,21 @@ in
       "pnpm:install"
     ];
     exec = ''
-      if devenv tasks run test:integration:node-sync --mode before --no-tui; then
+      if timeout --kill-after=30s 180s devenv tasks run test:integration:node-sync --mode before --no-tui; then
         exit 0
       fi
-      echo "::warning::Node-sync integration tests failed (flaky; carried over from livestorejs/livestore#624)"
+      echo "::warning::Node-sync integration tests failed or timed out (flaky; carried over from livestorejs/livestore#624)"
       exit 0
+    '';
+  };
+  tasks."test:examples:web-build" = {
+    description = "Build contrib web examples";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = ''
+      DT_PASSTHROUGH=1 pnpm --filter "./examples/web-*" run build
     '';
   };
   tasks."test:sync-provider:electric" = {

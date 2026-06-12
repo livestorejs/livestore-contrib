@@ -28,6 +28,8 @@ export const contribExampleMembers = [
   'examples/node-effect-cli',
   'examples/node-todomvc-sync-cf',
   'examples/web-multi-store',
+  'examples/web-todomvc-custom-elements',
+  'examples/web-todomvc-experimental',
   'examples/web-todomvc-solid',
   'examples/web-todomvc-svelte',
   'examples/web-todomvc-sync-electric',
