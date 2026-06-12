@@ -5,4 +5,12 @@
  * examples are imported, but branch protection should point at semantic gates.
  */
 
-export const requiredCIJobs = ['source-policy', 'check-all', 'release-surface'] as const
+export const requiredCIJobs = [
+  'source-policy',
+  'pr/quality',
+  'pr/types',
+  'pr/packages',
+  'pr/examples-build',
+  'pr/node',
+  'release-surface',
+] as const

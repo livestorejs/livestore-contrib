@@ -80,11 +80,13 @@ in
       hasTests = false;
       hasNixCheck = false;
       extraChecks = [
-        "lint:check:lockfile"
-        "workspace:shape-check"
+        "ci:quality"
+        "ci:types"
+        "ci:packages"
+        "ci:examples-build"
+        "ci:node"
+        "test:integration:node-sync:allow-flaky"
         "release:surface:check"
-        "test:examples:web-build"
-        "test:integration:node"
       ];
     })
     (taskModules.setup {
@@ -154,6 +156,30 @@ in
   tasks."ts:check".after = lib.mkForce generatedInstalledWorkspaceTasks;
   tasks."ts:check:strict".after = lib.mkForce generatedInstalledWorkspaceTasks;
   tasks."ts:emit".after = lib.mkForce generatedInstalledWorkspaceTasks;
+  tasks."ci:quality" = {
+    description = "Run PR quality checks for contrib";
+    after = [
+      "lint:check"
+      "mr:lock-sync-check"
+      "workspace:shape-check"
+    ];
+  };
+  tasks."ci:types" = {
+    description = "Run PR type checks for contrib";
+    after = [ "ts:check" ];
+  };
+  tasks."ci:packages" = {
+    description = "Run PR package unit tests for contrib";
+    after = [ "test:packages" ];
+  };
+  tasks."ci:examples-build" = {
+    description = "Build PR-covered contrib examples";
+    after = [ "test:examples:build" ];
+  };
+  tasks."ci:node" = {
+    description = "Run PR node adapter integration coverage for contrib";
+    after = [ "test:integration:node-misc" ];
+  };
   tasks."release:surface:check" = {
     description = "Validate the contrib release workflow surface";
     after = [
@@ -227,14 +253,52 @@ in
       exit 0
     '';
   };
-  tasks."test:examples:web-build" = {
-    description = "Build contrib web examples";
+  tasks."test:packages" = {
+    description = "Run stable contrib package unit tests";
+    after = [
+      "test:packages:cli"
+      "test:packages:svelte"
+      "test:packages:sync-s2"
+    ];
+  };
+  tasks."test:packages:cli" = {
+    description = "Run @livestore/cli unit tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts";
+  };
+  tasks."test:packages:svelte" = {
+    description = "Run @livestore/svelte unit tests";
     after = [
       "genie:run"
       "pnpm:install"
     ];
     exec = ''
-      DT_PASSTHROUGH=1 pnpm --filter "./examples/web-*" run build
+      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/svelte exec vitest run --config tests/vitest.config.ts
+    '';
+  };
+  tasks."test:packages:sync-s2" = {
+    description = "Run @livestore/sync-s2 unit tests";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/sync-s2 exec vitest run --config vitest.config.ts";
+  };
+  tasks."test:examples:build" = {
+    description = "Build contrib examples with build scripts";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = ''
+      DT_PASSTHROUGH=1 pnpm \
+        --filter "./examples/cf-chat" \
+        --filter "./examples/cf-chat-solid" \
+        --filter "./examples/web-*" \
+        run build
     '';
   };
   tasks."test:sync-provider:electric" = {

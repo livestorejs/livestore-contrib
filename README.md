@@ -65,5 +65,5 @@ Real publish dispatch remains gated on release-plan generation and approval.
 
 GitHub repository settings are generated from `.github/*.genie.ts` sources. The
 checked-in JSON artifacts define repository toggles and the `main-branch-rules`
-ruleset, including the required `source-policy`, `check-all`, and
-`release-surface` checks.
+ruleset, including the required `source-policy`, `pr/quality`, `pr/types`,
+`pr/packages`, `pr/examples-build`, `pr/node`, and `release-surface` checks.

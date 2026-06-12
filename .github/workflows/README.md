@@ -6,7 +6,8 @@ sources. Edit the Genie sources and regenerate instead of editing YAML outputs.
 ## `ci.yml`
 
 Primary pull request validation for the contrib workspace. The stable checks
-are `source-policy`, `check-all`, and `release-surface`.
+are `source-policy`, `pr/quality`, `pr/types`, `pr/packages`,
+`pr/examples-build`, `pr/node`, and `release-surface`.
 
 ## `release.yml`
 

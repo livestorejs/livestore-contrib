@@ -12,7 +12,7 @@ export default defineConfig({
        */
       '@standard-schema/spec': path.join(
         import.meta.dirname,
-        '../../../packages/@livestore/utils/node_modules/@standard-schema/spec',
+        '../../../repos/livestore/packages/@livestore/utils/node_modules/@standard-schema/spec',
       ),
     },
   },
