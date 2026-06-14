@@ -199,6 +199,24 @@ const npmViewExists = (name, version) => {
   }
 }
 
+const sleep = (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
+
+const waitForNpmView = (name, version) => {
+  const attempts = 24
+  const delayMs = 5_000
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    if (npmViewExists(name, version) === true) return
+
+    if (attempt !== attempts) {
+      console.log(`${name}@${version} is not visible on npm yet; retrying in ${delayMs / 1_000}s`)
+      sleep(delayMs)
+    }
+  }
+
+  throw new Error(`${name}@${version} is not visible on npm after publish`)
+}
+
 const packPackage = (pkg) => {
   const packageDir = dirname(join(rootDir, pkg.path))
   const packDir = mkdtempSync(join(tmpdir(), 'livestore-contrib-pack-'))
@@ -324,9 +342,7 @@ if (dryRun === true || publish === true) {
 
     if (publish === true) {
       for (const pkg of plan.packages) {
-        if (npmViewExists(pkg.name, pkg.version) === false) {
-          throw new Error(`${pkg.name}@${pkg.version} is not visible on npm after publish`)
-        }
+        waitForNpmView(pkg.name, pkg.version)
       }
     }
   } finally {
