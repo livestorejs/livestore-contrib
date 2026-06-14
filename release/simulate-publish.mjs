@@ -262,6 +262,10 @@ const smokeInstallPackedTarballs = (packed) => {
       dependencies: Object.fromEntries(packed.map(({ pkg, tarballPath }) => [pkg.name, `file:${tarballPath}`])),
     }
     writeFileSync(join(smokeDir, 'package.json'), `${JSON.stringify(smokeManifest, null, 2)}\n`)
+    writeFileSync(
+      join(smokeDir, 'pnpm-workspace.yaml'),
+      `packages: []\noverrides:\n${packed.map(({ pkg, tarballPath }) => `  ${JSON.stringify(pkg.name)}: ${JSON.stringify(`file:${tarballPath}`)}`).join('\n')}\n`,
+    )
     run('pnpm', ['install', '--ignore-scripts'], { cwd: smokeDir })
 
     for (const { pkg } of packed) {
