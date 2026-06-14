@@ -54,12 +54,17 @@ git diff --check
 
 ## Release Surface
 
-Publishing is guarded by a release-surface check. It reads the pinned core
-release version and simulates publish-time package manifests so local
-`link:` core dependencies and `workspace:` contrib dependencies are rewritten to
-publishable versions before a real release plan can be enabled.
+Publishing is guarded by a release-surface check and the generated release
+workflow. The release surface reads the pinned core version and simulates
+publish-time package manifests so local `link:` core dependencies and
+`workspace:` contrib dependencies are rewritten to publishable versions.
 
-Real publish dispatch remains gated on release-plan generation and approval.
+Snapshot publishing is centralized in `.github/workflows/release.yml` so npm
+trusted publishing has one workflow identity per package. Package snapshot
+versions include both the pinned core commit and the contrib commit, while core
+dependency rewrites use the pinned core snapshot from `megarepo.lock`.
+
+Stable release dispatch remains gated on release-plan generation and approval.
 
 ## Repository Settings
 

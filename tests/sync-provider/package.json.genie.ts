@@ -11,15 +11,7 @@ import utilsPkg from '../../repos/livestore/packages/@livestore/utils/package.js
 const runtimeDeps = catalog.compose({
   workspace: workspaceMember('tests/sync-provider'),
   dependencies: {
-    workspace: [
-      adapterNodePkg,
-      commonPkg,
-      livestorePkg,
-      sqliteWasmPkg,
-      syncElectricPkg,
-      syncS2Pkg,
-      utilsPkg,
-    ],
+    workspace: [adapterNodePkg, commonPkg, livestorePkg, sqliteWasmPkg, syncElectricPkg, syncS2Pkg, utilsPkg],
     external: {
       postgres: '3.4.7',
     },

@@ -87,6 +87,7 @@ in
         "ci:node"
         "test:integration:node-sync:allow-flaky"
         "release:surface:check"
+        "release:snapshot:dryrun"
       ];
     })
     (taskModules.setup {
@@ -205,7 +206,49 @@ in
 
       echo "Core version authority available: $core_version"
       echo "Package publish simulation passed."
-      echo "Package publish is intentionally blocked until release planning is added."
+    '';
+  };
+  tasks."release:snapshot:dryrun" = {
+    description = "Dry-run a contrib snapshot package publish";
+    after = [
+      "mr:check"
+      "pnpm:install"
+    ];
+    exec = ''
+      set -euo pipefail
+      cd "$DEVENV_ROOT"
+
+      git_sha="''${GIT_SHA:-$(git rev-parse HEAD)}"
+      core_sha="''${LIVESTORE_CORE_GIT_SHA:-$(jq -r '.members.livestore.commit' megarepo.lock)}"
+      release_version="''${LIVESTORE_RELEASE_VERSION:-0.0.0-snapshot-$git_sha}"
+      core_release_version="''${LIVESTORE_CORE_RELEASE_VERSION:-0.0.0-snapshot-$core_sha}"
+
+      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --dry-run
+    '';
+  };
+  tasks."release:snapshot:git-sha" = {
+    description = "Publish contrib snapshot packages for a git SHA";
+    after = [
+      "mr:check"
+      "pnpm:install"
+    ];
+    exec = ''
+      set -euo pipefail
+      cd "$DEVENV_ROOT"
+
+      : "''${GIT_SHA:?GIT_SHA is required}"
+      core_sha="''${LIVESTORE_CORE_GIT_SHA:-$(jq -r '.members.livestore.commit' megarepo.lock)}"
+      release_version="''${LIVESTORE_RELEASE_VERSION:-0.0.0-snapshot-$GIT_SHA}"
+      core_release_version="''${LIVESTORE_CORE_RELEASE_VERSION:-0.0.0-snapshot-$core_sha}"
+
+      if [ -n "''${NODE_AUTH_TOKEN:-}" ] || [ -n "''${NPM_TOKEN:-}" ]; then
+        echo "npm snapshot publishing must use trusted publishing; token auth is not allowed in this task." >&2
+        exit 1
+      fi
+
+      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --verify-core --publish
     '';
   };
   tasks."test:integration:node" = {
