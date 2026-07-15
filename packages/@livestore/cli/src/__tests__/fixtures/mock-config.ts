@@ -4,11 +4,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Events, makeSchema, State } from '@livestore/common/schema'
 import type { MockSyncBackend } from '@livestore/common/sync'
 import { EventFactory } from '@livestore/common/testing'
-import { Effect, FileSystem, type Mailbox, Schema } from '@livestore/utils/effect'
+import { Effect, FileSystem, type Queue, Schema } from '@livestore/utils/effect'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-class DynamicImportError extends Schema.TaggedError<DynamicImportError>()('DynamicImportError', {
+class DynamicImportError extends Schema.TaggedErrorClass<DynamicImportError>()('DynamicImportError', {
   cause: Schema.Defect,
   path: Schema.String,
 }) {}
@@ -49,21 +49,21 @@ const makeTempConfig = () => {
   const moduleSource = `
 import { schema } from ${JSON.stringify(schemaModuleUrl)}
 import { makeMockSyncBackend } from '@livestore/common/sync'
-import { Effect, Mailbox } from '@livestore/utils/effect'
+import { Effect, Queue } from '@livestore/utils/effect'
 
 export const mockBackend = await Effect.runPromise(Effect.scoped(makeMockSyncBackend({ startConnected: true })))
-export const connectionEvents = await Effect.runPromise(Mailbox.make<'connect' | 'disconnect'>())
+export const connectionEvents = await Effect.runPromise(Queue.make<'connect' | 'disconnect'>())
 
 export { schema }
 
 export const syncBackend = (_args) =>
   mockBackend.makeSyncBackend.pipe(
-    Effect.tap(() => connectionEvents.offer('connect')),
+    Effect.tap(() => Queue.offer(connectionEvents, 'connect')),
     Effect.map((backend) => {
       const disconnect = backend.disconnect ?? Effect.void
       return {
         ...backend,
-        disconnect: disconnect.pipe(Effect.tap(() => connectionEvents.offer('disconnect'))),
+        disconnect: disconnect.pipe(Effect.tap(() => Queue.offer(connectionEvents, 'disconnect'))),
       }
     }),
   )
@@ -92,7 +92,7 @@ export const useMockConfig = Effect.acquireRelease(
       catch: (cause) => new DynamicImportError({ cause, path: tempPath }),
     })) as {
       mockBackend: MockSyncBackend
-      connectionEvents: Mailbox.Mailbox<'connect' | 'disconnect'>
+      connectionEvents: Queue.Queue<'connect' | 'disconnect'>
     }
 
     return { configPath: tempPath, mockBackend: mod.mockBackend, connectionEvents: mod.connectionEvents }
@@ -100,7 +100,7 @@ export const useMockConfig = Effect.acquireRelease(
   ({ configPath }) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
-      yield* fs.remove(configPath, { recursive: false }).pipe(Effect.catchAll(() => Effect.void))
+      yield* fs.remove(configPath, { recursive: false }).pipe(Effect.catch(() => Effect.void))
     }),
 )
 

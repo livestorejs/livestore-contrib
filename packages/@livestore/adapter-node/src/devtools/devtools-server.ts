@@ -2,7 +2,7 @@ import http from 'node:http'
 import path from 'node:path'
 
 import type { Devtools } from '@livestore/common'
-import { isReadonlyArray, LS_DEV } from '@livestore/utils'
+import { LS_DEV } from '@livestore/utils'
 import type { HttpClient } from '@livestore/utils/effect'
 import {
   Deferred,
@@ -47,25 +47,28 @@ export const startDevtoolsServer = ({
   port: number
 }): Effect.Effect<never, never, HttpClient.HttpClient> =>
   Effect.gen(function* () {
-    const viteMiddleware = yield* makeViteMiddleware({
-      mode: { _tag: 'node', url: `http://${host}:${port}` },
-      schemaPath:
-        isReadonlyArray(schemaPath) === true
-          ? schemaPath.map((schemaPath) => path.resolve(process.cwd(), schemaPath))
-          : path.resolve(process.cwd(), schemaPath),
-      viteConfig: (viteConfig) => {
-        if (LS_DEV === true) {
-          viteConfig.server ??= {}
-          viteConfig.server.fs ??= {}
-          viteConfig.server.fs.strict = false
+    const viteMiddleware = yield* Effect.acquireRelease(
+      makeViteMiddleware({
+        mode: { _tag: 'node', url: `http://${host}:${port}` },
+        schemaPath:
+          typeof schemaPath === 'string'
+            ? path.resolve(process.cwd(), schemaPath)
+            : schemaPath.map((schemaPath) => path.resolve(process.cwd(), schemaPath)),
+        viteConfig: (viteConfig) => {
+          if (LS_DEV === true) {
+            viteConfig.server ??= {}
+            viteConfig.server.fs ??= {}
+            viteConfig.server.fs.strict = false
 
-          viteConfig.optimizeDeps ??= {}
-          viteConfig.optimizeDeps.force = true
-        }
+            viteConfig.optimizeDeps ??= {}
+            viteConfig.optimizeDeps.force = true
+          }
 
-        return viteConfig
-      },
-    }).pipe(Effect.acquireRelease((viteMiddleware) => Effect.promise(() => viteMiddleware.close())))
+          return viteConfig
+        },
+      }),
+      (viteMiddleware) => Effect.promise(() => viteMiddleware.close()),
+    )
 
     const relayNodeName = 'ws'
 
@@ -88,9 +91,10 @@ export const startDevtoolsServer = ({
         // To handle websocket closing, we need to race the `webChannel.closedDeferred` to properly interrupt the handler
         yield* Effect.raceFirst(
           Effect.gen(function* () {
-            yield* node
-              .addEdge({ target: from, edgeChannel: webChannel, replaceIfExists: true })
-              .pipe(Effect.acquireRelease(() => node.removeEdge(from).pipe(Effect.orDie)))
+            yield* Effect.acquireRelease(
+              node.addEdge({ target: from, edgeChannel: webChannel, replaceIfExists: true }),
+              () => node.removeEdge(from).pipe(Effect.orDie),
+            )
 
             if (LS_DEV === true) {
               yield* Effect.log(`WS Relay ${relayNodeName}: added edge from '${from}'`)
@@ -100,7 +104,7 @@ export const startDevtoolsServer = ({
             // We want to keep the websocket open until the client disconnects or the server shuts down
             return yield* Effect.never
           }),
-          webChannel.closedDeferred,
+          Deferred.await(webChannel.closedDeferred),
         )
 
         return HttpServerResponse.empty({ status: 101 })
@@ -113,9 +117,9 @@ export const startDevtoolsServer = ({
           // TODO replace this once @effect/platform-node supports Node HTTP middlewares
           const nodeReq = PlatformNode.NodeHttpServerRequest.toIncomingMessage(req)
           const nodeRes = PlatformNode.NodeHttpServerRequest.toServerResponse(req)
-          const deferred = yield* Deferred.make()
-          viteMiddleware.middlewares(nodeReq, nodeRes, () => Deferred.unsafeDone(deferred, Exit.void))
-          yield* deferred
+          const deferred = yield* Deferred.make<void>()
+          viteMiddleware.middlewares(nodeReq, nodeRes, () => Deferred.doneUnsafe(deferred, Exit.void))
+          yield* Deferred.await(deferred)
 
           // The response is already sent, so we need to return an empty response (which won't be sent)
           return HttpServerResponse.empty()
@@ -142,7 +146,7 @@ export const startDevtoolsServer = ({
       attributes: { clientSessionInfo, port, host, schemaPath },
     }),
     HttpMiddleware.withLoggerDisabled,
-    Layer.unwrapScoped,
+    Layer.unwrap,
     Layer.provide(PlatformNode.NodeHttpServer.layer(() => http.createServer(), { port, host })),
     Layer.launch,
     Effect.orDie,

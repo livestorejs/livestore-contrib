@@ -5,6 +5,33 @@
   "include": [],
   "references": [
     {
+      "path": "./packages/@livestore/adapter-expo"
+    },
+    {
+      "path": "./packages/@livestore/adapter-node"
+    },
+    {
+      "path": "./packages/@livestore/cli"
+    },
+    {
+      "path": "./packages/@livestore/devtools-expo"
+    },
+    {
+      "path": "./packages/@livestore/graphql"
+    },
+    {
+      "path": "./packages/@livestore/solid"
+    },
+    {
+      "path": "./packages/@livestore/svelte"
+    },
+    {
+      "path": "./packages/@livestore/sync-electric"
+    },
+    {
+      "path": "./packages/@livestore/sync-s2"
+    },
+    {
       "path": "./tests/integration"
     },
     {

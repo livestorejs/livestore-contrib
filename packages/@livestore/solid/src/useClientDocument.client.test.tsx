@@ -16,7 +16,7 @@ import type * as LiveStoreSolid from './mod.ts'
 
 // NOTE running tests concurrently doesn't work with the default global db graph
 Vitest.describe('useClientDocument', () => {
-  Vitest.scopedLive('should update the data based on component key', () =>
+  Vitest.live('should update the data based on component key', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -45,7 +45,7 @@ Vitest.describe('useClientDocument', () => {
 
   // TODO add a test that makes sure Solid doesn't re-render when a setter is used to set the same value
 
-  Vitest.scopedLive('should update the data reactively - via setState', () =>
+  Vitest.live('should update the data reactively - via setState', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -67,7 +67,7 @@ Vitest.describe('useClientDocument', () => {
     }),
   )
 
-  Vitest.scopedLive('should update the data reactively - via raw store commit', () =>
+  Vitest.live('should update the data reactively - via raw store commit', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -89,7 +89,7 @@ Vitest.describe('useClientDocument', () => {
     }),
   )
 
-  Vitest.scopedLive('should work for a larger app', () =>
+  Vitest.live('should work for a larger app', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -160,7 +160,7 @@ Vitest.describe('useClientDocument', () => {
     }),
   )
 
-  Vitest.scopedLive('should work for a useClientDocument query chained with a useTemporary query', () =>
+  Vitest.live('should work for a useClientDocument query chained with a useTemporary query', () =>
     Effect.gen(function* () {
       const { store, wrapper } = yield* makeTodoMvcSolid({})
 
@@ -201,7 +201,7 @@ Vitest.describe('useClientDocument', () => {
     }),
   )
 
-  Vitest.scopedLive('kv client document overwrites value (Schema.Any, no partial merge)', () =>
+  Vitest.live('kv client document overwrites value (Schema.Any, no partial merge)', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 

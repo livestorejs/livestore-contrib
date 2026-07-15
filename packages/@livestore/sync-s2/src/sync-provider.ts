@@ -43,10 +43,10 @@ import {
   Option,
   Schedule,
   Schema,
-  Sse,
   Stream,
   SubscriptionRef,
 } from '@livestore/utils/effect'
+import { Sse } from 'effect/unstable/encoding'
 
 import * as ApiSchema from './api-schema.ts'
 import { decodeReadBatch } from './decode.ts'
@@ -66,9 +66,9 @@ export interface SyncS2Options {
     /** Enable periodic ping; default true */
     enabled?: boolean
     /** Timeout for individual ping request; default 10s */
-    requestTimeout?: Duration.DurationInput
+    requestTimeout?: Duration.Input
     /** Interval between ping requests; default 10s */
-    requestInterval?: Duration.DurationInput
+    requestInterval?: Duration.Input
   }
   retry?: {
     /** Custom retry schedule for non-live pulls (default: 2 recurs, 100ms spaced) */
@@ -78,7 +78,7 @@ export interface SyncS2Options {
   }
 }
 
-export const defaultRetry = Schedule.compose(Schedule.recurs(2), Schedule.spaced(100))
+export const defaultRetry = Schedule.recurs(2).pipe(Schedule.addDelay(() => Effect.succeed(100)))
 
 const getBrowserOrigin = () => {
   if (typeof globalThis !== 'object' || globalThis === null || !('location' in globalThis)) {
@@ -115,7 +115,7 @@ export const makeSyncBackend =
       }).pipe(
         UnknownError.mapToUnknownError,
         Effect.timeout(pingTimeout),
-        Effect.catchTag('TimeoutException', () => SubscriptionRef.set(isConnected, false)),
+        Effect.catchTag('TimeoutError', () => SubscriptionRef.set(isConnected, false)),
       )
 
       const pingInterval = pingOptions?.requestInterval ?? 10_000
@@ -149,8 +149,8 @@ export const makeSyncBackend =
           .pipe(
             HttpClientResponse.stream,
             // decode text and split into lines
-            Stream.decodeText('utf8'),
-            Stream.pipeThroughChannel(Sse.makeChannel()),
+            Stream.decodeText({ encoding: 'utf8' }),
+            Stream.pipeThroughChannel(Sse.decode()),
             // Filter out pings, map errors to stream failures
             Stream.mapEffect(
               Effect.fnUntraced(function* (msg) {
@@ -160,7 +160,9 @@ export const makeSyncBackend =
                   return yield* new UnknownError({ cause: new Error(`SSE error: ${msg.data}`) })
                 }
                 if (evt === 'batch') {
-                  const readBatch = yield* Schema.decode(Schema.parseJson(HttpClientGenerated.ReadBatch))(msg.data)
+                  const readBatch = yield* Schema.decodeEffect(Schema.fromJsonString(HttpClientGenerated.ReadBatch))(
+                    msg.data,
+                  )
                   const batch = decodeReadBatch(readBatch)
 
                   const lastS2SeqNum = batch.at(-1)?.metadata.pipe(

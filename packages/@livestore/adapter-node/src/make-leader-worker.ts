@@ -7,14 +7,27 @@ if (process.execArgv.includes('--inspect') === true) {
 }
 
 import type { SyncOptions } from '@livestore/common'
-import { LogConfig } from '@livestore/common'
+import { LogConfig, UnknownError } from '@livestore/common'
 import type { StreamEventsOptions } from '@livestore/common/leader-thread'
 import { Eventlog, LeaderThreadCtx, streamEventsWithSyncState } from '@livestore/common/leader-thread'
 import type { LiveStoreSchema } from '@livestore/common/schema'
 import { LiveStoreEvent } from '@livestore/common/schema'
 import { loadSqlite3Wasm } from '@livestore/sqlite-wasm/load-wasm'
 import { sqliteDbFactory } from '@livestore/sqlite-wasm/node'
-import { Effect, FetchHttpClient, Layer, OtelTracer, Schema, Stream, WorkerRunner } from '@livestore/utils/effect'
+import { isDevEnv } from '@livestore/utils'
+import {
+  Effect,
+  FetchHttpClient,
+  Layer,
+  OtelTracer,
+  Queue,
+  References,
+  RpcServer,
+  RpcWorker,
+  Schema,
+  Scope,
+  Stream,
+} from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 import type * as otel from '@opentelemetry/api'
 
@@ -32,7 +45,7 @@ export type WorkerOptions = {
     serviceName?: string
   }
   testing?: TestingOverrides
-} & LogConfig.WithLoggerOptions
+} & LogConfig.LoggerOptions
 
 export const getWorkerArgs = () => Schema.decodeSync(WorkerSchema.WorkerArgv)(process.argv[2]!)
 
@@ -43,134 +56,161 @@ export const makeWorker = (options: WorkerOptions) => {
 export const makeWorkerEffect = (options: WorkerOptions) => {
   const TracingLive =
     options.otelOptions?.tracer !== undefined
-      ? Layer.unwrapEffect(Effect.map(OtelTracer.make, Layer.setTracer)).pipe(
+      ? OtelTracer.layerWithoutOtelTracer.pipe(
           Layer.provideMerge(Layer.succeed(OtelTracer.OtelTracer, options.otelOptions.tracer)),
         )
-      : undefined
+      : Layer.empty
 
   // Merge the runtime dependencies once so we can provide them together without chaining Effect.provide.
-  const runtimeLayer = Layer.mergeAll(
-    FetchHttpClient.layer,
-    PlatformNode.NodeFileSystem.layer,
-    TracingLive ?? Layer.empty,
-  )
+  const runtimeLayer = Layer.mergeAll(FetchHttpClient.layer, PlatformNode.NodeFileSystem.layer, TracingLive)
 
-  return WorkerRunner.layerSerialized(WorkerSchema.LeaderWorkerInnerRequest, {
-    InitialMessage: (args) =>
-      Effect.gen(function* () {
-        const sqlite3 = yield* Effect.promise(() => loadSqlite3Wasm()).pipe(
-          Effect.withSpan('@livestore/adapter-node:leader-thread:loadSqlite3Wasm'),
-        )
-        const makeSqliteDb = yield* sqliteDbFactory({ sqlite3 })
-        return yield* makeLeaderThread({
-          ...args,
-          syncOptions: options.sync,
-          schema: options.schema,
-          testing: options.testing,
-          makeSqliteDb,
-          syncPayloadEncoded: args.syncPayloadEncoded,
-          syncPayloadSchema: options.syncPayloadSchema,
-        })
-      }).pipe(Layer.unwrapScoped),
-    PushToLeader: ({ batch }) =>
-      Effect.andThen(LeaderThreadCtx, (_) =>
-        _.syncProcessor.push(batch.map((item) => new LiveStoreEvent.Client.EncodedWithMeta(item))),
-      ).pipe(Effect.uninterruptible, Effect.withSpan('@livestore/adapter-node:worker:PushToLeader')),
-    BootStatusStream: () =>
-      Effect.andThen(LeaderThreadCtx, (_) => Stream.fromQueue(_.bootStatusQueue)).pipe(Stream.unwrap),
-    PullStream: ({ cursor }) =>
-      Effect.gen(function* () {
-        const { syncProcessor } = yield* LeaderThreadCtx
-        return syncProcessor.pull({ cursor })
-      }).pipe(Stream.unwrapScoped),
-    StreamEvents: (options: WorkerSchema.LeaderWorkerInnerStreamEvents) =>
-      LeaderThreadCtx.pipe(
-        Effect.map(({ dbEventlog, syncProcessor }) => {
-          const { _tag: _ignored, ...payload } = options
-          const streamOptions = payload as StreamEventsOptions
-          return streamEventsWithSyncState({
-            dbEventlog,
-            syncState: syncProcessor.syncState,
-            options: streamOptions,
-          })
-        }),
-        Stream.unwrapScoped,
-        Stream.withSpan('@livestore/adapter-node:worker:StreamEvents'),
-      ),
-    Export: () =>
-      Effect.andThen(LeaderThreadCtx, (_) => _.dbState.export()).pipe(
-        Effect.withSpan('@livestore/adapter-node:worker:Export'),
-      ),
-    ExportEventlog: () =>
-      Effect.andThen(LeaderThreadCtx, (_) => _.dbEventlog.export()).pipe(
-        Effect.withSpan('@livestore/adapter-node:worker:ExportEventlog'),
-      ),
-    GetLeaderHead: Effect.fn('@livestore/adapter-node:worker:GetLeaderHead')(function* () {
-      const workerCtx = yield* LeaderThreadCtx
-      return Eventlog.getClientHeadFromDb(workerCtx.dbEventlog)
-    }),
-    GetLeaderSyncState: Effect.fn('@livestore/adapter-node:worker:GetLeaderSyncState')(function* () {
-      const workerCtx = yield* LeaderThreadCtx
-      return yield* workerCtx.syncProcessor.syncState
-    }),
-    SyncStateStream: () =>
-      Effect.gen(function* () {
-        const workerCtx = yield* LeaderThreadCtx
-        return workerCtx.syncProcessor.syncState.changes
-      }).pipe(Stream.unwrapScoped),
-    GetNetworkStatus: Effect.fn('@livestore/adapter-node:worker:GetNetworkStatus')(function* () {
-      const workerCtx = yield* LeaderThreadCtx
-      return yield* workerCtx.networkStatus
-    }),
-    NetworkStatusStream: () =>
-      Effect.gen(function* () {
-        const workerCtx = yield* LeaderThreadCtx
-        return workerCtx.networkStatus.changes
-      }).pipe(Stream.unwrapScoped),
-    GetRecreateSnapshot: Effect.fn('@livestore/adapter-node:worker:GetRecreateSnapshot')(function* () {
-      const workerCtx = yield* LeaderThreadCtx
-      // const result = yield* Deferred.await(workerCtx.initialSetupDeferred)
-      // NOTE we can only return the cached snapshot once as it's transferred (i.e. disposed), so we need to set it to undefined
-      // const cachedSnapshot =
-      //   result._tag === 'Recreate' ? yield* Ref.getAndSet(result.snapshotRef, undefined) : undefined
-      // return cachedSnapshot ?? workerCtx.db.export()
-      const snapshot = workerCtx.dbState.export()
-      return { snapshot, migrationsReport: workerCtx.initialState.migrationsReport }
-    }),
-    Shutdown: Effect.fn('@livestore/adapter-node:worker:Shutdown')(function* () {
-      // const { db, dbEventlog } = yield* LeaderThreadCtx
-      yield* Effect.logDebug('[@livestore/adapter-node:worker] Shutdown')
-
-      // if (devtools.enabled) {
-      //   yield* FiberSet.clear(devtools.connections)
-      // }
-      // db.close()
-      // dbEventlog.close()
-
-      // Buy some time for Otel to flush
-      // TODO find a cleaner way to do this
-      // yield* Effect.sleep(1000)
-    }),
-    ExtraDevtoolsMessage: ({ message }) =>
-      Effect.andThen(LeaderThreadCtx, (_) => _.extraIncomingMessagesQueue.offer(message)).pipe(
-        Effect.withSpan('@livestore/adapter-node:worker:ExtraDevtoolsMessage'),
-      ),
-  }).pipe(
-    Layer.provide(PlatformNode.NodeWorkerRunner.layer),
-    WorkerRunner.launch,
+  return RpcServer.make(WorkerSchema.LeaderWorkerInnerRpcs).pipe(
+    Effect.provide(makeWorkerRunnerInner(options)),
+    Effect.provide(RpcServer.layerProtocolWorkerRunner),
+    Effect.provide(PlatformNode.NodeWorkerRunner.layer),
     Effect.scoped,
     Effect.tapCauseLogPretty,
     Effect.annotateLogs({
       thread: options.otelOptions?.serviceName ?? 'livestore-node-leader-thread',
       processId: process.pid,
     }),
-    LogConfig.withLoggerConfig(
-      { logger: options.logger, logLevel: options.logLevel },
-      { threadName: options.otelOptions?.serviceName ?? 'livestore-node-leader-thread' },
+    Effect.provide(
+      Layer.mergeAll(
+        options.logger ?? Layer.empty,
+        Layer.succeed(References.MinimumLogLevel, options.logLevel ?? (isDevEnv() === true ? 'Debug' : 'Info')),
+      ),
     ),
-    // TODO bring back with Effect 4 once it's easier to work with replacing loggers.
-    // We basically only want to provide this logger if it's replacing the default logger, not if there's a custom logger already provided.
-    // Effect.provide(Logger.prettyWithThread(options.otelOptions?.serviceName ?? 'livestore-node-leader-thread')),
     Effect.provide(runtimeLayer),
   )
 }
+
+const makeWorkerRunnerInner = (options: WorkerOptions) =>
+  WorkerSchema.LeaderWorkerInnerRpcs.toLayer(
+    Effect.gen(function* () {
+      const leaderThreadScope = yield* Scope.make()
+      yield* Effect.addFinalizer((exit) => Scope.close(leaderThreadScope, exit))
+
+      const leaderThreadContextOnce = yield* Effect.cached(
+        Effect.gen(function* () {
+          const { storeId, clientId, storage, devtools, syncPayloadEncoded } = yield* RpcWorker.initialMessage(
+            WorkerSchema.LeaderWorkerInnerInitialMessage.payloadSchema,
+          )
+
+          const sqlite3 = yield* Effect.promise(() => loadSqlite3Wasm()).pipe(
+            Effect.withSpan('@livestore/adapter-node:leader-thread:loadSqlite3Wasm'),
+          )
+          const makeSqliteDb = yield* sqliteDbFactory({ sqlite3 })
+
+          const layer = yield* makeLeaderThread({
+            storeId,
+            clientId,
+            storage,
+            devtools,
+            syncOptions: options.sync,
+            schema: options.schema,
+            testing: options.testing,
+            makeSqliteDb,
+            syncPayloadEncoded,
+            syncPayloadSchema: options.syncPayloadSchema,
+          })
+
+          return yield* Layer.buildWithScope(layer, leaderThreadScope)
+        }).pipe(
+          Scope.provide(leaderThreadScope),
+          Effect.tapCauseLogPretty,
+          UnknownError.mapToUnknownError,
+          Effect.withSpan('@livestore/adapter-node:worker:InitialMessage'),
+          Effect.orDie,
+        ),
+      )
+
+      const provideLeaderThread = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+        Effect.gen(function* () {
+          const leaderThreadContext = yield* leaderThreadContextOnce
+          return yield* effect.pipe(Effect.provide(leaderThreadContext))
+        })
+
+      return WorkerSchema.LeaderWorkerInnerRpcs.of({
+        GetRecreateSnapshot: () =>
+          Effect.gen(function* () {
+            const workerCtx = yield* LeaderThreadCtx
+            const snapshot = workerCtx.dbState.export()
+            return { snapshot, migrationsReport: workerCtx.initialState.migrationsReport }
+          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetRecreateSnapshot')),
+        PullStream: ({ cursor }) =>
+          Effect.gen(function* () {
+            const { syncProcessor } = yield* LeaderThreadCtx
+            return syncProcessor.pull({ cursor })
+          }).pipe(provideLeaderThread, Stream.unwrap),
+        PushToLeader: ({ batch }) =>
+          Effect.andThen(LeaderThreadCtx, ({ syncProcessor }) =>
+            syncProcessor.push(batch.map((event) => new LiveStoreEvent.Client.EncodedWithMeta(event))),
+          ).pipe(provideLeaderThread, Effect.uninterruptible, Effect.withSpan('@livestore/adapter-node:worker:PushToLeader')),
+        StreamEvents: (options) =>
+          LeaderThreadCtx.pipe(
+            Effect.map(({ dbEventlog, syncProcessor }) =>
+              streamEventsWithSyncState({
+                dbEventlog,
+                syncState: syncProcessor.syncState,
+                options: options as StreamEventsOptions,
+              }),
+            ),
+            provideLeaderThread,
+            Stream.unwrap,
+            Stream.withSpan('@livestore/adapter-node:worker:StreamEvents'),
+          ),
+        Export: () =>
+          LeaderThreadCtx.pipe(
+            Effect.flatMap((_) => Effect.sync(() => _.dbState.export())),
+            provideLeaderThread,
+            Effect.withSpan('@livestore/adapter-node:worker:Export'),
+          ),
+        ExportEventlog: () =>
+          LeaderThreadCtx.pipe(
+            Effect.flatMap((_) => Effect.sync(() => _.dbEventlog.export())),
+            provideLeaderThread,
+            Effect.withSpan('@livestore/adapter-node:worker:ExportEventlog'),
+          ),
+        BootStatusStream: () =>
+          LeaderThreadCtx.pipe(
+            Effect.map((_) => Stream.fromQueue(_.bootStatusQueue)),
+            provideLeaderThread,
+            Stream.unwrap,
+          ),
+        GetLeaderHead: () =>
+          Effect.gen(function* () {
+            const workerCtx = yield* LeaderThreadCtx
+            return Eventlog.getClientHeadFromDb(workerCtx.dbEventlog)
+          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetLeaderHead')),
+        GetLeaderSyncState: () =>
+          Effect.gen(function* () {
+            const workerCtx = yield* LeaderThreadCtx
+            return yield* workerCtx.syncProcessor.syncState
+          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetLeaderSyncState')),
+        SyncStateStream: () =>
+          Effect.gen(function* () {
+            const workerCtx = yield* LeaderThreadCtx
+            return workerCtx.syncProcessor.syncState.changes
+          }).pipe(provideLeaderThread, Stream.unwrap),
+        GetNetworkStatus: () =>
+          Effect.gen(function* () {
+            const workerCtx = yield* LeaderThreadCtx
+            return yield* workerCtx.networkStatus
+          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetNetworkStatus')),
+        NetworkStatusStream: () =>
+          Effect.gen(function* () {
+            const workerCtx = yield* LeaderThreadCtx
+            return workerCtx.networkStatus.changes
+          }).pipe(provideLeaderThread, Stream.unwrap),
+        Shutdown: Effect.fn('@livestore/adapter-node:worker:Shutdown')(function* () {
+          yield* Effect.logDebug('[@livestore/adapter-node:worker] Shutdown')
+        }),
+        ExtraDevtoolsMessage: ({ message }) =>
+          Effect.andThen(LeaderThreadCtx, (_) => Queue.offer(_.extraIncomingMessagesQueue, message)).pipe(
+            provideLeaderThread,
+            Effect.asVoid,
+            Effect.withSpan('@livestore/adapter-node:worker:ExtraDevtoolsMessage'),
+          ),
+      })
+    }),
+  )

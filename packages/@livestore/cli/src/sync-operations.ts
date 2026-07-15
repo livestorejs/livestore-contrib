@@ -7,7 +7,6 @@ import { UnknownError } from '@livestore/common'
 import { LiveStoreEvent } from '@livestore/common/schema'
 import {
   Cause,
-  Chunk,
   Effect,
   type FileSystem,
   type HttpClient,
@@ -43,7 +42,7 @@ export const ExportFileSchema = Schema.Struct({
 
 export type ExportFile = typeof ExportFileSchema.Type
 
-export class ConnectionError extends Schema.TaggedError<ConnectionError>('~@livestore/cli/ConnectionError')(
+export class ConnectionError extends Schema.TaggedErrorClass<ConnectionError>('~@livestore/cli/ConnectionError')(
   'ConnectionError',
   {
     cause: Schema.Defect,
@@ -51,12 +50,12 @@ export class ConnectionError extends Schema.TaggedError<ConnectionError>('~@live
   },
 ) {}
 
-export class ExportError extends Schema.TaggedError<ExportError>('~@livestore/cli/ExportError')('ExportError', {
+export class ExportError extends Schema.TaggedErrorClass<ExportError>('~@livestore/cli/ExportError')('ExportError', {
   cause: Schema.Defect,
   note: Schema.String,
 }) {}
 
-export class ImportError extends Schema.TaggedError<ImportError>('~@livestore/cli/ImportError')('ImportError', {
+export class ImportError extends Schema.TaggedErrorClass<ImportError>('~@livestore/cli/ImportError')('ImportError', {
   cause: Schema.Defect,
   note: Schema.String,
 }) {}
@@ -88,7 +87,7 @@ export const makeSyncBackend = ({
       storeId,
       clientId,
       /** syncPayload is validated against syncPayloadSchema by loadModuleConfig */
-      payload: syncPayload as Schema.JsonValue | undefined,
+      payload: syncPayload as Schema.Json | undefined,
     }).pipe(Effect.provide(KeyValueStore.layerMemory), UnknownError.mapToUnknownError)
 
     /** Connect to the sync backend */
@@ -105,8 +104,8 @@ export const makeSyncBackend = ({
     /** Verify connectivity with a ping (with timeout) */
     yield* syncBackend.ping.pipe(
       Effect.timeout(CONNECTION_TIMEOUT_MS),
-      Effect.catchAll((cause) => {
-        if (Cause.isTimeoutException(cause) === true) {
+      Effect.catch((cause) => {
+        if (Cause.isTimeoutError(cause) === true) {
           return Effect.fail(
             new ConnectionError({
               cause,
@@ -129,7 +128,7 @@ export const makeSyncBackend = ({
 const releaseSyncBackend = (syncBackend: SyncBackend.SyncBackend): Effect.Effect<void> => {
   const maybeDisconnect = (syncBackend as { disconnect?: Effect.Effect<void> }).disconnect
   const releaseEffect = maybeDisconnect ?? SubscriptionRef.set(syncBackend.isConnected, false)
-  return releaseEffect.pipe(Effect.orElse(() => Effect.void))
+  return releaseEffect.pipe(Effect.catch(() => Effect.void))
 }
 
 export interface ExportResult {
@@ -176,9 +175,7 @@ export const pullEventsFromSyncBackend = ({
           ),
         )
 
-        const events = Chunk.toReadonlyArray(batchesChunk)
-          .flatMap((item) => item.batch)
-          .map((item) => item.eventEncoded)
+        const events = batchesChunk.flatMap((item) => item.batch).map((item) => item.eventEncoded)
 
         const exportedAt = new Date().toISOString()
         const exportData: ExportFile = {
@@ -227,7 +224,7 @@ export const validateExportData = ({
   targetStoreId: string
 }): Effect.Effect<ImportValidationResult, ImportError> =>
   Effect.gen(function* () {
-    const exportData = yield* Schema.decodeUnknown(ExportFileSchema)(data).pipe(
+    const exportData = yield* Schema.decodeUnknownEffect(ExportFileSchema)(data).pipe(
       Effect.mapError(
         (cause) =>
           new ImportError({
@@ -275,7 +272,7 @@ export const pushEventsToSyncBackend = ({
     makeSyncBackend({ configPath, storeId, clientId }),
     (syncBackend) =>
       Effect.gen(function* () {
-        const exportData = yield* Schema.decodeUnknown(ExportFileSchema)(data).pipe(
+        const exportData = yield* Schema.decodeUnknownEffect(ExportFileSchema)(data).pipe(
           Effect.mapError(
             (cause) =>
               new ImportError({

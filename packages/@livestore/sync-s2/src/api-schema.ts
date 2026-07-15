@@ -5,9 +5,9 @@ import { S2SeqNum } from './types.ts'
 
 export const PullArgs = Schema.Struct({
   storeId: Schema.String,
-  s2SeqNum: Schema.Union(S2SeqNum, Schema.Literal('from-start')),
+  s2SeqNum: Schema.Union([S2SeqNum, Schema.Literal('from-start')]),
   live: Schema.Boolean,
-  payload: Schema.UndefinedOr(Schema.JsonValue),
+  payload: Schema.UndefinedOr(Schema.Json),
 })
 
 export const PushPayload = Schema.Struct({
@@ -19,7 +19,7 @@ export type PullArgs = typeof PullArgs.Type
 export type PushPayload = typeof PushPayload.Type
 
 /** Encoded form for query parameter `args` */
-export const ArgsSchema = Schema.compose(Schema.StringFromUriComponent, Schema.parseJson(PullArgs))
+export const ArgsSchema = Schema.StringFromUriComponent.pipe(Schema.decodeTo(Schema.fromJsonString(PullArgs)))
 
 export const PushResponse = Schema.Struct({ success: Schema.Boolean })
 export type PushResponse = typeof PushResponse.Type

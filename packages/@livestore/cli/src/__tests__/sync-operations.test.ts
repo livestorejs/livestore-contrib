@@ -1,5 +1,4 @@
-import type { LiveStoreEvent } from '@livestore/common/schema'
-import { Chunk, Effect, FetchHttpClient, Layer, Mailbox, Stream } from '@livestore/utils/effect'
+import { Effect, FetchHttpClient, Layer, Queue, Stream } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { expect } from 'vitest'
@@ -17,15 +16,11 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
 
   /** Collects the connect + disconnect lifecycle emitted by the mock sync backend. */
   const expectConnectLifecycle = (
-    mailbox: Mailbox.Mailbox<'connect' | 'disconnect'>,
+    mailbox: Queue.Queue<'connect' | 'disconnect'>,
   ): Effect.Effect<ReadonlyArray<'connect' | 'disconnect'>> =>
-    Mailbox.toStream(mailbox).pipe(
-      Stream.take(2),
-      Stream.runCollect,
-      Effect.map((chunk) => Chunk.toReadonlyArray(chunk)),
-    )
+    Stream.fromQueue(mailbox).pipe(Stream.take(2), Stream.runCollect)
 
-  Vitest.scopedLive('exports events and releases the backend connection', (test: Vitest.TestContext) =>
+  Vitest.live('exports events and releases the backend connection', (test: Vitest.TestContext) =>
     Effect.gen(function* () {
       const { mockBackend, connectionEvents, configPath } = yield* useMockConfig
       const factory = makeEventFactory()
@@ -51,7 +46,7 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
     }).pipe(withTestCtx(test)),
   )
 
-  Vitest.scopedLive('fails import when backend is not empty', (test: Vitest.TestContext) =>
+  Vitest.live('fails import when backend is not empty', (test: Vitest.TestContext) =>
     Effect.gen(function* () {
       const { mockBackend, connectionEvents, configPath } = yield* useMockConfig
       const factory = makeEventFactory()
@@ -76,11 +71,11 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
         },
         force: false,
         dryRun: false,
-      }).pipe(Effect.either)
+      }).pipe(Effect.result)
 
-      expect(result._tag).toBe('Left')
-      if (result._tag === 'Left') {
-        expect(result.left._tag).toBe('ImportError')
+      expect(result._tag).toBe('Failure')
+      if (result._tag === 'Failure') {
+        expect(result.failure._tag).toBe('ImportError')
       }
 
       const lifecycle = yield* expectConnectLifecycle(connectionEvents)
@@ -88,7 +83,7 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
     }).pipe(withTestCtx(test)),
   )
 
-  Vitest.scopedLive('supports dry-run import and releases backend', (test: Vitest.TestContext) =>
+  Vitest.live('supports dry-run import and releases backend', (test: Vitest.TestContext) =>
     Effect.gen(function* () {
       const { configPath, connectionEvents } = yield* useMockConfig
       const factory = makeEventFactory()
@@ -117,7 +112,7 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
     }).pipe(withTestCtx(test)),
   )
 
-  Vitest.scopedLive('imports events into empty backend with progress and batching', (test: Vitest.TestContext) =>
+  Vitest.live('imports events into empty backend with progress and batching', (test: Vitest.TestContext) =>
     Effect.gen(function* () {
       const { mockBackend, configPath, connectionEvents } = yield* useMockConfig
       const factory = makeEventFactory()
@@ -150,11 +145,7 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
         { pushed: 120, total: 120 },
       ])
 
-      const pushedEvents = yield* mockBackend.pushedEvents.pipe(
-        Stream.take(importBatch.length),
-        Stream.runCollect,
-        Effect.map((chunk: Chunk.Chunk<LiveStoreEvent.Global.Encoded>) => Chunk.toReadonlyArray(chunk)),
-      )
+      const pushedEvents = yield* mockBackend.pushedEvents.pipe(Stream.take(importBatch.length), Stream.runCollect)
       expect(pushedEvents.map((event) => event.seqNum)).toHaveLength(importBatch.length)
 
       const lifecycle = yield* expectConnectLifecycle(connectionEvents)
@@ -162,7 +153,7 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
     }).pipe(withTestCtx(test)),
   )
 
-  Vitest.scopedLive('allows force import on store ID mismatch', (test: Vitest.TestContext) =>
+  Vitest.live('allows force import on store ID mismatch', (test: Vitest.TestContext) =>
     Effect.gen(function* () {
       const { mockBackend, configPath, connectionEvents } = yield* useMockConfig
       const factory = makeEventFactory()
@@ -186,11 +177,7 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
       expect(result.dryRun).toBe(false)
       expect(result.eventCount).toBe(importBatch.length)
 
-      const pushedEvents = yield* mockBackend.pushedEvents.pipe(
-        Stream.take(1),
-        Stream.runCollect,
-        Effect.map((chunk: Chunk.Chunk<LiveStoreEvent.Global.Encoded>) => Chunk.toReadonlyArray(chunk)),
-      )
+      const pushedEvents = yield* mockBackend.pushedEvents.pipe(Stream.take(1), Stream.runCollect)
       expect(pushedEvents).toHaveLength(1)
 
       const lifecycle = yield* expectConnectLifecycle(connectionEvents)
@@ -198,7 +185,7 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
     }).pipe(withTestCtx(test)),
   )
 
-  Vitest.scopedLive('rejects store ID mismatch without force', (test: Vitest.TestContext) =>
+  Vitest.live('rejects store ID mismatch without force', (test: Vitest.TestContext) =>
     Effect.gen(function* () {
       const { configPath, connectionEvents } = yield* useMockConfig
       const factory = makeEventFactory()
@@ -217,11 +204,11 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
         },
         force: false,
         dryRun: false,
-      }).pipe(Effect.either)
+      }).pipe(Effect.result)
 
-      expect(result._tag).toBe('Left')
-      if (result._tag === 'Left') {
-        expect(result.left._tag).toBe('ImportError')
+      expect(result._tag).toBe('Failure')
+      if (result._tag === 'Failure') {
+        expect(result.failure._tag).toBe('ImportError')
       }
 
       const lifecycle = yield* expectConnectLifecycle(connectionEvents)
