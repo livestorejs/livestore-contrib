@@ -18,6 +18,7 @@
   },
   "devDependencies": {
     "@livestore/devtools-vite": "0.4.0-dev.25",
+    "@parcel/watcher": "2.5.6",
     "@types/node": "25.3.3",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
