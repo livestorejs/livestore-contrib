@@ -8,12 +8,20 @@ export const PushPayload = Schema.TaggedStruct('@livestore/sync-electric.Push', 
 
 export const PullPayload = Schema.TaggedStruct('@livestore/sync-electric.Pull', {
   storeId: Schema.String,
-  payload: Schema.UndefinedOr(Schema.Json),
-  handle: Schema.Option(
-    Schema.Struct({
-      offset: Schema.String,
-      handle: Schema.String,
-    }),
+  // `optional` so an absent payload is omitted from the JSON entirely (a required key with an
+  // `undefined` value would be dropped by `JSON.stringify` and then fail decoding as "Missing key").
+  payload: Schema.optional(Schema.Json),
+  // `toCodecJson` makes the `Option` encode to its JSON-safe struct form (`{ _tag: "None" }` /
+  // `{ _tag: "Some", value }`). A bare `Schema.Option` encodes to a runtime `Option`, whose
+  // `toJSON` leaks `{"_id":"Option",...}` when `fromJsonString` runs `JSON.stringify`, and that
+  // shape then fails to decode back into an `Option`.
+  handle: Schema.toCodecJson(
+    Schema.Option(
+      Schema.Struct({
+        offset: Schema.String,
+        handle: Schema.String,
+      }),
+    ),
   ),
   live: Schema.Boolean,
 }).annotate({ title: '@livestore/sync-electric.PullPayload' })
