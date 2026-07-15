@@ -28,6 +28,20 @@ The deeper materializer integration was correctness-capable in the tested
 model, but its compaction hypothesis was falsified: merging during
 materialization does not itself compact the immutable event history.
 
+## Known limitations / open questions
+
+The opaque-bytes app does not currently converge after peers edit offline and
+then reconnect. The failure was reduced to an upstream `@livestore/sync-cf`
+deadlock: a stale-parent push receives `ServerAheadError`, while the leader
+waits for a catch-up pull chunk that `sync-cf` never sends. The issue is present
+on LiveStore `main` and is tracked in
+[livestorejs/livestore#1394](https://github.com/livestorejs/livestore/issues/1394),
+with a
+[minimal public reproduction](https://github.com/schickling-repros/2026-07-livestore-sync-cf-reconnect-deadlock).
+
+Online concurrent convergence and persistence across OPFS reloads are
+verified. Offline-then-reconnect convergence remains the open limitation.
+
 ## Live artifacts
 
 - [Results and methodology](https://livestore-crdt.scratch.schickling.dev)
