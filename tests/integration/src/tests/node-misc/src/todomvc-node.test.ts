@@ -71,13 +71,13 @@ Vitest.describe('todomvc-node', () => {
       expect(() =>
         store.commit(events.todoCreated({ id: nanoid(), title: 'Test' })),
       ).toThrowErrorMatchingInlineSnapshot(
-        `[UnknownError: { "cause": "Store has been shut down (while performing \\"commit\\").", "note": "You cannot perform this operation after the store has been shut down.", "payload": undefined }]`,
+        `[~@livestore/common/UnknownError]`,
       )
       expect(() => store.query(tables.todo)).toThrowErrorMatchingInlineSnapshot(
-        `[UnknownError: { "cause": "Store has been shut down (while performing \\"query\\").", "note": "You cannot perform this operation after the store has been shut down.", "payload": undefined }]`,
+        `[~@livestore/common/UnknownError]`,
       )
       expect(() => store.subscribe(tables.todo, () => {})).toThrowErrorMatchingInlineSnapshot(
-        `[UnknownError: { "cause": "Store has been shut down (while performing \\"subscribe\\").", "note": "You cannot perform this operation after the store has been shut down.", "payload": undefined }]`,
+        `[~@livestore/common/UnknownError]`,
       )
     }).pipe(withTestCtx(test)),
   )

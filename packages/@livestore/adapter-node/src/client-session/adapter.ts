@@ -33,6 +33,7 @@ import {
   RpcWorker,
   Schedule,
   Schema,
+  Scope,
   Stream,
   Subscribable,
   SubscriptionRef,
@@ -377,20 +378,34 @@ const makeLocalLeaderThread = ({
   }
 }) =>
   Effect.gen(function* () {
-    const layer = yield* Layer.build(
-      makeLeaderThread({
-        storeId,
-        clientId,
-        schema,
-        syncOptions,
-        storage,
-        syncPayloadEncoded,
-        syncPayloadSchema,
-        devtools,
-        makeSqliteDb,
-        ...omitUndefineds({ testing: testing?.overrides }),
-      }).pipe(Layer.unwrap),
-    )
+    // The single-threaded node adapter runs the leader thread co-located in the same runtime as the
+    // client session. Unlike the worker adapters (where the leader lives on its own event loop and drains
+    // pushes independently), a co-located leader only makes progress when the surrounding fibers yield.
+    //
+    // We give the leader thread its own dedicated scope whose teardown finalizer is registered *before*
+    // `makeClientSession`. Finalizers run in reverse registration order, so on store shutdown the client
+    // session tears down first and only then is the leader thread scope closed — keeping the leader (and
+    // its SQLite connections) alive while the client-session pusher's in-flight batch is still being
+    // persisted. Building the leader into the ambient store scope instead (via `Layer.build`) interrupts
+    // the leader's push drainer concurrently with the client session, dropping the in-flight batch and
+    // causing silent data loss on commit-then-shutdown.
+    const leaderThreadScope = yield* Scope.make()
+    yield* Effect.addFinalizer((exit) => Scope.close(leaderThreadScope, exit))
+
+    const leaderThreadLayer = yield* makeLeaderThread({
+      storeId,
+      clientId,
+      schema,
+      syncOptions,
+      storage,
+      syncPayloadEncoded,
+      syncPayloadSchema,
+      devtools,
+      makeSqliteDb,
+      ...omitUndefineds({ testing: testing?.overrides }),
+    }).pipe(Scope.provide(leaderThreadScope))
+
+    const layer = yield* Layer.buildWithScope(leaderThreadLayer, leaderThreadScope)
 
     return yield* Effect.gen(function* () {
       const { dbState, dbEventlog, syncProcessor, extraIncomingMessagesQueue, initialState, networkStatus } =
@@ -403,7 +418,13 @@ const makeLocalLeaderThread = ({
           events: {
             pull: ({ cursor }) => syncProcessor.pull({ cursor }),
             push: (batch) =>
-              syncProcessor.push(batch.map((item) => new LiveStoreEvent.Client.EncodedWithMeta(item))),
+              // Mirror the worker `PushToLeader` handler which runs the leader push uninterruptibly.
+              // Together with the dedicated `leaderThreadScope` above, this guarantees an in-flight batch is
+              // fully persisted by the (still-live) leader before the co-located pusher fiber is interrupted
+              // on store shutdown.
+              syncProcessor
+                .push(batch.map((item) => new LiveStoreEvent.Client.EncodedWithMeta(item)))
+                .pipe(Effect.uninterruptible),
             stream: (options) =>
               streamEventsWithSyncState({
                 dbEventlog,
