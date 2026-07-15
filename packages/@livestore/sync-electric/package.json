@@ -40,7 +40,8 @@
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/resources": "2.2.0",
     "@standard-schema/spec": "1.1.0",
-    "effect": "4.0.0-beta.98"
+    "effect": "4.0.0-beta.98",
+    "vitest": "4.1.9"
   },
   "peerDependencies": {
     "@effect/opentelemetry": "^4.0.0-beta.97",
