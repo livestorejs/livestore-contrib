@@ -1,0 +1,44 @@
+{
+  "name": "livestore-example-crdt-in-livestore",
+  "version": "0.0.5",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@livestore/adapter-web": "0.4.0",
+    "@livestore/livestore": "0.4.0",
+    "@livestore/peer-deps": "0.4.0",
+    "@livestore/sync-cf": "0.4.0",
+    "@livestore/wa-sqlite": "0.4.0",
+    "effect": "3.21.0",
+    "loro-crdt": "1.13.6",
+    "loro-prosemirror": "0.4.3",
+    "prosemirror-commands": "1.7.1",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-model": "1.25.11",
+    "prosemirror-schema-basic": "1.2.4",
+    "prosemirror-schema-list": "1.5.1",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-view": "1.42.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20251118.0",
+    "@playwright/test": "1.59.1",
+    "@types/node": "^25.0.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.1",
+    "wrangler": "4.42.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "pnpm run build:embed && pnpm run build:ref",
+    "build:embed": "vite build --config apps/embed/vite.config.ts apps/embed",
+    "build:ref": "vite build --config apps/ref/vite.config.ts apps/ref",
+    "bench:test": "node --expose-gc --test bench/harness/test/*.test.mjs bench/run-loro/*.test.mjs",
+    "dev:embed": "vite --config apps/embed/vite.config.ts apps/embed",
+    "dev:ref": "vite --config apps/ref/vite.config.ts apps/ref",
+    "test": "pnpm run bench:test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

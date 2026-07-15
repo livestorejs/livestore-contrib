@@ -1,0 +1,12 @@
+name = "livestore-crdt-demo-sync"
+main = "./src/cf-worker/index.ts"
+compatibility_date = "2026-07-14"
+compatibility_flags = ["enable_request_signal", "nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "SYNC_DO"
+class_name = "SyncDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncDO"]

@@ -1,0 +1,14 @@
+name = "livestore-crdt-demo-relay"
+main = "worker/loro-relay.ts"
+compatibility_date = "2026-07-14"
+
+[vars]
+ALLOWED_ORIGIN = "http://127.0.0.1:4174"
+
+[[durable_objects.bindings]]
+name = "LORO_RELAY_DO"
+class_name = "LoroRelayDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LoroRelayDO"]

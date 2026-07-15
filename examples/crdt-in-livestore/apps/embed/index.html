@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><circle cx='5' cy='5' r='5' fill='%2315704c'/></svg>"
+    />
+    <title>LiveStore × Loro real-network demo</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Flagship architecture A · real network transport</p>
+        <h1>LiveStore carries the log. Loro owns the document.</h1>
+        <p class="lede">
+          This browser is one independent client. Every native Loro update becomes one opaque LiveStore event, persists
+          in OPFS, and syncs through an isolated Cloudflare Durable Object. Decoding happens only in the read-side Loro
+          projection.
+        </p>
+      </header>
+
+      <section class="architecture" aria-label="Architecture">
+        <span>ProseMirror</span><b>↔</b><span>Loro projection</span><b>→</b><span>LiveStore event</span><b>→</b
+        ><span>WebSocket + per-document SyncDO</span>
+      </section>
+
+      <section class="network-panel" aria-label="Network sync">
+        <div>
+          <strong>Real LiveStore network sync</strong>
+          <p id="network-status">Opening persisted store and blocking on initial sync…</p>
+        </div>
+        <div class="share-actions">
+          <button id="copy-client-link" type="button">Copy second-client URL</button>
+          <button id="open-client-window" type="button">Open second window</button>
+        </div>
+      </section>
+      <p class="independence-note">
+        For genuinely separate OPFS and SharedWorker state, open the copied URL in another browser profile, private
+        context, or device. A normal same-profile tab shares this origin’s local storage.
+      </p>
+
+      <article id="client" class="client-card">
+        <div class="client-heading">
+          <div>
+            <span class="client-dot"></span>
+            <h2>Independent client</h2>
+          </div>
+          <code id="client-id"></code>
+        </div>
+        <div class="toolbar" role="toolbar" aria-label="Rich text formatting">
+          <button type="button" data-command="bold" aria-label="Bold"><strong>B</strong></button>
+          <button type="button" data-command="italic" aria-label="Italic"><em>I</em></button>
+          <button type="button" data-command="heading" aria-label="Heading">H2</button>
+          <button type="button" data-command="bullet-list" aria-label="Bullet list">• List</button>
+          <button type="button" data-command="ordered-list" aria-label="Ordered list">1. List</button>
+        </div>
+        <div id="editor" class="editor" data-testid="editor" aria-label="Rich text editor"></div>
+        <div class="client-meta">
+          <span id="client-status">Booting…</span>
+          <span><b id="event-count">0</b> rows · <b id="byte-count">0</b> opaque bytes</span>
+        </div>
+      </article>
+
+      <section class="devtools" aria-labelledby="devtools-title">
+        <div class="devtools-heading">
+          <div>
+            <p class="eyebrow">In-page devtools</p>
+            <h2 id="devtools-title">Opaque log → decoded read side</h2>
+          </div>
+          <p>The materializer only appends strings and metadata. Only the read side calls <code>importBatch</code>.</p>
+        </div>
+
+        <div class="pipeline-grid">
+          <section class="tool-panel event-log-panel" data-panel="event-log">
+            <div class="panel-heading">
+              <h3>1 · LiveStore event log</h3>
+              <span>backend-confirmed</span>
+            </div>
+            <p>Opaque carrier bytes. Expand any event to inspect the full base64 payload.</p>
+            <div id="event-log" class="event-list" data-testid="event-log"></div>
+          </section>
+
+          <section class="tool-panel" data-panel="materialized-table">
+            <div class="panel-heading">
+              <h3>2 · Materialized append table</h3>
+              <span>never decodes</span>
+            </div>
+            <p>The trivial materializer writes the carrier fields verbatim with <code>INSERT OR IGNORE</code>.</p>
+            <div id="materialized-table" class="table-list" data-testid="materialized-table"></div>
+          </section>
+
+          <section class="tool-panel" data-panel="loro-state">
+            <div class="panel-heading">
+              <h3>3 · Loro read model</h3>
+              <span>decoded here</span>
+            </div>
+            <dl id="loro-metrics" class="metrics"></dl>
+            <pre id="loro-json" data-testid="loro-json"></pre>
+          </section>
+
+          <section class="tool-panel" data-panel="prosemirror-state">
+            <div class="panel-heading">
+              <h3>4 · ProseMirror document</h3>
+              <span>editor projection</span>
+            </div>
+            <pre id="prosemirror-json" data-testid="prosemirror-json"></pre>
+          </section>
+
+          <section class="tool-panel sync-flow-panel" data-panel="sync-flow">
+            <div class="panel-heading">
+              <h3>5 · Real network flow</h3>
+              <span id="flow-state">connecting</span>
+            </div>
+            <p>
+              Local-origin confirmed events were pushed; other-origin confirmed events were pulled. Pending count comes
+              directly from <code>store.syncStatus()</code>.
+            </p>
+            <div id="sync-metrics" class="sync-metrics"></div>
+            <div id="sync-flow" class="flow-list" data-testid="sync-flow"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
