@@ -18,6 +18,7 @@ import {
   preparePinnedDevenvStep,
   restorePnpmStateStep,
   type PnpmPackageClosureConfig,
+  utilsEffectPeerDeps,
   validateNixStoreStep,
   type WorkspaceIdentity,
 } from '../repos/livestore/genie/repo.ts'
@@ -39,6 +40,16 @@ export const workspaceMember = (
 export const catalog = contribCatalog
 
 export const packageJson = contribPackageJson
+
+/**
+ * Override core's `effectDevDeps` so contrib-owned packages resolve Effect
+ * dev dependencies against contrib's catalog (`4.0.0-beta.98`) instead of core's
+ * (`4.0.0-beta.97`). This explicit named export shadows the `export *` re-export
+ * from core's repo helpers. `getUtilsPeerDeps` intentionally stays on core's
+ * `^4.0.0-beta.97` peer ranges (which beta.98 satisfies).
+ */
+export const effectDevDeps = (...additionalDeps: Parameters<typeof contribCatalog.pick>) =>
+  contribCatalog.pick(...utilsEffectPeerDeps, ...additionalDeps)
 
 export const githubRepositorySettings = <const TSettings extends Record<string, unknown>>(settings: TSettings) =>
   jsonArtifact({ data: settings })

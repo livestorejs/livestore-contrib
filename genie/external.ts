@@ -4,8 +4,45 @@ import {
   packageJson,
   type WorkspaceIdentity,
 } from '../repos/effect-utils/genie/external.ts'
-import { livestoreOnlyCatalog } from '../repos/livestore/genie/external.ts'
+import { effectV4Catalog, livestoreOnlyCatalog, obsoleteEffectV3Packages } from '../repos/livestore/genie/external.ts'
 import { coreOwnedPackageNames, contribPackageNames } from './internal.ts'
+
+/**
+ * Contrib pins one Effect release ahead of core's `4.0.0-beta.97` so the
+ * contrib-owned surface resolves at `4.0.0-beta.98`. This still satisfies core's
+ * `^4.0.0-beta.97` peer ranges while letting contrib move independently.
+ */
+const contribEffectVersion = '4.0.0-beta.98'
+
+/**
+ * Reuse core's Effect v4 package-name set (single source of truth for *which*
+ * packages exist under v4) but remap every version to contrib's pin.
+ */
+const contribEffectV4Catalog = Object.fromEntries(
+  Object.keys(effectV4Catalog).map((name) => [name, contribEffectVersion]),
+) as Record<keyof typeof effectV4Catalog, typeof contribEffectVersion>
+
+const obsoleteEffectV3PackageNames = new Set<string>(obsoleteEffectV3Packages)
+
+const contribEffectV4CatalogPackageNames = new Set<string>(Object.keys(contribEffectV4Catalog))
+
+/**
+ * Keep inheriting non-Effect tooling versions from effect-utils while contrib
+ * owns the Effect v4 surface. Drop the obsolete v3 packages (absorbed into
+ * `effect` core) and the v4-overridden names so the flat catalog composition
+ * below cannot reintroduce v3-era pins.
+ */
+const effectUtilsCatalogWithoutEffectV3 = Object.fromEntries(
+  Object.entries(effectUtilsCatalog).filter(
+    ([name]) =>
+      obsoleteEffectV3PackageNames.has(name) === false && contribEffectV4CatalogPackageNames.has(name) === false,
+  ),
+)
+
+/** TODO: Remove once effect-utils upgrades its TypeScript catalog pin. */
+const contribCatalogOverrides = {
+  typescript: '6.0.3',
+} as const
 
 export const coreWorkspaceCatalog = Object.fromEntries(
   coreOwnedPackageNames.map((name) => [`@livestore/${name}`, 'workspace:*']),
@@ -18,13 +55,13 @@ export const livestoreContribWorkspaceCatalog = Object.fromEntries(
 export const livestoreContribOnlyCatalog = {} as const
 
 export const catalog = defineCatalog({
-  extends: effectUtilsCatalog,
-  packages: {
-    ...coreWorkspaceCatalog,
-    ...livestoreContribWorkspaceCatalog,
-    ...livestoreOnlyCatalog,
-    ...livestoreContribOnlyCatalog,
-  },
+  ...effectUtilsCatalogWithoutEffectV3,
+  ...contribCatalogOverrides,
+  ...contribEffectV4Catalog,
+  ...coreWorkspaceCatalog,
+  ...livestoreContribWorkspaceCatalog,
+  ...livestoreOnlyCatalog,
+  ...livestoreContribOnlyCatalog,
 })
 
 export { packageJson }

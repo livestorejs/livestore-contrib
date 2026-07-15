@@ -1,7 +1,7 @@
-import { LanguageModel } from '@effect/ai'
+import { AiError, LanguageModel, Prompt, Tool } from 'effect/unstable/ai'
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai'
 
-import { AiError, Config, Effect, FetchHttpClient, Layer, Prompt, Schema, Tool } from '@livestore/utils/effect'
+import { Config, Effect, FetchHttpClient, Layer, Schema } from '@livestore/utils/effect'
 
 // Define the coach tool that analyzes LiveStore usage
 export const coachTool = Tool.make('livestore_coach', {
