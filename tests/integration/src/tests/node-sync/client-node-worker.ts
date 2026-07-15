@@ -7,6 +7,7 @@ import { makeWsSync } from '@livestore/sync-cf/client'
 import { IS_CI } from '@livestore/utils'
 import { OtelLiveHttp } from '@livestore/utils-dev/node'
 import {
+  Deferred,
   Effect,
   OtelTracer,
   pipe,
@@ -118,7 +119,7 @@ const makeWorkerRunnerInner = WorkerSchema.WorkerRpcs.toLayer(
         }).pipe(Stream.unwrap, Stream.withSpan('@livestore/adapter-node-sync:test:stream-todos')),
       OnShutdown: Effect.fn('@livestore/adapter-node-sync:test:on-shutdown')(function* () {
         const { shutdownDeferred } = yield* workerContextOnce
-        yield* shutdownDeferred.pipe(Effect.catchTag('StoreInterrupted', () => Effect.void))
+        yield* Deferred.await(shutdownDeferred).pipe(Effect.catchTag('StoreInterrupted', () => Effect.void))
       }),
     })
   }),

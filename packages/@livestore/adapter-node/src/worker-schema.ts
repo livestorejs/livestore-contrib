@@ -26,7 +26,7 @@ export const StorageTypeInMemory = Schema.Struct({
    * Only works with single-threaded leader thread for now.
    * Should be mostly used for testing.
    */
-  importSnapshot: Schema.optional(Schema.Uint8Array as any as Schema.Schema<Uint8Array<ArrayBuffer>>),
+  importSnapshot: Schema.optional(Schema.Uint8Array as any as Schema.Codec<Uint8Array<ArrayBuffer>>),
 })
 
 export type StorageTypeInMemory = typeof StorageTypeInMemory.Type

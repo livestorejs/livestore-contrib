@@ -164,6 +164,13 @@ const makeRouter = ({
         '/',
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest
+
+          // HEAD / (ping): v4 HttpRouter serves unmatched HEAD requests via the GET handler,
+          // so answer reachability probes here before running the pull logic.
+          if (request.method === 'HEAD') {
+            return HttpServerResponse.empty()
+          }
+
           const args = S2Sync.decodePullArgsFromSearchParams(new URL(request.url, 'http://localhost').searchParams)
 
           const stream = S2Sync.makeS2StreamName(args.storeId)
@@ -305,8 +312,6 @@ const makeRouter = ({
         }),
       )
 
-      // HEAD / (ping)
-      yield* router.add('HEAD', '/', HttpServerResponse.empty())
     }),
   )
 }

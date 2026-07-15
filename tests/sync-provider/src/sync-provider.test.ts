@@ -8,6 +8,7 @@ import { events } from '@livestore/livestore/internal/testing-utils'
 import { OtelLiveHttp } from '@livestore/utils-dev/node'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import {
+  type Context,
   Duration,
   Effect,
   FetchHttpClient,
@@ -22,6 +23,7 @@ import {
   Schedule,
   Schema,
   Stream,
+  SubscriptionRef,
 } from '@livestore/utils/effect'
 
 import { providerKeys, providerRegistry } from './providers/registry.ts'
@@ -36,6 +38,8 @@ const defaultClient = EventFactory.clientIdentity('test-client', 'test-session')
 const makeFactory = EventFactory.makeFactory(events)
 
 const providerLayers = providerKeys.map((key) => providerRegistry[key])
+
+type RuntimeServices = SyncProviderImpl | HttpClient.HttpClient
 
 const withTestCtx = ({ suffix, timeout }: { suffix?: string; timeout?: Duration.Input } = {}) =>
   Vitest.makeWithTestCtx({
@@ -54,7 +58,8 @@ const runFirstNonEmpty = <T, E, R>(stream: Stream.Stream<SyncBackend.PullResItem
 
 // TODO come up with a way to target specific providers individually
 Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, ({ layer, name }) => {
-  let runtime: ManagedRuntime.ManagedRuntime<SyncProviderImpl | HttpClient.HttpClient, never>
+  let runtime: ManagedRuntime.ManagedRuntime<RuntimeServices, never>
+  let runtimeContext: Context.Context<RuntimeServices>
   let testId: string
 
   Vitest.beforeAll(async () => {
@@ -69,7 +74,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       ),
     )
     // Eagerly start the runtime
-    await runtime.runPromise(Effect.void)
+    runtimeContext = await runtime.context()
   })
 
   Vitest.afterAll(async () => await runtime.dispose())
@@ -86,7 +91,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
           },
           options,
         ),
-      ).pipe(Effect.provide(runtime)),
+      ).pipe(Effect.provide(runtimeContext)),
     )
 
   // Simple test to verify the setup works
@@ -116,14 +121,14 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       const syncBackend = yield* makeProvider(test.task.name)
 
       // Check initial state
-      const initialConnected = yield* syncBackend.isConnected.get
+      const initialConnected = yield* SubscriptionRef.get(syncBackend.isConnected)
       expect(initialConnected).toBe(false)
 
       // Connect
       yield* syncBackend.connect
 
       // Check connected state
-      const connected = yield* syncBackend.isConnected
+      const connected = yield* SubscriptionRef.get(syncBackend.isConnected)
       expect(connected).toBe(true)
     }).pipe(withTestCtx()(test)),
   )
@@ -277,20 +282,31 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
         }
       })
 
+    type BatchPullStats = {
+      totalEvents: number
+      nonEmptyBatches: number
+      maxBatchSize: number
+    }
+
     const collectBatchPullStats = (syncBackend: SyncBackend.SyncBackend) =>
       syncBackend.pull(Option.none()).pipe(
-        Stream.runFold({ totalEvents: 0, nonEmptyBatches: 0, maxBatchSize: 0 }, (acc, { batch }) => ({
-          totalEvents: acc.totalEvents + batch.length,
-          nonEmptyBatches: acc.nonEmptyBatches + (batch.length > 0 ? 1 : 0),
-          maxBatchSize: Math.max(acc.maxBatchSize, batch.length),
-        })),
+        Stream.runFold(
+          (): BatchPullStats => ({ totalEvents: 0, nonEmptyBatches: 0, maxBatchSize: 0 }),
+          (acc, { batch }) => ({
+            totalEvents: acc.totalEvents + batch.length,
+            nonEmptyBatches: acc.nonEmptyBatches + (batch.length > 0 ? 1 : 0),
+            maxBatchSize: Math.max(acc.maxBatchSize, batch.length),
+          }),
+        ),
       )
 
     // Per-scenario timeout (all providers)
     const scenarioTimeout = Duration.minutes(6)
     // Vitest case timeout in ms (scenario + buffer)
     const vitestTimeoutMs = Duration.toMillis(scenarioTimeout) + Duration.toMillis(Duration.seconds(30))
-    const batchPingSchedule = Schedule.spaced(Duration.minutes(5)).pipe(Schedule.addDelay(() => Duration.minutes(1)))
+    const batchPingSchedule = Schedule.spaced(Duration.minutes(5)).pipe(
+      Schedule.addDelay(() => Effect.succeed(Duration.minutes(1))),
+    )
 
     // Additionally to the property-based tests we also have some deterministic scenarios.
     for (const { label, scenario } of deterministicBatchCases) {
@@ -414,7 +430,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
 
         const result = yield* Fiber.join(fiber)
         expect(result.batch.length).toBe(1)
-      }).pipe(Effect.provide(runtime), withTestCtx()(test)),
+      }).pipe(Effect.provide(runtimeContext), withTestCtx()(test)),
     )
   })
 

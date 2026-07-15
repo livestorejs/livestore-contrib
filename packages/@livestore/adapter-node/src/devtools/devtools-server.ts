@@ -127,7 +127,7 @@ export const startDevtoolsServer = ({
       }
 
       return HttpServerResponse.text('Not found')
-    }).pipe(Effect.tapCauseLogPretty, Effect.interruptible)
+    }).pipe(Effect.tapCauseLogPretty, Effect.interruptible, HttpMiddleware.withLoggerDisabled)
 
     const sessionSuffix =
       clientSessionInfo !== undefined
@@ -145,7 +145,6 @@ export const startDevtoolsServer = ({
     Effect.withSpan('@livestore/adapter-node:startDevtoolsServer', {
       attributes: { clientSessionInfo, port, host, schemaPath },
     }),
-    HttpMiddleware.withLoggerDisabled,
     Layer.unwrap,
     Layer.provide(PlatformNode.NodeHttpServer.layer(() => http.createServer(), { port, host })),
     Layer.launch,

@@ -151,6 +151,17 @@ const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; post
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest
 
+          // HEAD / (ping): v4 HttpRouter serves unmatched HEAD requests via the GET handler,
+          // so proxy the reachability probe to Electric before running the pull logic.
+          if (request.method === 'HEAD') {
+            const electricResponse = yield* HttpClient.head(electricHost)
+
+            return HttpServerResponse.empty().pipe(
+              HttpServerResponse.setStatus(electricResponse.status),
+              HttpServerResponse.setHeaders(streamResponseHeaders(electricResponse.headers)),
+            )
+          }
+
           const { url, storeId, needsInit /* payload */ } = ElectricSync.makeElectricUrl({
             electricHost,
             searchParams: new URL(request.url, `http://localhost`).searchParams,
@@ -198,19 +209,6 @@ const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; post
         }),
       )
 
-      // HEAD / (ping)
-      yield* router.add(
-        'HEAD',
-        '/',
-        Effect.gen(function* () {
-          const electricResponse = yield* HttpClient.head(electricHost)
-
-          return HttpServerResponse.empty().pipe(
-            HttpServerResponse.setStatus(electricResponse.status),
-            HttpServerResponse.setHeaders(streamResponseHeaders(electricResponse.headers)),
-          )
-        }),
-      )
     }),
   )
 }

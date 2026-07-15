@@ -5,7 +5,7 @@ import type { MetroConfig } from 'expo/metro-config'
 import type { Middleware, Options } from './types.ts'
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, unicorn/prefer-module, @typescript-eslint/consistent-type-imports
-const { Effect, Logger, LogLevel, Layer } = require('@livestore/utils/effect') as typeof EffectModule
+const { Effect, Logger, Layer, References } = require('@livestore/utils/effect') as typeof EffectModule
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, unicorn/prefer-module, @typescript-eslint/consistent-type-imports
 const { PlatformNode } = require('@livestore/utils/node') as typeof PlatformNodeModule
@@ -27,8 +27,8 @@ const addLiveStoreDevtoolsMiddleware = (config: MutableDeep<MetroConfig>, option
   import('@livestore/adapter-node/devtools')
     .then(async ({ startDevtoolsServer }) => {
       const layer = Layer.mergeAll(
-        PlatformNode.NodeHttpClient.layer,
-        Logger.prettyWithThread('@livestore/devtools-expo:metro-config'),
+        PlatformNode.NodeHttpClient.layerUndici,
+        Logger.layer([Logger.consolePretty()]),
       )
 
       startDevtoolsServer({
@@ -38,7 +38,7 @@ const addLiveStoreDevtoolsMiddleware = (config: MutableDeep<MetroConfig>, option
         port,
       }).pipe(
         Effect.provide(layer),
-        Logger.withMinimumLogLevel(LogLevel.Debug),
+        Effect.provideService(References.MinimumLogLevel, 'Debug'),
         Effect.tapCauseLogPretty,
         Effect.runPromise,
       )

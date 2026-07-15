@@ -343,13 +343,13 @@ export const makeSyncBackend =
               // Continue pagination if we have data
               if (batch.length > 0) {
                 hasEmittedAtLeastOnce = true
-                return [{ batch, hasMore: true }, nextMetadataOption] as const
+                return [{ batch, hasMore: true as boolean }, nextMetadataOption] as const
               }
 
               // Make sure we emit at least once even if there's no data or we're live-pulling
               if (hasEmittedAtLeastOnce === false || options?.live === true) {
                 hasEmittedAtLeastOnce = true
-                return [{ batch, hasMore: false }, nextMetadataOption] as const
+                return [{ batch, hasMore: false as boolean }, nextMetadataOption] as const
               }
 
               // Stop on empty batch (when not live)
