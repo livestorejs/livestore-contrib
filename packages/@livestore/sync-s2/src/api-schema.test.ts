@@ -1,4 +1,4 @@
-import { Schema } from '@livestore/utils/effect'
+import { Result, Schema } from '@livestore/utils/effect'
 import { describe, expect, it } from 'vitest'
 
 import * as Api from './api-schema.ts'
@@ -16,7 +16,7 @@ describe('ApiSchema', () => {
 
   it('decodes PushPayload with typed events', () => {
     const payload = Api.PushPayload.make({ storeId: 's', batch: [] })
-    const decoded = Schema.decodeUnknownEither(Api.PushPayload)(payload)
-    expect(decoded._tag).toBe('Right')
+    const decoded = Schema.decodeUnknownResult(Api.PushPayload)(payload)
+    expect(Result.isSuccess(decoded)).toBe(true)
   })
 })

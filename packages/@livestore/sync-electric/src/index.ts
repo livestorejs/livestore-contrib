@@ -21,7 +21,7 @@ import * as ApiSchema from './api-schema.ts'
 export class InvalidOperationError extends Schema.TaggedErrorClass<InvalidOperationError>(
   '~@livestore/sync-electric/InvalidOperationError',
 )('InvalidOperationError', {
-  operation: Schema.Literal('delete', 'update'),
+  operation: Schema.Literals(['delete', 'update']),
   message: Schema.String,
 }) {}
 
@@ -223,7 +223,7 @@ export const makeSyncBackend =
         UnknownError | IsOfflineError
       > =>
         Effect.gen(function* () {
-          const argsJson = yield* Schema.encode(ApiSchema.ArgsSchema)(
+          const argsJson = yield* Schema.encodeEffect(ApiSchema.ArgsSchema)(
             ApiSchema.PullPayload.make({ storeId, handle, payload, live }),
           )
           const url = `${pullEndpoint}?args=${argsJson}`

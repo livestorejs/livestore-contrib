@@ -9,7 +9,7 @@ import { Effect, FileSystem, type Queue, Schema } from '@livestore/utils/effect'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 class DynamicImportError extends Schema.TaggedErrorClass<DynamicImportError>()('DynamicImportError', {
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
   path: Schema.String,
 }) {}
 

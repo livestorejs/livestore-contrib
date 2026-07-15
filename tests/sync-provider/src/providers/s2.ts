@@ -11,7 +11,6 @@ import {
   HttpClientRequest,
   HttpClientResponse,
   HttpRouter,
-  HttpServer,
   HttpServerRequest,
   HttpServerResponse,
   Layer,
@@ -34,7 +33,7 @@ export type ProviderSpecific = {
   failNextRead: (storeId: string, count: number) => Effect.Effect<void>
 }
 
-export const layer: SyncProviderLayer = Layer.scoped(
+export const layer: SyncProviderLayer = Layer.effect(
   SyncProviderImpl,
   Effect.gen(function* () {
     const { endpointPort } = yield* startS2LiteProxy
@@ -49,7 +48,7 @@ export const layer: SyncProviderLayer = Layer.scoped(
             const http = yield* HttpClient.HttpClient
             const req = HttpClientRequest.post(`http://localhost:${endpointPort}/_test/append-raw`).pipe(
               HttpClientRequest.setHeader('content-type', 'application/json'),
-              HttpClientRequest.bodyUnsafeJson({ storeId, bodies }),
+              HttpClientRequest.bodyJsonUnsafe({ storeId, bodies }),
             )
             yield* http
               .pipe(HttpClient.filterStatusOk)
@@ -67,7 +66,7 @@ export const layer: SyncProviderLayer = Layer.scoped(
             const http = yield* HttpClient.HttpClient
             const req = HttpClientRequest.post(`http://localhost:${endpointPort}/_test/fail-next-append`).pipe(
               HttpClientRequest.setHeader('content-type', 'application/json'),
-              HttpClientRequest.bodyUnsafeJson({ storeId, count }),
+              HttpClientRequest.bodyJsonUnsafe({ storeId, count }),
             )
             yield* http
               .pipe(HttpClient.filterStatusOk)
@@ -83,7 +82,7 @@ export const layer: SyncProviderLayer = Layer.scoped(
             const http = yield* HttpClient.HttpClient
             const req = HttpClientRequest.post(`http://localhost:${endpointPort}/_test/fail-next-read`).pipe(
               HttpClientRequest.setHeader('content-type', 'application/json'),
-              HttpClientRequest.bodyUnsafeJson({ storeId, count }),
+              HttpClientRequest.bodyJsonUnsafe({ storeId, count }),
             )
             yield* http
               .pipe(HttpClient.filterStatusOk)
@@ -113,10 +112,8 @@ const startS2LiteProxy = Effect.gen(function* () {
     lite: true,
   }
 
-  const httpClient = yield* HttpClient.HttpClient.pipe(
-    Effect.andThen(
-      HttpClient.mapRequest(HttpClientRequest.setHeaders({ Authorization: 'Bearer unused', 's2-basin': basin })),
-    ),
+  const httpClient = (yield* HttpClient.HttpClient).pipe(
+    HttpClient.mapRequest(HttpClientRequest.setHeaders({ Authorization: 'Bearer unused', 's2-basin': basin })),
   )
 
   const basinClient = S2Sync.HttpClientGenerated.make(httpClient, {
@@ -137,8 +134,7 @@ const startS2LiteProxy = Effect.gen(function* () {
     Effect.withSpan('s2-lite-provider:create-basin', { attributes: { basin } }),
   )
 
-  yield* makeRouter({ s2Config, basinClient }).pipe(
-    HttpServer.serve(),
+  yield* HttpRouter.serve(makeRouter({ s2Config, basinClient })).pipe(
     Layer.provide(PlatformNode.NodeHttpServer.layer(() => http.createServer(), { port: endpointPort })),
     Layer.launch,
     Effect.tapCauseLogPretty,
@@ -160,150 +156,157 @@ const makeRouter = ({
   s2Config: S2Helpers.S2Config
   basinClient: S2Sync.HttpClientGenerated.Client
 }) => {
-  return HttpRouter.empty.pipe(
-    // GET / (pull)
-    HttpRouter.get(
-      '/',
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const args = S2Sync.decodePullArgsFromSearchParams(new URL(request.url, 'http://localhost').searchParams)
+  return HttpRouter.use((router) =>
+    Effect.gen(function* () {
+      // GET / (pull)
+      yield* router.add(
+        'GET',
+        '/',
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const args = S2Sync.decodePullArgsFromSearchParams(new URL(request.url, 'http://localhost').searchParams)
 
-        const stream = S2Sync.makeS2StreamName(args.storeId)
-        if (createdStreams.has(stream) === false) {
+          const stream = S2Sync.makeS2StreamName(args.storeId)
+          if (createdStreams.has(stream) === false) {
+            yield* basinClient
+              .createStream({ stream })
+              .pipe(
+                Effect.retry(Schedule.exponentialBackoff10Sec),
+                Effect.withSpan('s2-lite-provider:create-stream', { attributes: { stream, route: 'pull' } }),
+              )
+            createdStreams.add(stream)
+          }
+
+          if ((args.payload as any)?.testCloseOnce === true && closedOnceStreams.has(stream) === false) {
+            closedOnceStreams.add(stream)
+            const sseLines = ['event: ping', 'data: {}', '']
+            return HttpServerResponse.stream(Stream.fromIterable(sseLines).pipe(Stream.encodeText), {
+              contentType: 'text/event-stream',
+            })
+          }
+          // SSE tailing: proxy S2 SSE stream directly
+          const pullRequest = S2Helpers.buildPullRequest({ config: s2Config, args })
+          const resp = yield* HttpClientRequest.get(pullRequest.url).pipe(
+            HttpClientRequest.setHeaders(pullRequest.headers),
+            HttpClient.execute,
+            Effect.retry(Schedule.exponentialBackoff10Sec),
+            Effect.withSpan('s2-lite-provider:pull-stream', { attributes: { stream, live: args.live } }),
+          )
+
+          const bodyStream = HttpClientResponse.stream(Effect.succeed(resp))
+          return HttpServerResponse.stream(bodyStream, { contentType: 'text/event-stream' })
+        }).pipe(
+          // Never fail the route: return empty ReadBatch on unexpected error to keep the pull stream alive
+          Effect.catch(() => HttpServerResponse.json({ records: [] })),
+        ),
+      )
+
+      // POST / (push)
+      yield* router.add(
+        'POST',
+        '/',
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const body = yield* request.json
+          const parsed = yield* Schema.decodeUnknownEffect(S2Sync.ApiSchema.PushPayload)(body)
+
+          const streamName = S2Sync.makeS2StreamName(parsed.storeId)
+          if (createdStreams.has(streamName) === false) {
+            yield* basinClient.createStream({ stream: streamName }).pipe(
+              Effect.catchIf(
+                (_) => _._tag === 'ErrorResponse' && _.cause.code === 'stream_already_exists',
+                () => Effect.void,
+              ),
+              Effect.retry(Schedule.exponentialBackoff10Sec),
+              Effect.withSpan('s2-lite-provider:create-stream', {
+                attributes: { stream: streamName, route: 'push' },
+              }),
+            )
+            createdStreams.add(streamName)
+          }
+          const lines = parsed.batch.map((ev: LiveStoreEvent.Global.Encoded) => JSON.stringify(ev))
+          if ((failNextAppend.get(streamName) ?? 0) > 0) {
+            failNextAppend.set(streamName, (failNextAppend.get(streamName) ?? 1) - 1)
+            return yield* HttpServerResponse.json({ error: 'test induced append failure' }, { status: 500 })
+          }
           yield* basinClient
-            .createStream({ stream })
+            .append(streamName, {
+              params: { 's2-format': 'raw' },
+              payload: { records: lines.map((line: string) => ({ body: line })) },
+            })
             .pipe(
               Effect.retry(Schedule.exponentialBackoff10Sec),
-              Effect.withSpan('s2-lite-provider:create-stream', { attributes: { stream, route: 'pull' } }),
+              Effect.withSpan('s2-lite-provider:append', {
+                attributes: { stream: streamName, recordCount: lines.length },
+              }),
             )
-          createdStreams.add(stream)
-        }
 
-        if ((args.payload as any)?.testCloseOnce === true && closedOnceStreams.has(stream) === false) {
-          closedOnceStreams.add(stream)
-          const sseLines = ['event: ping', 'data: {}', '']
-          return yield* HttpServerResponse.stream(Stream.fromIterable(sseLines).pipe(Stream.encodeText), {
-            contentType: 'text/event-stream',
-          })
-        }
-        // SSE tailing: proxy S2 SSE stream directly
-        const pullRequest = S2Helpers.buildPullRequest({ config: s2Config, args })
-        const resp = yield* HttpClientRequest.get(pullRequest.url).pipe(
-          HttpClientRequest.setHeaders(pullRequest.headers),
-          HttpClient.execute,
-          Effect.retry(Schedule.exponentialBackoff10Sec),
-          Effect.withSpan('s2-lite-provider:pull-stream', { attributes: { stream, live: args.live } }),
-        )
+          return yield* HttpServerResponse.json({ success: true })
+        }),
+      )
 
-        const bodyStream = HttpClientResponse.stream(Effect.succeed(resp))
-        return yield* HttpServerResponse.stream(bodyStream, { contentType: 'text/event-stream' })
-      }).pipe(
-        // Never fail the route: return empty ReadBatch on unexpected error to keep the pull stream alive
-        Effect.catchAll(() => HttpServerResponse.json({ records: [] })),
-      ),
-    ),
+      // POST /_test/append-raw (test-only)
+      yield* router.add(
+        'POST',
+        '/_test/append-raw',
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const body = (yield* request.json) as { storeId: string; bodies: string[] }
+          const stream = S2Sync.makeS2StreamName(body.storeId)
+          if (createdStreams.has(stream) === false) {
+            yield* basinClient.createStream({ stream }).pipe(
+              Effect.catchIf(
+                (_) => _._tag === 'ErrorResponse' && _.cause.code === 'stream_already_exists',
+                () => Effect.void,
+              ),
+              Effect.retry(Schedule.exponentialBackoff10Sec),
+              Effect.withSpan('s2-lite-provider:create-stream', {
+                attributes: { stream, route: 'append-raw' },
+              }),
+            )
+            createdStreams.add(stream)
+          }
+          yield* basinClient
+            .append(stream, {
+              params: { 's2-format': 'raw' },
+              payload: { records: body.bodies.map((line) => ({ body: line })) },
+            })
+            .pipe(
+              Effect.retry(Schedule.exponentialBackoff10Sec),
+              Effect.withSpan('s2-lite-provider:append', {
+                attributes: { stream, recordCount: body.bodies.length, route: 'append-raw' },
+              }),
+            )
+          return yield* HttpServerResponse.json({ success: true })
+        }),
+      )
 
-    // POST / (push)
-    HttpRouter.post(
-      '/',
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const body = yield* request.json
-        const parsed = yield* Schema.decodeUnknown(S2Sync.ApiSchema.PushPayload)(body)
+      // POST /_test/fail-next-append
+      yield* router.add(
+        'POST',
+        '/_test/fail-next-append',
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const body = (yield* request.json) as { storeId: string; count: number }
+          failNextAppend.set(S2Sync.makeS2StreamName(body.storeId), Math.max(0, Math.floor(body.count ?? 1)))
+          return yield* HttpServerResponse.json({ success: true })
+        }),
+      )
 
-        const streamName = S2Sync.makeS2StreamName(parsed.storeId)
-        if (createdStreams.has(streamName) === false) {
-          yield* basinClient.createStream({ stream: streamName }).pipe(
-            Effect.catchIf(
-              (_) => _._tag === 'ErrorResponse' && _.cause.code === 'stream_already_exists',
-              () => Effect.void,
-            ),
-            Effect.retry(Schedule.exponentialBackoff10Sec),
-            Effect.withSpan('s2-lite-provider:create-stream', {
-              attributes: { stream: streamName, route: 'push' },
-            }),
-          )
-          createdStreams.add(streamName)
-        }
-        const lines = parsed.batch.map((ev: LiveStoreEvent.Global.Encoded) => JSON.stringify(ev))
-        if ((failNextAppend.get(streamName) ?? 0) > 0) {
-          failNextAppend.set(streamName, (failNextAppend.get(streamName) ?? 1) - 1)
-          return yield* HttpServerResponse.json({ error: 'test induced append failure' }, { status: 500 })
-        }
-        yield* basinClient
-          .append(streamName, {
-            params: { 's2-format': 'raw' },
-            payload: { records: lines.map((line: string) => ({ body: line })) },
-          })
-          .pipe(
-            Effect.retry(Schedule.exponentialBackoff10Sec),
-            Effect.withSpan('s2-lite-provider:append', {
-              attributes: { stream: streamName, recordCount: lines.length },
-            }),
-          )
+      // POST /_test/fail-next-read
+      yield* router.add(
+        'POST',
+        '/_test/fail-next-read',
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const body = (yield* request.json) as { storeId: string; count: number }
+          failNextRead.set(S2Sync.makeS2StreamName(body.storeId), Math.max(0, Math.floor(body.count ?? 1)))
+          return yield* HttpServerResponse.json({ success: true })
+        }),
+      )
 
-        return yield* HttpServerResponse.json({ success: true })
-      }),
-    ),
-
-    // POST /_test/append-raw (test-only)
-    HttpRouter.post(
-      '/_test/append-raw',
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const body = (yield* request.json) as { storeId: string; bodies: string[] }
-        const stream = S2Sync.makeS2StreamName(body.storeId)
-        if (createdStreams.has(stream) === false) {
-          yield* basinClient.createStream({ stream }).pipe(
-            Effect.catchIf(
-              (_) => _._tag === 'ErrorResponse' && _.cause.code === 'stream_already_exists',
-              () => Effect.void,
-            ),
-            Effect.retry(Schedule.exponentialBackoff10Sec),
-            Effect.withSpan('s2-lite-provider:create-stream', {
-              attributes: { stream, route: 'append-raw' },
-            }),
-          )
-          createdStreams.add(stream)
-        }
-        yield* basinClient
-          .append(stream, {
-            params: { 's2-format': 'raw' },
-            payload: { records: body.bodies.map((line) => ({ body: line })) },
-          })
-          .pipe(
-            Effect.retry(Schedule.exponentialBackoff10Sec),
-            Effect.withSpan('s2-lite-provider:append', {
-              attributes: { stream, recordCount: body.bodies.length, route: 'append-raw' },
-            }),
-          )
-        return yield* HttpServerResponse.json({ success: true })
-      }),
-    ),
-
-    // POST /_test/fail-next-append
-    HttpRouter.post(
-      '/_test/fail-next-append',
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const body = (yield* request.json) as { storeId: string; count: number }
-        failNextAppend.set(S2Sync.makeS2StreamName(body.storeId), Math.max(0, Math.floor(body.count ?? 1)))
-        return yield* HttpServerResponse.json({ success: true })
-      }),
-    ),
-
-    // POST /_test/fail-next-read
-    HttpRouter.post(
-      '/_test/fail-next-read',
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const body = (yield* request.json) as { storeId: string; count: number }
-        failNextRead.set(S2Sync.makeS2StreamName(body.storeId), Math.max(0, Math.floor(body.count ?? 1)))
-        return yield* HttpServerResponse.json({ success: true })
-      }),
-    ),
-
-    // HEAD / (ping)
-    HttpRouter.head('/', HttpServerResponse.empty()),
+      // HEAD / (ping)
+      yield* router.add('HEAD', '/', HttpServerResponse.empty())
+    }),
   )
 }

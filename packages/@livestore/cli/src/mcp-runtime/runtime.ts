@@ -55,7 +55,7 @@ export const init = ({
         storeId,
         adapter,
         disableDevtools: true,
-        syncPayload,
+        ...(syncPayload !== undefined ? { syncPayload } : {}),
         syncPayloadSchema,
       }),
     )

@@ -12,7 +12,7 @@ import type * as Vite from 'vite'
 export class DevtoolsViteNotInstalledError extends Schema.TaggedErrorClass<DevtoolsViteNotInstalledError>(
   '~@livestore/adapter-node/DevtoolsViteNotInstalledError',
 )('DevtoolsViteNotInstalledError', {
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {
   override get message(): string {
     return (
@@ -27,7 +27,7 @@ export class DevtoolsViteNotInstalledError extends Schema.TaggedErrorClass<Devto
 export class ViteNotInstalledError extends Schema.TaggedErrorClass<ViteNotInstalledError>(
   '~@livestore/adapter-node/ViteNotInstalledError',
 )('ViteNotInstalledError', {
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {
   override get message(): string {
     return (

@@ -6,11 +6,12 @@ import { Vitest } from '@livestore/utils-dev/node-vitest'
 import {
   Effect,
   FetchHttpClient,
+  Fiber,
   KeyValueStore,
   Layer,
   Logger,
-  LogLevel,
   Option,
+  References,
   Schema,
   Stream,
 } from '@livestore/utils/effect'
@@ -23,8 +24,8 @@ import { SyncProviderImpl } from './types.ts'
 const providerLayer = S2Provider.layer.pipe(
   Layer.provideMerge(FetchHttpClient.layer),
   Layer.provideMerge(KeyValueStore.layerMemory),
-  Layer.provide(Logger.prettyWithThread('s2-specific')),
-  Layer.provide(Logger.minimumLogLevel(LogLevel.Debug)),
+  Layer.provide(Logger.layer([Logger.consolePretty()])),
+  Layer.provide(Layer.succeed(References.MinimumLogLevel, 'Debug')),
   Layer.orDie,
 )
 
@@ -52,7 +53,7 @@ Vitest.describe('S2-specific', { timeout: 60000 }, () => {
       ),
     )
 
-  Vitest.scopedLive('SSE reconnect resumes and receives new events', (test) =>
+  Vitest.live('SSE reconnect resumes and receives new events', (test) =>
     Effect.gen(function* () {
       // Create a backend with payload to trigger one-time SSE close in proxy
       const storeId = `s2-reconnect-${test.task.name}-${testId}`
@@ -67,7 +68,7 @@ Vitest.describe('S2-specific', { timeout: 60000 }, () => {
       const fiber = yield* syncBackend.pull(Option.none(), { live: true }).pipe(
         Stream.filter((i) => i.batch.length > 0),
         Stream.runFirstUnsafe,
-        Effect.fork,
+        Effect.forkChild,
       )
 
       // Give SSE a moment to connect and be closed by proxy, then push an event
@@ -83,12 +84,12 @@ Vitest.describe('S2-specific', { timeout: 60000 }, () => {
         }),
       ])
 
-      const result = yield* fiber
+      const result = yield* Fiber.join(fiber)
       expect(result.batch.length).toBe(1)
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('retries transient append failure', (test) =>
+  Vitest.live('retries transient append failure', (test) =>
     Effect.gen(function* () {
       const storeId = `s2-retry-append-${test.task.name}-${testId}`
       const provider = yield* SyncProviderImpl
@@ -116,7 +117,7 @@ Vitest.describe('S2-specific', { timeout: 60000 }, () => {
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('retries transient non-live read failure', (test) =>
+  Vitest.live('retries transient non-live read failure', (test) =>
     Effect.gen(function* () {
       const storeId = `s2-retry-read-${test.task.name}-${testId}`
       const provider = yield* SyncProviderImpl
@@ -145,7 +146,7 @@ Vitest.describe('S2-specific', { timeout: 60000 }, () => {
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('non-live decoding (JSON ReadBatch) returns events', (test) =>
+  Vitest.live('non-live decoding (JSON ReadBatch) returns events', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
@@ -169,7 +170,7 @@ Vitest.describe('S2-specific', { timeout: 60000 }, () => {
         parentSeqNum: EventSequenceNumber.Global.make(1),
       })
 
-      const jsonEncode = Schema.encode(Schema.parseJson())
+      const jsonEncode = Schema.encodeEffect(Schema.UnknownFromJsonString)
       yield* providerSpecific.appendRaw(storeId, [yield* jsonEncode(ev1), yield* jsonEncode(ev2)])
 
       // Non-live pull should yield the 2 events

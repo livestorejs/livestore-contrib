@@ -37,6 +37,7 @@ import { shouldNeverHappen } from '@livestore/utils'
 import {
   type Duration,
   Effect,
+  Filter,
   HttpClient,
   HttpClientRequest,
   HttpClientResponse,
@@ -190,7 +191,7 @@ export const makeSyncBackend =
                 return shouldNeverHappen(`Unexpected SSE event: ${evt}`, msg)
               }),
             ),
-            Stream.filterMap((_) => _), // filter out Option.none()
+            Stream.filterMap(Filter.fromPredicateOption((_) => _)), // filter out Option.none()
             Stream.mapError((cause) => (cause._tag === 'UnknownError' ? cause : new UnknownError({ cause }))),
             Stream.retry(retry?.pull ?? defaultRetry),
           )

@@ -20,7 +20,7 @@ import { detectPackageManager, pmCommands } from '../package-manager.ts'
 // Schema for GitHub API response
 const GitHubContentSchema = Schema.Struct({
   name: Schema.String,
-  type: Schema.Literal('dir', 'file'),
+  type: Schema.Literals(['dir', 'file']),
   path: Schema.String,
   download_url: Schema.NullOr(Schema.String),
 })

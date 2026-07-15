@@ -14,9 +14,9 @@ import {
   KeyValueStore,
   Layer,
   Logger,
-  LogLevel,
   ManagedRuntime,
   Option,
+  References,
   Stream,
 } from '@livestore/utils/effect'
 
@@ -28,7 +28,7 @@ const withTestCtx = ({ suffix }: { suffix?: string } = {}) =>
     suffix,
     // timeout: testTimeout,
     // makeLayer: (testContext) => makeFileLogger('runner', { testContext }),
-    makeLayer: (_testContext) => Layer.mergeAll(Logger.prettyWithThread('test-runner'), KeyValueStore.layerMemory),
+    makeLayer: (_testContext) => Layer.mergeAll(Logger.layer([Logger.consolePretty()]), KeyValueStore.layerMemory),
   })
 
 // ElectricSQL-specific tests for delete/update operations
@@ -42,8 +42,8 @@ Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () =>
       ElectricProvider.layer.pipe(
         Layer.provideMerge(FetchHttpClient.layer),
         Layer.provide(OtelLiveHttp({ rootSpanName: 'beforeAll', serviceName: 'vitest-runner', skipLogUrl: false })),
-        Layer.provide(Logger.prettyWithThread('test-runner')),
-        Layer.provide(Logger.minimumLogLevel(LogLevel.Debug)),
+        Layer.provide(Logger.layer([Logger.consolePretty()])),
+        Layer.provide(Layer.succeed(References.MinimumLogLevel, 'Debug')),
         Layer.orDie,
       ),
     )
@@ -69,7 +69,7 @@ Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () =>
       ).pipe(Effect.provide(runtime)),
     )
 
-  Vitest.scopedLive('should throw descriptive error when detecting delete operations', (test) =>
+  Vitest.live('should throw descriptive error when detecting delete operations', (test) =>
     Effect.gen(function* () {
       const storeId = `test-store-electric-${test.task.name}-${testId}`
       const syncBackend: SyncBackend.SyncBackend<ElectricSync.SyncMetadata> = yield* makeElectricProvider({ storeId })
@@ -117,7 +117,7 @@ Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () =>
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('should throw descriptive error when detecting update operations', (test) =>
+  Vitest.live('should throw descriptive error when detecting update operations', (test) =>
     Effect.gen(function* () {
       const storeId = `test-store-electric-${test.task.name}-${testId}`
 

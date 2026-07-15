@@ -186,7 +186,7 @@ export class DeleteOnEmptyConfig extends S.Class<DeleteOnEmptyConfig>('DeleteOnE
   min_age_secs: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
 }) {}
 
-export const InfiniteRetention = S.Record({ key: S.String, value: S.Unknown })
+export const InfiniteRetention = S.Record(S.String, S.Unknown)
 
 export const RetentionPolicy = S.Union([
   /**

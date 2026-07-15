@@ -288,7 +288,7 @@ const makeAdapterImpl = ({
               devtools: devtoolsOptions,
               bootStatusQueue,
               syncPayloadEncoded,
-            })
+            }).pipe(UnknownError.mapToUnknownError)
 
       syncInMemoryDb.import(initialSnapshot)
       syncInMemoryDb.debug.head = leaderThread.initialState.leaderHead

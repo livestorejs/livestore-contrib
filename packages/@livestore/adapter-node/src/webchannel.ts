@@ -44,7 +44,7 @@ export const makeBroadcastChannel = <Msg, MsgEncoded>({
         Queue.offerUnsafe(messageQueue, event.data)
       }
 
-      const listen = Stream.fromQueue(messageQueue).pipe(Stream.map((data) => Schema.decodeResult(schema)(data)))
+      const listen = Stream.fromQueue(messageQueue).pipe(Stream.map((data) => Schema.decodeUnknownResult(schema)(data)))
 
       const closedDeferred = yield* Effect.acquireRelease(Deferred.make<void>(), Deferred.done(Exit.void))
       const supportsTransferables = false

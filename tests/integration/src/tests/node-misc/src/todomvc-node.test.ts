@@ -25,7 +25,7 @@ const TMP_STORE_DIR = path.join(
 const withTestCtx = Vitest.makeWithTestCtx({ timeout: IS_CI === true ? 600_000 : 900_000 })
 
 Vitest.describe('todomvc-node', () => {
-  Vitest.scopedLive('should push pending events to the leader after reboot', (test) =>
+  Vitest.live('should push pending events to the leader after reboot', (test) =>
     Effect.gen(function* () {
       const storeId = nanoid(10)
       const clientId = 'test-client'
@@ -59,7 +59,7 @@ Vitest.describe('todomvc-node', () => {
     }).pipe(withTestCtx(test)),
   )
 
-  Vitest.scopedLive('should reject operations after shutdown', (test) =>
+  Vitest.live('should reject operations after shutdown', (test) =>
     Effect.gen(function* () {
       const storeId = nanoid(10)
       const adapter = makeAdapter({ storage: { type: 'fs', baseDirectory: TMP_STORE_DIR }, clientId: 'test' })
@@ -82,7 +82,7 @@ Vitest.describe('todomvc-node', () => {
     }).pipe(withTestCtx(test)),
   )
 
-  Vitest.scopedLive('should handle concurrent commits before shutdown', (test) =>
+  Vitest.live('should handle concurrent commits before shutdown', (test) =>
     Effect.gen(function* () {
       const storeId = nanoid(10)
       const adapter = makeAdapter({ storage: { type: 'fs', baseDirectory: TMP_STORE_DIR }, clientId: 'test' })

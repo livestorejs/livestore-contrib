@@ -45,18 +45,18 @@ export type ExportFile = typeof ExportFileSchema.Type
 export class ConnectionError extends Schema.TaggedErrorClass<ConnectionError>('~@livestore/cli/ConnectionError')(
   'ConnectionError',
   {
-    cause: Schema.Defect,
+    cause: Schema.Defect(),
     note: Schema.String,
   },
 ) {}
 
 export class ExportError extends Schema.TaggedErrorClass<ExportError>('~@livestore/cli/ExportError')('ExportError', {
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
   note: Schema.String,
 }) {}
 
 export class ImportError extends Schema.TaggedErrorClass<ImportError>('~@livestore/cli/ImportError')('ImportError', {
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
   note: Schema.String,
 }) {}
 
