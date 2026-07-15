@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><circle cx='5' cy='5' r='5' fill='%2315704c'/></svg>" />
+    <title>LiveStore ref-only × Loro real relay demo</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Baseline architecture C / reference-only</p>
+        <h1>LiveStore stores the ref. Loro syncs the text.</h1>
+        <p class="lede">
+          This reference-only baseline keeps rich text outside the LiveStore log. LiveStore persists one document
+          reference locally; Loro owns the document bytes, OPFS snapshot, and WebSocket relay sync lifecycle.
+        </p>
+      </header>
+
+      <section class="architecture" aria-label="Architecture">
+        <span>LiveStore</span><b>→</b><span>doc ref only</span><b>∥</b><span>ProseMirror</span><b>↔</b
+        ><span>Loro native updates</span><b>→</b><span>Durable Object WebSocket relay</span>
+      </section>
+
+      <section class="metrics" aria-label="Transport split">
+        <div>
+          <span>LiveStore</span>
+          <strong><b id="livestore-count">0</b> ref event</strong>
+          <p>Doc id and Loro channel pointer only. No text bytes in the LiveStore event log.</p>
+        </div>
+        <div>
+          <span>Loro side-channel</span>
+          <strong><b id="side-channel-count">0</b> updates / <b id="side-channel-bytes">0</b> bytes</strong>
+          <p>Native CRDT updates carry rich text over the Loro relay, outside LiveStore.</p>
+        </div>
+      </section>
+
+      <section class="sync-panel">
+        <div>
+          <strong>Real Loro relay transport</strong>
+          <p>
+            Client <b id="client-name">client-a</b> joins room <b id="room-name">reference-only-demo</b>.
+            Relay: <code id="relay-url">connecting</code>. Status: <b id="connection-status">booting</b>.
+          </p>
+        </div>
+        <button id="sync-now" type="button">Publish snapshot</button>
+      </section>
+
+      <section class="replica" aria-label="Independent client">
+        <div class="replica-heading">
+          <div><span class="client-dot"></span><h2>Independent browser client</h2></div>
+          <span class="storage-pill">OPFS persistence</span>
+        </div>
+        <div id="toolbar" class="toolbar" role="toolbar" aria-label="Formatting">
+          <button type="button" data-command="bold" aria-label="Bold"><strong>B</strong></button>
+          <button type="button" data-command="italic" aria-label="Italic"><em>I</em></button>
+          <button type="button" data-command="heading" aria-label="Heading">H2</button>
+          <button type="button" data-command="bullet-list" aria-label="Bullet list">• List</button>
+          <button type="button" data-command="ordered-list" aria-label="Ordered list">1. List</button>
+        </div>
+        <div id="editor" class="editor" aria-label="Rich text editor"></div>
+      </section>
+
+      <section class="devtools-shell" aria-label="Interactive devtools">
+        <div class="section-heading">
+          <h2>Interactive devtools</h2>
+          <p>LiveStore log: one ref, no text. Loro side-channel: native updates over the real relay.</p>
+        </div>
+        <div id="devtools" class="devtools-grid"></div>
+      </section>
+
+      <p id="global-status" class="global-status" role="status">Starting independent LiveStore ref client...</p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

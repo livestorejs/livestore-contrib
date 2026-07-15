@@ -23,6 +23,7 @@ export const coreOwnedPackageNames = livestoreCorePackageNames
 export const contribExampleMembers = [
   'examples/cf-chat',
   'examples/cf-chat-solid',
+  'examples/crdt-in-livestore',
   'examples/expo-linearlite',
   'examples/expo-todomvc-sync-cf',
   'examples/node-effect-cli',
