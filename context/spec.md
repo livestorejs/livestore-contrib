@@ -21,16 +21,18 @@ context/
   sync/            realize core 02-system/03-sync/ (provider contract)
     electric/  s2/
   integrations/    realize core 02-system/08-integrations/
-    solid/  svelte/  graphql/
+    solid/  svelte/
+  query-surfaces/  realize core 05-store/01-reactivity/ (query-kind contract)
+    graphql/
   devtools/        realize core 02-system/07-devtools/ (surface contract)
     expo/
   cli/             standalone tool; realizes no core dimension
 ```
 
 Every contrib package has a node. `cli` realizes no core dimension and lives at
-the top level; `graphql` sits under `integrations/` for now but is a
-query-surface rather than a framework binding (see
-[open-questions.md](./open-questions.md) LSC-DQ1).
+the top level. `graphql` is a query-surface (a new live-query kind), not a
+framework binding, so it lives under `query-surfaces/` and refines the core
+reactivity contract rather than the integration contract (LSC-DQ1, resolved).
 
 ## ID Scheme
 
@@ -47,7 +49,7 @@ IDs with links (see below).
 | `LSC.SYNC.S2-*` | `sync/s2/` |
 | `LSC.INT.SOLID-*` | `integrations/solid/` |
 | `LSC.INT.SVELTE-*` | `integrations/svelte/` |
-| `LSC.INT.GQL-*` | `integrations/graphql/` |
+| `LSC.QS.GQL-*` | `query-surfaces/graphql/` |
 | `LSC.DT.EXPO-*` | `devtools/expo/` |
 | `LSC.CLI-*` | `cli/` |
 

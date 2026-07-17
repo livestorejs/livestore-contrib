@@ -1,11 +1,9 @@
-# GraphQL Integration — Spec
+# GraphQL Query Surface — Spec
 
 Specifies the GraphQL query surface (`packages/@livestore/graphql`) at the
 realization-contract level. Builds on [requirements.md](./requirements.md). The
 query-kind contract it realizes is core
-[`05-store/01-reactivity/spec.md`](https://github.com/livestorejs/livestore/blob/main/context/02-system/05-store/01-reactivity/spec.md);
-the framework-integration contract it is filed under (but fits poorly) is core
-[`08-integrations/spec.md`](https://github.com/livestorejs/livestore/blob/main/context/02-system/08-integrations/spec.md).
+[`05-store/01-reactivity/spec.md`](https://github.com/livestorejs/livestore/blob/main/context/02-system/05-store/01-reactivity/spec.md).
 Citations are `src/…:line` within the package. The whole surface is one file,
 `src/graphql.ts` (296 lines), re-exported from `src/index.ts:1`.
 
@@ -21,7 +19,7 @@ a `(get) => variables` thunk, and options `{ label?, map?, deps? }`
 (`src/graphql.ts:42-49`), and returns a `LiveQueries.LiveQueryDef<TResultMapped>`
 (`:50`) — the exact shape core queries produce, so a GraphQL query is
 interchangeable with a db/computed/signal query wherever a `LiveQueryDef` is
-consumed (LSC.INT.GQL-R01).
+consumed (LSC.QS.GQL-R01).
 
 The def's `make` is wrapped in `LiveQueries.withRCMap(hash, …)`
 (`:61`) and constructs a `LiveStoreGraphQLQuery` (`:62`); `Equal`/`Hash` are
@@ -48,7 +46,7 @@ holds two thunks in the store's reactivity graph
 
 ## Reactivity — Table-Ref Deps
 
-Reactive parity (LSC.INT.GQL-R02) works by table tracking, not by parsing the
+Reactive parity (LSC.QS.GQL-R02) works by table tracking, not by parsing the
 GraphQL document. The query context carries a `queriedTables: Set<string>`
 (`src/graphql.ts:12-16`). Before each execution the set is cleared
 (`:224`); resolvers add to it as they read tables (the set is handed to
@@ -67,14 +65,14 @@ same per-written-table invalidation model core db queries use
 (`:220`) with `graphql.variables` / `graphql.query` attributes (`:221-222`),
 sets the active OTel context for resolver tracing (`:226`), and calls
 `graphql.executeSync({ document, contextValue, schema, variableValues })`
-(`:228-233`) — fully synchronous, no promise (LSC.INT.GQL-R03). It records
+(`:228-233`) — fully synchronous, no promise (LSC.QS.GQL-R03). It records
 execution duration into `executionTimes` (`:254-256`) and returns
 `{ result, queriedTables, durationMs }` (`:258-262`).
 
 **Errors crash.** When `executeSync` returns `errors`, the span is marked ERROR
 (`:238`), the errors are logged, a `debugger` statement fires (`:246`), and
 `shouldNeverHappen(...)` throws (`:247`) — an unrecoverable crash, not a
-recoverable query error (LSC.INT.GQL-DQ1).
+recoverable query error (LSC.QS.GQL-DQ1).
 
 ## Typing & Result Mapping
 
@@ -84,7 +82,7 @@ constructor (`:132-147`): `undefined` → identity; a `Schema` →
 `Schema.decodeEither`, logging + `shouldNeverHappen` on decode failure
 (`:135-144`); a function → used directly (`:145-146`); anything else →
 `shouldNeverHappen` (`:147`). This is the typed-result / result-mapping contract
-(LSC.INT.GQL-R04; the `map` opt-out mirrors LS.SYS.STORE.RX-R05).
+(LSC.QS.GQL-R04; the `map` opt-out mirrors LS.SYS.STORE.RX-R05).
 
 ## Cache Identity (hash / deps)
 
@@ -92,7 +90,7 @@ The def `hash` is `LiveQueries.depsToString(options.deps)` when `deps` is given,
 else the document's operation name, else `shouldNeverHappen('No document name
 found and no deps provided')` (`src/graphql.ts:51-55`). `label` defaults to the
 operation name then `'graphql'` (`:56`, `:124`). The hash is the two-level dedup
-key and the explicit-deps escape hatch (LSC.INT.GQL-R05).
+key and the explicit-deps escape hatch (LSC.QS.GQL-R05).
 
 ## Schema & Context
 
@@ -110,13 +108,13 @@ for resolver tracing" (`:12-16`).
 SqliteDbWrapper, tracer, sessionId) => TContext }` — the intended
 schema+context-factory shape — but **no function in this package installs it on
 the store**; callers must assemble `store.context.graphql` and the
-`LazyGraphQLContextRef` themselves (LSC.INT.GQL-DQ2).
+`LazyGraphQLContextRef` themselves (LSC.QS.GQL-DQ2).
 
 ## Not Present
 
 - No use of `@livestore/framework-toolkit` — the package builds directly on
   `@livestore/livestore/internal` `LiveQueries` / `ReactiveGraph`
-  (`src/graphql.ts:5`). Core LS.SYS.INT-R02 (shared toolkit) does not apply.
-- No store-registry / lifecycle ownership (LS.SYS.INT-R03) — the produced def is
-  consumed by whatever binding subscribes to it.
+  (`src/graphql.ts:5`).
+- No store-registry or lifecycle ownership — the produced def is consumed by
+  whatever binding or code subscribes to it.
 - No tests (`package.json` `"test": "echo 'No tests'"`).

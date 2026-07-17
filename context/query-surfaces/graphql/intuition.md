@@ -1,21 +1,21 @@
-# GraphQL Integration — Intuition
+# GraphQL Query Surface — Intuition
 
 *For: contributors to `@livestore/graphql` · Assumes: the core reactive query
-model (live queries composing into one incremental graph,
-[../../../../context/02-system/05-store/01-reactivity/](https://github.com/livestorejs/livestore/tree/main/context/02-system/05-store/01-reactivity))
-· Covers: why GraphQL here is a query *kind*, not a framework binding*
+model (live queries composing into one incremental graph, core
+[`05-store/01-reactivity/`](https://github.com/livestorejs/livestore/tree/main/context/02-system/05-store/01-reactivity))
+· Covers: why GraphQL is a query *kind*, not a framework binding*
 
-## It's a query surface wearing the "integration" label
+## It's a query surface, not a framework binding
 
-The sibling nodes here — Solid, Svelte — are framework bindings: they translate
-one store into a framework's native reactive values and own nothing else.
-GraphQL is a different animal. It doesn't bind the store to a framework; it adds
-a new **way to write a query**. `queryGraphQL` gives you back exactly what
-`queryDb` gives you — a `LiveQueryDef` — so the GraphQL query drops into the same
-reactive graph and is consumed by the same React/Solid hooks. The store doesn't
-know or care that this particular live query happens to run resolvers. That is
-why it lives under `integrations/` but refines the *reactivity* contract, not the
-framework-integration one (see requirements §Context and the delta).
+The framework bindings — Solid, Svelte, under `integrations/` — translate one
+store into a framework's native reactive values and own nothing else. GraphQL is
+a different animal. It doesn't bind the store to a framework; it adds a new **way
+to write a query**. `queryGraphQL` gives you back exactly what `queryDb` gives
+you — a `LiveQueryDef` — so the GraphQL query drops into the same reactive graph
+and is consumed by the same React/Solid hooks. The store doesn't know or care
+that this particular live query happens to run resolvers. That is why it is homed
+here under `query-surfaces/`, refining the reactivity contract (it adds a new
+live-query kind), not the framework-integration one.
 
 ## The trick: reactivity by observing what resolvers touch
 
