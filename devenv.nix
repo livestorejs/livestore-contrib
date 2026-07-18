@@ -379,7 +379,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=electric pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/electric-specific.test.ts";
+    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=electric pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/electric-specific.test.ts src/electric-lifecycle.test.ts";
   };
   tasks."test:sync-provider:s2" = {
     description = "Run moved S2 sync-provider tests";
