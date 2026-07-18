@@ -4,10 +4,19 @@
 
 This repository is the contrib companion to `livestorejs/livestore`.
 
-- Architecture source of truth: `repos/livestore/context/repo-architecture/`
+- Architecture & contract source of truth: the core **intent layer** at
+  `repos/livestore/context/` (see [`livestorejs/livestore`](https://github.com/livestorejs/livestore/tree/main/context)); this repo hosts its own realization intent under `context/` (see Intent Layer below)
 - Progress tracker: `livestorejs/livestore#1265`
 - Core packages are consumed through the materialized megarepo member at `repos/livestore`
 - Shared generator and devenv helpers come from `repos/effect-utils`
+
+## Intent Layer (`context/`)
+
+`context/` is this repo's **realization intent layer** (a VRS tree): one node per contrib package, describing how it realizes a core pluggable dimension (adapter, sync provider, framework integration, devtools surface, query surface). Read [`context/spec.md`](./context/spec.md) for the contrib conventions.
+
+- The **core** intent layer (`repos/livestore/context/`, source: [`livestorejs/livestore`](https://github.com/livestorejs/livestore/tree/main/context)) is the source of truth for the contracts these nodes refine. Reference core contracts by their `LS.*` ID + link — never restate them here. Contrib IDs use the `LSC.*` namespaces and never enter the core ID table.
+- When a package's behavior, deviation, or open question changes, update its `context/` node. Confirmed divergence from a core contract → the node's `.delta/`; consequential choices → `.decisions/`.
+- A dependency-free enforcement suite mirrors core's: `bun tests/intent-layer/check.ts` (LSC ID uniqueness, namespace↔dir, `refines:` resolution, links, decision shape, maturity vocabulary). Run it and keep it green when editing `context/`. It also resolves `refines: LS.*` against the megarepo-pinned core intent layer when that pin carries `context/`.
 
 ## Development Environment
 
