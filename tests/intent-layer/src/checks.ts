@@ -35,8 +35,10 @@ export interface CheckResult {
   crossRepoActive: boolean
 }
 
-const CONTRIB_ID = String.raw`LSC(?:\.[A-Z]+)*-(?:A|T|R|DQ)\d+`
-const CORE_ID = String.raw`LS(?:\.[A-Z]+)*-(?:A|T|R|DQ)\d+`
+// Namespace segments may contain digits (e.g. `SYNC.S2`), so allow `[A-Z0-9]`
+// after the leading letter — otherwise digit-bearing IDs are silently skipped.
+const CONTRIB_ID = String.raw`LSC(?:\.[A-Z][A-Z0-9]*)*-(?:A|T|R|DQ)\d+`
+const CORE_ID = String.raw`LS(?:\.[A-Z][A-Z0-9]*)*-(?:A|T|R|DQ)\d+`
 const DEFINITION_RE = new RegExp(String.raw`^\s*-\s+\*\*(${CONTRIB_ID})[^*]*[:.]\*\*`)
 
 const walkFiles = (dir: string): string[] =>
@@ -79,7 +81,7 @@ const parseNamespaceTable = (contextDir: string) => {
     if (row.trimStart().startsWith('|') === false) continue
     const cells = row.split('|').map((c) => c.trim())
     if (cells.length < 3) continue
-    const namespaces = [...cells[1]!.matchAll(/`(LSC(?:\.[A-Z]+)*)-\*`/g)].map((m) => m[1]!)
+    const namespaces = [...cells[1]!.matchAll(/`(LSC(?:\.[A-Z][A-Z0-9]*)*)-\*`/g)].map((m) => m[1]!)
     if (namespaces.length === 0) continue
     const firstPath = /`([\w./-]+\/)`/.exec(cells[2]!)?.[1] ?? ''
     namespaces.forEach((ns, i) => map.set(ns, { dir: firstPath, isRealization: i > 0 }))
@@ -139,32 +141,33 @@ export const runChecks = (opts: Options): CheckResult => {
     return inNode ? [] : [`${rel(d.file)}:${d.line} — ${d.id} expected under context/${entry.dir}`]
   })
 
-  // 3. refines targets resolve — LSC.* locally, LS.* cross-repo (guarded)
-  v['refines'] = mdFiles.flatMap((file) =>
-    fs
-      .readFileSync(file, 'utf8')
-      .split('\n')
-      .flatMap((line, i) =>
-        [...line.matchAll(/`refines: ([^`]+)`/g)].flatMap((m) =>
-          m[1]!
-            .split(',')
-            .map((t) => t.trim())
-            .flatMap((token) => {
-              if (/^<[^>]+>$/.test(token)) return []
-              const isContrib = new RegExp(`^${CONTRIB_ID}$`).test(token)
-              const isCore = new RegExp(`^${CORE_ID}$`).test(token)
-              if (isContrib) {
-                return definedIds.has(token) ? [] : [`${rel(file)}:${i + 1} — refines target ${token} not defined in contrib`]
-              }
-              if (isCore) {
-                if (crossRepoActive === false) return [] // guarded
-                return coreIds.has(token) ? [] : [`${rel(file)}:${i + 1} — cross-repo refines target ${token} not in core intent layer`]
-              }
-              return [`${rel(file)}:${i + 1} — malformed refines target ${JSON.stringify(token)}`]
-            }),
-        ),
-      ),
-  )
+  // 3. refines targets resolve — LSC.* locally, LS.* cross-repo (guarded).
+  // Scan the whole file (not line-by-line) so a `refines:` span that wraps
+  // across lines is parsed as one span; the line number is derived from the
+  // match offset for reporting.
+  v['refines'] = mdFiles.flatMap((file) => {
+    const text = fs.readFileSync(file, 'utf8')
+    return [...text.matchAll(/`refines:\s*([^`]+)`/g)].flatMap((m) => {
+      const line = text.slice(0, m.index).split('\n').length
+      return m[1]!
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+        .flatMap((token) => {
+          if (/^<[^>]+>$/.test(token)) return []
+          const isContrib = new RegExp(`^${CONTRIB_ID}$`).test(token)
+          const isCore = new RegExp(`^${CORE_ID}$`).test(token)
+          if (isContrib) {
+            return definedIds.has(token) ? [] : [`${rel(file)}:${line} — refines target ${token} not defined in contrib`]
+          }
+          if (isCore) {
+            if (crossRepoActive === false) return [] // guarded
+            return coreIds.has(token) ? [] : [`${rel(file)}:${line} — cross-repo refines target ${token} not in core intent layer`]
+          }
+          return [`${rel(file)}:${line} — malformed refines target ${JSON.stringify(token)}`]
+        })
+    })
+  })
 
   // 4. relative links resolve (http/mailto/anchor skipped)
   v['links'] = mdFiles.flatMap((file) =>
