@@ -30,6 +30,7 @@ export const contribExampleMembers = [
   'examples/web-multi-store',
   'examples/web-todomvc-custom-elements',
   'examples/web-todomvc-experimental',
+  'examples/web-todomvc-redwood',
   'examples/web-todomvc-solid',
   'examples/web-todomvc-svelte',
   'examples/web-todomvc-sync-electric',
