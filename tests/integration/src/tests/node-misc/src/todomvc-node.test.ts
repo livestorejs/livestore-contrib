@@ -1,12 +1,13 @@
 import path from 'node:path'
 
-import { expect } from 'vitest'
+import { expect, it } from 'vitest'
 
-import { makeAdapter } from '@livestore/adapter-node'
+import { makeAdapter, makeWorkerAdapter } from '@livestore/adapter-node'
+import { WorkerArgv } from '@livestore/adapter-node/worker'
 import { createStore, StoreInternalsSymbol } from '@livestore/livestore'
 import { IS_CI, shouldNeverHappen } from '@livestore/utils'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
-import { Effect } from '@livestore/utils/effect'
+import { Effect, Schema } from '@livestore/utils/effect'
 import { nanoid } from '@livestore/utils/nanoid'
 
 // Reuse the same schema from node-sync tests
@@ -25,6 +26,44 @@ const TMP_STORE_DIR = path.join(
 const withTestCtx = Vitest.makeWithTestCtx({ timeout: IS_CI === true ? 600_000 : 900_000 })
 
 Vitest.describe('todomvc-node', () => {
+  it('round-trips worker arguments without extraArgs', () => {
+    const encoded = Schema.encodeSync(WorkerArgv)({
+      clientId: 'client',
+      storeId: 'store',
+      sessionId: 'session',
+      extraArgs: undefined,
+    })
+
+    expect(JSON.parse(encoded)).not.toHaveProperty('extraArgs')
+    expect(Schema.decodeSync(WorkerArgv)(encoded)).toEqual({
+      clientId: 'client',
+      storeId: 'store',
+      sessionId: 'session',
+    })
+  })
+
+  Vitest.live('should start a worker adapter without extra arguments', (test) =>
+    Effect.gen(function* () {
+      const adapter = makeWorkerAdapter({
+        workerUrl: new URL('./livestore-default.worker.ts', import.meta.url),
+        storage: { type: 'in-memory' },
+        clientId: 'default-worker-test',
+      })
+      const store = yield* createStore({
+        adapter,
+        schema,
+        storeId: nanoid(10),
+        disableDevtools: true,
+      })
+
+      const todo = { id: nanoid(), title: 'Worker default arguments' }
+      store.commit(events.todoCreated(todo))
+      expect(store.query(tables.todo)).toEqual([todo])
+
+      yield* store.shutdown()
+    }).pipe(withTestCtx(test)),
+  )
+
   Vitest.live('should push pending events to the leader after reboot', (test) =>
     Effect.gen(function* () {
       const storeId = nanoid(10)
@@ -70,23 +109,15 @@ Vitest.describe('todomvc-node', () => {
       // All operations should throw after shutdown
       expect(() =>
         store.commit(events.todoCreated({ id: nanoid(), title: 'Test' })),
-      ).toThrowErrorMatchingInlineSnapshot(
-        `[~@livestore/common/UnknownError]`,
-      )
-      expect(() => store.query(tables.todo)).toThrowErrorMatchingInlineSnapshot(
-        `[~@livestore/common/UnknownError]`,
-      )
+      ).toThrowErrorMatchingInlineSnapshot(`[~@livestore/common/UnknownError]`)
+      expect(() => store.query(tables.todo)).toThrowErrorMatchingInlineSnapshot(`[~@livestore/common/UnknownError]`)
       expect(() => store.subscribe(tables.todo, () => {})).toThrowErrorMatchingInlineSnapshot(
         `[~@livestore/common/UnknownError]`,
       )
     }).pipe(withTestCtx(test)),
   )
 
-  // TODO(livestorejs/livestore#1405): unskip once the core drain-on-shutdown fix lands and we repin.
-  // The queued-batch loss on shutdown can only be fixed in core `ClientSessionSyncProcessor`
-  // (the pusher fiber and `leaderPushQueue` are core-owned); the adapter-node in-flight fix covers
-  // only the single-batch reboot case. Skipped here so contrib CI is green while #1405 is pending.
-  Vitest.live.skip('should handle concurrent commits before shutdown', (test) =>
+  Vitest.live('should handle concurrent commits before shutdown', (test) =>
     Effect.gen(function* () {
       const storeId = nanoid(10)
       const adapter = makeAdapter({ storage: { type: 'fs', baseDirectory: TMP_STORE_DIR }, clientId: 'test' })

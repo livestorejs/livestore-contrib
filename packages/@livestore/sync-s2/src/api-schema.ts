@@ -7,7 +7,7 @@ export const PullArgs = Schema.Struct({
   storeId: Schema.String,
   s2SeqNum: Schema.Union([S2SeqNum, Schema.Literal('from-start')]),
   live: Schema.Boolean,
-  payload: Schema.UndefinedOr(Schema.Json),
+  payload: Schema.optional(Schema.Json),
 })
 
 export const PushPayload = Schema.Struct({

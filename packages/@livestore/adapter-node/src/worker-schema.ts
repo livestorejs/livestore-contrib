@@ -16,7 +16,7 @@ export const WorkerArgv = Schema.fromJsonString(
     clientId: Schema.String,
     storeId: Schema.String,
     sessionId: Schema.String,
-    extraArgs: Schema.UndefinedOr(Schema.Json),
+    extraArgs: Schema.optional(Schema.Json),
   }),
 )
 
@@ -26,7 +26,7 @@ export const StorageTypeInMemory = Schema.Struct({
    * Only works with single-threaded leader thread for now.
    * Should be mostly used for testing.
    */
-  importSnapshot: Schema.optional(Schema.Uint8Array as any as Schema.Codec<Uint8Array<ArrayBuffer>>),
+  importSnapshot: Schema.optional(Transferable.Uint8Array),
 })
 
 export type StorageTypeInMemory = typeof StorageTypeInMemory.Type
@@ -75,7 +75,7 @@ export class LeaderWorkerInnerInitialMessage extends Rpc.make('InitialMessage', 
       Schema.Struct({
         enabled: Schema.Literal(true),
         schemaPath: Schema.String,
-        port: Schema.Number,
+        port: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 65_535 })),
         host: Schema.String,
         schemaAlias: Schema.String,
         useExistingDevtoolsServer: Schema.Boolean,
@@ -124,14 +124,14 @@ export class LeaderWorkerInnerPushToLeader extends Rpc.make('PushToLeader', {
 
 export class LeaderWorkerInnerExport extends Rpc.make('Export', {
   payload: {},
-  success: Transferable.Uint8Array as Schema.Codec<Uint8Array<ArrayBuffer>>,
+  success: Transferable.Uint8Array,
   error: Schema.Never,
 }) {}
 
 export class LeaderWorkerInnerGetRecreateSnapshot extends Rpc.make('GetRecreateSnapshot', {
   payload: {},
   success: Schema.Struct({
-    snapshot: Transferable.Uint8Array as Schema.Codec<Uint8Array<ArrayBuffer>>,
+    snapshot: Transferable.Uint8Array,
     migrationsReport: MigrationsReport,
   }),
   error: Schema.Never,
@@ -139,7 +139,7 @@ export class LeaderWorkerInnerGetRecreateSnapshot extends Rpc.make('GetRecreateS
 
 export class LeaderWorkerInnerExportEventlog extends Rpc.make('ExportEventlog', {
   payload: {},
-  success: Transferable.Uint8Array as Schema.Codec<Uint8Array<ArrayBuffer>>,
+  success: Transferable.Uint8Array,
   error: Schema.Never,
 }) {}
 
