@@ -1,0 +1,67 @@
+// Generated file - DO NOT EDIT
+// Source: tsconfig.json.genie.ts
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "ignoreEffectWarningsInTscExitCode": false,
+        "ignoreEffectSuggestionsInTscExitCode": false,
+        "ignoreEffectErrorsInTscExitCode": false,
+        "includeSuggestionsInTsc": true,
+        "pipeableMinArgCount": 2,
+        "diagnosticSeverity": {
+          "missedPipeableOpportunity": "warning",
+          "schemaUnionOfLiterals": "warning",
+          "anyUnknownInErrorContext": "warning",
+          "preferSchemaOverJson": "warning"
+        },
+        "allowedDuplicatedPackages": ["@livestore/utils"]
+      }
+    ],
+    "composite": true,
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "types": ["vitest/globals", "node"]
+  },
+  "include": ["./src"],
+  "exclude": ["node_modules", "**/dist", "**/node_modules/.pnpm", "**/*.genie.ts"],
+  "references": [
+    {
+      "path": "../../packages/@livestore/adapter-web"
+    },
+    {
+      "path": "../../packages/@livestore/common"
+    },
+    {
+      "path": "../../packages/@livestore/livestore"
+    },
+    {
+      "path": "../../packages/@livestore/sqlite-wasm"
+    },
+    {
+      "path": "../../packages/@livestore/utils"
+    },
+    {
+      "path": "../../packages/@livestore/utils-dev"
+    }
+  ]
+}

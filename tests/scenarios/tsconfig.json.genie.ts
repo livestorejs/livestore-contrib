@@ -1,0 +1,24 @@
+import { baseTsconfigCompilerOptions, packageTsconfigExclude, tsconfigJson } from '../../genie/repo.ts'
+
+export default tsconfigJson({
+  compilerOptions: {
+    ...baseTsconfigCompilerOptions,
+    composite: true,
+    exactOptionalPropertyTypes: false,
+    outDir: './dist',
+    rootDir: './src',
+    resolveJsonModule: true,
+    tsBuildInfoFile: './dist/.tsbuildinfo',
+    types: ['vitest/globals', 'node'],
+  },
+  include: ['./src'],
+  exclude: [...packageTsconfigExclude],
+  references: [
+    { path: '../../packages/@livestore/adapter-web' },
+    { path: '../../packages/@livestore/common' },
+    { path: '../../packages/@livestore/livestore' },
+    { path: '../../packages/@livestore/sqlite-wasm' },
+    { path: '../../packages/@livestore/utils' },
+    { path: '../../packages/@livestore/utils-dev' },
+  ],
+})
