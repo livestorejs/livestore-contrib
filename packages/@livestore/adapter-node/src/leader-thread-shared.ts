@@ -40,9 +40,9 @@ export interface MakeLeaderThreadArgs {
   syncOptions: SyncOptions | undefined
   storage: WorkerSchema.StorageType
   makeSqliteDb: MakeNodeSqliteDb
-  devtools: WorkerSchema.LeaderWorkerInnerInitialMessage['devtools']
+  devtools: WorkerSchema.LeaderWorkerInnerInitialMessagePayload['devtools']
   schema: LiveStoreSchema
-  syncPayloadEncoded: Schema.JsonValue | undefined
+  syncPayloadEncoded: Schema.Json | undefined
   syncPayloadSchema: Schema.Schema<any> | undefined
   testing: TestingOverrides | undefined
 }
@@ -64,7 +64,7 @@ export const makeLeaderThread = ({
   Scope.Scope
 > =>
   Effect.gen(function* () {
-    const runtime = yield* Effect.runtime()
+    const services = yield* Effect.context()
 
     const schemaHashSuffix =
       schema.state.sqlite.migrations.strategy === 'manual' ? 'fixed' : schema.state.sqlite.hash.toString()
@@ -79,18 +79,19 @@ export const makeLeaderThread = ({
       return storage.type === 'in-memory'
         ? makeSqliteDb({
             _tag: 'in-memory',
-            configureDb: (db) =>
-              configureConnection(db, { foreignKeys: true }).pipe(Effect.provide(runtime), Effect.runSync),
+            configureDb: (db) => configureConnection(db, { foreignKeys: true }).pipe(Effect.runSyncWith(services)),
           })
-        : makeSqliteDb({
-            _tag: 'fs',
-            directory: path.join(storage.baseDirectory ?? '', storeId),
-            fileName:
-              kind === 'state' ? getStateDbFileName(schemaHashSuffix) : `eventlog@${liveStoreStorageFormatVersion}.db`,
-            // TODO enable WAL for nodejs
-            configureDb: (db) =>
-              configureConnection(db, { foreignKeys: true }).pipe(Effect.provide(runtime), Effect.runSync),
-          }).pipe(Effect.acquireRelease((db) => Effect.sync(() => db.close())))
+        : Effect.acquireRelease(
+            makeSqliteDb({
+              _tag: 'fs',
+              directory: path.join(storage.baseDirectory ?? '', storeId),
+              fileName:
+                kind === 'state' ? getStateDbFileName(schemaHashSuffix) : `eventlog@${liveStoreStorageFormatVersion}.db`,
+              // TODO enable WAL for nodejs
+              configureDb: (db) => configureConnection(db, { foreignKeys: true }).pipe(Effect.runSyncWith(services)),
+            }),
+            (db) => Effect.sync(() => db.close()),
+          )
     }
 
     // Might involve some async work, so we're running them concurrently
@@ -116,7 +117,7 @@ export const makeLeaderThread = ({
       devtoolsOptions,
       shutdownChannel,
       syncPayloadEncoded,
-      syncPayloadSchema,
+      syncPayloadSchema: syncPayloadSchema as Schema.Decoder<Schema.Json, never> | undefined,
     })
   }).pipe(
     Effect.tapCauseLogPretty,
@@ -139,7 +140,7 @@ const makeDevtoolsOptions = ({
   dbEventlog: LeaderSqliteDb
   storeId: string
   clientId: string
-  devtools: WorkerSchema.LeaderWorkerInnerInitialMessage['devtools']
+  devtools: WorkerSchema.LeaderWorkerInnerInitialMessagePayload['devtools']
 }): Effect.Effect<DevtoolsOptions, UnknownError, Scope.Scope> =>
   Effect.gen(function* () {
     if (devtools.enabled === false) {

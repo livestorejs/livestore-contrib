@@ -8,20 +8,22 @@ import { events } from '@livestore/livestore/internal/testing-utils'
 import { OtelLiveHttp } from '@livestore/utils-dev/node'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import {
-  Chunk,
+  type Context,
   Duration,
   Effect,
   FetchHttpClient,
+  Fiber,
   type HttpClient,
   KeyValueStore,
   Layer,
   Logger,
-  LogLevel,
   ManagedRuntime,
   Option,
+  References,
   Schedule,
   Schema,
   Stream,
+  SubscriptionRef,
 } from '@livestore/utils/effect'
 
 import { providerKeys, providerRegistry } from './providers/registry.ts'
@@ -37,12 +39,14 @@ const makeFactory = EventFactory.makeFactory(events)
 
 const providerLayers = providerKeys.map((key) => providerRegistry[key])
 
-const withTestCtx = ({ suffix, timeout }: { suffix?: string; timeout?: Duration.DurationInput } = {}) =>
+type RuntimeServices = SyncProviderImpl | HttpClient.HttpClient
+
+const withTestCtx = ({ suffix, timeout }: { suffix?: string; timeout?: Duration.Input } = {}) =>
   Vitest.makeWithTestCtx({
     suffix,
     timeout,
     // makeLayer: (testContext) => makeFileLogger('runner', { testContext }),
-    makeLayer: (_testContext) => Layer.mergeAll(Logger.prettyWithThread('test-runner'), KeyValueStore.layerMemory),
+    makeLayer: (_testContext) => Layer.mergeAll(Logger.layer([Logger.consolePretty()]), KeyValueStore.layerMemory),
     forceOtel: true,
   })
 
@@ -54,7 +58,8 @@ const runFirstNonEmpty = <T, E, R>(stream: Stream.Stream<SyncBackend.PullResItem
 
 // TODO come up with a way to target specific providers individually
 Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, ({ layer, name }) => {
-  let runtime: ManagedRuntime.ManagedRuntime<SyncProviderImpl | HttpClient.HttpClient, never>
+  let runtime: ManagedRuntime.ManagedRuntime<RuntimeServices, never>
+  let runtimeContext: Context.Context<RuntimeServices>
   let testId: string
 
   Vitest.beforeAll(async () => {
@@ -63,13 +68,13 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       layer.pipe(
         Layer.provideMerge(FetchHttpClient.layer),
         Layer.provide(OtelLiveHttp({ rootSpanName: 'beforeAll', serviceName: 'vitest-runner', skipLogUrl: false })),
-        Layer.provide(Logger.prettyWithThread('test-runner')),
-        Layer.provide(Logger.minimumLogLevel(LogLevel.Debug)),
+        Layer.provide(Logger.layer([Logger.consolePretty()])),
+        Layer.provide(Layer.succeed(References.MinimumLogLevel, 'Debug')),
         Layer.orDie,
       ),
     )
     // Eagerly start the runtime
-    await runtime.runPromise(Effect.void)
+    runtimeContext = await runtime.context()
   })
 
   Vitest.afterAll(async () => await runtime.dispose())
@@ -86,11 +91,11 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
           },
           options,
         ),
-      ).pipe(Effect.provide(runtime)),
+      ).pipe(Effect.provide(runtimeContext)),
     )
 
   // Simple test to verify the setup works
-  Vitest.scopedLive('can create sync backend', (test) =>
+  Vitest.live('can create sync backend', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
@@ -103,7 +108,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('can ping sync backend', (test) =>
+  Vitest.live('can ping sync backend', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
@@ -111,24 +116,24 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('can connect to sync backend', (test) =>
+  Vitest.live('can connect to sync backend', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
       // Check initial state
-      const initialConnected = yield* syncBackend.isConnected.get
+      const initialConnected = yield* SubscriptionRef.get(syncBackend.isConnected)
       expect(initialConnected).toBe(false)
 
       // Connect
       yield* syncBackend.connect
 
       // Check connected state
-      const connected = yield* syncBackend.isConnected
+      const connected = yield* SubscriptionRef.get(syncBackend.isConnected)
       expect(connected).toBe(true)
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('can pull events from sync backend', (test) =>
+  Vitest.live('can pull events from sync backend', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
@@ -141,7 +146,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
   )
 
   Vitest.describe('live pull', () => {
-    Vitest.scopedLive('needs to return a no-more page info', (test) =>
+    Vitest.live('needs to return a no-more page info', (test) =>
       Effect.gen(function* () {
         const syncBackend = yield* makeProvider(test.task.name)
 
@@ -151,13 +156,13 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       }).pipe(withTestCtx()(test)),
     )
 
-    Vitest.scopedLive('survives idle and receives later event', (test) =>
+    Vitest.live('survives idle and receives later event', (test) =>
       Effect.gen(function* () {
         const syncBackend = yield* makeProvider(test.task.name)
         const eventFactory = makeFactory({ client: defaultClient, startSeq: 1, initialParent: 'root' })
 
         // Start live pull and wait for the first non-empty batch in a fiber
-        const fiber = yield* syncBackend.pull(Option.none(), { live: true }).pipe(runFirstNonEmpty, Effect.fork)
+        const fiber = yield* syncBackend.pull(Option.none(), { live: true }).pipe(runFirstNonEmpty, Effect.forkChild)
 
         // Let the live pull idle for a bit (covers long-poll/SSE)
         yield* Effect.sleep(800)
@@ -165,13 +170,13 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
         // Push an event; live stream should emit it
         yield* syncBackend.push([eventFactory.todoCreated.next({ id: 'idle-1', text: 'Late event', completed: false })])
 
-        const result = yield* fiber
+        const result = yield* Fiber.join(fiber)
         expect(result.batch.length).toBe(1)
       }).pipe(withTestCtx()(test)),
     )
   })
 
-  Vitest.scopedLive('can pull with cursor', (test) =>
+  Vitest.live('can pull with cursor', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
@@ -197,27 +202,31 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
 
     const fewLargeScenarioSchema = Schema.Struct({
       variant: Schema.Literal('fewLarge'),
-      eventCount: Schema.Int.pipe(Schema.between(20, 28)),
-      payloadSize: Schema.Int.pipe(Schema.between(70_000, 110_000)),
-      pushBatchSize: Schema.Int.pipe(Schema.between(6, 12)),
-    }).pipe(
-      Schema.filter((scenario) => scenario.eventCount * scenario.payloadSize >= MIN_BATCH_PAYLOAD_BYTES, {
-        message: () => 'Large batch scenarios should exceed provider payload limits',
-      }),
+      eventCount: Schema.Int.check(Schema.isBetween({ minimum: 20, maximum: 28 })),
+      payloadSize: Schema.Int.check(Schema.isBetween({ minimum: 70_000, maximum: 110_000 })),
+      pushBatchSize: Schema.Int.check(Schema.isBetween({ minimum: 6, maximum: 12 })),
+    }).check(
+      Schema.makeFilter((scenario) =>
+        scenario.eventCount * scenario.payloadSize >= MIN_BATCH_PAYLOAD_BYTES
+          ? undefined
+          : 'Large batch scenarios should exceed provider payload limits',
+      ),
     )
 
     const manySmallScenarioSchema = Schema.Struct({
       variant: Schema.Literal('manySmall'),
-      eventCount: Schema.Int.pipe(Schema.between(1_200, 1_600)),
-      payloadSize: Schema.Int.pipe(Schema.between(900, 1_200)),
-      pushBatchSize: Schema.Int.pipe(Schema.between(30, 160)),
-    }).pipe(
-      Schema.filter((scenario) => scenario.eventCount * scenario.payloadSize >= MIN_BATCH_PAYLOAD_BYTES, {
-        message: () => 'Small batch scenarios should exceed provider payload limits',
-      }),
+      eventCount: Schema.Int.check(Schema.isBetween({ minimum: 1_200, maximum: 1_600 })),
+      payloadSize: Schema.Int.check(Schema.isBetween({ minimum: 900, maximum: 1_200 })),
+      pushBatchSize: Schema.Int.check(Schema.isBetween({ minimum: 30, maximum: 160 })),
+    }).check(
+      Schema.makeFilter((scenario) =>
+        scenario.eventCount * scenario.payloadSize >= MIN_BATCH_PAYLOAD_BYTES
+          ? undefined
+          : 'Small batch scenarios should exceed provider payload limits',
+      ),
     )
 
-    const LargeBatchScenarioSchema = Schema.Union(fewLargeScenarioSchema, manySmallScenarioSchema)
+    const LargeBatchScenarioSchema = Schema.Union([fewLargeScenarioSchema, manySmallScenarioSchema])
 
     type LargeBatchScenario = Schema.Schema.Type<typeof LargeBatchScenarioSchema>
 
@@ -273,26 +282,37 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
         }
       })
 
+    type BatchPullStats = {
+      totalEvents: number
+      nonEmptyBatches: number
+      maxBatchSize: number
+    }
+
     const collectBatchPullStats = (syncBackend: SyncBackend.SyncBackend) =>
       syncBackend.pull(Option.none()).pipe(
-        Stream.runFold({ totalEvents: 0, nonEmptyBatches: 0, maxBatchSize: 0 }, (acc, { batch }) => ({
-          totalEvents: acc.totalEvents + batch.length,
-          nonEmptyBatches: acc.nonEmptyBatches + (batch.length > 0 ? 1 : 0),
-          maxBatchSize: Math.max(acc.maxBatchSize, batch.length),
-        })),
+        Stream.runFold(
+          (): BatchPullStats => ({ totalEvents: 0, nonEmptyBatches: 0, maxBatchSize: 0 }),
+          (acc, { batch }) => ({
+            totalEvents: acc.totalEvents + batch.length,
+            nonEmptyBatches: acc.nonEmptyBatches + (batch.length > 0 ? 1 : 0),
+            maxBatchSize: Math.max(acc.maxBatchSize, batch.length),
+          }),
+        ),
       )
 
     // Per-scenario timeout (all providers)
     const scenarioTimeout = Duration.minutes(6)
     // Vitest case timeout in ms (scenario + buffer)
     const vitestTimeoutMs = Duration.toMillis(scenarioTimeout) + Duration.toMillis(Duration.seconds(30))
-    const batchPingSchedule = Schedule.spaced(Duration.minutes(5)).pipe(Schedule.addDelay(() => Duration.minutes(1)))
+    const batchPingSchedule = Schedule.spaced(Duration.minutes(5)).pipe(
+      Schedule.addDelay(() => Effect.succeed(Duration.minutes(1))),
+    )
 
     // Additionally to the property-based tests we also have some deterministic scenarios.
     for (const { label, scenario } of deterministicBatchCases) {
       const scenarioSummary = batchScenarioSummary(scenario)
 
-      Vitest.scopedLive(label, (test) => {
+      Vitest.live(label, (test) => {
         return Effect.gen(function* () {
           const scenarioId = nanoid()
           const approxBytes = approxBatchPayloadBytes(scenario)
@@ -326,7 +346,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       })
     }
 
-    Vitest.scopedLive.prop(
+    Vitest.live.prop(
       'streams batch variations over provider payload limits',
       [LargeBatchScenarioSchema],
       ([scenario], test) => {
@@ -367,7 +387,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
     )
   })
 
-  Vitest.scopedLive('non-live pull returns multiple events', (test) =>
+  Vitest.live('non-live pull returns multiple events', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
       const eventFactory = makeFactory({ client: defaultClient, startSeq: 1, initialParent: 'root' })
@@ -391,11 +411,11 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
   )
 
   Vitest.describe('connection management', () => {
-    Vitest.scopedLive('can reconnect to sync backend', (test) =>
+    Vitest.live('can reconnect to sync backend', (test) =>
       Effect.gen(function* () {
         const syncBackend = yield* makeProvider(test.task.name)
 
-        const fiber = yield* syncBackend.pull(Option.none(), { live: true }).pipe(runFirstNonEmpty, Effect.fork)
+        const fiber = yield* syncBackend.pull(Option.none(), { live: true }).pipe(runFirstNonEmpty, Effect.forkChild)
 
         const syncProvider = yield* SyncProviderImpl
 
@@ -408,13 +428,13 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
         eventFactory.todoCreated.advanceTo(1, 'root')
         yield* syncBackend.push([eventFactory.todoCreated.next({ id: '1', text: 'Test event 1.', completed: false })])
 
-        const result = yield* fiber
+        const result = yield* Fiber.join(fiber)
         expect(result.batch.length).toBe(1)
-      }).pipe(Effect.provide(runtime), withTestCtx()(test)),
+      }).pipe(Effect.provide(runtimeContext), withTestCtx()(test)),
     )
   })
 
-  Vitest.scopedLive('remaining field works correctly', (test) =>
+  Vitest.live('remaining field works correctly', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
@@ -477,7 +497,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('remaining field with limited take', (test) =>
+  Vitest.live('remaining field with limited take', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider(test.task.name)
 
@@ -495,8 +515,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
 
       // Take only first 3 emissions from the stream
       // Note: Each emission from the Electric provider contains a batch of events
-      const limitedResultsChunk = yield* syncBackend.pull(Option.none()).pipe(Stream.take(3), Stream.runCollect)
-      const limitedResults = Chunk.toArray(limitedResultsChunk)
+      const limitedResults = yield* syncBackend.pull(Option.none()).pipe(Stream.take(3), Stream.runCollect)
 
       // Should have at least 1 result (Electric batches events)
       expect(limitedResults.length).toBeGreaterThanOrEqual(1)
@@ -519,8 +538,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       }
 
       // Now pull all to verify there were indeed more items available
-      const allResultsChunk = yield* syncBackend.pull(Option.none()).pipe(Stream.runCollect)
-      const allResults = Chunk.toArray(allResultsChunk)
+      const allResults = yield* syncBackend.pull(Option.none()).pipe(Stream.runCollect)
 
       // Count total events across all results
       const totalItemCount = allResults.reduce((acc, r) => acc + r.batch.length, 0)
@@ -552,7 +570,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('large batch pagination', (test) =>
+  Vitest.live('large batch pagination', (test) =>
     Effect.gen(function* () {
       const syncBackend = yield* makeProvider('large-batch-test')
 
@@ -580,8 +598,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       }
 
       // Pull all events non-live
-      const allResultsChunk = yield* syncBackend.pull(Option.none()).pipe(Stream.runCollect)
-      const allResults = Chunk.toArray(allResultsChunk)
+      const allResults = yield* syncBackend.pull(Option.none()).pipe(Stream.runCollect)
 
       // Count total events retrieved
       const totalRetrievedEvents = allResults.reduce((acc, r) => acc + r.batch.length, 0)
@@ -614,8 +631,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
           metadata: middleEvent.metadata,
         })
 
-        const fromMiddleChunk = yield* syncBackend.pull(middleCursor).pipe(Stream.runCollect)
-        const eventsFromMiddle = Chunk.toArray(fromMiddleChunk).flatMap((r) => r.batch)
+        const eventsFromMiddle = (yield* syncBackend.pull(middleCursor).pipe(Stream.runCollect)).flatMap((r) => r.batch)
 
         // Should get events after the cursor (or 0 if near the end)
         expect(eventsFromMiddle.length).toBeGreaterThanOrEqual(0)
@@ -646,7 +662,7 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
    *
    * @see https://github.com/livestorejs/livestore/issues/981
    */
-  Vitest.scopedLive('BackendIdMismatchError serializes correctly', (test) =>
+  Vitest.live('BackendIdMismatchError serializes correctly', (test) =>
     Effect.gen(function* () {
       const originalError = new BackendIdMismatchError({
         expected: 'expected-backend-id-123',
@@ -659,8 +675,8 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
       expect(originalError.received).toBe('received-backend-id-456')
 
       // Simulate what happens during RPC: encode to JSON and decode back
-      const str = yield* Schema.encode(Schema.parseJson())(originalError)
-      const encoded = (yield* Schema.decodeUnknown(Schema.parseJson())(str)) as {
+      const str = yield* Schema.encodeEffect(Schema.UnknownFromJsonString)(originalError)
+      const encoded = (yield* Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(str)) as {
         _tag: string
         expected: string
         received: string

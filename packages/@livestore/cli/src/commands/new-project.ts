@@ -3,7 +3,8 @@ import * as nodePath from 'node:path'
 
 import { sluggify } from '@livestore/utils'
 import {
-  Command,
+  ChildProcess,
+  ChildProcessSpawner,
   Console,
   Effect,
   FileSystem,
@@ -19,7 +20,7 @@ import { detectPackageManager, pmCommands } from '../package-manager.ts'
 // Schema for GitHub API response
 const GitHubContentSchema = Schema.Struct({
   name: Schema.String,
-  type: Schema.Literal('dir', 'file'),
+  type: Schema.Literals(['dir', 'file']),
   path: Schema.String,
   download_url: Schema.NullOr(Schema.String),
 })
@@ -34,11 +35,11 @@ const githubRequest = (url: string) => {
 
 /** Schema for parsing package.json scripts (dev or start) */
 const PackageJsonScriptsSchema = Schema.Struct({
-  scripts: Schema.Union(Schema.Struct({ dev: Schema.String }), Schema.Struct({ start: Schema.String })),
+  scripts: Schema.Union([Schema.Struct({ dev: Schema.String }), Schema.Struct({ start: Schema.String })]),
 })
 
 // Error types
-export class ExampleNotFoundError extends Schema.TaggedError<ExampleNotFoundError>(
+export class ExampleNotFoundError extends Schema.TaggedErrorClass<ExampleNotFoundError>(
   '~@livestore/cli/ExampleNotFoundError',
 )('ExampleNotFoundError', {
   exampleName: Schema.String,
@@ -46,19 +47,19 @@ export class ExampleNotFoundError extends Schema.TaggedError<ExampleNotFoundErro
   message: Schema.String,
 }) {}
 
-export class NetworkError extends Schema.TaggedError<NetworkError>('~@livestore/cli/NetworkError')('NetworkError', {
+export class NetworkError extends Schema.TaggedErrorClass<NetworkError>('~@livestore/cli/NetworkError')('NetworkError', {
   cause: Schema.Unknown,
   message: Schema.String,
 }) {}
 
-export class DirectoryExistsError extends Schema.TaggedError<DirectoryExistsError>(
+export class DirectoryExistsError extends Schema.TaggedErrorClass<DirectoryExistsError>(
   '~@livestore/cli/DirectoryExistsError',
 )('DirectoryExistsError', {
   path: Schema.String,
   message: Schema.String,
 }) {}
 
-export class NoExamplesError extends Schema.TaggedError<NoExamplesError>('~@livestore/cli/NoExamplesError')(
+export class NoExamplesError extends Schema.TaggedErrorClass<NoExamplesError>('~@livestore/cli/NoExamplesError')(
   'NoExamplesError',
   {
     message: Schema.String,
@@ -75,7 +76,7 @@ const fetchExamples = (ref: string) =>
     const request = githubRequest(url)
     const response = yield* HttpClient.execute(request).pipe(
       Effect.scoped,
-      Effect.catchAll(
+      Effect.catch(
         (error) =>
           new NetworkError({
             cause: error,
@@ -86,8 +87,10 @@ const fetchExamples = (ref: string) =>
 
     const responseText = yield* response.text
 
-    const examples = yield* Schema.decodeUnknown(Schema.parseJson(GitHubContentsResponseSchema))(responseText).pipe(
-      Effect.catchAll(
+    const examples = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(GitHubContentsResponseSchema))(
+      responseText,
+    ).pipe(
+      Effect.catch(
         (error) =>
           new NetworkError({
             cause: error,
@@ -130,6 +133,8 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
   Effect.gen(function* () {
     yield* Console.log(`📥 Downloading example "${exampleName}" from ref "${ref}"...`)
 
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+
     const tempDir = yield* Effect.sync(() => os.tmpdir())
     const tarballPath = nodePath.join(tempDir, `livestore-${sluggify(ref)}-${Date.now()}.tar.gz`)
     const tarballUrl = `https://api.github.com/repos/livestorejs/livestore/tarball/${ref}`
@@ -139,7 +144,7 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
 
     const response = yield* HttpClient.execute(request).pipe(
       Effect.scoped,
-      Effect.catchAll(
+      Effect.catch(
         (error) =>
           new NetworkError({
             cause: error,
@@ -161,10 +166,9 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
     const extractDir = nodePath.join(tempDir, `extract-${Date.now()}`)
     yield* fs.makeDirectory(extractDir, { recursive: true })
 
-    // Extract tarball using Effect Command
-    yield* Command.make('tar', '-xzf', tarballPath, '-C', extractDir).pipe(
-      Command.exitCode,
-      Effect.catchAll(
+    // Extract tarball using a child process
+    yield* spawner.exitCode(ChildProcess.make('tar', ['-xzf', tarballPath, '-C', extractDir])).pipe(
+      Effect.catch(
         (error) =>
           new NetworkError({
             cause: error,
@@ -197,10 +201,9 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
       })
     }
 
-    // Copy the example directory contents to the destination using Effect Command
-    yield* Command.make('cp', '-r', `${exampleSourcePath}/.`, destinationPath).pipe(
-      Command.exitCode,
-      Effect.catchAll(
+    // Copy the example directory contents to the destination using a child process
+    yield* spawner.exitCode(ChildProcess.make('cp', ['-r', `${exampleSourcePath}/.`, destinationPath])).pipe(
+      Effect.catch(
         (error) =>
           new NetworkError({
             cause: error,
@@ -210,10 +213,10 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
     )
 
     // Clean up extract directory
-    yield* fs.remove(extractDir, { recursive: true }).pipe(Effect.catchAll(() => Effect.void))
+    yield* fs.remove(extractDir, { recursive: true }).pipe(Effect.catch(() => Effect.void))
 
     // Clean up tarball
-    yield* fs.remove(tarballPath).pipe(Effect.catchAll(() => Effect.void))
+    yield* fs.remove(tarballPath).pipe(Effect.catch(() => Effect.void))
 
     yield* Console.log(`✅ Example "${exampleName}" created successfully at: ${destinationPath}`)
   })
@@ -221,22 +224,22 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
 export const createCommand = Cli.Command.make(
   'create',
   {
-    example: Cli.Options.text('example').pipe(
-      Cli.Options.optional,
-      Cli.Options.withDescription('Example name to create (bypasses interactive selection)'),
+    example: Cli.Flag.string('example').pipe(
+      Cli.Flag.optional,
+      Cli.Flag.withDescription('Example name to create (bypasses interactive selection)'),
     ),
-    ref: Cli.Options.text('ref').pipe(
-      Cli.Options.withAlias('commit'),
-      Cli.Options.withAlias('branch'),
-      Cli.Options.withAlias('tag'),
-      Cli.Options.withDefault('main'),
-      Cli.Options.withDescription(
+    ref: Cli.Flag.string('ref').pipe(
+      Cli.Flag.withAlias('commit'),
+      Cli.Flag.withAlias('branch'),
+      Cli.Flag.withAlias('tag'),
+      Cli.Flag.withDefault('main'),
+      Cli.Flag.withDescription(
         'The name of the commit/branch/tag to fetch examples from. Pull requests refs must be fully-formed (e.g., `refs/pull/123/merge`).',
       ),
     ),
-    path: Cli.Args.text({ name: 'path' }).pipe(
-      Cli.Args.optional,
-      Cli.Args.withDescription('Destination path for the new project'),
+    path: Cli.Argument.string('path').pipe(
+      Cli.Argument.optional,
+      Cli.Argument.withDescription('Destination path for the new project'),
     ),
   },
   Effect.fn(function* ({
@@ -289,7 +292,9 @@ export const createCommand = Cli.Command.make(
     const fs = yield* FileSystem.FileSystem
     const packageJsonPath = nodePath.join(destinationPath, 'package.json')
     const packageJsonContent = yield* fs.readFileString(packageJsonPath)
-    const runScript = yield* Schema.decodeUnknown(Schema.parseJson(PackageJsonScriptsSchema))(packageJsonContent).pipe(
+    const runScript = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PackageJsonScriptsSchema))(
+      packageJsonContent,
+    ).pipe(
       Effect.map((pkg) => ('dev' in pkg.scripts ? ('dev' as const) : ('start' as const))),
       Effect.orElseSucceed(() => undefined),
     )

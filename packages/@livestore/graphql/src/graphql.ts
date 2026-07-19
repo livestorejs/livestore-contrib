@@ -4,7 +4,7 @@ import type { RefreshReason, SqliteDbWrapper, Store } from '@livestore/livestore
 import { StoreInternalsSymbol } from '@livestore/livestore'
 import { LiveQueries, ReactiveGraph } from '@livestore/livestore/internal'
 import { objectToString, omitUndefineds, shouldNeverHappen } from '@livestore/utils'
-import { Equal, Hash, Predicate, Schema, TreeFormatter } from '@livestore/utils/effect'
+import { Equal, Hash, Predicate, Result, Schema, SchemaIssue } from '@livestore/utils/effect'
 import * as otel from '@opentelemetry/api'
 import type { GraphQLSchema } from 'graphql'
 import * as graphql from 'graphql'
@@ -32,7 +32,7 @@ export type GraphQLOptions<TContext> = {
   makeContext: (db: SqliteDbWrapper, tracer: otel.Tracer, sessionId: string) => TContext
 }
 
-export type MapResult<To, From> = ((res: From, get: LiveQueries.GetAtomResult) => To) | Schema.Schema<To, From>
+export type MapResult<To, From> = ((res: From, get: LiveQueries.GetAtomResult) => To) | Schema.Codec<To, From>
 
 export const queryGraphQL = <
   TResult extends Record<string, any>,
@@ -134,12 +134,14 @@ export class LiveStoreGraphQLQuery<
         ? (res: TResult) => res as any as TResultMapped
         : Schema.isSchema(map) === true
           ? (res: TResult) => {
-              const parseResult = Schema.decodeEither(map as Schema.Schema<TResultMapped, TResult>)(res)
-              if (parseResult._tag === 'Left') {
-                console.error(`Error parsing GraphQL query result: ${TreeFormatter.formatErrorSync(parseResult.left)}`)
-                return shouldNeverHappen(`Error parsing SQL query result: ${String(parseResult.left)}`)
+              const parseResult = Schema.decodeResult(map as Schema.Codec<TResultMapped, TResult>)(res)
+              if (Result.isFailure(parseResult) === true) {
+                console.error(
+                  `Error parsing GraphQL query result: ${SchemaIssue.makeFormatterDefault()(parseResult.failure.issue)}`,
+                )
+                return shouldNeverHappen(`Error parsing SQL query result: ${String(parseResult.failure)}`)
               } else {
-                return parseResult.right
+                return parseResult.success
               }
             }
           : typeof map === 'function'

@@ -6,20 +6,20 @@ import { expect } from 'vitest'
 import { ClientSessionSyncProcessorSimulationParams } from '@livestore/common'
 import { IS_CI, stringifyObject } from '@livestore/utils'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
-import { WranglerDevServerService } from '@livestore/utils-dev/wrangler'
+import { WranglerDevServer } from '@livestore/utils-dev/wrangler'
 import {
   Duration,
   Effect,
   FetchHttpClient,
   Layer,
-  Logger,
-  LogLevel,
+  References,
+  RpcClient,
+  RpcWorker,
   Schema,
   Stream,
-  Worker,
 } from '@livestore/utils/effect'
 import { nanoid } from '@livestore/utils/nanoid'
-import { ChildProcessWorker, PlatformNode } from '@livestore/utils/node'
+import { PlatformNode } from '@livestore/utils/node'
 
 import { makeFileLogger } from './fixtures/file-logger.ts'
 import * as WorkerSchema from './worker-schema.ts'
@@ -38,15 +38,15 @@ const withTestCtx = ({ suffix }: { suffix?: string } = {}) =>
     makeLayer: (testContext) =>
       Layer.mergeAll(
         makeFileLogger('runner', { testContext }),
-        WranglerDevServerService.Default({
+        WranglerDevServer.layer({
           cwd: `${import.meta.dirname}/fixtures`,
           readiness: { connectTimeout: Duration.seconds(45) },
         }).pipe(
           Layer.provide(
             Layer.mergeAll(
-              PlatformNode.NodeContext.layer,
+              PlatformNode.NodeServices.layer,
               FetchHttpClient.layer,
-              Logger.minimumLogLevel(LogLevel.Debug),
+              Layer.succeed(References.MinimumLogLevel, 'Debug'),
             ),
           ),
         ),
@@ -54,7 +54,7 @@ const withTestCtx = ({ suffix }: { suffix?: string } = {}) =>
   })
 
 Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
-  Vitest.scopedLive.prop(
+  Vitest.live.prop(
     'create 4 todos on client-a and wait for them to be synced to client-b',
     [WorkerSchema.StorageType, WorkerSchema.AdapterType],
     ([storageType, adapterType], test) =>
@@ -70,12 +70,12 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           { concurrency: 'unbounded' },
         )
 
-        yield* clientA.executeEffect(WorkerSchema.CreateTodos.make({ count: todoCount }))
+        yield* clientA.CreateTodos({ count: todoCount })
 
-        const result = yield* clientB.execute(WorkerSchema.StreamTodos.make()).pipe(
+        const result = yield* clientB.StreamTodos({}).pipe(
           Stream.filter((_) => _.length === todoCount),
           Stream.runHead,
-          Effect.flatten,
+          Effect.flatMap(Effect.fromOption),
         )
 
         expect(result.length).toEqual(todoCount)
@@ -84,15 +84,15 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
   )
 
   // Warning: A high CreateCount coupled with high simulation params can lead to very long test runs since those get multiplied with the number of todos.
-  const CreateCount = Schema.Int.pipe(Schema.between(1, 400))
-  const CommitBatchSize = Schema.Literal(1, 2, 10, 100)
-  const LEADER_PUSH_BATCH_SIZE = Schema.Literal(1, 2, 10, 100)
+  const CreateCount = Schema.Int.pipe(Schema.check(Schema.isBetween({ minimum: 1, maximum: 400 })))
+  const CommitBatchSize = Schema.Literals([1, 2, 10, 100])
+  const LEADER_PUSH_BATCH_SIZE = Schema.Literals([1, 2, 10, 100])
   // TODO introduce random delays in async operations as part of prop testing
 
   // TODO investigate why stoping this test in VSC Vitest UI often doesn't stop the test runs
   // https://share.cleanshot.com/8gDKh62c
   Vitest.asProp(
-    Vitest.scopedLive,
+    Vitest.live,
     'node-sync prop tests',
     Vitest.DEBUGGER_ACTIVE === true
       ? {
@@ -161,34 +161,27 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
         )
 
         // TODO also alternate the order and delay of todo creation as part of prop testing
-        yield* clientA
-          .executeEffect(WorkerSchema.CreateTodos.make({ count: todoCountA, commitBatchSize }))
-          .pipe(Effect.fork)
+        yield* clientA.CreateTodos({ count: todoCountA, commitBatchSize }).pipe(Effect.forkChild)
 
-        yield* clientB
-          .executeEffect(WorkerSchema.CreateTodos.make({ count: todoCountB, commitBatchSize }))
-          .pipe(Effect.fork)
+        yield* clientB.CreateTodos({ count: todoCountB, commitBatchSize }).pipe(Effect.forkChild)
 
         const exec = Effect.all(
           [
-            clientA.execute(WorkerSchema.StreamTodos.make()).pipe(
+            clientA.StreamTodos({}).pipe(
               Stream.filter((_) => _.length === totalCount),
               Stream.runHead,
-              Effect.flatten,
+              Effect.flatMap(Effect.fromOption),
             ),
-            clientB.execute(WorkerSchema.StreamTodos.make()).pipe(
+            clientB.StreamTodos({}).pipe(
               Stream.filter((_) => _.length === totalCount),
               Stream.runHead,
-              Effect.flatten,
+              Effect.flatMap(Effect.fromOption),
             ),
           ],
           { concurrency: 'unbounded' },
         )
 
-        const onShutdown = Effect.raceFirst(
-          clientA.executeEffect(WorkerSchema.OnShutdown.make()),
-          clientB.executeEffect(WorkerSchema.OnShutdown.make()),
-        )
+        const onShutdown = Effect.raceFirst(clientA.OnShutdown({}), clientB.OnShutdown({}))
 
         yield* Effect.raceFirst(exec, onShutdown)
       }).pipe(
@@ -225,25 +218,31 @@ const makeWorker = ({
   params?: WorkerSchema.Params
 }) =>
   Effect.gen(function* () {
+    const server = yield* WranglerDevServer.WranglerDevServer
+
     // Warning: we need to build the layer here eagerly to tie it to the scope
-    const childProcessWorkerContext = yield* Layer.build(
-      ChildProcessWorker.layer(() =>
-        ChildProcess.fork(
-          new URL('./client-node-worker.ts', import.meta.url),
-          // TODO get rid of this once passing args to the worker parent span is supported (wait for Tim Smart)
-          [clientId],
+    const innerWorkerContext = yield* Layer.build(
+      RpcClient.layerProtocolWorker({ size: 1, concurrency: 100 }).pipe(
+        Layer.provide(
+          PlatformNode.NodeWorker.layer(() =>
+            ChildProcess.fork(
+              new URL('./client-node-worker.ts', import.meta.url),
+              // TODO get rid of this once passing args to the worker parent span is supported (wait for Tim Smart)
+              [clientId],
+            ),
+          ),
+        ),
+        Layer.provide(
+          RpcWorker.layerInitialMessage(
+            WorkerSchema.InitialMessage.payloadSchema,
+            Effect.succeed({ storeId, clientId, adapterType, storageType, params, syncUrl: server.url }),
+          ),
         ),
       ),
     )
 
-    const server = yield* WranglerDevServerService
-    const worker = yield* Worker.makePoolSerialized<typeof WorkerSchema.Request.Type>({
-      size: 1,
-      concurrency: 100,
-      initialMessage: () =>
-        WorkerSchema.InitialMessage.make({ storeId, clientId, adapterType, storageType, params, syncUrl: server.url }),
-    }).pipe(
-      Effect.provide(childProcessWorkerContext),
+    const worker = yield* RpcClient.make(WorkerSchema.WorkerRpcs).pipe(
+      Effect.provide(innerWorkerContext),
       Effect.tapCauseLogPretty,
       Effect.withSpan(`@livestore/adapter-node-sync:test:boot-worker-${clientId}`),
     )

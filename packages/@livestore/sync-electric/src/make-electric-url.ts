@@ -1,5 +1,5 @@
 import { shouldNeverHappen } from '@livestore/utils'
-import { Hash, Schema } from '@livestore/utils/effect'
+import { Hash, Result, Schema } from '@livestore/utils/effect'
 
 import * as ApiSchema from './api-schema.ts'
 
@@ -40,13 +40,13 @@ export const makeElectricUrl = ({
    */
   needsInit: boolean
   /** Sync payload provided by the client */
-  payload: Schema.JsonValue | undefined
+  payload: Schema.Json | undefined
 } => {
   const endpointUrl = `${electricHost}/v1/shape`
   const UrlParamsSchema = Schema.Struct({ args: ApiSchema.ArgsSchema })
-  const argsResult = Schema.decodeUnknownEither(UrlParamsSchema)(Object.fromEntries(providedSearchParams.entries()))
+  const argsResult = Schema.decodeUnknownResult(UrlParamsSchema)(Object.fromEntries(providedSearchParams.entries()))
 
-  if (argsResult._tag === 'Left') {
+  if (Result.isFailure(argsResult) === true) {
     return shouldNeverHappen(
       'Invalid search params provided to makeElectricUrl',
       providedSearchParams,
@@ -54,7 +54,7 @@ export const makeElectricUrl = ({
     )
   }
 
-  const args = argsResult.right.args
+  const args = argsResult.success.args
   const tableName = toTableName(args.storeId)
   // TODO refactor with Effect URLSearchParams schema
   // https://electric-sql.com/openapi.html

@@ -1,6 +1,6 @@
 import type { LiveStoreEvent } from '@livestore/common/schema'
-import { splitChunkBySize } from '@livestore/common/sync'
-import { Chunk, Effect, Schema } from '@livestore/utils/effect'
+import { splitArrayBySize } from '@livestore/common/sync'
+import { Effect, ReadonlyArray as EffectArray, Schema } from '@livestore/utils/effect'
 
 const textEncoder = new TextEncoder()
 
@@ -19,9 +19,9 @@ export const MAX_BATCH_METERED_BYTES = 1_048_576 // 1 MiB
  */
 export const MAX_RECORDS_PER_BATCH = 1_000
 
-const LimitType = Schema.Literal('record-metered-bytes', 'batch-metered-bytes', 'batch-count')
+const LimitType = Schema.Literals(['record-metered-bytes', 'batch-metered-bytes', 'batch-count'])
 
-export class S2LimitExceededError extends Schema.TaggedError<S2LimitExceededError>(
+export class S2LimitExceededError extends Schema.TaggedErrorClass<S2LimitExceededError>(
   '~@livestore/sync-s2/S2LimitExceededError',
 )('S2LimitExceededError', {
   limitType: LimitType,
@@ -91,9 +91,8 @@ const convertEventsToPrepared = (events: ReadonlyArray<LiveStoreEvent.Global.Enc
 const makeChunkMeasure = (items: ReadonlyArray<PreparedEvent>): number =>
   items.reduce((acc, item) => acc + item.meteredBytes, 0)
 
-const mapPreparedChunks = (chunks: Chunk.Chunk<Chunk.Chunk<PreparedEvent>>): ReadonlyArray<S2Chunk> =>
-  Chunk.toReadonlyArray(chunks).map((chunk) => {
-    const chunkItems = Chunk.toReadonlyArray(chunk)
+const mapPreparedChunks = (chunks: ReadonlyArray<ReadonlyArray<PreparedEvent>>): ReadonlyArray<S2Chunk> =>
+  chunks.map((chunkItems) => {
     const events = chunkItems.map((item) => item.event)
     const records = chunkItems.map((item) => item.record)
     return {
@@ -104,22 +103,19 @@ const mapPreparedChunks = (chunks: Chunk.Chunk<Chunk.Chunk<PreparedEvent>>): Rea
   })
 
 export const chunkEventsForS2 = (events: ReadonlyArray<LiveStoreEvent.Global.Encoded>): ReadonlyArray<S2Chunk> => {
-  if (events.length === 0) {
+  const prepared = convertEventsToPrepared(events)
+
+  if (EffectArray.isReadonlyArrayNonEmpty(prepared) === false) {
     return []
   }
 
-  const prepared = convertEventsToPrepared(events)
-
   try {
-    const chunks = Chunk.fromIterable(prepared).pipe(
-      splitChunkBySize({
-        maxItems: MAX_RECORDS_PER_BATCH,
-        maxBytes: MAX_BATCH_METERED_BYTES,
-        encode: (items) => ({ records: items.map((item) => item.record) }),
-        measure: makeChunkMeasure,
-      }),
-      Effect.runSync,
-    )
+    const chunks = splitArrayBySize<PreparedEvent>({
+      maxItems: MAX_RECORDS_PER_BATCH,
+      maxBytes: MAX_BATCH_METERED_BYTES,
+      encode: (items) => ({ records: items.map((item) => item.record) }),
+      measure: makeChunkMeasure,
+    })(prepared).pipe(Effect.runSync)
 
     return mapPreparedChunks(chunks)
   } catch (error) {

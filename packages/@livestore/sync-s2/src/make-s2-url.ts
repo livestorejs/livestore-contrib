@@ -1,5 +1,5 @@
 import { shouldNeverHappen } from '@livestore/utils'
-import { Schema } from '@livestore/utils/effect'
+import { Result, Schema } from '@livestore/utils/effect'
 
 import * as ApiSchema from './api-schema.ts'
 
@@ -10,9 +10,9 @@ export const makeS2StreamName = (storeId: string) => storeId.replace(/[^a-zA-Z0-
  */
 export const decodePullArgsFromSearchParams = (searchParams: URLSearchParams): typeof ApiSchema.PullArgs.Type => {
   const UrlParamsSchema = Schema.Struct({ args: ApiSchema.ArgsSchema })
-  const argsResult = Schema.decodeUnknownEither(UrlParamsSchema)(Object.fromEntries(searchParams.entries()))
+  const argsResult = Schema.decodeUnknownResult(UrlParamsSchema)(Object.fromEntries(searchParams.entries()))
 
-  if (argsResult._tag === 'Left') {
+  if (Result.isFailure(argsResult) === true) {
     return shouldNeverHappen(
       'Invalid search params provided to decodePullArgsFromSearchParams',
       searchParams,
@@ -20,5 +20,5 @@ export const decodePullArgsFromSearchParams = (searchParams: URLSearchParams): t
     )
   }
 
-  return argsResult.right.args
+  return argsResult.success.args
 }

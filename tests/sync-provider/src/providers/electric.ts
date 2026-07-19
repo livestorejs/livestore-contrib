@@ -17,14 +17,13 @@ import { UnknownError } from '@livestore/common'
 import type { LiveStoreEvent } from '@livestore/livestore'
 import { nanoid, Schema } from '@livestore/livestore'
 import * as ElectricSync from '@livestore/sync-electric'
-import { type DockerComposeError, DockerComposeService } from '@livestore/utils-dev/node'
+import { DockerCompose } from '@livestore/utils-dev/node'
 import {
   type Cause,
-  type CommandExecutor,
+  ChildProcessSpawner,
   Effect,
   HttpClient,
   HttpRouter,
-  HttpServer,
   HttpServerRequest,
   HttpServerResponse,
   Layer,
@@ -39,7 +38,7 @@ const dockerHostName = process.env.DOCKER_CONTEXT ?? 'localhost'
 
 export const name = 'ElectricSQL'
 
-const DockerComposeLive = DockerComposeService.Default({ cwd: path.join(import.meta.dirname, 'electric') })
+const DockerComposeLive = DockerCompose.layer({ cwd: path.join(import.meta.dirname, 'electric') })
 const streamResponseHeaders = (headers: Record<string, string>) =>
   Object.fromEntries(
     Object.entries(headers).filter(
@@ -49,24 +48,24 @@ const streamResponseHeaders = (headers: Record<string, string>) =>
 
 export const prepare: Effect.Effect<
   void,
-  PlatformError.PlatformError | DockerComposeError,
-  CommandExecutor.CommandExecutor
+  PlatformError.PlatformError | DockerCompose.DockerComposeError,
+  ChildProcessSpawner.ChildProcessSpawner
 > = Effect.gen(function* () {
-  const dockerCompose = yield* DockerComposeService
+  const dockerCompose = yield* DockerCompose.DockerCompose
   yield* dockerCompose.pull
 }).pipe(Effect.provide(DockerComposeLive), Effect.withSpan('electric-provider:prepare'))
 
-export const getProviderSpecific = (provider: SyncProviderImpl['Type']) =>
+export const getProviderSpecific = (provider: SyncProviderImpl['Service']) =>
   provider.providerSpecific as {
     getDbForTesting: (storeId: string) => {
-      migrate: Effect.Effect<void, Cause.UnknownException>
-      disconnect: Effect.Effect<void, Cause.UnknownException>
+      migrate: Effect.Effect<void, Cause.UnknownError>
+      disconnect: Effect.Effect<void, Cause.UnknownError>
       sql: any
       tableName: string
     }
   }
 
-export const layer: SyncProviderLayer = Layer.scoped(
+export const layer: SyncProviderLayer = Layer.effect(
   SyncProviderImpl,
   Effect.gen(function* () {
     const { endpointPort, postgresPort } = yield* startElectricApi
@@ -91,7 +90,7 @@ export const layer: SyncProviderLayer = Layer.scoped(
   }),
 ).pipe(
   Layer.provide(DockerComposeLive),
-  Layer.provide(PlatformNode.NodeContext.layer),
+  Layer.provide(PlatformNode.NodeServices.layer),
   UnknownError.mapToUnknownErrorLayer,
 )
 
@@ -108,7 +107,7 @@ const startElectricApi = Effect.gen(function* () {
   yield* Effect.logDebug('Postgres port:', postgresPort)
   yield* Effect.logDebug('Compose project name:', projectName)
 
-  const dockerCompose = yield* DockerComposeService
+  const dockerCompose = yield* DockerCompose.DockerCompose
   yield* dockerCompose.start({
     healthCheck: { url: healthCheckUrl },
     env: {
@@ -129,9 +128,7 @@ const startElectricApi = Effect.gen(function* () {
   const endpointPort = yield* getFreePort
 
   // Start the HTTP server in the background
-  yield* makeRouter({ electricPort, postgresPort }).pipe(
-    // HttpMiddleware.logger, // Can be useful for debugging
-    HttpServer.serve(),
+  yield* HttpRouter.serve(makeRouter({ electricPort, postgresPort })).pipe(
     Layer.provide(PlatformNode.NodeHttpServer.layer(() => http.createServer(), { port: endpointPort })),
     Layer.launch,
     Effect.tapCauseLogPretty,
@@ -145,71 +142,74 @@ const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; post
   const electricHost = `http://${dockerHostName}:${electricPort}`
   const apiSecret = 'change-me-electric-secret'
 
-  return HttpRouter.empty.pipe(
-    // GET / (pull)
-    HttpRouter.get(
-      '/',
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
+  return HttpRouter.use((router) =>
+    Effect.gen(function* () {
+      // GET / (pull)
+      yield* router.add(
+        'GET',
+        '/',
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest
 
-        const { url, storeId, needsInit /* payload */ } = ElectricSync.makeElectricUrl({
-          electricHost,
-          searchParams: new URL(request.url, `http://localhost`).searchParams,
-          apiSecret,
-        })
+          // HEAD / (ping): v4 HttpRouter serves unmatched HEAD requests via the GET handler,
+          // so proxy the reachability probe to Electric before running the pull logic.
+          if (request.method === 'HEAD') {
+            const electricResponse = yield* HttpClient.head(electricHost)
 
-        // Validate auth token (for testing purposes)
-        // if ((payload as any)?.authToken !== 'insecure-token-change-me') {
-        //   return yield* HttpServerResponse.json({ error: 'Invalid auth token' }).pipe(
-        //     Effect.andThen(HttpServerResponse.setStatus(401)),
-        //   )
-        // }
+            return HttpServerResponse.empty().pipe(
+              HttpServerResponse.setStatus(electricResponse.status),
+              HttpServerResponse.setHeaders(streamResponseHeaders(electricResponse.headers)),
+            )
+          }
 
-        if (needsInit === true) {
-          const db = makeDb({ storeId, postgresPort })
+          const { url, storeId, needsInit /* payload */ } = ElectricSync.makeElectricUrl({
+            electricHost,
+            searchParams: new URL(request.url, `http://localhost`).searchParams,
+            apiSecret,
+          })
+
+          // Validate auth token (for testing purposes)
+          // if ((payload as any)?.authToken !== 'insecure-token-change-me') {
+          //   return yield* HttpServerResponse.json({ error: 'Invalid auth token' }).pipe(
+          //     Effect.andThen(HttpServerResponse.setStatus(401)),
+          //   )
+          // }
+
+          if (needsInit === true) {
+            const db = makeDb({ storeId, postgresPort })
+            yield* db.migrate
+            yield* db.disconnect
+          }
+
+          const electricResponse = yield* HttpClient.get(url)
+
+          return HttpServerResponse.stream(electricResponse.stream, {
+            headers: streamResponseHeaders(electricResponse.headers),
+            status: electricResponse.status,
+          })
+        }),
+      )
+
+      // POST / (push)
+      yield* router.add(
+        'POST',
+        '/',
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const body = yield* request.json
+          const parsedPayload = yield* Schema.decodeUnknownEffect(ElectricSync.ApiSchema.PushPayload)(body)
+
+          const db = makeDb({ storeId: parsedPayload.storeId, postgresPort })
+
           yield* db.migrate
+          yield* db.createEvents(parsedPayload.batch)
           yield* db.disconnect
-        }
 
-        const electricResponse = yield* HttpClient.get(url)
+          return yield* HttpServerResponse.json({ success: true })
+        }),
+      )
 
-        return yield* HttpServerResponse.stream(electricResponse.stream, {
-          headers: streamResponseHeaders(electricResponse.headers),
-          status: electricResponse.status,
-        })
-      }),
-    ),
-
-    // POST / (push)
-    HttpRouter.post(
-      '/',
-      Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const body = yield* request.json
-        const parsedPayload = yield* Schema.decodeUnknown(ElectricSync.ApiSchema.PushPayload)(body)
-
-        const db = makeDb({ storeId: parsedPayload.storeId, postgresPort })
-
-        yield* db.migrate
-        yield* db.createEvents(parsedPayload.batch)
-        yield* db.disconnect
-
-        return yield* HttpServerResponse.json({ success: true })
-      }),
-    ),
-
-    // HEAD / (ping)
-    HttpRouter.head(
-      '/',
-      Effect.gen(function* () {
-        const electricResponse = yield* HttpClient.head(electricHost)
-
-        return yield* HttpServerResponse.empty().pipe(
-          HttpServerResponse.setStatus(electricResponse.status),
-          HttpServerResponse.setHeaders(streamResponseHeaders(electricResponse.headers)),
-        )
-      }),
-    ),
+    }),
   )
 }
 

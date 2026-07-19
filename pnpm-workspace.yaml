@@ -43,11 +43,18 @@ packages:
   - tests/integration
   - tests/sync-provider
 
+overrides:
+  effect: 4.0.0-beta.98
+  '@effect/platform-browser': 4.0.0-beta.98
+  '@effect/platform-bun': 4.0.0-beta.98
+  '@effect/platform-node': 4.0.0-beta.98
+  '@effect/platform-node-shared': 4.0.0-beta.98
+  '@effect/opentelemetry': 4.0.0-beta.98
+  '@effect/vitest': 4.0.0-beta.98
+
 peerDependencyRules:
   allowedVersions:
-    '@effect/experimental': '>=0.58.0'
-    '@effect/platform': '>=0.94.2'
-    '@effect/rpc': '>=0.73.0'
+    ioredis: '>=5.6.1'
 
 allowBuilds:
   '@parcel/watcher': true

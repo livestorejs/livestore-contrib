@@ -1,4 +1,6 @@
-import { Effect, FetchHttpClient, Layer, type Toolkit } from '@livestore/utils/effect'
+import { type Toolkit } from 'effect/unstable/ai'
+
+import { Effect, FetchHttpClient, Layer } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
 import { blogSchemaContent } from '../mcp-content/schemas/blog.ts'

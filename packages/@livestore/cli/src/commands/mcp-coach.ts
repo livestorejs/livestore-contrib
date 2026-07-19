@@ -1,36 +1,36 @@
-import { LanguageModel } from '@effect/ai'
+import { AiError, LanguageModel, Prompt, Tool } from 'effect/unstable/ai'
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai'
 
-import { AiError, Config, Effect, FetchHttpClient, Layer, Prompt, Schema, Tool } from '@livestore/utils/effect'
+import { Config, Effect, FetchHttpClient, Layer, Schema } from '@livestore/utils/effect'
 
 // Define the coach tool that analyzes LiveStore usage
 export const coachTool = Tool.make('livestore_coach', {
   description:
     'Analyze LiveStore code (schemas, queries, mutations, etc.) and provide AI-powered feedback on best practices, performance, and improvements.',
-  parameters: {
-    code: Schema.String.annotations({
+  parameters: Schema.Struct({
+    code: Schema.String.annotate({
       description: 'The LiveStore code to analyze (TypeScript/JavaScript)',
     }),
     codeType: Schema.optional(
-      Schema.String.annotations({
+      Schema.String.annotate({
         description: "Type of code being analyzed: 'schema', 'query', 'mutation', 'component', or 'general'",
       }),
     ),
-  },
+  }),
   success: Schema.Struct({
-    feedback: Schema.String.annotations({
+    feedback: Schema.String.annotate({
       description: 'AI-generated feedback and recommendations for the code',
     }),
     score: Schema.optional(
-      Schema.Number.annotations({
+      Schema.Number.annotate({
         description: 'Code quality score from 1-10 (optional)',
       }),
     ),
     suggestions: Schema.Array(
-      Schema.String.annotations({
+      Schema.String.annotate({
         description: 'Specific actionable suggestions for improvement',
       }),
-    ).annotations({
+    ).annotate({
       description: 'List of specific improvement suggestions',
     }),
   }),

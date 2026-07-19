@@ -8,15 +8,16 @@ import type * as ElectricSync from '@livestore/sync-electric'
 import { OtelLiveHttp } from '@livestore/utils-dev/node'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import {
+  type Context,
   Effect,
   FetchHttpClient,
   type HttpClient,
   KeyValueStore,
   Layer,
   Logger,
-  LogLevel,
   ManagedRuntime,
   Option,
+  References,
   Stream,
 } from '@livestore/utils/effect'
 
@@ -28,12 +29,13 @@ const withTestCtx = ({ suffix }: { suffix?: string } = {}) =>
     suffix,
     // timeout: testTimeout,
     // makeLayer: (testContext) => makeFileLogger('runner', { testContext }),
-    makeLayer: (_testContext) => Layer.mergeAll(Logger.prettyWithThread('test-runner'), KeyValueStore.layerMemory),
+    makeLayer: (_testContext) => Layer.mergeAll(Logger.layer([Logger.consolePretty()]), KeyValueStore.layerMemory),
   })
 
 // ElectricSQL-specific tests for delete/update operations
 Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () => {
   let runtime: ManagedRuntime.ManagedRuntime<SyncProviderImpl | HttpClient.HttpClient, never>
+  let runtimeContext: Context.Context<SyncProviderImpl | HttpClient.HttpClient>
   let testId: string
 
   Vitest.beforeAll(async () => {
@@ -42,13 +44,13 @@ Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () =>
       ElectricProvider.layer.pipe(
         Layer.provideMerge(FetchHttpClient.layer),
         Layer.provide(OtelLiveHttp({ rootSpanName: 'beforeAll', serviceName: 'vitest-runner', skipLogUrl: false })),
-        Layer.provide(Logger.prettyWithThread('test-runner')),
-        Layer.provide(Logger.minimumLogLevel(LogLevel.Debug)),
+        Layer.provide(Logger.layer([Logger.consolePretty()])),
+        Layer.provide(Layer.succeed(References.MinimumLogLevel, 'Debug')),
         Layer.orDie,
       ),
     )
     // Eagerly start the runtime
-    await runtime.runPromise(Effect.void)
+    runtimeContext = await runtime.context()
   })
 
   Vitest.afterAll(async () => {
@@ -66,14 +68,14 @@ Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () =>
           clientId: 'test-client',
           payload: undefined,
         }),
-      ).pipe(Effect.provide(runtime)),
+      ).pipe(Effect.provide(runtimeContext)),
     )
 
-  Vitest.scopedLive('should throw descriptive error when detecting delete operations', (test) =>
+  Vitest.live('should throw descriptive error when detecting delete operations', (test) =>
     Effect.gen(function* () {
       const storeId = `test-store-electric-${test.task.name}-${testId}`
       const syncBackend: SyncBackend.SyncBackend<ElectricSync.SyncMetadata> = yield* makeElectricProvider({ storeId })
-      const provider = yield* Effect.provide(SyncProviderImpl, runtime)
+      const provider = yield* Effect.provide(SyncProviderImpl, runtimeContext)
 
       // Push a valid event first
       const eventFactory = EventFactory.makeFactory(events)({
@@ -117,12 +119,12 @@ Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () =>
     }).pipe(withTestCtx()(test)),
   )
 
-  Vitest.scopedLive('should throw descriptive error when detecting update operations', (test) =>
+  Vitest.live('should throw descriptive error when detecting update operations', (test) =>
     Effect.gen(function* () {
       const storeId = `test-store-electric-${test.task.name}-${testId}`
 
       const syncBackend = yield* makeElectricProvider({ storeId })
-      const provider = yield* Effect.provide(SyncProviderImpl, runtime)
+      const provider = yield* Effect.provide(SyncProviderImpl, runtimeContext)
 
       // Push a valid event first
       const eventFactory = EventFactory.makeFactory(events)({

@@ -14,8 +14,8 @@ import { Effect, FileSystem, Schema } from '@livestore/utils/effect'
 export interface ModuleConfig {
   schema: LiveStoreSchema
   syncBackendConstructor: SyncBackend.SyncBackendConstructor
-  syncPayloadSchema: Schema.Schema<any>
-  syncPayload: unknown
+  syncPayloadSchema: Schema.Codec<Schema.Json, Schema.Json>
+  syncPayload: Schema.Json | undefined
 }
 
 /**
@@ -71,9 +71,9 @@ export const loadModuleConfig = ({
     const syncPayloadSchemaExport = mod?.syncPayloadSchema
     const syncPayloadSchema =
       syncPayloadSchemaExport === undefined
-        ? Schema.JsonValue
+        ? Schema.Json
         : Schema.isSchema(syncPayloadSchemaExport) === true
-          ? (syncPayloadSchemaExport as Schema.Schema<any>)
+          ? (syncPayloadSchemaExport as Schema.Codec<Schema.Json, Schema.Json>)
           : shouldNeverHappen(
               `Exported 'syncPayloadSchema' from ${abs} must be an Effect Schema (received ${typeof syncPayloadSchemaExport}).`,
             )
@@ -81,8 +81,8 @@ export const loadModuleConfig = ({
     const syncPayloadExport = mod?.syncPayload
     const syncPayload = yield* (
       syncPayloadExport === undefined
-        ? Effect.succeed<unknown>(undefined)
-        : Schema.decodeUnknown(syncPayloadSchema)(syncPayloadExport)
+        ? Effect.succeed<Schema.Json | undefined>(undefined)
+        : Schema.decodeUnknownEffect(syncPayloadSchema)(syncPayloadExport)
     ).pipe(UnknownError.mapToUnknownError)
 
     return {

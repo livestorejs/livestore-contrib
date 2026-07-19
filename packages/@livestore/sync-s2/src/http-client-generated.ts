@@ -10,20 +10,16 @@ import {
   HttpClientError,
   HttpClientRequest,
   HttpClientResponse,
-  type ParseResult,
   Schema as S,
 } from '@livestore/utils/effect'
 
-export class ListAccessTokensParams extends S.Struct({
-  prefix: S.optionalWith(S.String, { nullable: true, default: () => '' as const }),
-  start_after: S.optionalWith(S.String, { nullable: true, default: () => '' as const }),
-  limit: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0), S.lessThanOrEqualTo(1000)), {
-    nullable: true,
-    default: () => 1000 as const,
-  }),
+export class ListAccessTokensParams extends S.Class<ListAccessTokensParams>('ListAccessTokensParams')({
+  prefix: S.String.pipe(S.optional, S.withDecodingDefault(Effect.succeed(''))),
+  start_after: S.String.pipe(S.optional, S.withDecodingDefault(Effect.succeed(''))),
+  limit: S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(1000)).pipe(S.optional, S.withDecodingDefault(Effect.succeed(1000))),
 }) {}
 
-export class ResourceSet extends S.Union(
+export const ResourceSet = S.Union([
   /**
    * Match only the resource with this exact name.
    * Use an empty string to match no resources.
@@ -46,26 +42,26 @@ export class ResourceSet extends S.Union(
      */
     prefix: S.String,
   }),
-) {}
+])
 
 export class ReadWritePermissions extends S.Class<ReadWritePermissions>('ReadWritePermissions')({
   /**
    * Read permission.
    */
-  read: S.optionalWith(S.Boolean, { nullable: true, default: () => false as const }),
+  read: S.Boolean.pipe(S.optional, S.withDecodingDefault(Effect.succeed(false))),
   /**
    * Write permission.
    */
-  write: S.optionalWith(S.Boolean, { nullable: true, default: () => false as const }),
+  write: S.Boolean.pipe(S.optional, S.withDecodingDefault(Effect.succeed(false))),
 }) {}
 
 export class PermittedOperationGroups extends S.Class<PermittedOperationGroups>('PermittedOperationGroups')({
-  account: S.optionalWith(ReadWritePermissions, { nullable: true }),
-  basin: S.optionalWith(ReadWritePermissions, { nullable: true }),
-  stream: S.optionalWith(ReadWritePermissions, { nullable: true }),
+  account: S.optional(S.NullOr(ReadWritePermissions)),
+  basin: S.optional(S.NullOr(ReadWritePermissions)),
+  stream: S.optional(S.NullOr(ReadWritePermissions)),
 }) {}
 
-export class Operation extends S.Literal(
+export const Operation = S.Literals([
   'list-basins',
   'create-basin',
   'delete-basin',
@@ -87,18 +83,18 @@ export class Operation extends S.Literal(
   'account-metrics',
   'basin-metrics',
   'stream-metrics',
-) {}
+])
 
 export class AccessTokenScope extends S.Class<AccessTokenScope>('AccessTokenScope')({
-  access_tokens: S.optionalWith(ResourceSet, { nullable: true }),
-  basins: S.optionalWith(ResourceSet, { nullable: true }),
-  op_groups: S.optionalWith(PermittedOperationGroups, { nullable: true }),
+  access_tokens: S.optional(S.NullOr(ResourceSet)),
+  basins: S.optional(S.NullOr(ResourceSet)),
+  op_groups: S.optional(S.NullOr(PermittedOperationGroups)),
   /**
    * Operations allowed for the token.
    * A union of allowed operations and groups is used as an effective set of allowed operations.
    */
-  ops: S.optionalWith(S.Array(Operation), { nullable: true }),
-  streams: S.optionalWith(ResourceSet, { nullable: true }),
+  ops: S.optional(S.NullOr(S.Array(Operation))),
+  streams: S.optional(S.NullOr(ResourceSet)),
 }) {}
 
 export class AccessTokenInfo extends S.Class<AccessTokenInfo>('AccessTokenInfo')({
@@ -106,12 +102,12 @@ export class AccessTokenInfo extends S.Class<AccessTokenInfo>('AccessTokenInfo')
    * Namespace streams based on the configured stream-level scope, which must be a prefix.
    * Stream name arguments will be automatically prefixed, and the prefix will be stripped when listing streams.
    */
-  auto_prefix_streams: S.optionalWith(S.Boolean, { nullable: true, default: () => false as const }),
+  auto_prefix_streams: S.Boolean.pipe(S.optional, S.withDecodingDefault(Effect.succeed(false))),
   /**
    * Expiration time in ISO 8601 format.
    * If not set, the expiration will be set to that of the requestor's token.
    */
-  expires_at: S.optionalWith(S.String, { nullable: true }),
+  expires_at: S.optional(S.NullOr(S.String)),
   /**
    * Access token ID.
    * It must be unique to the account and between 1 and 96 bytes in length.
@@ -127,7 +123,7 @@ export class ListAccessTokensResponse extends S.Class<ListAccessTokensResponse>(
   /**
    * Matching access tokens.
    */
-  access_tokens: S.Array(AccessTokenInfo).pipe(S.maxItems(1000)),
+  access_tokens: S.Array(AccessTokenInfo).check(S.isMaxLength(1000)),
   /**
    * Indicates that there are more access tokens that match the criteria.
    */
@@ -135,7 +131,7 @@ export class ListAccessTokensResponse extends S.Class<ListAccessTokensResponse>(
 }) {}
 
 export class ErrorResponse extends S.Class<ErrorResponse>('ErrorResponse')({
-  code: S.optionalWith(S.String, { nullable: true }),
+  code: S.optional(S.NullOr(S.String)),
   message: S.String,
 }) {}
 
@@ -146,18 +142,15 @@ export class IssueAccessTokenResponse extends S.Class<IssueAccessTokenResponse>(
   access_token: S.String,
 }) {}
 
-export class ListBasinsParams extends S.Struct({
-  prefix: S.optionalWith(S.String, { nullable: true, default: () => '' as const }),
-  start_after: S.optionalWith(S.String, { nullable: true, default: () => '' as const }),
-  limit: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0), S.lessThanOrEqualTo(1000)), {
-    nullable: true,
-    default: () => 1000 as const,
-  }),
+export class ListBasinsParams extends S.Class<ListBasinsParams>('ListBasinsParams')({
+  prefix: S.String.pipe(S.optional, S.withDecodingDefault(Effect.succeed(''))),
+  start_after: S.String.pipe(S.optional, S.withDecodingDefault(Effect.succeed(''))),
+  limit: S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(1000)).pipe(S.optional, S.withDecodingDefault(Effect.succeed(1000))),
 }) {}
 
-export class BasinScope extends S.Literal('aws:us-east-1') {}
+export const BasinScope = S.Literal('aws:us-east-1')
 
-export class BasinState extends S.Literal('active', 'creating', 'deleting') {}
+export const BasinState = S.Literals(['active', 'creating', 'deleting'])
 
 export class BasinInfo extends S.Class<BasinInfo>('BasinInfo')({
   /**
@@ -178,7 +171,7 @@ export class ListBasinsResponse extends S.Class<ListBasinsResponse>('ListBasinsR
   /**
    * Matching basins.
    */
-  basins: S.Array(BasinInfo).pipe(S.maxItems(1000)),
+  basins: S.Array(BasinInfo).check(S.isMaxLength(1000)),
   /**
    * Indicates that there are more basins that match the criteria.
    */
@@ -190,12 +183,12 @@ export class DeleteOnEmptyConfig extends S.Class<DeleteOnEmptyConfig>('DeleteOnE
    * Minimum age in seconds before an empty stream can be deleted.
    * Set to 0 (default) to disable delete-on-empty (don't delete automatically).
    */
-  min_age_secs: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
+  min_age_secs: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
 }) {}
 
-export class InfiniteRetention extends S.Record({ key: S.String, value: S.Unknown }) {}
+export const InfiniteRetention = S.Record(S.String, S.Unknown)
 
-export class RetentionPolicy extends S.Union(
+export const RetentionPolicy = S.Union([
   /**
    * Age in seconds for automatic trimming of records older than this threshold.
    * This must be set to a value greater than 0 seconds.
@@ -207,7 +200,7 @@ export class RetentionPolicy extends S.Union(
      * This must be set to a value greater than 0 seconds.
      * (While S2 is in public preview, this is capped at 28 days. Let us know if you'd like the cap removed.)
      */
-    age: S.Int.pipe(S.greaterThanOrEqualTo(0)),
+    age: S.Int.check(S.isGreaterThanOrEqualTo(0)),
   }),
   /**
    * Retain records unless explicitly trimmed.
@@ -218,38 +211,38 @@ export class RetentionPolicy extends S.Union(
      */
     infinite: InfiniteRetention,
   }),
-) {}
+])
 
-export class StorageClass extends S.Literal('standard', 'express') {}
+export const StorageClass = S.Literals(['standard', 'express'])
 
-export class TimestampingMode extends S.Literal('client-prefer', 'client-require', 'arrival') {}
+export const TimestampingMode = S.Literals(['client-prefer', 'client-require', 'arrival'])
 
 export class TimestampingConfig extends S.Class<TimestampingConfig>('TimestampingConfig')({
-  mode: S.optionalWith(TimestampingMode, { nullable: true }),
+  mode: S.optional(S.NullOr(TimestampingMode)),
   /**
    * Allow client-specified timestamps to exceed the arrival time.
    * If this is `false` or not set, client timestamps will be capped at the arrival time.
    */
-  uncapped: S.optionalWith(S.Boolean, { nullable: true }),
+  uncapped: S.optional(S.NullOr(S.Boolean)),
 }) {}
 
 export class StreamConfig extends S.Class<StreamConfig>('StreamConfig')({
-  delete_on_empty: S.optionalWith(DeleteOnEmptyConfig, { nullable: true }),
-  retention_policy: S.optionalWith(RetentionPolicy, { nullable: true }),
-  storage_class: S.optionalWith(StorageClass, { nullable: true }),
-  timestamping: S.optionalWith(TimestampingConfig, { nullable: true }),
+  delete_on_empty: S.optional(S.NullOr(DeleteOnEmptyConfig)),
+  retention_policy: S.optional(S.NullOr(RetentionPolicy)),
+  storage_class: S.optional(S.NullOr(StorageClass)),
+  timestamping: S.optional(S.NullOr(TimestampingConfig)),
 }) {}
 
 export class BasinConfig extends S.Class<BasinConfig>('BasinConfig')({
   /**
    * Create stream on append if it doesn't exist, using the default stream configuration.
    */
-  create_stream_on_append: S.optionalWith(S.Boolean, { nullable: true }),
+  create_stream_on_append: S.optional(S.NullOr(S.Boolean)),
   /**
    * Create stream on read if it doesn't exist, using the default stream configuration.
    */
-  create_stream_on_read: S.optionalWith(S.Boolean, { nullable: true }),
-  default_stream_config: S.optionalWith(StreamConfig, { nullable: true }),
+  create_stream_on_read: S.optional(S.NullOr(S.Boolean)),
+  default_stream_config: S.optional(S.NullOr(StreamConfig)),
 }) {}
 
 export class CreateBasinRequest extends S.Class<CreateBasinRequest>('CreateBasinRequest')({
@@ -259,18 +252,18 @@ export class CreateBasinRequest extends S.Class<CreateBasinRequest>('CreateBasin
    * It cannot begin or end with a hyphen.
    */
   basin: S.String,
-  config: S.optionalWith(BasinConfig, { nullable: true }),
+  config: S.optional(S.NullOr(BasinConfig)),
   /**
    * Basin scope.
    */
-  scope: S.optionalWith(BasinScope, { nullable: true, default: () => 'aws:us-east-1' as const }),
+  scope: BasinScope.pipe(S.optional, S.withDecodingDefault(Effect.succeed('aws:us-east-1'))),
 }) {}
 
-export class CreateOrReconfigureBasinParams extends S.Struct({
-  's2-request-token': S.optionalWith(S.String, { nullable: true }),
+export class CreateOrReconfigureBasinParams extends S.Class<CreateOrReconfigureBasinParams>('CreateOrReconfigureBasinParams')({
+  's2-request-token': S.optional(S.NullOr(S.String)),
 }) {}
 
-export class CreateOrReconfigureBasinRequest extends S.Union(S.Null) {}
+export const CreateOrReconfigureBasinRequest = S.Union([S.Null])
 // export class CreateOrReconfigureBasinRequest extends S.Union(S.Null, CreateOrReconfigureBasinRequest) {}
 
 export class DeleteOnEmptyReconfiguration extends S.Class<DeleteOnEmptyReconfiguration>('DeleteOnEmptyReconfiguration')(
@@ -279,49 +272,49 @@ export class DeleteOnEmptyReconfiguration extends S.Class<DeleteOnEmptyReconfigu
      * Minimum age in seconds before an empty stream can be deleted.
      * Set to 0 to disable delete-on-empty (don't delete automatically).
      */
-    min_age_secs: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
+    min_age_secs: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
   },
 ) {}
 
 export class TimestampingReconfiguration extends S.Class<TimestampingReconfiguration>('TimestampingReconfiguration')({
-  mode: S.optionalWith(TimestampingMode, { nullable: true }),
+  mode: S.optional(S.NullOr(TimestampingMode)),
   /**
    * Allow client-specified timestamps to exceed the arrival time.
    */
-  uncapped: S.optionalWith(S.Boolean, { nullable: true }),
+  uncapped: S.optional(S.NullOr(S.Boolean)),
 }) {}
 
 export class StreamReconfiguration extends S.Class<StreamReconfiguration>('StreamReconfiguration')({
-  delete_on_empty: S.optionalWith(DeleteOnEmptyReconfiguration, { nullable: true }),
-  retention_policy: S.optionalWith(RetentionPolicy, { nullable: true }),
-  storage_class: S.optionalWith(StorageClass, { nullable: true }),
-  timestamping: S.optionalWith(TimestampingReconfiguration, { nullable: true }),
+  delete_on_empty: S.optional(S.NullOr(DeleteOnEmptyReconfiguration)),
+  retention_policy: S.optional(S.NullOr(RetentionPolicy)),
+  storage_class: S.optional(S.NullOr(StorageClass)),
+  timestamping: S.optional(S.NullOr(TimestampingReconfiguration)),
 }) {}
 
 export class BasinReconfiguration extends S.Class<BasinReconfiguration>('BasinReconfiguration')({
   /**
    * Create a stream on append.
    */
-  create_stream_on_append: S.optionalWith(S.Boolean, { nullable: true }),
+  create_stream_on_append: S.optional(S.NullOr(S.Boolean)),
   /**
    * Create a stream on read.
    */
-  create_stream_on_read: S.optionalWith(S.Boolean, { nullable: true }),
-  default_stream_config: S.optionalWith(StreamReconfiguration, { nullable: true }),
+  create_stream_on_read: S.optional(S.NullOr(S.Boolean)),
+  default_stream_config: S.optional(S.NullOr(StreamReconfiguration)),
 }) {}
 
-export class AccountMetricSet extends S.Literal('active-basins', 'account-ops') {}
+export const AccountMetricSet = S.Literals(['active-basins', 'account-ops'])
 
-export class TimeseriesInterval extends S.Literal('minute', 'hour', 'day') {}
+export const TimeseriesInterval = S.Literals(['minute', 'hour', 'day'])
 
-export class AccountMetricsParams extends S.Struct({
+export class AccountMetricsParams extends S.Class<AccountMetricsParams>('AccountMetricsParams')({
   set: AccountMetricSet,
-  start: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  end: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  interval: S.optionalWith(TimeseriesInterval, { nullable: true }),
+  start: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  end: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  interval: S.optional(S.NullOr(TimeseriesInterval)),
 }) {}
 
-export class MetricUnit extends S.Literal('bytes', 'operations') {}
+export const MetricUnit = S.Literals(['bytes', 'operations'])
 
 export class Scalar extends S.Class<Scalar>('Scalar')({
   /**
@@ -375,7 +368,7 @@ export class Label extends S.Class<Label>('Label')({
   values: S.Array(S.String),
 }) {}
 
-export class Metric extends S.Union(
+export const Metric = S.Union([
   /**
    * Single named value.
    */
@@ -414,7 +407,7 @@ export class Metric extends S.Union(
      */
     label: Label,
   }),
-) {}
+])
 
 export class MetricSetResponse extends S.Class<MetricSetResponse>('MetricSetResponse')({
   /**
@@ -423,38 +416,35 @@ export class MetricSetResponse extends S.Class<MetricSetResponse>('MetricSetResp
   values: S.Array(Metric),
 }) {}
 
-export class BasinMetricSet extends S.Literal(
+export const BasinMetricSet = S.Literals([
   'storage',
   'append-ops',
   'read-ops',
   'read-throughput',
   'append-throughput',
   'basin-ops',
-) {}
+])
 
-export class BasinMetricsParams extends S.Struct({
+export class BasinMetricsParams extends S.Class<BasinMetricsParams>('BasinMetricsParams')({
   set: BasinMetricSet,
-  start: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  end: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  interval: S.optionalWith(TimeseriesInterval, { nullable: true }),
+  start: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  end: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  interval: S.optional(S.NullOr(TimeseriesInterval)),
 }) {}
 
-export class StreamMetricSet extends S.Literal('storage') {}
+export const StreamMetricSet = S.Literal('storage')
 
-export class StreamMetricsParams extends S.Struct({
+export class StreamMetricsParams extends S.Class<StreamMetricsParams>('StreamMetricsParams')({
   set: StreamMetricSet,
-  start: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  end: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  interval: S.optionalWith(TimeseriesInterval, { nullable: true }),
+  start: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  end: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  interval: S.optional(S.NullOr(TimeseriesInterval)),
 }) {}
 
-export class ListStreamsParams extends S.Struct({
-  prefix: S.optionalWith(S.String, { nullable: true, default: () => '' as const }),
-  start_after: S.optionalWith(S.String, { nullable: true, default: () => '' as const }),
-  limit: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0), S.lessThanOrEqualTo(1000)), {
-    nullable: true,
-    default: () => 1000 as const,
-  }),
+export class ListStreamsParams extends S.Class<ListStreamsParams>('ListStreamsParams')({
+  prefix: S.String.pipe(S.optional, S.withDecodingDefault(Effect.succeed(''))),
+  start_after: S.String.pipe(S.optional, S.withDecodingDefault(Effect.succeed(''))),
+  limit: S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(1000)).pipe(S.optional, S.withDecodingDefault(Effect.succeed(1000))),
 }) {}
 
 export class StreamInfo extends S.Class<StreamInfo>('StreamInfo')({
@@ -465,7 +455,7 @@ export class StreamInfo extends S.Class<StreamInfo>('StreamInfo')({
   /**
    * Deletion time in ISO 8601 format, if the stream is being deleted.
    */
-  deleted_at: S.optionalWith(S.String, { nullable: true }),
+  deleted_at: S.optional(S.NullOr(S.String)),
   /**
    * Stream name.
    */
@@ -480,11 +470,11 @@ export class ListStreamsResponse extends S.Class<ListStreamsResponse>('ListStrea
   /**
    * Matching streams.
    */
-  streams: S.Array(StreamInfo).pipe(S.maxItems(1000)),
+  streams: S.Array(StreamInfo).check(S.isMaxLength(1000)),
 }) {}
 
 export class CreateStreamRequest extends S.Class<CreateStreamRequest>('CreateStreamRequest')({
-  config: S.optionalWith(StreamConfig, { nullable: true }),
+  config: S.optional(S.NullOr(StreamConfig)),
   /**
    * Stream name that is unique to the basin.
    * It can be between 1 and 512 bytes in length.
@@ -492,25 +482,25 @@ export class CreateStreamRequest extends S.Class<CreateStreamRequest>('CreateStr
   stream: S.String,
 }) {}
 
-export class CreateOrReconfigureStreamParams extends S.Struct({
-  's2-request-token': S.optionalWith(S.String, { nullable: true }),
+export class CreateOrReconfigureStreamParams extends S.Class<CreateOrReconfigureStreamParams>('CreateOrReconfigureStreamParams')({
+  's2-request-token': S.optional(S.NullOr(S.String)),
 }) {}
 
-export class CreateOrReconfigureStreamRequest extends S.Union(S.Null, StreamConfig) {}
+export const CreateOrReconfigureStreamRequest = S.Union([S.Null, StreamConfig])
 
-export class S2Format extends S.Literal('raw', 'base64') {}
+export const S2Format = S.Literals(['raw', 'base64'])
 
-export class U64 extends S.Int.pipe(S.greaterThanOrEqualTo(0)) {}
+export const U64 = S.Int.check(S.isGreaterThanOrEqualTo(0))
 
-export class ReadParams extends S.Struct({
-  's2-format': S.optionalWith(S2Format, { nullable: true }),
-  seq_num: S.optionalWith(U64, { nullable: true }),
-  timestamp: S.optionalWith(U64, { nullable: true }),
-  tail_offset: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  count: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  bytes: S.optionalWith(S.Int.pipe(S.greaterThanOrEqualTo(0)), { nullable: true }),
-  until: S.optionalWith(U64, { nullable: true }),
-  clamp: S.optionalWith(S.Boolean, { nullable: true }),
+export class ReadParams extends S.Class<ReadParams>('ReadParams')({
+  's2-format': S.optional(S.NullOr(S2Format)),
+  seq_num: S.optional(S.NullOr(U64)),
+  timestamp: S.optional(S.NullOr(U64)),
+  tail_offset: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  count: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  bytes: S.optional(S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))),
+  until: S.optional(S.NullOr(U64)),
+  clamp: S.optional(S.NullOr(S.Boolean)),
 }) {}
 
 /**
@@ -518,7 +508,7 @@ export class ReadParams extends S.Struct({
  *
  * The name cannot be empty, with the exception of an S2 command record.
  */
-export class Header extends S.NonEmptyArray(S.String).pipe(S.minItems(2), S.maxItems(2)) {}
+export const Header = S.NonEmptyArray(S.String).check(S.isMinLength(2), S.isMaxLength(2))
 
 /**
  * Record that is durably sequenced on a stream.
@@ -527,11 +517,11 @@ export class SequencedRecord extends S.Class<SequencedRecord>('SequencedRecord')
   /**
    * Body of the record.
    */
-  body: S.optionalWith(S.String, { nullable: true }),
+  body: S.optional(S.NullOr(S.String)),
   /**
    * Series of name-value pairs for this record.
    */
-  headers: S.optionalWith(S.Array(Header), { nullable: true }),
+  headers: S.optional(S.NullOr(S.Array(Header))),
   /**
    * Sequence number assigned by the service.
    */
@@ -549,12 +539,12 @@ export class StreamPosition extends S.Class<StreamPosition>('StreamPosition')({
   /**
    * Sequence number assigned by the service.
    */
-  seq_num: S.Int.pipe(S.greaterThanOrEqualTo(0)),
+  seq_num: S.Int.check(S.isGreaterThanOrEqualTo(0)),
   /**
    * Timestamp, which may be client-specified or assigned by the service.
    * If it is assigned by the service, it will represent milliseconds since Unix epoch.
    */
-  timestamp: S.Int.pipe(S.greaterThanOrEqualTo(0)),
+  timestamp: S.Int.check(S.isGreaterThanOrEqualTo(0)),
 }) {}
 
 export class ReadBatch extends S.Class<ReadBatch>('ReadBatch')({
@@ -563,7 +553,7 @@ export class ReadBatch extends S.Class<ReadBatch>('ReadBatch')({
    * This can only be empty in response to a regular (non-SSE) read, if the request cannot be satisfied without violating an explicit limit.
    */
   records: S.Array(SequencedRecord),
-  tail: S.optionalWith(StreamPosition, { nullable: true }),
+  tail: S.optional(S.NullOr(StreamPosition)),
 }) {}
 
 export class TailResponse extends S.Class<TailResponse>('TailResponse')({
@@ -573,8 +563,8 @@ export class TailResponse extends S.Class<TailResponse>('TailResponse')({
   tail: StreamPosition,
 }) {}
 
-export class AppendParams extends S.Struct({
-  's2-format': S.optionalWith(S2Format, { nullable: true }),
+export class AppendParams extends S.Class<AppendParams>('AppendParams')({
+  's2-format': S.optional(S.NullOr(S2Format)),
 }) {}
 
 /**
@@ -584,12 +574,12 @@ export class AppendRecord extends S.Class<AppendRecord>('AppendRecord')({
   /**
    * Body of the record.
    */
-  body: S.optionalWith(S.String, { nullable: true }),
+  body: S.optional(S.NullOr(S.String)),
   /**
    * Series of name-value pairs for this record.
    */
-  headers: S.optionalWith(S.Array(Header), { nullable: true }),
-  timestamp: S.optionalWith(U64, { nullable: true }),
+  headers: S.optional(S.NullOr(S.Array(Header))),
+  timestamp: S.optional(S.NullOr(U64)),
 }) {}
 
 /**
@@ -599,8 +589,8 @@ export class AppendInput extends S.Class<AppendInput>('AppendInput')({
   /**
    * Enforce a fencing token, which starts out as an empty string that can be overridden by a `fence` command record.
    */
-  fencing_token: S.optionalWith(S.String, { nullable: true }),
-  match_seq_num: S.optionalWith(U64, { nullable: true }),
+  fencing_token: S.optional(S.NullOr(S.String)),
+  match_seq_num: S.optional(S.NullOr(U64)),
   /**
    * Batch of records to append atomically, which must contain at least one record, and no more than 1000.
    * The total size of a batch of records may not exceed 1 MiB of metered bytes.
@@ -631,7 +621,7 @@ export class AppendAck extends S.Class<AppendAck>('AppendAck')({
 /**
  * Aborted due to a failed condition.
  */
-export class AppendConditionFailed extends S.Union(
+export const AppendConditionFailed = S.Union([
   /**
    * Fencing token did not match.
    * The expected fencing token is returned.
@@ -652,9 +642,9 @@ export class AppendConditionFailed extends S.Union(
      * Sequence number did not match the tail of the stream.
      * The expected next sequence number is returned.
      */
-    seq_num_mismatch: S.Int.pipe(S.greaterThanOrEqualTo(0)),
+    seq_num_mismatch: S.Int.check(S.isGreaterThanOrEqualTo(0)),
   }),
-) {}
+])
 
 export const make = (
   httpClient: HttpClient.HttpClient,
@@ -667,10 +657,9 @@ export const make = (
       Effect.orElseSucceed(response.json, () => 'Unexpected status code'),
       (description) =>
         Effect.fail(
-          new HttpClientError.ResponseError({
+          new HttpClientError.StatusCodeError({
             request: response.request,
             response,
-            reason: 'StatusCode',
             description: typeof description === 'string' ? description : JSON.stringify(description),
           }),
         ),
@@ -686,11 +675,11 @@ export const make = (
           )
       : (f) => (request) => Effect.flatMap(httpClient.execute(request), f)
   const decodeSuccess =
-    <A, I, R>(schema: S.Schema<A, I, R>) =>
+    <A, I, R>(schema: S.Codec<A, I, R>) =>
     (response: HttpClientResponse.HttpClientResponse) =>
       HttpClientResponse.schemaBodyJson(schema)(response)
   const decodeError =
-    <const Tag extends string, A, I, R>(tag: Tag, schema: S.Schema<A, I, R>) =>
+    <const Tag extends string, A, I, R>(tag: Tag, schema: S.Codec<A, I, R>) =>
     (response: HttpClientResponse.HttpClientResponse) =>
       Effect.flatMap(HttpClientResponse.schemaBodyJson(schema)(response), (cause) =>
         Effect.fail(ClientError(tag, cause, response)),
@@ -717,7 +706,7 @@ export const make = (
     issueAccessToken: (options) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.post(`/access-tokens`).pipe(
-        HttpClientRequest.bodyUnsafeJson(options),
+        HttpClientRequest.bodyJsonUnsafe(options),
         withResponse(
           HttpClientResponse.matchStatus({
             '2xx': decodeSuccess(IssueAccessTokenResponse),
@@ -730,7 +719,7 @@ export const make = (
       ),
     revokeAccessToken: (id) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
-      HttpClientRequest.del(`/access-tokens/${id}`).pipe(
+      HttpClientRequest.delete(`/access-tokens/${id}`).pipe(
         withResponse(
           HttpClientResponse.matchStatus({
             '400': decodeError('ErrorResponse', ErrorResponse),
@@ -760,7 +749,7 @@ export const make = (
     createBasin: (options) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.post(`/basins`).pipe(
-        HttpClientRequest.bodyUnsafeJson(options),
+        HttpClientRequest.bodyJsonUnsafe(options),
         withResponse(
           HttpClientResponse.matchStatus({
             '200': decodeSuccess(BasinInfo),
@@ -790,7 +779,7 @@ export const make = (
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.put(`/basins/${basin}`).pipe(
         HttpClientRequest.setHeaders({ 's2-request-token': options.params?.['s2-request-token'] ?? undefined }),
-        HttpClientRequest.bodyUnsafeJson(options.payload),
+        HttpClientRequest.bodyJsonUnsafe(options.payload),
         withResponse(
           HttpClientResponse.matchStatus({
             '200': decodeSuccess(BasinInfo),
@@ -803,7 +792,7 @@ export const make = (
       ),
     deleteBasin: (basin) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
-      HttpClientRequest.del(`/basins/${basin}`).pipe(
+      HttpClientRequest.delete(`/basins/${basin}`).pipe(
         withResponse(
           HttpClientResponse.matchStatus({
             '400': decodeError('ErrorResponse', ErrorResponse),
@@ -818,7 +807,7 @@ export const make = (
     reconfigureBasin: (basin, options) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.patch(`/basins/${basin}`).pipe(
-        HttpClientRequest.bodyUnsafeJson(options),
+        HttpClientRequest.bodyJsonUnsafe(options),
         withResponse(
           HttpClientResponse.matchStatus({
             '2xx': decodeSuccess(BasinConfig),
@@ -904,7 +893,7 @@ export const make = (
     createStream: (options) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.post(`/streams`).pipe(
-        HttpClientRequest.bodyUnsafeJson(options),
+        HttpClientRequest.bodyJsonUnsafe(options),
         withResponse(
           HttpClientResponse.matchStatus({
             '2xx': decodeSuccess(StreamInfo),
@@ -934,7 +923,7 @@ export const make = (
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.put(`/streams/${stream}`).pipe(
         HttpClientRequest.setHeaders({ 's2-request-token': options.params?.['s2-request-token'] ?? undefined }),
-        HttpClientRequest.bodyUnsafeJson(options.payload),
+        HttpClientRequest.bodyJsonUnsafe(options.payload),
         withResponse(
           HttpClientResponse.matchStatus({
             '2xx': decodeSuccess(StreamInfo),
@@ -949,7 +938,7 @@ export const make = (
       ),
     deleteStream: (stream) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
-      HttpClientRequest.del(`/streams/${stream}`).pipe(
+      HttpClientRequest.delete(`/streams/${stream}`).pipe(
         withResponse(
           HttpClientResponse.matchStatus({
             '400': decodeError('ErrorResponse', ErrorResponse),
@@ -963,7 +952,7 @@ export const make = (
     reconfigureStream: (stream, options) =>
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.patch(`/streams/${stream}`).pipe(
-        HttpClientRequest.bodyUnsafeJson(options),
+        HttpClientRequest.bodyJsonUnsafe(options),
         withResponse(
           HttpClientResponse.matchStatus({
             '2xx': decodeSuccess(StreamConfig),
@@ -1005,7 +994,7 @@ export const make = (
       // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       HttpClientRequest.post(`/streams/${stream}/records`).pipe(
         HttpClientRequest.setHeaders({ 's2-format': options.params?.['s2-format'] ?? undefined }),
-        HttpClientRequest.bodyUnsafeJson(options.payload),
+        HttpClientRequest.bodyJsonUnsafe(options.payload),
         withResponse(
           HttpClientResponse.matchStatus({
             '2xx': decodeSuccess(AppendAck),
@@ -1046,7 +1035,7 @@ export interface Client {
     options?: typeof ListAccessTokensParams.Encoded,
   ) => Effect.Effect<
     typeof ListAccessTokensResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Issue a new access token.
@@ -1055,7 +1044,7 @@ export interface Client {
     options: typeof AccessTokenInfo.Encoded,
   ) => Effect.Effect<
     typeof IssueAccessTokenResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Revoke an access token.
@@ -1064,7 +1053,7 @@ export interface Client {
     id: string,
   ) => Effect.Effect<
     void,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * List basins.
@@ -1073,7 +1062,7 @@ export interface Client {
     options?: typeof ListBasinsParams.Encoded,
   ) => Effect.Effect<
     typeof ListBasinsResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Create a basin.
@@ -1082,7 +1071,7 @@ export interface Client {
     options: typeof CreateBasinRequest.Encoded,
   ) => Effect.Effect<
     typeof BasinInfo.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Get basin configuration.
@@ -1091,7 +1080,7 @@ export interface Client {
     basin: string,
   ) => Effect.Effect<
     typeof BasinConfig.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Create or reconfigure a basin.
@@ -1104,7 +1093,7 @@ export interface Client {
     },
   ) => Effect.Effect<
     typeof BasinInfo.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Delete a basin.
@@ -1113,7 +1102,7 @@ export interface Client {
     basin: string,
   ) => Effect.Effect<
     void,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Reconfigure a basin.
@@ -1123,7 +1112,7 @@ export interface Client {
     options: typeof BasinReconfiguration.Encoded,
   ) => Effect.Effect<
     typeof BasinConfig.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Account-level metrics.
@@ -1132,7 +1121,7 @@ export interface Client {
     options: typeof AccountMetricsParams.Encoded,
   ) => Effect.Effect<
     typeof MetricSetResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Basin-level metrics.
@@ -1142,7 +1131,7 @@ export interface Client {
     options: typeof BasinMetricsParams.Encoded,
   ) => Effect.Effect<
     typeof MetricSetResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Stream-level metrics.
@@ -1153,7 +1142,7 @@ export interface Client {
     options: typeof StreamMetricsParams.Encoded,
   ) => Effect.Effect<
     typeof MetricSetResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * List streams.
@@ -1162,7 +1151,7 @@ export interface Client {
     options?: typeof ListStreamsParams.Encoded,
   ) => Effect.Effect<
     typeof ListStreamsResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Create a stream.
@@ -1171,7 +1160,7 @@ export interface Client {
     options: typeof CreateStreamRequest.Encoded,
   ) => Effect.Effect<
     typeof StreamInfo.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Get stream configuration.
@@ -1180,7 +1169,7 @@ export interface Client {
     stream: string,
   ) => Effect.Effect<
     typeof StreamConfig.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Create or reconfigure a stream.
@@ -1193,7 +1182,7 @@ export interface Client {
     },
   ) => Effect.Effect<
     typeof StreamInfo.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Delete a stream.
@@ -1202,7 +1191,7 @@ export interface Client {
     stream: string,
   ) => Effect.Effect<
     void,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Reconfigure a stream.
@@ -1212,7 +1201,7 @@ export interface Client {
     options: typeof StreamReconfiguration.Encoded,
   ) => Effect.Effect<
     typeof StreamConfig.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
   /**
    * Read records.
@@ -1223,7 +1212,7 @@ export interface Client {
   ) => Effect.Effect<
     typeof ReadBatch.Type,
     | HttpClientError.HttpClientError
-    | ParseResult.ParseError
+    | S.SchemaError
     | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
     | ClientError<'TailResponse', typeof TailResponse.Type>
   >
@@ -1239,7 +1228,7 @@ export interface Client {
   ) => Effect.Effect<
     typeof AppendAck.Type,
     | HttpClientError.HttpClientError
-    | ParseResult.ParseError
+    | S.SchemaError
     | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
     | ClientError<'AppendConditionFailed', typeof AppendConditionFailed.Type>
   >
@@ -1250,7 +1239,7 @@ export interface Client {
     stream: string,
   ) => Effect.Effect<
     typeof TailResponse.Type,
-    HttpClientError.HttpClientError | ParseResult.ParseError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
   >
 }
 

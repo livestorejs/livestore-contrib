@@ -1,4 +1,6 @@
-import { Effect, Layer, Logger, McpServer } from '@livestore/utils/effect'
+import { McpServer } from 'effect/unstable/ai'
+
+import { Effect, Layer, Logger } from '@livestore/utils/effect'
 import { Cli, PlatformNode } from '@livestore/utils/node'
 
 import { architectureContent } from '../mcp-content/architecture.ts'
@@ -84,12 +86,11 @@ const mcpServerCommand = Cli.Command.make(
     return yield* McpServer.layerStdio({
       name: 'livestore-mcp',
       version: '0.1.0',
-      stdin: PlatformNode.NodeStream.stdin,
-      stdout: PlatformNode.NodeSink.stdout,
     }).pipe(
       Layer.provide(LivestoreResources),
       Layer.provide(LivestoreTools),
-      Layer.provide(Logger.add(Logger.prettyLogger({ stderr: true }))),
+      Layer.provide(Logger.layer([Logger.consolePretty({ stderr: true })])),
+      Layer.provide(PlatformNode.NodeStdio.layer),
       Layer.launch,
     )
   }),

@@ -105,7 +105,7 @@ export type SolidApi = {
 export const useStore = <
   TSchema extends LiveStoreSchema,
   TContext = {},
-  TSyncPayloadSchema extends Schema.Schema<any> = typeof Schema.JsonValue,
+  TSyncPayloadSchema extends Schema.Codec<Schema.Json, Schema.Json> = typeof Schema.Json,
 >(
   options: AccessorMaybe<RegistryStoreOptions<TSchema, TContext, TSyncPayloadSchema>>,
 ): Solid.Resource<Store<TSchema, TContext>> & SolidApi => {

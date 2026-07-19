@@ -21,4 +21,4 @@ const layer = Layer.mergeAll(
 makeWorkerEffect({
   sync: { backend: makeWsSync({ url: syncUrl }) },
   schema,
-}).pipe(Effect.provide(layer), PlatformNode.NodeRuntime.runMain({ disablePrettyLogger: true }))
+}).pipe(Effect.provide(layer), PlatformNode.NodeRuntime.runMain)

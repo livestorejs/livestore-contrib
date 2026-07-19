@@ -55,7 +55,7 @@ export const init = ({
         storeId,
         adapter,
         disableDevtools: true,
-        syncPayload,
+        ...(syncPayload !== undefined ? { syncPayload } : {}),
         syncPayloadSchema,
       }),
     )
@@ -73,7 +73,7 @@ export const init = ({
     return store
   }).pipe(Effect.provide(ModuleLoaderLayer), Effect.withSpan('mcp-runtime:init'))
 
-export const getStore = Effect.sync(() => Option.fromNullable(store))
+export const getStore = Effect.sync(() => Option.fromNullishOr(store))
 
 export const status = Effect.gen(function* () {
   const opt = yield* getStore
@@ -111,26 +111,26 @@ export const query = Effect.fn('mcp-runtime:query')(function* ({
 }) {
   const opt = yield* getStore
   if (opt._tag === 'None') {
-    return yield* Effect.dieMessage('LiveStore not connected. Call livestore_instance_connect first.')
+    return yield* Effect.die(new Error('LiveStore not connected. Call livestore_instance_connect first.'))
   }
   const s = opt.value
 
   const rows = s.query<Array<Record<string, unknown>>>({ query: sql, bindValues: (bindValues as any) ?? [] })
-  const jsonRows = rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v as Schema.JsonValue])))
+  const jsonRows = rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v as Schema.Json])))
   return { rows: jsonRows, rowCount: jsonRows.length }
 })
 
 export const commit = Effect.fn('mcp-runtime:commit')(function* ({
   events,
 }: {
-  events: ReadonlyArray<{ name: string; args: Schema.JsonValue }>
+  events: ReadonlyArray<{ name: string; args: Schema.Json }>
 }) {
   const opt = yield* getStore
   if (opt._tag === 'None') {
-    return yield* Effect.dieMessage('LiveStore not connected. Call livestore_instance_connect first.')
+    return yield* Effect.die(new Error('LiveStore not connected. Call livestore_instance_connect first.'))
   }
   const s = opt.value
-  const InputEventSchema = LiveStoreEvent.Input.makeSchema(s.schema) as Schema.Schema<any>
+  const InputEventSchema = LiveStoreEvent.Input.makeSchema(s.schema) as Schema.Codec<any>
   const decoded = events.map((e) => Schema.decodeSync(InputEventSchema)(e))
   s.commit(...decoded)
   return { committed: decoded.length }

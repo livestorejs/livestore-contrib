@@ -31,7 +31,7 @@ Vitest.describe('useQuery', () => {
     RG.__resetIds()
   })
 
-  Vitest.scopedLive('simple', () =>
+  Vitest.live('simple', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -55,7 +55,7 @@ Vitest.describe('useQuery', () => {
     }),
   )
 
-  Vitest.scopedLive('same `useQuery` hook invoked with different queries', () =>
+  Vitest.live('same `useQuery` hook invoked with different queries', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -104,7 +104,7 @@ Vitest.describe('useQuery', () => {
     }),
   )
 
-  Vitest.scopedLive('filtered dependency query', () =>
+  Vitest.live('filtered dependency query', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -141,7 +141,7 @@ Vitest.describe('useQuery', () => {
     }),
   )
 
-  Vitest.scopedLive('should work for a dynamic list with query swapping', () =>
+  Vitest.live('should work for a dynamic list with query swapping', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -177,7 +177,7 @@ Vitest.describe('useQuery', () => {
   // NOTE: This test covers special Solid lifecycle patterns similar to react-window
   // It causes query swapping in reactive computations and cleanup calls
   // This tests the `_tag: 'destroyed'` state in the `spanAlreadyStartedCache`
-  Vitest.scopedLive('should work for a virtualized list with @solid-primitives/virtual', () =>
+  Vitest.live('should work for a virtualized list with @solid-primitives/virtual', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -228,7 +228,7 @@ Vitest.describe('useQuery', () => {
     }),
   )
 
-  Vitest.scopedLive('should work with signal', () =>
+  Vitest.live('should work with signal', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
       const num$ = signal(0)
@@ -243,7 +243,7 @@ Vitest.describe('useQuery', () => {
     }),
   )
 
-  Vitest.scopedLive('supports query builders directly', () =>
+  Vitest.live('supports query builders directly', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 
@@ -266,7 +266,7 @@ Vitest.describe('useQuery', () => {
     }),
   )
 
-  Vitest.scopedLive('union of different result types with useQuery', () =>
+  Vitest.live('union of different result types with useQuery', () =>
     Effect.gen(function* () {
       const { wrapper, store } = yield* makeTodoMvcSolid({})
 

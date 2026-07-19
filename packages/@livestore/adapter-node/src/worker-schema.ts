@@ -9,14 +9,14 @@ import {
 } from '@livestore/common'
 import { StreamEventsOptionsFields } from '@livestore/common/leader-thread'
 import { EventSequenceNumber, LiveStoreEvent } from '@livestore/common/schema'
-import { Schema, Transferable } from '@livestore/utils/effect'
+import { Rpc, RpcGroup, Schema, Transferable } from '@livestore/utils/effect'
 
-export const WorkerArgv = Schema.parseJson(
+export const WorkerArgv = Schema.fromJsonString(
   Schema.Struct({
     clientId: Schema.String,
     storeId: Schema.String,
     sessionId: Schema.String,
-    extraArgs: Schema.UndefinedOr(Schema.JsonValue),
+    extraArgs: Schema.optional(Schema.Json),
   }),
 )
 
@@ -26,7 +26,7 @@ export const StorageTypeInMemory = Schema.Struct({
    * Only works with single-threaded leader thread for now.
    * Should be mostly used for testing.
    */
-  importSnapshot: Schema.optional(Schema.Uint8Array as any as Schema.Schema<Uint8Array<ArrayBuffer>>),
+  importSnapshot: Schema.optional(Transferable.Uint8Array),
 })
 
 export type StorageTypeInMemory = typeof StorageTypeInMemory.Type
@@ -43,7 +43,7 @@ export const StorageTypeFs = Schema.Struct({
 
 export type StorageTypeFs = typeof StorageTypeFs.Type
 
-export const StorageType = Schema.Union(StorageTypeInMemory, StorageTypeFs)
+export const StorageType = Schema.Union([StorageTypeInMemory, StorageTypeFs])
 export type StorageType = typeof StorageType.Type
 export type StorageTypeEncoded = typeof StorageType.Encoded
 
@@ -54,175 +54,142 @@ export type StorageTypeEncoded = typeof StorageType.Encoded
 // })
 
 // export const SyncBackendOptions = Schema.Union(SyncBackendOptionsWebsocket)
-export const SyncBackendOptions = Schema.Record({ key: Schema.String, value: Schema.JsonValue })
-export type SyncBackendOptions = Record<string, Schema.JsonValue>
+export const SyncBackendOptions = Schema.Record(Schema.String, Schema.Json)
+export type SyncBackendOptions = Record<string, Schema.Json>
 
-export class LeaderWorkerOuterInitialMessage extends Schema.TaggedRequest<LeaderWorkerOuterInitialMessage>()(
-  'InitialMessage',
-  {
-    payload: { port: Transferable.MessagePort },
-    success: Schema.Void,
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerOuterInitialMessage extends Rpc.make('InitialMessage', {
+  payload: { port: Transferable.MessagePort },
+  success: Schema.Void,
+  error: Schema.Never,
+}) {}
 
-export class LeaderWorkerOuterRequest extends Schema.Union(LeaderWorkerOuterInitialMessage) {}
+export class LeaderWorkerOuterRpcs extends RpcGroup.make(LeaderWorkerOuterInitialMessage) {}
 
-export class LeaderWorkerInnerInitialMessage extends Schema.TaggedRequest<LeaderWorkerInnerInitialMessage>()(
-  'InitialMessage',
-  {
-    payload: {
-      storeId: Schema.String,
-      clientId: Schema.String,
-      storage: StorageType,
-      syncPayloadEncoded: Schema.UndefinedOr(Schema.JsonValue),
-      devtools: Schema.Union(
-        Schema.Struct({
-          enabled: Schema.Literal(true),
-          schemaPath: Schema.String,
-          port: Schema.Number,
-          host: Schema.String,
-          schemaAlias: Schema.String,
-          useExistingDevtoolsServer: Schema.Boolean,
-        }),
-        Schema.Struct({ enabled: Schema.Literal(false) }),
-      ),
-    },
-    success: Schema.Void,
-    failure: UnknownError,
-  },
-) {}
-
-export class LeaderWorkerInnerBootStatusStream extends Schema.TaggedRequest<LeaderWorkerInnerBootStatusStream>()(
-  'BootStatusStream',
-  {
-    payload: {},
-    success: BootStatus,
-    failure: Schema.Never,
-  },
-) {}
-
-export class LeaderWorkerInnerPullStream extends Schema.TaggedRequest<LeaderWorkerInnerPullStream>()('PullStream', {
+export class LeaderWorkerInnerInitialMessage extends Rpc.make('InitialMessage', {
   payload: {
-    cursor: Schema.typeSchema(EventSequenceNumber.Client.Composite),
+    storeId: Schema.String,
+    clientId: Schema.String,
+    storage: StorageType,
+    syncPayloadEncoded: Schema.UndefinedOr(Schema.Json),
+    devtools: Schema.Union([
+      Schema.Struct({
+        enabled: Schema.Literal(true),
+        schemaPath: Schema.String,
+        port: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 65_535 })),
+        host: Schema.String,
+        schemaAlias: Schema.String,
+        useExistingDevtoolsServer: Schema.Boolean,
+      }),
+      Schema.Struct({ enabled: Schema.Literal(false) }),
+    ]),
+  },
+  success: Schema.Void,
+  error: UnknownError,
+}) {}
+
+export type LeaderWorkerInnerInitialMessagePayload = typeof LeaderWorkerInnerInitialMessage.payloadSchema.Type
+
+export class LeaderWorkerInnerBootStatusStream extends Rpc.make('BootStatusStream', {
+  payload: {},
+  success: BootStatus,
+  error: Schema.Never,
+  stream: true,
+}) {}
+
+export class LeaderWorkerInnerPullStream extends Rpc.make('PullStream', {
+  payload: {
+    cursor: Schema.toType(EventSequenceNumber.Client.Composite),
   },
   success: Schema.Struct({
     payload: SyncState.PayloadUpstream,
   }),
-  failure: Schema.Never,
+  error: Schema.Never,
+  stream: true,
 }) {}
 
-export class LeaderWorkerInnerStreamEvents extends Schema.TaggedRequest<LeaderWorkerInnerStreamEvents>()(
-  'StreamEvents',
-  {
-    payload: StreamEventsOptionsFields,
-    success: LiveStoreEvent.Client.Encoded,
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerStreamEvents extends Rpc.make('StreamEvents', {
+  payload: StreamEventsOptionsFields,
+  success: LiveStoreEvent.Client.Encoded,
+  error: Schema.Never,
+  stream: true,
+}) {}
 
-export class LeaderWorkerInnerPushToLeader extends Schema.TaggedRequest<LeaderWorkerInnerPushToLeader>()(
-  'PushToLeader',
-  {
-    payload: {
-      batch: Schema.Array(Schema.typeSchema(LiveStoreEvent.Client.Encoded)),
-    },
-    success: Schema.Void as Schema.Schema<void>,
-    failure: RejectedPushError,
+export class LeaderWorkerInnerPushToLeader extends Rpc.make('PushToLeader', {
+  payload: {
+    batch: Schema.Array(Schema.toType(LiveStoreEvent.Client.Encoded)),
   },
-) {}
+  success: Schema.Void,
+  error: RejectedPushError,
+}) {}
 
-export class LeaderWorkerInnerExport extends Schema.TaggedRequest<LeaderWorkerInnerExport>()('Export', {
+export class LeaderWorkerInnerExport extends Rpc.make('Export', {
   payload: {},
-  success: Transferable.Uint8Array as Schema.Schema<Uint8Array<ArrayBuffer>>,
-  failure: Schema.Never,
+  success: Transferable.Uint8Array,
+  error: Schema.Never,
 }) {}
 
-export class LeaderWorkerInnerGetRecreateSnapshot extends Schema.TaggedRequest<LeaderWorkerInnerGetRecreateSnapshot>()(
-  'GetRecreateSnapshot',
-  {
-    payload: {},
-    success: Schema.Struct({
-      snapshot: Transferable.Uint8Array as Schema.Schema<Uint8Array<ArrayBuffer>>,
-      migrationsReport: MigrationsReport,
-    }),
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerGetRecreateSnapshot extends Rpc.make('GetRecreateSnapshot', {
+  payload: {},
+  success: Schema.Struct({
+    snapshot: Transferable.Uint8Array,
+    migrationsReport: MigrationsReport,
+  }),
+  error: Schema.Never,
+}) {}
 
-export class LeaderWorkerInnerExportEventlog extends Schema.TaggedRequest<LeaderWorkerInnerExportEventlog>()(
-  'ExportEventlog',
-  {
-    payload: {},
-    success: Transferable.Uint8Array as Schema.Schema<Uint8Array<ArrayBuffer>>,
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerExportEventlog extends Rpc.make('ExportEventlog', {
+  payload: {},
+  success: Transferable.Uint8Array,
+  error: Schema.Never,
+}) {}
 
-export class LeaderWorkerInnerGetLeaderHead extends Schema.TaggedRequest<LeaderWorkerInnerGetLeaderHead>()(
-  'GetLeaderHead',
-  {
-    payload: {},
-    success: Schema.typeSchema(EventSequenceNumber.Client.Composite),
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerGetLeaderHead extends Rpc.make('GetLeaderHead', {
+  payload: {},
+  success: Schema.toType(EventSequenceNumber.Client.Composite),
+  error: Schema.Never,
+}) {}
 
-export class LeaderWorkerInnerGetLeaderSyncState extends Schema.TaggedRequest<LeaderWorkerInnerGetLeaderSyncState>()(
-  'GetLeaderSyncState',
-  {
-    payload: {},
-    success: SyncState.SyncState,
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerGetLeaderSyncState extends Rpc.make('GetLeaderSyncState', {
+  payload: {},
+  success: SyncState.SyncState,
+  error: Schema.Never,
+}) {}
 
-export class LeaderWorkerInnerSyncStateStream extends Schema.TaggedRequest<LeaderWorkerInnerSyncStateStream>()(
-  'SyncStateStream',
-  {
-    payload: {},
-    success: SyncState.SyncState,
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerSyncStateStream extends Rpc.make('SyncStateStream', {
+  payload: {},
+  success: SyncState.SyncState,
+  error: Schema.Never,
+  stream: true,
+}) {}
 
-export class LeaderWorkerInnerGetNetworkStatus extends Schema.TaggedRequest<LeaderWorkerInnerGetNetworkStatus>()(
-  'GetNetworkStatus',
-  {
-    payload: {},
-    success: SyncBackend.NetworkStatus,
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerGetNetworkStatus extends Rpc.make('GetNetworkStatus', {
+  payload: {},
+  success: SyncBackend.NetworkStatus,
+  error: Schema.Never,
+}) {}
 
-export class LeaderWorkerInnerNetworkStatusStream extends Schema.TaggedRequest<LeaderWorkerInnerNetworkStatusStream>()(
-  'NetworkStatusStream',
-  {
-    payload: {},
-    success: SyncBackend.NetworkStatus,
-    failure: Schema.Never,
-  },
-) {}
+export class LeaderWorkerInnerNetworkStatusStream extends Rpc.make('NetworkStatusStream', {
+  payload: {},
+  success: SyncBackend.NetworkStatus,
+  error: Schema.Never,
+  stream: true,
+}) {}
 
-export class LeaderWorkerInnerShutdown extends Schema.TaggedRequest<LeaderWorkerInnerShutdown>()('Shutdown', {
+export class LeaderWorkerInnerShutdown extends Rpc.make('Shutdown', {
   payload: {},
   success: Schema.Void,
-  failure: Schema.Never,
+  error: Schema.Never,
 }) {}
 
-export class LeaderWorkerInnerExtraDevtoolsMessage extends Schema.TaggedRequest<LeaderWorkerInnerExtraDevtoolsMessage>()(
-  'ExtraDevtoolsMessage',
-  {
-    payload: {
-      message: Devtools.Leader.MessageToApp,
-    },
-    success: Schema.Void,
-    failure: Schema.Never,
+export class LeaderWorkerInnerExtraDevtoolsMessage extends Rpc.make('ExtraDevtoolsMessage', {
+  payload: {
+    message: Devtools.Leader.MessageToApp,
   },
-) {}
+  success: Schema.Void,
+  error: Schema.Never,
+}) {}
 
-export const LeaderWorkerInnerRequest = Schema.Union(
-  LeaderWorkerInnerInitialMessage,
+export class LeaderWorkerInnerRpcs extends RpcGroup.make(
   LeaderWorkerInnerBootStatusStream,
   LeaderWorkerInnerPullStream,
   LeaderWorkerInnerStreamEvents,
@@ -237,5 +204,4 @@ export const LeaderWorkerInnerRequest = Schema.Union(
   LeaderWorkerInnerNetworkStatusStream,
   LeaderWorkerInnerShutdown,
   LeaderWorkerInnerExtraDevtoolsMessage,
-)
-export type LeaderWorkerInnerRequest = typeof LeaderWorkerInnerRequest.Type
+) {}

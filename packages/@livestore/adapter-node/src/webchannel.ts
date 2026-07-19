@@ -1,14 +1,13 @@
 import type { BroadcastChannel as NodeBroadcastChannel } from 'node:worker_threads'
 
-import type { Either, ParseResult } from '@livestore/utils/effect'
-import { Deferred, Effect, Exit, Schema, Scope, Stream, WebChannel } from '@livestore/utils/effect'
+import { Deferred, Effect, Exit, Queue, Schema, Scope, Stream, WebChannel } from '@livestore/utils/effect'
 
 export const makeBroadcastChannel = <Msg, MsgEncoded>({
   channelName,
   schema,
 }: {
   channelName: string
-  schema: Schema.Schema<Msg, MsgEncoded>
+  schema: Schema.Codec<Msg, MsgEncoded>
 }): Effect.Effect<WebChannel.WebChannel<Msg, Msg>, never, Scope.Scope> =>
   Effect.scopeWithCloseable((scope) =>
     Effect.gen(function* () {
@@ -21,39 +20,33 @@ export const makeBroadcastChannel = <Msg, MsgEncoded>({
       // from `node:worker_threads` is not yet stable in Deno
       const channel = new globalThis.BroadcastChannel(channelName) as any as NodeBroadcastChannel
 
-      yield* Effect.addFinalizer(() => Effect.try(() => channel.close()).pipe(Effect.ignoreLogged))
+      yield* Effect.addFinalizer(() =>
+        Effect.try(() => {
+          // NOTE not all BroadcastChannel implementations have the `unref` method
+          if (typeof channel.unref === 'function') {
+            channel.unref()
+          }
+          channel.close()
+        }).pipe(Effect.ignore),
+      )
 
       const send = (message: Msg) =>
         Effect.gen(function* () {
-          const messageEncoded = yield* Schema.encode(schema)(message)
+          const messageEncoded = yield* Schema.encodeEffect(schema)(message)
           channel.postMessage(messageEncoded)
         })
 
-      // TODO also listen to `messageerror` in parallel
-      // const listen = Stream.fromEventListener<MessageEvent>(channel, 'message').pipe(
-      //   Stream.map((_) => Schema.decodeEither(listenSchema)(_.data)),
-      // )
+      // In Effect v4, forking a consumer is not a readiness handshake. Install the message
+      // listener while constructing the channel and buffer into a scoped queue so early messages
+      // are not lost before `listen` is pulled.
+      const messageQueue = yield* Effect.acquireRelease(Queue.unbounded<unknown>(), Queue.shutdown)
+      channel.onmessage = (event: any) => {
+        Queue.offerUnsafe(messageQueue, event.data)
+      }
 
-      const listen = Stream.asyncPush<Either.Either<Msg, ParseResult.ParseError>>((emit) =>
-        Effect.acquireRelease(
-          Effect.gen(function* () {
-            channel.onmessage = (event: any) => {
-              return emit.single(Schema.decodeEither(schema)(event.data))
-            }
+      const listen = Stream.fromQueue(messageQueue).pipe(Stream.map((data) => Schema.decodeUnknownResult(schema)(data)))
 
-            return channel
-          }),
-          (channel) =>
-            Effect.sync(() => {
-              // NOTE not all BroadcastChannel implementations have the `unref` method
-              if (typeof channel.unref === 'function') {
-                channel.unref()
-              }
-            }),
-        ),
-      )
-
-      const closedDeferred = yield* Deferred.make<void>().pipe(Effect.acquireRelease(Deferred.done(Exit.void)))
+      const closedDeferred = yield* Effect.acquireRelease(Deferred.make<void>(), Deferred.done(Exit.void))
       const supportsTransferables = false
 
       return {
