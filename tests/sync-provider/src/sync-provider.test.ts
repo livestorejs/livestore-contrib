@@ -73,11 +73,11 @@ Vitest.describe.each(providerLayers)('$name sync provider', { timeout: 60000 }, 
         Layer.orDie,
       ),
     )
-    // Eagerly start the runtime
+    // Eagerly start the runtime. Container-backed providers can exceed Vitest's 10-second hook default.
     runtimeContext = await runtime.context()
-  })
+  }, 60000)
 
-  Vitest.afterAll(async () => await runtime.dispose())
+  Vitest.afterAll(async () => await runtime.dispose(), 60000)
 
   const makeProvider = (testName?: string, options?: SyncProviderOptions) =>
     Effect.suspend(() =>

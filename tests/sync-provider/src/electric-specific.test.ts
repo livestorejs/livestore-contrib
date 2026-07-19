@@ -51,13 +51,13 @@ Vitest.describe('ElectricSQL specific error handling', { timeout: 60000 }, () =>
     )
     // Eagerly start the runtime
     runtimeContext = await runtime.context()
-  })
+  }, 60000)
 
   Vitest.afterAll(async () => {
     if (runtime !== undefined) {
       await runtime.dispose()
     }
-  })
+  }, 60000)
 
   const makeElectricProvider = ({ storeId }: { storeId: string }) =>
     Effect.suspend(() =>

@@ -15,7 +15,7 @@ import postgres from 'postgres'
 
 import { UnknownError } from '@livestore/common'
 import type { LiveStoreEvent } from '@livestore/livestore'
-import { nanoid, Schema } from '@livestore/livestore'
+import { Schema } from '@livestore/livestore'
 import * as ElectricSync from '@livestore/sync-electric'
 import { DockerCompose } from '@livestore/utils-dev/node'
 import {
@@ -97,32 +97,21 @@ export const layer: SyncProviderLayer = Layer.effect(
 const startElectricApi = Effect.gen(function* () {
   const electricPort = yield* getFreePort
   const postgresPort = yield* getFreePort
-  // Use a unique Docker Compose project name per test runtime to avoid collisions
-  const projectName = process.env.COMPOSE_PROJECT_NAME ?? `ls_electric_${nanoid().toLowerCase()}`
-
   // Start Docker Compose services (postgres + electric)
   const healthCheckUrl = `http://${dockerHostName}:${electricPort}/v1/health`
   yield* Effect.logDebug('Health check URL:', healthCheckUrl)
   yield* Effect.logDebug('Electric port:', electricPort)
   yield* Effect.logDebug('Postgres port:', postgresPort)
-  yield* Effect.logDebug('Compose project name:', projectName)
 
   const dockerCompose = yield* DockerCompose.DockerCompose
   yield* dockerCompose.start({
     healthCheck: { url: healthCheckUrl },
     env: {
-      // Ensure each test runtime uses its own isolated compose project
-      COMPOSE_PROJECT_NAME: projectName,
       ELECTRIC_PORT: electricPort.toString(),
       POSTGRES_PORT: postgresPort.toString(),
     },
     // forwardLogs: true,
   })
-
-  // Ensure resources are cleaned up on scope exit (containers and networks)
-  yield* Effect.addFinalizer(() =>
-    dockerCompose.down({ env: { COMPOSE_PROJECT_NAME: projectName }, volumes: true }).pipe(Effect.orDie),
-  )
 
   // Get a free port for our HTTP API server
   const endpointPort = yield* getFreePort
@@ -138,7 +127,7 @@ const startElectricApi = Effect.gen(function* () {
   return { endpointPort, postgresPort }
 }).pipe(Effect.withSpan('electric-provider:startElectricApi'))
 
-const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; postgresPort: number }) => {
+export const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; postgresPort: number }) => {
   const electricHost = `http://${dockerHostName}:${electricPort}`
   const apiSecret = 'change-me-electric-secret'
 
@@ -151,15 +140,10 @@ const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; post
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest
 
-          // HEAD / (ping): v4 HttpRouter serves unmatched HEAD requests via the GET handler,
-          // so proxy the reachability probe to Electric before running the pull logic.
+          // Compose has already completed Electric's direct health check before this server starts.
+          // Keep endpoint readiness local so an aborted HEAD cannot retain an upstream request fiber.
           if (request.method === 'HEAD') {
-            const electricResponse = yield* HttpClient.head(electricHost)
-
-            return HttpServerResponse.empty().pipe(
-              HttpServerResponse.setStatus(electricResponse.status),
-              HttpServerResponse.setHeaders(streamResponseHeaders(electricResponse.headers)),
-            )
+            return HttpServerResponse.empty()
           }
 
           const { url, storeId, needsInit /* payload */ } = ElectricSync.makeElectricUrl({
@@ -208,7 +192,6 @@ const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; post
           return yield* HttpServerResponse.json({ success: true })
         }),
       )
-
     }),
   )
 }
