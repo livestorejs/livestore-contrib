@@ -12,7 +12,10 @@ const runtimeDeps = catalog.compose({
   },
   devDependencies: {
     workspace: [utilsDevPkg],
-    external: effectDevDeps('@types/node', 'vitest'),
+    external: {
+      ...effectDevDeps('@types/node', 'vite', 'vitest'),
+      tsx: '^4.20.0',
+    },
   },
 })
 
@@ -21,8 +24,11 @@ export default packageJson(
     name: '@local/tests-scenarios',
     ...localPackageDefaults,
     scripts: {
+      'scenario:run': 'tsx src/cli.ts',
       test: 'vitest run',
       'test:watch': 'vitest',
+      viewer: 'pnpm exec vite --config scenario-viewer.vite.config.ts',
+      'viewer:build': 'pnpm exec vite build --config scenario-viewer.vite.config.ts',
     },
   },
   runtimeDeps,

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LiveStore scenario replay</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="toolbar">
+        <div>
+          <p class="eyebrow">LiveStore verification</p>
+          <h1>Sync scenario</h1>
+          <p id="run-summary" class="summary">Load a completed run artifact to begin.</p>
+        </div>
+        <div class="controls">
+          <label class="file-button">
+            Open artifact
+            <input id="artifact-file" type="file" accept="application/json,.json" />
+          </label>
+          <button id="load-default" type="button">Load generated run</button>
+          <button id="play" type="button" disabled>Play</button>
+        </div>
+      </header>
+
+      <section class="cursor-panel">
+        <div class="cursor-copy">
+          <span id="cursor-label">No cursor</span>
+          <span id="record-label">No observation selected</span>
+        </div>
+        <input id="cursor" type="range" min="0" max="0" value="0" disabled />
+      </section>
+
+      <section aria-labelledby="system-state-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Observed system state at cursor</p>
+            <h2 id="system-state-heading">Sync topology</h2>
+          </div>
+          <div id="run-status" class="badge neutral">Not loaded</div>
+        </div>
+        <div id="system-state" class="empty-state">Choose an artifact above.</div>
+      </section>
+
+      <section aria-labelledby="timeline-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Uniform observation order</p>
+            <h2 id="timeline-heading">Scenario timeline</h2>
+          </div>
+          <p id="event-selection" class="selection-copy">Select an event to highlight its path.</p>
+        </div>
+        <div id="timeline" class="timeline empty-state">No trace loaded.</div>
+      </section>
+
+      <section class="details" aria-labelledby="details-heading">
+        <div class="section-heading">
+          <h2 id="details-heading">Selected trace record</h2>
+        </div>
+        <pre id="record-details">No trace record selected.</pre>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

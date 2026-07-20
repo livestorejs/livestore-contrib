@@ -1,5 +1,8 @@
 import { Schema } from '@livestore/utils/effect'
 
+export const scenarioTraceVersion = 2 as const
+export const scenarioArtifactVersion = 2 as const
+
 export const ParticipantRef = Schema.Struct({
   clientId: Schema.String,
   sessionId: Schema.String,
@@ -152,12 +155,124 @@ export const SyncObservation = Schema.Struct({
 })
 export type SyncObservation = typeof SyncObservation.Type
 
+export const ObservedEvent = Schema.Struct({
+  eventRef: Schema.String,
+  name: Schema.String,
+  args: Schema.Json,
+  origin: ParticipantRef,
+  position: Schema.String,
+  parentPosition: Schema.String,
+  disposition: Schema.Literals(['pending', 'confirmed']),
+})
+export type ObservedEvent = typeof ObservedEvent.Type
+
+export const ComponentSyncObservation = Schema.Struct({
+  localHead: Schema.String,
+  upstreamHead: Schema.String,
+  pendingCount: Schema.Finite,
+  events: Schema.Array(ObservedEvent),
+})
+export type ComponentSyncObservation = typeof ComponentSyncObservation.Type
+
+export const BackendObservation = Schema.Struct({
+  id: Schema.String,
+  connected: Schema.Boolean,
+  head: Schema.String,
+  events: Schema.Array(ObservedEvent),
+})
+export type BackendObservation = typeof BackendObservation.Type
+
+export const ClientSystemObservation = Schema.Struct({
+  clientId: Schema.String,
+  connected: Schema.Boolean,
+  leader: ComponentSyncObservation,
+  sessions: Schema.Array(
+    Schema.Struct({
+      sessionId: Schema.String,
+      sync: ComponentSyncObservation,
+    }),
+  ),
+})
+export type ClientSystemObservation = typeof ClientSystemObservation.Type
+
+export const HostSystemObservation = Schema.Struct({
+  backend: BackendObservation,
+  clients: Schema.Array(ClientSystemObservation),
+})
+export type HostSystemObservation = typeof HostSystemObservation.Type
+
+export const SyncObservationPayload = Schema.Struct({
+  participant: Schema.String,
+  localHead: Schema.String,
+  upstreamHead: Schema.String,
+  pendingCount: Schema.Finite,
+  isSynced: Schema.Boolean,
+})
+export type SyncObservationPayload = typeof SyncObservationPayload.Type
+
+export const ScenarioTracePayload = Schema.Union([
+  Schema.TaggedStruct('run.started', {
+    scenarioId: Schema.String,
+    applicationId: Schema.String,
+    seed: Schema.Finite,
+  }),
+  Schema.TaggedStruct('run.completed', { status: Schema.Literals(['passed', 'failed']) }),
+  Schema.TaggedStruct('client.create.requested', {
+    sessions: Schema.Array(Schema.String),
+    initiallyConnected: Schema.Boolean,
+  }),
+  Schema.TaggedStruct('client.created', { status: Schema.Literal('acknowledged') }),
+  Schema.TaggedStruct('phase.started', { description: Schema.String }),
+  Schema.TaggedStruct('phase.completed', {}),
+  Schema.TaggedStruct('action.requested', { action: Schema.String, input: Schema.Json }),
+  Schema.TaggedStruct('action.completed', {
+    action: Schema.String,
+    status: Schema.Literal('acknowledged'),
+  }),
+  Schema.TaggedStruct('connectivity.disconnect.requested', { connected: Schema.Literal(false) }),
+  Schema.TaggedStruct('connectivity.reconnect.requested', { connected: Schema.Literal(true) }),
+  Schema.TaggedStruct('connectivity.disconnected', { connected: Schema.Literal(false) }),
+  Schema.TaggedStruct('connectivity.reconnected', { connected: Schema.Literal(true) }),
+  Schema.TaggedStruct('settlement.requested', {
+    participants: Schema.Array(Schema.String),
+    healDisconnectedClients: Schema.Array(Schema.String),
+    timeoutMs: Schema.Finite,
+  }),
+  Schema.TaggedStruct('settlement.progress', {
+    settled: Schema.Boolean,
+    observations: Schema.Array(SyncObservationPayload),
+  }),
+  Schema.TaggedStruct('settlement.completed', { observations: Schema.Array(SyncObservationPayload) }),
+  Schema.TaggedStruct('sync.snapshot', SyncObservationPayload.fields),
+  Schema.TaggedStruct('state.snapshot', { inspector: Schema.String, value: Schema.Json }),
+  Schema.TaggedStruct('backend.observed', { reason: Schema.String, observation: BackendObservation }),
+  Schema.TaggedStruct('client.connectivity.observed', {
+    reason: Schema.String,
+    connected: Schema.Boolean,
+  }),
+  Schema.TaggedStruct('leader.sync.observed', {
+    reason: Schema.String,
+    observation: ComponentSyncObservation,
+  }),
+  Schema.TaggedStruct('session.sync.observed', {
+    reason: Schema.String,
+    observation: ComponentSyncObservation,
+  }),
+  Schema.TaggedStruct('oracle.verdict', {
+    oracleId: Schema.String,
+    oracle: Schema.String,
+    status: Schema.Literals(['passed', 'failed']),
+    summary: Schema.String,
+    evidence: Schema.Array(Schema.Finite),
+  }),
+])
+export type ScenarioTracePayload = typeof ScenarioTracePayload.Type
+
 export const ScenarioTraceRecord = Schema.Struct({
-  traceVersion: Schema.Literal(1),
+  traceVersion: Schema.Literal(scenarioTraceVersion),
   runId: Schema.String,
   index: Schema.Finite,
   origin: Schema.Literals(['instruction', 'acknowledgement', 'observation', 'verdict']),
-  kind: Schema.String,
   correlationId: Schema.NullOr(Schema.String),
   causationId: Schema.NullOr(Schema.String),
   clientId: Schema.NullOr(Schema.String),
@@ -165,7 +280,7 @@ export const ScenarioTraceRecord = Schema.Struct({
   phaseId: Schema.NullOr(Schema.String),
   logicalTime: Schema.Finite,
   wallTimeMs: Schema.Finite,
-  payload: Schema.Json,
+  payload: ScenarioTracePayload,
 })
 export type ScenarioTraceRecord = typeof ScenarioTraceRecord.Type
 
@@ -186,7 +301,7 @@ export const ParticipantSnapshot = Schema.Struct({
 export type ParticipantSnapshot = typeof ParticipantSnapshot.Type
 
 export const ScenarioRunArtifact = Schema.Struct({
-  artifactVersion: Schema.Literal(1),
+  artifactVersion: Schema.Literal(scenarioArtifactVersion),
   descriptor: Schema.Struct({
     runId: Schema.String,
     scenarioId: Schema.String,

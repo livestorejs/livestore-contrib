@@ -11,9 +11,13 @@ import {
   participantKey,
   type ScenarioAst,
   type ScenarioOracle,
+  scenarioArtifactVersion,
   ScenarioRunArtifact,
   type ScenarioStep,
+  scenarioTraceVersion,
+  type ScenarioTracePayload,
   type ScenarioTraceRecord,
+  type SyncObservationPayload,
   type SyncObservation,
 } from './model.ts'
 
@@ -54,46 +58,56 @@ export const runScenario = (args: {
 
     record({
       origin: 'observation',
-      kind: 'run.started',
       payload: {
+        _tag: 'run.started',
         scenarioId: args.scenario.id,
         applicationId: args.applicationId,
         seed: args.scenario.seed,
       },
     })
+    yield* recordSystemObservation({ host: args.host, record, reason: 'run-started' })
 
     for (const client of args.scenario.topology.clients) {
       const operationId = `create:${client.id}`
       record({
         origin: 'instruction',
-        kind: 'client.create.requested',
         correlationId: operationId,
         clientId: client.id,
-        payload: { sessions: [...client.sessions], initiallyConnected: client.initiallyConnected },
+        payload: {
+          _tag: 'client.create.requested',
+          sessions: [...client.sessions],
+          initiallyConnected: client.initiallyConnected,
+        },
       })
       yield* args.host.createClient({ operationId, storeId: args.scenario.topology.storeId, client })
       record({
         origin: 'acknowledgement',
-        kind: 'client.created',
         correlationId: operationId,
         clientId: client.id,
-        payload: { status: 'acknowledged' },
+        payload: { _tag: 'client.created', status: 'acknowledged' },
       })
+      yield* recordSystemObservation({ host: args.host, record, reason: operationId, correlationId: operationId })
     }
 
     for (const phase of args.scenario.phases) {
       logicalTime += 1
       record({
         origin: 'observation',
-        kind: 'phase.started',
         phaseId: phase.id,
-        payload: { description: phase.description },
+        payload: { _tag: 'phase.started', description: phase.description },
       })
       for (const step of phase.steps) {
         logicalTime += 1
         yield* executeStep({ host: args.host, phaseId: phase.id, record, step })
+        yield* recordSystemObservation({
+          host: args.host,
+          record,
+          reason: step.id,
+          correlationId: step.id,
+          phaseId: phase.id,
+        })
       }
-      record({ origin: 'observation', kind: 'phase.completed', phaseId: phase.id, payload: {} })
+      record({ origin: 'observation', phaseId: phase.id, payload: { _tag: 'phase.completed' } })
     }
 
     const snapshotResult = yield* captureSnapshots({ host: args.host, scenario: args.scenario, record })
@@ -105,15 +119,15 @@ export const runScenario = (args: {
     })
     const status = verdicts.every((verdict) => verdict.status === 'passed') === true ? 'passed' : 'failed'
 
-    record({ origin: 'observation', kind: 'run.completed', payload: { status } })
+    record({ origin: 'observation', payload: { _tag: 'run.completed', status } })
 
     return yield* Schema.decodeUnknownEffect(ScenarioRunArtifact)({
-      artifactVersion: 1,
+      artifactVersion: scenarioArtifactVersion,
       descriptor: {
         runId,
         scenarioId: args.scenario.id,
         scenarioVersion: args.scenario.version,
-        traceVersion: 1,
+        traceVersion: scenarioTraceVersion,
         applicationId: args.applicationId,
         sourceRevision: args.options?.sourceRevision ?? 'working-tree',
         seed: args.scenario.seed,
@@ -132,8 +146,7 @@ export const runScenario = (args: {
 
 type TraceInput = {
   readonly origin: ScenarioTraceRecord['origin']
-  readonly kind: string
-  readonly payload: Schema.Json
+  readonly payload: ScenarioTracePayload
   readonly correlationId?: string
   readonly causationId?: string
   readonly clientId?: string
@@ -151,11 +164,10 @@ const makeTraceRecorder = (args: {
   let index = 0
   return (input) => {
     const record: ScenarioTraceRecord = {
-      traceVersion: 1,
+      traceVersion: scenarioTraceVersion,
       runId: args.runId,
       index,
       origin: input.origin,
-      kind: input.kind,
       correlationId: input.correlationId ?? null,
       causationId: input.causationId ?? null,
       clientId: input.clientId ?? null,
@@ -183,12 +195,11 @@ const executeStep = (args: {
       return Effect.gen(function* () {
         args.record({
           origin: 'instruction',
-          kind: 'action.requested',
           correlationId: step.id,
           clientId: step.target.clientId,
           sessionId: step.target.sessionId,
           phaseId: args.phaseId,
-          payload: { action: step.action, input: step.input },
+          payload: { _tag: 'action.requested', action: step.action, input: step.input },
         })
         yield* args.host.dispatchAction({
           operationId: step.id,
@@ -198,12 +209,11 @@ const executeStep = (args: {
         })
         args.record({
           origin: 'acknowledgement',
-          kind: 'action.completed',
           correlationId: step.id,
           clientId: step.target.clientId,
           sessionId: step.target.sessionId,
           phaseId: args.phaseId,
-          payload: { action: step.action, status: 'acknowledged' },
+          payload: { _tag: 'action.completed', action: step.action, status: 'acknowledged' },
         })
       })
     }
@@ -224,10 +234,10 @@ const executeStep = (args: {
       return Effect.gen(function* () {
         args.record({
           origin: 'instruction',
-          kind: 'settlement.requested',
           correlationId: step.id,
           phaseId: args.phaseId,
           payload: {
+            _tag: 'settlement.requested',
             participants: step.participants.map(participantKey),
             healDisconnectedClients: [...step.healDisconnectedClients],
             timeoutMs: step.timeoutMs,
@@ -253,10 +263,9 @@ const executeStep = (args: {
         })
         args.record({
           origin: 'acknowledgement',
-          kind: 'settlement.completed',
           correlationId: step.id,
           phaseId: args.phaseId,
-          payload: { observations: settled.map(syncObservationPayload) },
+          payload: { _tag: 'settlement.completed', observations: settled.map(syncObservationPayload) },
         })
       })
     }
@@ -274,11 +283,13 @@ const setConnectivity = (args: {
   Effect.gen(function* () {
     args.record({
       origin: 'instruction',
-      kind: args.connected === true ? 'connectivity.reconnect.requested' : 'connectivity.disconnect.requested',
       correlationId: args.operationId,
       clientId: args.clientId,
       phaseId: args.phaseId,
-      payload: { connected: args.connected },
+      payload:
+        args.connected === true
+          ? { _tag: 'connectivity.reconnect.requested', connected: true }
+          : { _tag: 'connectivity.disconnect.requested', connected: false },
     })
     yield* args.host.setConnectivity({
       operationId: args.operationId,
@@ -287,12 +298,62 @@ const setConnectivity = (args: {
     })
     args.record({
       origin: 'acknowledgement',
-      kind: args.connected === true ? 'connectivity.reconnected' : 'connectivity.disconnected',
       correlationId: args.operationId,
       clientId: args.clientId,
       phaseId: args.phaseId,
-      payload: { connected: args.connected },
+      payload:
+        args.connected === true
+          ? { _tag: 'connectivity.reconnected', connected: true }
+          : { _tag: 'connectivity.disconnected', connected: false },
     })
+  })
+
+/** Records component-scoped facts so every cursor advances one observed component at a time. */
+const recordSystemObservation = (args: {
+  host: ParticipantHost
+  record: TraceRecorder
+  reason: string
+  correlationId?: string
+  phaseId?: string
+}): Effect.Effect<void, HostError> =>
+  Effect.gen(function* () {
+    const observation = yield* args.host.observeSystem
+    args.record({
+      origin: 'observation',
+      correlationId: args.correlationId,
+      causationId: args.correlationId,
+      phaseId: args.phaseId,
+      payload: { _tag: 'backend.observed', reason: args.reason, observation: observation.backend },
+    })
+    for (const client of observation.clients) {
+      args.record({
+        origin: 'observation',
+        correlationId: args.correlationId,
+        causationId: args.correlationId,
+        clientId: client.clientId,
+        phaseId: args.phaseId,
+        payload: { _tag: 'client.connectivity.observed', reason: args.reason, connected: client.connected },
+      })
+      args.record({
+        origin: 'observation',
+        correlationId: args.correlationId,
+        causationId: args.correlationId,
+        clientId: client.clientId,
+        phaseId: args.phaseId,
+        payload: { _tag: 'leader.sync.observed', reason: args.reason, observation: client.leader },
+      })
+      for (const session of client.sessions) {
+        args.record({
+          origin: 'observation',
+          correlationId: args.correlationId,
+          causationId: args.correlationId,
+          clientId: client.clientId,
+          sessionId: session.sessionId,
+          phaseId: args.phaseId,
+          payload: { _tag: 'session.sync.observed', reason: args.reason, observation: session.sync },
+        })
+      }
+    }
   })
 
 const awaitSettlement = (args: {
@@ -314,10 +375,20 @@ const awaitSettlement = (args: {
       const isStable = observationsAreSettled(observations)
       args.record({
         origin: 'observation',
-        kind: 'settlement.progress',
         correlationId: args.correlationId,
         phaseId: args.phaseId,
-        payload: { settled: isStable, observations: observations.map(syncObservationPayload) },
+        payload: {
+          _tag: 'settlement.progress',
+          settled: isStable,
+          observations: observations.map(syncObservationPayload),
+        },
+      })
+      yield* recordSystemObservation({
+        host: args.host,
+        record: args.record,
+        reason: 'settlement-poll',
+        correlationId: args.correlationId,
+        phaseId: args.phaseId,
       })
 
       if (isStable === true && previousStableSignature === signature) return observations
@@ -365,10 +436,9 @@ const captureSnapshots = (args: {
         const sync = yield* args.host.observeSync(participant)
         const syncRecord = args.record({
           origin: 'observation',
-          kind: 'sync.snapshot',
           clientId: participant.clientId,
           sessionId: participant.sessionId,
-          payload: syncObservationPayload(sync),
+          payload: { _tag: 'sync.snapshot', ...syncObservationPayload(sync) },
         })
         const evidence = [syncRecord.index]
         const state: Record<string, Schema.Json> = {}
@@ -378,11 +448,10 @@ const captureSnapshots = (args: {
           state[inspector] = inspected
           const stateRecord = args.record({
             origin: 'observation',
-            kind: 'state.snapshot',
             correlationId: operationId,
             clientId: participant.clientId,
             sessionId: participant.sessionId,
-            payload: { inspector, value: inspected },
+            payload: { _tag: 'state.snapshot', inspector, value: inspected },
           })
           evidence.push(stateRecord.index)
         }
@@ -410,9 +479,9 @@ const evaluateOracles = (args: {
     const verdict = evaluateOracle(oracle, selected, evidence)
     args.record({
       origin: 'verdict',
-      kind: 'oracle.verdict',
       correlationId: oracle.id,
       payload: {
+        _tag: 'oracle.verdict',
         oracleId: verdict.oracleId,
         oracle: verdict.oracle,
         status: verdict.status,
@@ -515,7 +584,7 @@ const observationsAreSettled = (observations: ReadonlyArray<SyncObservation>): b
 
 const globalPosition = (head: string): number => EventSequenceNumber.Client.fromString(head).global
 
-const syncObservationPayload = (observation: SyncObservation): Schema.Json => ({
+const syncObservationPayload = (observation: SyncObservation): SyncObservationPayload => ({
   participant: participantKey(observation.participant),
   localHead: observation.localHead,
   upstreamHead: observation.upstreamHead,

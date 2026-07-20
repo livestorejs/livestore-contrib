@@ -1,8 +1,8 @@
 import { makeInMemoryAdapter } from '@livestore/adapter-web'
 import { makeMockSyncBackend, SyncBackend, type UnknownError } from '@livestore/common'
-import type { LiveStoreSchema } from '@livestore/common/schema'
+import { EventSequenceNumber, type LiveStoreEvent, type LiveStoreSchema } from '@livestore/common/schema'
 import { createStore, type Store } from '@livestore/livestore'
-import { Effect, type OtelTracer, type Schema, type Scope, SubscriptionRef } from '@livestore/utils/effect'
+import { Effect, type OtelTracer, Schema, type Scope, Stream, SubscriptionRef } from '@livestore/utils/effect'
 
 import {
   dispatchApplicationAction,
@@ -15,7 +15,9 @@ import type {
   DispatchActionCommand,
   HostAcknowledgement,
   HostCapabilities,
+  HostSystemObservation,
   InspectStateCommand,
+  ObservedEvent,
   ParticipantRef,
   SetConnectivityCommand,
   SyncObservation,
@@ -34,6 +36,7 @@ export interface ParticipantHost {
   readonly setConnectivity: (
     command: SetConnectivityCommand,
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
+  readonly observeSystem: Effect.Effect<HostSystemObservation, HostError>
   readonly observeSync: (participant: ParticipantRef) => Effect.Effect<SyncObservation, HostError>
   readonly inspectState: (command: InspectStateCommand) => Effect.Effect<Schema.Json, HostError>
 }
@@ -45,6 +48,8 @@ export const inProcessHostCapabilities: HostCapabilities = {
     'named-actions',
     'disconnect-reconnect',
     'sync-observation',
+    'system-observation',
+    'event-lineage',
     'state-inspection',
     'sqlite-state',
   ],
@@ -61,6 +66,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
 ): Effect.Effect<ParticipantHost, UnknownError, Scope.Scope> =>
   Effect.gen(function* () {
     const sharedBackend = yield* makeMockSyncBackend({ startConnected: true })
+    const eventRefs = makeEventRefRegistry()
     const clients = new Map<
       string,
       {
@@ -144,6 +150,57 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
         return { participant, ...store.syncStatus() }
       })
 
+    const observeSystem: ParticipantHost['observeSystem'] = Effect.gen(function* () {
+      const backendEvents = yield* sharedBackend.events
+      const backendConnected = yield* SubscriptionRef.get(sharedBackend.isConnected)
+      const clientObservations = yield* Effect.forEach([...clients.entries()], ([clientId, client]) =>
+        Effect.gen(function* () {
+          const participant = { clientId, sessionId: client.sessionId }
+          const store = yield* getStore(stores, participant)
+          const connected = yield* SubscriptionRef.get(client.connectivity)
+          const syncStates = yield* Effect.promise(() => store._dev.syncStates())
+          const leaderConfirmed = yield* collectConfirmedEvents(store, syncStates.leader.upstreamHead)
+          const sessionConfirmed = leaderConfirmed.filter(
+            (event) => event.seqNum.global <= syncStates.session.upstreamHead.global,
+          )
+
+          return {
+            clientId,
+            connected,
+            leader: makeComponentSyncObservation({
+              confirmed: leaderConfirmed,
+              pending: syncStates.leader.pending,
+              localHead: syncStates.leader.localHead,
+              upstreamHead: syncStates.leader.upstreamHead,
+              eventRefs,
+            }),
+            sessions: [
+              {
+                sessionId: client.sessionId,
+                sync: makeComponentSyncObservation({
+                  confirmed: sessionConfirmed,
+                  pending: syncStates.session.pending,
+                  localHead: syncStates.session.localHead,
+                  upstreamHead: syncStates.session.upstreamHead,
+                  eventRefs,
+                }),
+              },
+            ],
+          }
+        }),
+      )
+
+      return {
+        backend: {
+          id: 'sync-backend',
+          connected: backendConnected,
+          head: `e${backendEvents.at(-1)?.seqNum ?? 0}`,
+          events: eventRefs.observeGlobalEvents(backendEvents),
+        },
+        clients: clientObservations,
+      }
+    })
+
     const inspectState: ParticipantHost['inspectState'] = (command) =>
       Effect.gen(function* () {
         const store = yield* getStore(stores, command.target)
@@ -160,6 +217,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
       createClient,
       dispatchAction,
       setConnectivity,
+      observeSystem,
       observeSync,
       inspectState,
     }
@@ -197,3 +255,113 @@ const getStore = <TSchema extends LiveStoreSchema>(
 }
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
+
+type ClientEvent = LiveStoreEvent.Client.Encoded
+
+const collectConfirmedEvents = <TSchema extends LiveStoreSchema>(
+  store: Store<TSchema>,
+  until: EventSequenceNumber.Client.Composite,
+): Effect.Effect<ReadonlyArray<ClientEvent>, UnknownError> =>
+  store.eventsStream({ until }).pipe(Stream.runCollectReadonlyArray) as Effect.Effect<
+    ReadonlyArray<ClientEvent>,
+    UnknownError
+  >
+
+const makeComponentSyncObservation = (args: {
+  confirmed: ReadonlyArray<ClientEvent>
+  pending: ReadonlyArray<LiveStoreEvent.Client.EncodedWithMeta>
+  localHead: EventSequenceNumber.Client.Composite
+  upstreamHead: EventSequenceNumber.Client.Composite
+  eventRefs: EventRefRegistry
+}) => ({
+  localHead: EventSequenceNumber.Client.toString(args.localHead),
+  upstreamHead: EventSequenceNumber.Client.toString(args.upstreamHead),
+  pendingCount: args.pending.length,
+  events: args.eventRefs.observeClientEvents(args.confirmed, args.pending),
+})
+
+interface EventRefRegistry {
+  readonly observeClientEvents: (
+    confirmed: ReadonlyArray<ClientEvent>,
+    pending: ReadonlyArray<LiveStoreEvent.Client.Encoded>,
+  ) => ReadonlyArray<ObservedEvent>
+  readonly observeGlobalEvents: (events: ReadonlyArray<LiveStoreEvent.Global.Encoded>) => ReadonlyArray<ObservedEvent>
+}
+
+/**
+ * Assigns one run-local reference to each origin occurrence while preserving
+ * the actual LiveStore position observed at every component.
+ */
+const makeEventRefRegistry = (): EventRefRegistry => {
+  const refs = new Map<string, string>()
+  let nextRef = 1
+
+  const resolveRef = (event: TraceableEvent, occurrence: number): string => {
+    const lineageKey = `${eventFingerprint(event)}\u0000${occurrence}`
+    const existing = refs.get(lineageKey)
+    if (existing !== undefined) return existing
+    const eventRef = `event-${String(nextRef).padStart(4, '0')}`
+    nextRef += 1
+    refs.set(lineageKey, eventRef)
+    return eventRef
+  }
+
+  const observe = (
+    events: ReadonlyArray<{ event: TraceableEvent; disposition: ObservedEvent['disposition'] }>,
+    position: (event: TraceableEvent) => { position: string; parentPosition: string },
+  ): ReadonlyArray<ObservedEvent> => {
+    const occurrences = new Map<string, number>()
+    return events.map(({ event, disposition }) => {
+      const fingerprint = eventFingerprint(event)
+      const occurrence = occurrences.get(fingerprint) ?? 0
+      occurrences.set(fingerprint, occurrence + 1)
+      return {
+        eventRef: resolveRef(event, occurrence),
+        name: event.name,
+        args: normalizeJson(event.args),
+        origin: { clientId: event.clientId, sessionId: event.sessionId },
+        ...position(event),
+        disposition,
+      }
+    })
+  }
+
+  return {
+    observeClientEvents: (confirmed, pending) =>
+      observe(
+        [
+          ...confirmed.map((event) => ({ event, disposition: 'confirmed' as const })),
+          ...pending.map((event) => ({ event, disposition: 'pending' as const })),
+        ],
+        (event) => {
+          const clientEvent = event as ClientEvent
+          return {
+            position: EventSequenceNumber.Client.toString(clientEvent.seqNum),
+            parentPosition: EventSequenceNumber.Client.toString(clientEvent.parentSeqNum),
+          }
+        },
+      ),
+    observeGlobalEvents: (events) =>
+      observe(
+        events.map((event) => ({ event, disposition: 'confirmed' as const })),
+        (event) => {
+          const globalEvent = event as LiveStoreEvent.Global.Encoded
+          return { position: `e${globalEvent.seqNum}`, parentPosition: `e${globalEvent.parentSeqNum}` }
+        },
+      ),
+  }
+}
+
+type TraceableEvent = {
+  readonly name: string
+  readonly args: unknown
+  readonly clientId: string
+  readonly sessionId: string
+  readonly seqNum: unknown
+  readonly parentSeqNum: unknown
+}
+
+const eventFingerprint = (event: TraceableEvent): string =>
+  JSON.stringify([event.clientId, event.sessionId, event.name, normalizeJson(event.args)])
+
+const normalizeJson = Schema.decodeUnknownSync(Schema.Json)
