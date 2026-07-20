@@ -10,19 +10,7 @@ export const offlineWriterRecovery = defineScenario({
   tags: ['sync', 'offline', 'rebase'],
   seed: 1442,
   applicationId: 'scenario-todo-app',
-  execution: {
-    participantProfile: 'in-process',
-    syncBackend: 'mock',
-    stateProfile: 'sqlite',
-    requires: [
-      'multiple-clients',
-      'named-actions',
-      'disconnect-reconnect',
-      'sync-observation',
-      'state-inspection',
-      'sqlite-state',
-    ],
-  },
+  requires: ['multiple-clients', 'named-actions', 'disconnect-reconnect', 'sync-observation', 'state-inspection'],
   topology: {
     storeId: 'scenario-offline-writer-recovery',
     clients: [

@@ -1,5 +1,5 @@
 import { makeInMemoryAdapter } from '@livestore/adapter-web'
-import { makeMockSyncBackend, SyncBackend, type UnknownError } from '@livestore/common'
+import { SyncBackend, type UnknownError } from '@livestore/common'
 import { EventSequenceNumber, type LiveStoreEvent, type LiveStoreSchema } from '@livestore/common/schema'
 import { createStore, type Store } from '@livestore/livestore'
 import { Effect, type OtelTracer, Schema, type Scope, Stream, SubscriptionRef } from '@livestore/utils/effect'
@@ -10,6 +10,7 @@ import {
   type ApplicationDefinition,
   ScenarioOperationError,
 } from './application.ts'
+import type { ScenarioBackend } from './backends.ts'
 import type {
   CreateClientCommand,
   DispatchActionCommand,
@@ -21,6 +22,7 @@ import type {
   ParticipantRef,
   SetConnectivityCommand,
   SyncObservation,
+  SyncBackendRealization,
 } from './model.ts'
 import { participantKey } from './model.ts'
 
@@ -29,6 +31,7 @@ export type HostServices = Scope.Scope | OtelTracer.OtelTracer
 
 export interface ParticipantHost {
   readonly capabilities: HostCapabilities
+  readonly backendId: SyncBackendRealization
   readonly createClient: (command: CreateClientCommand) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
   readonly dispatchAction: (
     command: DispatchActionCommand,
@@ -36,7 +39,7 @@ export interface ParticipantHost {
   readonly setConnectivity: (
     command: SetConnectivityCommand,
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
-  readonly observeSystem: Effect.Effect<HostSystemObservation, HostError>
+  readonly observeSystem: Effect.Effect<HostSystemObservation, HostError, Scope.Scope>
   readonly observeSync: (participant: ParticipantRef) => Effect.Effect<SyncObservation, HostError>
   readonly inspectState: (command: InspectStateCommand) => Effect.Effect<Schema.Json, HostError>
 }
@@ -61,12 +64,13 @@ export const inProcessHostCapabilities: HostCapabilities = {
  * Creates the first production-shaped host: each Client owns a real in-memory
  * adapter leader and Store session while all Clients share one mock backend.
  */
-export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
-  application: ApplicationDefinition<TSchema>,
-): Effect.Effect<ParticipantHost, UnknownError, Scope.Scope> =>
+export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata>(args: {
+  application: ApplicationDefinition<TSchema>
+  backend: ScenarioBackend<TSyncMetadata>
+}): Effect.Effect<ParticipantHost, UnknownError, Scope.Scope> =>
   Effect.gen(function* () {
-    const sharedBackend = yield* makeMockSyncBackend({ startConnected: true })
     const eventRefs = makeEventRefRegistry()
+    let observedStoreId: string | undefined
     const clients = new Map<
       string,
       {
@@ -93,7 +97,11 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
         }
 
         const sessionId = command.client.sessions[0]!
-        const underlying = yield* sharedBackend.makeSyncBackend
+        const underlying = yield* args.backend.makeBackend({
+          storeId: command.storeId,
+          clientId: command.client.id,
+          payload: undefined,
+        })
         const connectivity = yield* SubscriptionRef.make(command.client.initiallyConnected)
         const controlledBackend = makeConnectivityControlledBackend({
           clientId: command.client.id,
@@ -102,7 +110,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
         })
 
         const store = yield* createStore({
-          schema: application.schema,
+          schema: args.application.schema,
           storeId: command.storeId,
           adapter: makeInMemoryAdapter({
             clientId: command.client.id,
@@ -116,6 +124,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
 
         clients.set(command.client.id, { connectivity, sessionId })
         stores.set(participantKey({ clientId: command.client.id, sessionId }), store)
+        observedStoreId ??= command.storeId
         return acknowledge(command.operationId)
       })
 
@@ -123,7 +132,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
       Effect.gen(function* () {
         const store = yield* getStore(stores, command.target)
         yield* dispatchApplicationAction({
-          application,
+          application: args.application,
           store,
           participant: command.target,
           action: command.action,
@@ -151,8 +160,8 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
       })
 
     const observeSystem: ParticipantHost['observeSystem'] = Effect.gen(function* () {
-      const backendEvents = yield* sharedBackend.events
-      const backendConnected = yield* SubscriptionRef.get(sharedBackend.isConnected)
+      const backend =
+        observedStoreId === undefined ? { connected: true, events: [] } : yield* args.backend.observe(observedStoreId)
       const clientObservations = yield* Effect.forEach([...clients.entries()], ([clientId, client]) =>
         Effect.gen(function* () {
           const participant = { clientId, sessionId: client.sessionId }
@@ -193,9 +202,9 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
       return {
         backend: {
           id: 'sync-backend',
-          connected: backendConnected,
-          head: `e${backendEvents.at(-1)?.seqNum ?? 0}`,
-          events: eventRefs.observeGlobalEvents(backendEvents),
+          connected: backend.connected,
+          head: `e${backend.events.at(-1)?.seqNum ?? 0}`,
+          events: eventRefs.observeGlobalEvents(backend.events),
         },
         clients: clientObservations,
       }
@@ -205,7 +214,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
       Effect.gen(function* () {
         const store = yield* getStore(stores, command.target)
         return yield* inspectApplicationState({
-          application,
+          application: args.application,
           store,
           participant: command.target,
           inspector: command.inspector,
@@ -214,6 +223,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
 
     return {
       capabilities: inProcessHostCapabilities,
+      backendId: args.backend.id,
       createClient,
       dispatchAction,
       setConnectivity,
@@ -223,11 +233,11 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema>(
     }
   })
 
-const makeConnectivityControlledBackend = (args: {
+const makeConnectivityControlledBackend = <TSyncMetadata>(args: {
   clientId: string
   connectivity: SubscriptionRef.SubscriptionRef<boolean>
-  underlying: SyncBackend.SyncBackend
-}): SyncBackend.SyncBackend =>
+  underlying: SyncBackend.SyncBackend<TSyncMetadata>
+}): SyncBackend.SyncBackend<TSyncMetadata> =>
   SyncBackend.of({
     ...args.underlying,
     connect: SubscriptionRef.set(args.connectivity, true),

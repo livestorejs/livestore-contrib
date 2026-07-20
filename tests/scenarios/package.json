@@ -13,10 +13,13 @@
   "dependencies": {
     "@livestore/adapter-web": "workspace:^",
     "@livestore/common": "workspace:^",
+    "@livestore/effect-playwright": "workspace:^",
     "@livestore/livestore": "workspace:^",
+    "@livestore/sync-cf": "workspace:^",
     "@livestore/utils": "workspace:^"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "4.20251118.0",
     "@effect/opentelemetry": "4.0.0-beta.99",
     "@effect/platform-browser": "4.0.0-beta.99",
     "@effect/platform-bun": "4.0.0-beta.99",
@@ -26,6 +29,7 @@
     "@livestore/utils-dev": "workspace:^",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/resources": "2.2.0",
+    "@playwright/test": "1.61.0",
     "@standard-schema/spec": "1.1.0",
     "@types/node": "25.3.3",
     "effect": "4.0.0-beta.99",

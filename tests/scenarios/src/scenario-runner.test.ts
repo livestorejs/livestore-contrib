@@ -3,12 +3,13 @@ import { expect } from 'vitest'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { Effect, Exit, Schema } from '@livestore/utils/effect'
 
+import { makeMockScenarioBackend } from './backends.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { makeInProcessHost } from './host.ts'
 import { defineScenario, ScenarioRunArtifact } from './model.ts'
 import { deriveEventTimeline, projectTraceAt } from './projection.ts'
-import { runInProcessScenario } from './runner.ts'
+import { runInProcessLocalSyncCfScenario, runInProcessScenario } from './runner.ts'
 
 /** Verifies: LS.SYS.VER.SCEN-R01, LS.SYS.VER.SCEN-R03, LS.SYS.VER.SCEN-R06 */
 Vitest.describe('scenario model', () => {
@@ -22,7 +23,8 @@ Vitest.describe('scenario model', () => {
 Vitest.describe('in-process host conformance', () => {
   Vitest.live('rejects topology beyond its advertised session capability', (test) =>
     Effect.gen(function* () {
-      const host = yield* makeInProcessHost(todoApplication)
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
       expect(host.capabilities.maximumSessionsPerClient).toBe(1)
 
       const exit = yield* host
@@ -54,7 +56,7 @@ Vitest.describe('offline writer recovery', () => {
         })
 
         expect(artifact.status).toBe('passed')
-        expect(artifact.artifactVersion).toBe(2)
+        expect(artifact.artifactVersion).toBe(3)
         expect(artifact.descriptor.traceVersion).toBe(2)
         expect(artifact.verdicts).toHaveLength(4)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
@@ -114,5 +116,30 @@ Vitest.describe('offline writer recovery', () => {
         ).toBeGreaterThan(1)
       }).pipe(Vitest.withTestCtx(test)),
     15_000,
+  )
+})
+
+/** Verifies the local-concrete backend realization independently of participant placement. */
+Vitest.describe('local sync-cf backend', () => {
+  Vitest.live(
+    'runs the portable scenario through the real WebSocket and SQLite Durable Object backend',
+    (test) =>
+      Effect.gen(function* () {
+        const artifact = yield* runInProcessLocalSyncCfScenario({
+          scenario: offlineWriterRecovery,
+          application: todoApplication,
+          options: { runId: 'offline-writer-recovery-local-sync-cf', sourceRevision: 'test' },
+        })
+
+        expect(artifact.status).toBe('passed')
+        expect(artifact.descriptor.execution).toEqual({
+          participantProfile: 'in-process',
+          syncBackend: 'local-sync-cf',
+          stateProfile: 'sqlite',
+        })
+        expect(artifact.trace.some((record) => record.payload._tag === 'backend.observed')).toBe(true)
+        expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)
+      }).pipe(Vitest.withTestCtx(test)),
+    60_000,
   )
 })

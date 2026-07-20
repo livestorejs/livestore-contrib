@@ -1,7 +1,23 @@
 import { Schema } from '@livestore/utils/effect'
 
 export const scenarioTraceVersion = 2 as const
-export const scenarioArtifactVersion = 2 as const
+export const scenarioArtifactVersion = 3 as const
+
+export const ParticipantProfile = Schema.Literals(['in-process', 'process', 'browser'])
+export type ParticipantProfile = typeof ParticipantProfile.Type
+
+export const SyncBackendRealization = Schema.Literals(['mock', 'local-sync-cf'])
+export type SyncBackendRealization = typeof SyncBackendRealization.Type
+
+export const StateProfile = Schema.Literals(['sqlite', 'opfs'])
+export type StateProfile = typeof StateProfile.Type
+
+export const ExecutionConfiguration = Schema.Struct({
+  participantProfile: ParticipantProfile,
+  syncBackend: SyncBackendRealization,
+  stateProfile: StateProfile,
+})
+export type ExecutionConfiguration = typeof ExecutionConfiguration.Type
 
 export const ParticipantRef = Schema.Struct({
   clientId: Schema.String,
@@ -88,12 +104,7 @@ export const ScenarioAst = Schema.Struct({
   tags: Schema.Array(Schema.String),
   seed: Schema.Finite,
   applicationId: Schema.String,
-  execution: Schema.Struct({
-    participantProfile: Schema.Literal('in-process'),
-    syncBackend: Schema.Literal('mock'),
-    stateProfile: Schema.Literal('sqlite'),
-    requires: Schema.Array(Schema.String),
-  }),
+  requires: Schema.Array(Schema.String),
   topology: Schema.Struct({
     storeId: Schema.String,
     clients: Schema.Array(ClientDefinition),
@@ -104,7 +115,7 @@ export const ScenarioAst = Schema.Struct({
 export type ScenarioAst = typeof ScenarioAst.Type
 
 export const HostCapabilities = Schema.Struct({
-  profile: Schema.Literal('in-process'),
+  profile: ParticipantProfile,
   capabilities: Schema.Array(Schema.String),
   maximumSessionsPerClient: Schema.Finite,
   settlement: Schema.Literal('stable-poll'),
@@ -311,7 +322,7 @@ export const ScenarioRunArtifact = Schema.Struct({
     sourceRevision: Schema.String,
     seed: Schema.Finite,
     reproductionMode: Schema.Literal('seeded'),
-    execution: ScenarioAst.fields.execution,
+    execution: ExecutionConfiguration,
     capabilities: HostCapabilities,
     componentVersions: Schema.Record(Schema.String, Schema.String),
   }),

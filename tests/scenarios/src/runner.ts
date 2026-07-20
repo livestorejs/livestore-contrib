@@ -1,11 +1,15 @@
 import type { LiveStoreSchema } from '@livestore/common/schema'
 import { EventSequenceNumber } from '@livestore/common/schema'
-import { Effect, type OtelTracer, Schema, type Scope } from '@livestore/utils/effect'
+import { WranglerDevServer } from '@livestore/utils-dev/wrangler'
+import { Effect, FetchHttpClient, type OtelTracer, Schema, type Scope } from '@livestore/utils/effect'
+import { PlatformNode } from '@livestore/utils/node'
 
 import { type ApplicationDefinition, ScenarioOperationError } from './application.ts'
+import { makeLocalSyncCfScenarioBackend, makeMockScenarioBackend } from './backends.ts'
 import { makeInProcessHost, type HostError, type ParticipantHost } from './host.ts'
 import {
   type OracleVerdict,
+  type ExecutionConfiguration,
   type ParticipantRef,
   type ParticipantSnapshot,
   participantKey,
@@ -24,6 +28,13 @@ import {
 export interface RunScenarioOptions {
   readonly runId?: string
   readonly sourceRevision?: string
+  readonly execution?: ExecutionConfiguration
+}
+
+export const defaultInProcessExecution: ExecutionConfiguration = {
+  participantProfile: 'in-process',
+  syncBackend: 'mock',
+  stateProfile: 'sqlite',
 }
 
 export const runInProcessScenario = <TSchema extends LiveStoreSchema>(args: {
@@ -32,12 +43,43 @@ export const runInProcessScenario = <TSchema extends LiveStoreSchema>(args: {
   options?: RunScenarioOptions
 }): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
-    const host = yield* makeInProcessHost(args.application)
+    const backend = yield* makeMockScenarioBackend
+    const host = yield* makeInProcessHost({ application: args.application, backend })
     return yield* runScenario({
       scenario: args.scenario,
       applicationId: args.application.id,
       host,
-      options: args.options,
+      options: { ...args.options, execution: args.options?.execution ?? defaultInProcessExecution },
+    })
+  })
+
+export const runInProcessLocalSyncCfScenario = <TSchema extends LiveStoreSchema>(args: {
+  scenario: ScenarioAst
+  application: ApplicationDefinition<TSchema>
+  options?: RunScenarioOptions
+}): Effect.Effect<
+  ScenarioRunArtifact,
+  HostError | WranglerDevServer.WranglerDevServerError,
+  Scope.Scope | OtelTracer.OtelTracer
+> =>
+  Effect.gen(function* () {
+    const backend = yield* makeLocalSyncCfScenarioBackend.pipe(
+      Effect.provide(PlatformNode.NodeServices.layer),
+      Effect.provide(FetchHttpClient.layer),
+    )
+    const host = yield* makeInProcessHost({ application: args.application, backend })
+    return yield* runScenario({
+      scenario: args.scenario,
+      applicationId: args.application.id,
+      host,
+      options: {
+        ...args.options,
+        execution: {
+          participantProfile: 'in-process',
+          syncBackend: 'local-sync-cf',
+          stateProfile: 'sqlite',
+        },
+      },
     })
   })
 
@@ -49,7 +91,8 @@ export const runScenario = (args: {
   options?: RunScenarioOptions
 }): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
-    yield* validateExecution(args)
+    const execution = args.options?.execution ?? defaultInProcessExecution
+    yield* validateExecution({ ...args, execution })
 
     const runId = args.options?.runId ?? `${args.scenario.id}:${args.scenario.seed}:${Date.now()}`
     const trace: ScenarioTraceRecord[] = []
@@ -132,7 +175,7 @@ export const runScenario = (args: {
         sourceRevision: args.options?.sourceRevision ?? 'working-tree',
         seed: args.scenario.seed,
         reproductionMode: 'seeded',
-        execution: args.scenario.execution,
+        execution,
         capabilities: args.host.capabilities,
         componentVersions: { '@livestore/livestore': 'workspace' },
       },
@@ -315,7 +358,7 @@ const recordSystemObservation = (args: {
   reason: string
   correlationId?: string
   phaseId?: string
-}): Effect.Effect<void, HostError> =>
+}): Effect.Effect<void, HostError, Scope.Scope> =>
   Effect.gen(function* () {
     const observation = yield* args.host.observeSystem
     args.record({
@@ -363,12 +406,12 @@ const awaitSettlement = (args: {
   record: TraceRecorder
   phaseId: string
   correlationId: string
-}): Effect.Effect<ReadonlyArray<SyncObservation>, HostError> => {
+}): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> => {
   const deadline = Date.now() + args.timeoutMs
 
   const loop = (
     previousStableSignature: string | undefined,
-  ): Effect.Effect<ReadonlyArray<SyncObservation>, HostError> =>
+  ): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> =>
     Effect.gen(function* () {
       const observations = yield* Effect.forEach(args.participants, args.host.observeSync)
       const signature = canonicalJson(observations.map(syncObservationPayload))
@@ -546,6 +589,7 @@ const validateExecution = (args: {
   scenario: ScenarioAst
   applicationId: string
   host: ParticipantHost
+  execution: ExecutionConfiguration
 }): Effect.Effect<void, ScenarioOperationError> => {
   if (args.scenario.applicationId !== args.applicationId) {
     return Effect.fail(
@@ -555,8 +599,33 @@ const validateExecution = (args: {
       ),
     )
   }
+  if (args.execution.participantProfile !== args.host.capabilities.profile) {
+    return Effect.fail(
+      new ScenarioOperationError(
+        'capability-unavailable',
+        `Execution selected ${args.execution.participantProfile}, received ${args.host.capabilities.profile} host`,
+      ),
+    )
+  }
+  if (args.execution.syncBackend !== args.host.backendId) {
+    return Effect.fail(
+      new ScenarioOperationError(
+        'capability-unavailable',
+        `Execution selected ${args.execution.syncBackend}, received ${args.host.backendId} backend`,
+      ),
+    )
+  }
   const available = new Set(args.host.capabilities.capabilities)
-  const missing = args.scenario.execution.requires.filter((capability) => available.has(capability) === false)
+  const stateCapability = args.execution.stateProfile === 'opfs' ? 'opfs-state' : 'sqlite-state'
+  if (available.has(stateCapability) === false) {
+    return Effect.fail(
+      new ScenarioOperationError(
+        'capability-unavailable',
+        `Host ${args.host.capabilities.profile} does not provide ${args.execution.stateProfile} state`,
+      ),
+    )
+  }
+  const missing = args.scenario.requires.filter((capability) => available.has(capability) === false)
   if (missing.length > 0) {
     return Effect.fail(
       new ScenarioOperationError(
