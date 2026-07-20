@@ -19,8 +19,9 @@ const requireElement = <T extends typeof Element>(id: string, constructor: T): I
 const fileInput = requireElement('artifact-file', HTMLInputElement)
 const loadDefaultButton = requireElement('load-default', HTMLButtonElement)
 const playButton = requireElement('play', HTMLButtonElement)
-const cursorInput = requireElement('cursor', HTMLInputElement)
+const runTitle = requireElement('run-title', HTMLElement)
 const runSummary = requireElement('run-summary', HTMLElement)
+const traceName = requireElement('trace-name', HTMLElement)
 const cursorLabel = requireElement('cursor-label', HTMLElement)
 const recordLabel = requireElement('record-label', HTMLElement)
 const runStatus = requireElement('run-status', HTMLElement)
@@ -50,12 +51,6 @@ loadDefaultButton.addEventListener('click', () => {
     .catch(showLoadError)
 })
 
-cursorInput.addEventListener('input', () => {
-  stopPlayback()
-  cursorIndex = Number(cursorInput.value)
-  render()
-})
-
 playButton.addEventListener('click', () => {
   if (playTimer !== undefined) {
     stopPlayback()
@@ -63,7 +58,7 @@ playButton.addEventListener('click', () => {
   }
   if (artifact === undefined) return
   if (cursorIndex >= artifact.trace.length - 1) cursorIndex = -1
-  playButton.textContent = 'Pause'
+  playButton.textContent = 'pause'
   playTimer = window.setInterval(() => {
     if (artifact === undefined || cursorIndex >= artifact.trace.length - 1) {
       stopPlayback()
@@ -79,11 +74,11 @@ const loadArtifactJson = (input: string): void => {
   artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(input)
   cursorIndex = artifact.trace.length - 1
   selectedEventRef = undefined
-  cursorInput.disabled = false
-  cursorInput.max = String(Math.max(artifact.trace.length - 1, 0))
-  cursorInput.value = String(Math.max(cursorIndex, 0))
   playButton.disabled = false
+  runTitle.textContent = artifact.descriptor.scenarioId
   runSummary.textContent = `${artifact.scenario.description} · seed ${artifact.descriptor.seed}`
+  traceName.textContent = artifact.descriptor.runId
+  traceName.title = artifact.descriptor.runId
   render()
 }
 
@@ -96,25 +91,25 @@ const showLoadError = (cause: unknown): void => {
 const stopPlayback = (): void => {
   if (playTimer !== undefined) window.clearInterval(playTimer)
   playTimer = undefined
-  playButton.textContent = 'Play'
+  playButton.textContent = 'play'
 }
 
 const render = (): void => {
   if (artifact === undefined) return
-  cursorInput.value = String(Math.max(cursorIndex, 0))
   const projected = projectTraceAt({ scenario: artifact.scenario, trace: artifact.trace, cursorIndex })
   const record = cursorIndex < 0 ? undefined : artifact.trace[cursorIndex]
 
-  cursorLabel.textContent = cursorIndex < 0 ? 'Before first observation' : `Observation ${cursorIndex + 1}`
+  cursorLabel.textContent =
+    cursorIndex < 0 ? `0 / ${artifact.trace.length}` : `${cursorIndex + 1} / ${artifact.trace.length}`
   recordLabel.textContent = record?.payload._tag ?? 'No observation applied'
-  recordDetails.textContent =
-    record === undefined ? 'No trace record selected.' : Schema.encodeSync(Schema.UnknownFromJsonString)(record)
+  recordDetails.textContent = record === undefined ? 'No trace record selected.' : JSON.stringify(record, null, 2)
   runStatus.textContent = projected.runStatus
   runStatus.className = `badge ${statusTone(projected.runStatus)}`
   systemState.className = 'topology'
   systemState.innerHTML = renderTopology(projected)
   renderTimeline()
   bindEventSelection()
+  bindTimelineScrubber()
 }
 
 const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
@@ -123,9 +118,7 @@ const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
     <article class="component-card" style="--component-color:#4169e1">
       <div class="component-title">
         <h3>Sync backend</h3>
-        <span class="badge ${backend?.connected === true ? 'good' : backend === null ? 'neutral' : 'bad'}">
-          ${backend === null ? 'unobserved' : backend.connected === true ? 'online' : 'offline'}
-        </span>
+        <span class="badge ${backend?.connected === true ? 'good' : backend === null ? 'neutral' : 'bad'}">${backend === null ? 'unobserved' : backend.connected === true ? 'online' : 'offline'}</span>
       </div>
       ${renderEventlog(backend?.events ?? [], backend === null ? 'No backend observation yet' : `Authoritative head ${backend.head}`)}
     </article>`
@@ -245,14 +238,26 @@ const renderTimeline = (): void => {
 
   timeline.className = 'timeline'
   timeline.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Scenario event propagation timeline">
+    <svg
+      viewBox="0 0 ${width} ${height}"
+      role="slider"
+      tabindex="0"
+      aria-label="Trace cursor"
+      aria-valuemin="0"
+      aria-valuemax="${artifact.trace.length - 1}"
+      aria-valuenow="${Math.max(cursorIndex, 0)}"
+      aria-valuetext="${escapeMarkup(recordLabel.textContent ?? '')}"
+    >
       ${lanesSvg}
       ${paths}
       ${markerSvg}
       ${
         cursorIndex < 0
           ? ''
-          : `<line class="cursor-line" x1="${xAt(cursorIndex)}" x2="${xAt(cursorIndex)}" y1="8" y2="${height - 10}" />`
+          : `<g class="cursor-scrubber" aria-hidden="true">
+              <line class="cursor-line" x1="${xAt(cursorIndex)}" x2="${xAt(cursorIndex)}" y1="10" y2="${height - 10}" />
+              <circle class="cursor-handle" cx="${xAt(cursorIndex)}" cy="9" r="6" />
+            </g>`
       }
     </svg>`
 }
@@ -264,6 +269,68 @@ const bindEventSelection = (): void => {
       eventSelection.textContent = selectedEventRef === undefined ? '' : `Highlighting ${selectedEventRef}`
       render()
     })
+  })
+}
+
+const bindTimelineScrubber = (): void => {
+  if (artifact === undefined) return
+  const svg = timeline.querySelector('svg')
+  if (svg === null) return
+
+  const traceMax = Math.max(artifact.trace.length - 1, 0)
+  const viewBoxWidth = 1400
+  const plotLeft = 180
+  const plotRight = 35
+  const plotWidth = viewBoxWidth - plotLeft - plotRight
+
+  const moveCursor = (clientX: number, bounds: DOMRect): void => {
+    const svgX = ((clientX - bounds.left) / bounds.width) * viewBoxWidth
+    const ratio = Math.min(Math.max((svgX - plotLeft) / plotWidth, 0), 1)
+    const nextCursor = Math.round(ratio * traceMax)
+    if (nextCursor === cursorIndex) return
+    stopPlayback()
+    cursorIndex = nextCursor
+    render()
+  }
+
+  svg.addEventListener('pointerdown', (event) => {
+    if (event.target instanceof Element && event.target.closest('[data-event-ref]') !== null) return
+    event.preventDefault()
+    const bounds = svg.getBoundingClientRect()
+    const pointerId = event.pointerId
+    const onPointerMove = (moveEvent: PointerEvent): void => {
+      if (moveEvent.pointerId !== pointerId || moveEvent.buttons !== 1) return
+      moveCursor(moveEvent.clientX, bounds)
+    }
+    const onPointerUp = (endEvent: PointerEvent): void => {
+      if (endEvent.pointerId !== pointerId) return
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerUp)
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
+    moveCursor(event.clientX, bounds)
+  })
+
+  svg.addEventListener('keydown', (event) => {
+    const nextCursor =
+      event.key === 'ArrowLeft'
+        ? cursorIndex - 1
+        : event.key === 'ArrowRight'
+          ? cursorIndex + 1
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? traceMax
+              : undefined
+    if (nextCursor === undefined) return
+    event.preventDefault()
+    stopPlayback()
+    cursorIndex = Math.min(Math.max(nextCursor, 0), traceMax)
+    render()
+    timeline.querySelector('svg')?.focus()
   })
 }
 
