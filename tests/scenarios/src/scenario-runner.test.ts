@@ -4,12 +4,18 @@ import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { Effect, Exit, Schema } from '@livestore/utils/effect'
 
 import { makeMockScenarioBackend } from './backends.ts'
+import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { makeInProcessHost } from './host.ts'
 import { defineScenario, ScenarioRunArtifact } from './model.ts'
 import { deriveEventTimeline, projectTraceAt } from './projection.ts'
-import { runInProcessLocalSyncCfScenario, runInProcessScenario, runProcessLocalSyncCfScenario } from './runner.ts'
+import {
+  runBrowserLocalSyncCfScenario,
+  runInProcessLocalSyncCfScenario,
+  runInProcessScenario,
+  runProcessLocalSyncCfScenario,
+} from './runner.ts'
 
 /** Verifies: LS.SYS.VER.SCEN-R01, LS.SYS.VER.SCEN-R03, LS.SYS.VER.SCEN-R06 */
 Vitest.describe('scenario model', () => {
@@ -167,5 +173,53 @@ Vitest.describe('process profile', () => {
         expect(artifact.snapshots).toHaveLength(2)
       }).pipe(Vitest.withTestCtx(test)),
     90_000,
+  )
+})
+
+/** Verifies the persisted web topology, browser network boundary, and lifecycle controls. */
+Vitest.describe('browser profile', () => {
+  Vitest.live(
+    'runs offline writer recovery through isolated browser Clients and local sync-cf',
+    (test) =>
+      Effect.gen(function* () {
+        const artifact = yield* runBrowserLocalSyncCfScenario({
+          scenario: offlineWriterRecovery,
+          applicationId: todoApplication.id,
+          options: { runId: 'offline-writer-recovery-browser', sourceRevision: 'test' },
+        })
+
+        expect(artifact.status).toBe('passed')
+        expect(artifact.descriptor.execution).toEqual({
+          participantProfile: 'browser',
+          syncBackend: 'local-sync-cf',
+          stateProfile: 'opfs',
+        })
+        expect(artifact.descriptor.capabilities.capabilities).toContain('browser-shared-worker')
+      }).pipe(Vitest.withTestCtx(test)),
+    120_000,
+  )
+
+  Vitest.live(
+    'restores two sessions through page and persistent Client restarts',
+    (test) =>
+      Effect.gen(function* () {
+        const artifact = yield* runBrowserLocalSyncCfScenario({
+          scenario: browserMultiSessionRecovery,
+          applicationId: todoApplication.id,
+          options: { runId: 'browser-multi-session-recovery-test', sourceRevision: 'test' },
+        })
+
+        expect(artifact.status).toBe('passed')
+        expect(artifact.snapshots).toHaveLength(2)
+        expect(artifact.trace.map((record) => record.payload._tag)).toEqual(
+          expect.arrayContaining([
+            'lifecycle.session-stopped',
+            'lifecycle.session-restarted',
+            'lifecycle.client-restarted',
+          ]),
+        )
+        expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
+      }).pipe(Vitest.withTestCtx(test)),
+    180_000,
   )
 })

@@ -11,7 +11,7 @@ import {
 
 export const ProjectedSession = Schema.Struct({
   sessionId: Schema.String,
-  lifecycle: Schema.Literals(['declared', 'created']),
+  lifecycle: Schema.Literals(['declared', 'created', 'stopped']),
   sync: Schema.NullOr(ComponentSyncObservation),
 })
 export type ProjectedSession = typeof ProjectedSession.Type
@@ -84,6 +84,26 @@ export const projectTraceAt = (args: {
             ...client,
             lifecycle: 'created',
             sessions: client.sessions.map((session) => ({ ...session, lifecycle: 'created' })),
+          }))
+        }
+        break
+      case 'lifecycle.session-stopped':
+        if (record.clientId !== null && record.sessionId !== null) {
+          state = updateClient(state, record.clientId, (client) => ({
+            ...client,
+            sessions: client.sessions.map((session) =>
+              session.sessionId === record.sessionId ? { ...session, lifecycle: 'stopped' } : session,
+            ),
+          }))
+        }
+        break
+      case 'lifecycle.session-restarted':
+        if (record.clientId !== null && record.sessionId !== null) {
+          state = updateClient(state, record.clientId, (client) => ({
+            ...client,
+            sessions: client.sessions.map((session) =>
+              session.sessionId === record.sessionId ? { ...session, lifecycle: 'created' } : session,
+            ),
           }))
         }
         break

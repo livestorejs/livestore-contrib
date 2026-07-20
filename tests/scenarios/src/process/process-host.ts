@@ -166,6 +166,9 @@ export const makeProcessHost = (args: {
       createClient,
       dispatchAction,
       setConnectivity,
+      stopSession: unsupportedLifecycle('session stop'),
+      restartSession: unsupportedLifecycle('session restart'),
+      restartClient: unsupportedLifecycle('Client restart'),
       observeSystem,
       observeSync,
       inspectState,
@@ -326,3 +329,6 @@ const reconcileClientObservation =
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 
 const processError = (message: string) => new ScenarioOperationError('capability-unavailable', message)
+
+const unsupportedLifecycle = (operation: string) => (_command: { operationId: string }) =>
+  Effect.fail(new ScenarioOperationError('capability-unavailable', `Process host does not support ${operation}`))

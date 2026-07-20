@@ -49,6 +49,21 @@ export const ReconnectStep = Schema.TaggedStruct('reconnect', {
   clientId: Schema.String,
 })
 
+export const StopSessionStep = Schema.TaggedStruct('stop-session', {
+  id: Schema.String,
+  target: ParticipantRef,
+})
+
+export const RestartSessionStep = Schema.TaggedStruct('restart-session', {
+  id: Schema.String,
+  target: ParticipantRef,
+})
+
+export const RestartClientStep = Schema.TaggedStruct('restart-client', {
+  id: Schema.String,
+  clientId: Schema.String,
+})
+
 export const SettleStep = Schema.TaggedStruct('settle', {
   id: Schema.String,
   participants: Schema.Array(ParticipantRef),
@@ -56,7 +71,15 @@ export const SettleStep = Schema.TaggedStruct('settle', {
   timeoutMs: Schema.Finite,
 })
 
-export const ScenarioStep = Schema.Union([ActionStep, DisconnectStep, ReconnectStep, SettleStep])
+export const ScenarioStep = Schema.Union([
+  ActionStep,
+  DisconnectStep,
+  ReconnectStep,
+  StopSessionStep,
+  RestartSessionStep,
+  RestartClientStep,
+  SettleStep,
+])
 export type ScenarioStep = typeof ScenarioStep.Type
 
 export const ScenarioPhase = Schema.Struct({
@@ -143,6 +166,18 @@ export const SetConnectivityCommand = Schema.Struct({
   connected: Schema.Boolean,
 })
 export type SetConnectivityCommand = typeof SetConnectivityCommand.Type
+
+export const SessionLifecycleCommand = Schema.Struct({
+  operationId: Schema.String,
+  target: ParticipantRef,
+})
+export type SessionLifecycleCommand = typeof SessionLifecycleCommand.Type
+
+export const ClientLifecycleCommand = Schema.Struct({
+  operationId: Schema.String,
+  clientId: Schema.String,
+})
+export type ClientLifecycleCommand = typeof ClientLifecycleCommand.Type
 
 export const InspectStateCommand = Schema.Struct({
   operationId: Schema.String,
@@ -244,6 +279,12 @@ export const ScenarioTracePayload = Schema.Union([
   Schema.TaggedStruct('connectivity.reconnect.requested', { connected: Schema.Literal(true) }),
   Schema.TaggedStruct('connectivity.disconnected', { connected: Schema.Literal(false) }),
   Schema.TaggedStruct('connectivity.reconnected', { connected: Schema.Literal(true) }),
+  Schema.TaggedStruct('lifecycle.session-stop.requested', {}),
+  Schema.TaggedStruct('lifecycle.session-stopped', {}),
+  Schema.TaggedStruct('lifecycle.session-restart.requested', {}),
+  Schema.TaggedStruct('lifecycle.session-restarted', {}),
+  Schema.TaggedStruct('lifecycle.client-restart.requested', {}),
+  Schema.TaggedStruct('lifecycle.client-restarted', {}),
   Schema.TaggedStruct('settlement.requested', {
     participants: Schema.Array(Schema.String),
     healDisconnectedClients: Schema.Array(Schema.String),
@@ -381,6 +422,8 @@ export const defineScenario = (input: unknown): ScenarioAst => {
       if (stepIds.has(step.id) === true) throw new ScenarioValidationError(`Duplicate step id: ${step.id}`)
       stepIds.add(step.id)
       if (step._tag === 'action') assertParticipant(step.target)
+      if (step._tag === 'stop-session' || step._tag === 'restart-session') assertParticipant(step.target)
+      if (step._tag === 'restart-client') assertClient(step.clientId)
       if (step._tag === 'disconnect' || step._tag === 'reconnect') assertClient(step.clientId)
       if (step._tag === 'settle') {
         if (step.timeoutMs <= 0) throw new ScenarioValidationError(`Settle timeout must be positive: ${step.id}`)

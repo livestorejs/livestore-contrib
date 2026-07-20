@@ -6,6 +6,7 @@ import { PlatformNode } from '@livestore/utils/node'
 
 import { type ApplicationDefinition, ScenarioOperationError } from './application.ts'
 import { makeLocalSyncCfScenarioBackend, makeMockScenarioBackend } from './backends.ts'
+import { makeBrowserHost } from './browser/browser-host.ts'
 import { makeInProcessHost, type HostError, type ParticipantHost } from './host.ts'
 import {
   type OracleVerdict,
@@ -109,6 +110,36 @@ export const runProcessLocalSyncCfScenario = (args: {
           participantProfile: 'process',
           syncBackend: 'local-sync-cf',
           stateProfile: 'sqlite',
+        },
+      },
+    })
+  })
+
+export const runBrowserLocalSyncCfScenario = (args: {
+  scenario: ScenarioAst
+  applicationId: string
+  options?: RunScenarioOptions
+}): Effect.Effect<
+  ScenarioRunArtifact,
+  HostError | WranglerDevServer.WranglerDevServerError,
+  Scope.Scope | OtelTracer.OtelTracer
+> =>
+  Effect.gen(function* () {
+    const backend = yield* makeLocalSyncCfScenarioBackend.pipe(
+      Effect.provide(PlatformNode.NodeServices.layer),
+      Effect.provide(FetchHttpClient.layer),
+    )
+    const host = yield* makeBrowserHost({ applicationId: args.applicationId, backend })
+    return yield* runScenario({
+      scenario: args.scenario,
+      applicationId: args.applicationId,
+      host,
+      options: {
+        ...args.options,
+        execution: {
+          participantProfile: 'browser',
+          syncBackend: 'local-sync-cf',
+          stateProfile: 'opfs',
         },
       },
     })
@@ -303,6 +334,54 @@ const executeStep = (args: {
         connected,
       })
     }
+    case 'stop-session':
+    case 'restart-session': {
+      const step = args.step
+      const restarting = step._tag === 'restart-session'
+      return Effect.gen(function* () {
+        args.record({
+          origin: 'instruction',
+          correlationId: step.id,
+          clientId: step.target.clientId,
+          sessionId: step.target.sessionId,
+          phaseId: args.phaseId,
+          payload: restarting
+            ? { _tag: 'lifecycle.session-restart.requested' }
+            : { _tag: 'lifecycle.session-stop.requested' },
+        })
+        const command = { operationId: step.id, target: step.target }
+        if (restarting === true) yield* args.host.restartSession(command)
+        else yield* args.host.stopSession(command)
+        args.record({
+          origin: 'acknowledgement',
+          correlationId: step.id,
+          clientId: step.target.clientId,
+          sessionId: step.target.sessionId,
+          phaseId: args.phaseId,
+          payload: restarting ? { _tag: 'lifecycle.session-restarted' } : { _tag: 'lifecycle.session-stopped' },
+        })
+      })
+    }
+    case 'restart-client': {
+      const step = args.step
+      return Effect.gen(function* () {
+        args.record({
+          origin: 'instruction',
+          correlationId: step.id,
+          clientId: step.clientId,
+          phaseId: args.phaseId,
+          payload: { _tag: 'lifecycle.client-restart.requested' },
+        })
+        yield* args.host.restartClient({ operationId: step.id, clientId: step.clientId })
+        args.record({
+          origin: 'acknowledgement',
+          correlationId: step.id,
+          clientId: step.clientId,
+          phaseId: args.phaseId,
+          payload: { _tag: 'lifecycle.client-restarted' },
+        })
+      })
+    }
     case 'settle': {
       const step = args.step
       return Effect.gen(function* () {
@@ -490,7 +569,8 @@ const captureSnapshots = (args: {
     snapshots: ReadonlyArray<ParticipantSnapshot>
     evidenceByParticipant: ReadonlyMap<string, ReadonlyArray<number>>
   },
-  HostError
+  HostError,
+  Scope.Scope
 > => {
   const inspectorNames = [
     ...new Set(

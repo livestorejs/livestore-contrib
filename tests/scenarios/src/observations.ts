@@ -97,10 +97,12 @@ export const collectConfirmedEvents = <TSchema extends LiveStoreSchema>(
   store: Store<TSchema>,
   until: EventSequenceNumber.Client.Composite,
 ): Effect.Effect<ReadonlyArray<ClientEvent>, UnknownError> =>
-  store.eventsStream({ until }).pipe(Stream.runCollectReadonlyArray) as Effect.Effect<
-    ReadonlyArray<ClientEvent>,
-    UnknownError
-  >
+  until.global === 0
+    ? Effect.succeed([])
+    : (store.eventsStream({ until }).pipe(Stream.runCollectReadonlyArray) as Effect.Effect<
+        ReadonlyArray<ClientEvent>,
+        UnknownError
+      >)
 
 export const makeComponentSyncObservation = (args: {
   confirmed: ReadonlyArray<ClientEvent>

@@ -13,6 +13,7 @@ import {
 import { makeConnectivityControlledBackend, type ScenarioBackend } from './backends.ts'
 import type {
   CreateClientCommand,
+  ClientLifecycleCommand,
   DispatchActionCommand,
   HostAcknowledgement,
   HostCapabilities,
@@ -20,6 +21,7 @@ import type {
   InspectStateCommand,
   ObservedEvent,
   ParticipantRef,
+  SessionLifecycleCommand,
   SetConnectivityCommand,
   SyncObservation,
   SyncBackendRealization,
@@ -41,8 +43,17 @@ export interface ParticipantHost {
   readonly setConnectivity: (
     command: SetConnectivityCommand,
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
+  readonly stopSession: (
+    command: SessionLifecycleCommand,
+  ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
+  readonly restartSession: (
+    command: SessionLifecycleCommand,
+  ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
+  readonly restartClient: (
+    command: ClientLifecycleCommand,
+  ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
   readonly observeSystem: Effect.Effect<HostSystemObservation, HostError, Scope.Scope>
-  readonly observeSync: (participant: ParticipantRef) => Effect.Effect<SyncObservation, HostError>
+  readonly observeSync: (participant: ParticipantRef) => Effect.Effect<SyncObservation, HostError, Scope.Scope>
   readonly inspectState: (command: InspectStateCommand) => Effect.Effect<Schema.Json, HostError>
 }
 
@@ -233,6 +244,9 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
       createClient,
       dispatchAction,
       setConnectivity,
+      stopSession: unsupportedLifecycle('session stop'),
+      restartSession: unsupportedLifecycle('session restart'),
+      restartClient: unsupportedLifecycle('Client restart'),
       observeSystem,
       observeSync,
       inspectState,
@@ -255,3 +269,6 @@ const getStore = <TSchema extends LiveStoreSchema>(
 }
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
+
+const unsupportedLifecycle = (operation: string) => (_command: { operationId: string }) =>
+  Effect.fail(new ScenarioOperationError('capability-unavailable', `In-process host does not support ${operation}`))
