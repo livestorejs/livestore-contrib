@@ -24,6 +24,7 @@ import {
   type SyncObservationPayload,
   type SyncObservation,
 } from './model.ts'
+import { makeProcessHost } from './process/process-host.ts'
 
 export interface RunScenarioOptions {
   readonly runId?: string
@@ -76,6 +77,36 @@ export const runInProcessLocalSyncCfScenario = <TSchema extends LiveStoreSchema>
         ...args.options,
         execution: {
           participantProfile: 'in-process',
+          syncBackend: 'local-sync-cf',
+          stateProfile: 'sqlite',
+        },
+      },
+    })
+  })
+
+export const runProcessLocalSyncCfScenario = (args: {
+  scenario: ScenarioAst
+  applicationId: string
+  options?: RunScenarioOptions
+}): Effect.Effect<
+  ScenarioRunArtifact,
+  HostError | WranglerDevServer.WranglerDevServerError,
+  Scope.Scope | OtelTracer.OtelTracer
+> =>
+  Effect.gen(function* () {
+    const backend = yield* makeLocalSyncCfScenarioBackend.pipe(
+      Effect.provide(PlatformNode.NodeServices.layer),
+      Effect.provide(FetchHttpClient.layer),
+    )
+    const host = yield* makeProcessHost({ applicationId: args.applicationId, backend })
+    return yield* runScenario({
+      scenario: args.scenario,
+      applicationId: args.applicationId,
+      host,
+      options: {
+        ...args.options,
+        execution: {
+          participantProfile: 'process',
           syncBackend: 'local-sync-cf',
           stateProfile: 'sqlite',
         },
@@ -177,7 +208,7 @@ export const runScenario = (args: {
         reproductionMode: 'seeded',
         execution,
         capabilities: args.host.capabilities,
-        componentVersions: { '@livestore/livestore': 'workspace' },
+        componentVersions: args.host.componentVersions,
       },
       scenario: args.scenario,
       trace,

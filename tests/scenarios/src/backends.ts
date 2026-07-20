@@ -23,6 +23,8 @@ export interface BackendSnapshot {
   readonly events: ReadonlyArray<LiveStoreEvent.Global.Encoded>
 }
 
+export type SerializedBackendConfig = ScenarioBackend['serializedConfig']
+
 /** Backend realization owned by the runner, independently of participant placement. */
 export interface ScenarioBackend<TSyncMetadata = Schema.Json> {
   readonly id: 'mock' | 'local-sync-cf'
@@ -35,6 +37,23 @@ export interface ScenarioBackend<TSyncMetadata = Schema.Json> {
     | { readonly _tag: 'sync-cf-ws'; readonly url: string; readonly storeIdSuffix: string }
   readonly componentVersions: Readonly<Record<string, string>>
 }
+
+/** Applies runner-controlled connectivity without replacing the real provider implementation. */
+export const makeConnectivityControlledBackend = <TSyncMetadata>(args: {
+  clientId: string
+  connectivity: SubscriptionRef.SubscriptionRef<boolean>
+  underlying: SyncBackend.SyncBackend<TSyncMetadata>
+}): SyncBackend.SyncBackend<TSyncMetadata> =>
+  SyncBackend.of({
+    ...args.underlying,
+    connect: SubscriptionRef.set(args.connectivity, true),
+    isConnected: args.connectivity,
+    metadata: {
+      ...args.underlying.metadata,
+      name: '@local/scenario-controlled-sync',
+      description: `Scenario-controlled sync backend for ${args.clientId}`,
+    },
+  })
 
 export const makeMockScenarioBackend: Effect.Effect<ScenarioBackend, UnknownError, Scope.Scope> = Effect.gen(
   function* () {

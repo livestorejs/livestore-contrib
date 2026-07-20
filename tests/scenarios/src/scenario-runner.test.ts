@@ -9,7 +9,7 @@ import { todoApplication } from './fixtures/todo-application.ts'
 import { makeInProcessHost } from './host.ts'
 import { defineScenario, ScenarioRunArtifact } from './model.ts'
 import { deriveEventTimeline, projectTraceAt } from './projection.ts'
-import { runInProcessLocalSyncCfScenario, runInProcessScenario } from './runner.ts'
+import { runInProcessLocalSyncCfScenario, runInProcessScenario, runProcessLocalSyncCfScenario } from './runner.ts'
 
 /** Verifies: LS.SYS.VER.SCEN-R01, LS.SYS.VER.SCEN-R03, LS.SYS.VER.SCEN-R06 */
 Vitest.describe('scenario model', () => {
@@ -141,5 +141,31 @@ Vitest.describe('local sync-cf backend', () => {
         expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)
       }).pipe(Vitest.withTestCtx(test)),
     60_000,
+  )
+})
+
+/** Verifies the worker/process participant profile against the same portable scenario. */
+Vitest.describe('process profile', () => {
+  Vitest.live(
+    'runs one isolated Node process per Client against local sync-cf',
+    (test) =>
+      Effect.gen(function* () {
+        const artifact = yield* runProcessLocalSyncCfScenario({
+          scenario: offlineWriterRecovery,
+          applicationId: todoApplication.id,
+          options: { runId: 'offline-writer-recovery-process', sourceRevision: 'test' },
+        })
+
+        expect(artifact.status).toBe('passed')
+        expect(artifact.descriptor.execution).toEqual({
+          participantProfile: 'process',
+          syncBackend: 'local-sync-cf',
+          stateProfile: 'sqlite',
+        })
+        expect(artifact.descriptor.capabilities.capabilities).toContain('process-isolation')
+        expect(artifact.descriptor.componentVersions.node).toBe(process.version)
+        expect(artifact.snapshots).toHaveLength(2)
+      }).pipe(Vitest.withTestCtx(test)),
+    90_000,
   )
 })
