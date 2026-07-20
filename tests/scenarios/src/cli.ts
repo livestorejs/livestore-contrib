@@ -31,43 +31,32 @@ const scenarios: Readonly<Record<string, ScenarioAst>> = {
   [browserMultiSessionRecovery.id]: browserMultiSessionRecovery,
 }
 
-const cli = parseCliOptions(process.argv.slice(2))
-
-const program = Effect.gen(function* () {
-  const runOptions = {
-    runId: `${cli.scenario.id}-${cli.profile}-${Date.now()}`,
-    sourceRevision: process.env.GITHUB_SHA ?? 'working-tree',
-  }
-  const artifact = yield* runSelectedScenario(cli, runOptions)
-  const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(ScenarioRunArtifact))(artifact)
-  yield* Effect.tryPromise(async () => {
-    await fs.mkdir(path.dirname(cli.outputPath), { recursive: true })
-    await fs.writeFile(cli.outputPath, `${encoded}\n`, 'utf8')
-  })
-  yield* Effect.sync(() => {
-    console.log(`Scenario ${artifact.status}: ${artifact.descriptor.scenarioId}`)
-    console.log(`Execution: ${cli.profile} + ${cli.backend}`)
-    console.log(`Trace records: ${artifact.trace.length}`)
-    console.log(`Artifact: ${cli.outputPath}`)
-  })
-}).pipe(Effect.withSpan('scenario-cli'), Effect.scoped, Effect.provide(OtelLiveDummy))
-
-PlatformNode.NodeRuntime.runMain(program)
-
-function runSelectedScenario(cli: CliOptions, options: { runId: string; sourceRevision: string }) {
-  switch (cli.profile) {
+const runSelectedScenario = (options: CliOptions, runOptions: { runId: string; sourceRevision: string }) => {
+  switch (options.profile) {
     case 'in-process':
-      return cli.backend === 'mock'
-        ? runInProcessScenario({ scenario: cli.scenario, application: todoApplication, options })
-        : runInProcessLocalSyncCfScenario({ scenario: cli.scenario, application: todoApplication, options })
+      return options.backend === 'mock'
+        ? runInProcessScenario({ scenario: options.scenario, application: todoApplication, options: runOptions })
+        : runInProcessLocalSyncCfScenario({
+            scenario: options.scenario,
+            application: todoApplication,
+            options: runOptions,
+          })
     case 'process':
-      return runProcessLocalSyncCfScenario({ scenario: cli.scenario, applicationId: todoApplication.id, options })
+      return runProcessLocalSyncCfScenario({
+        scenario: options.scenario,
+        applicationId: todoApplication.id,
+        options: runOptions,
+      })
     case 'browser':
-      return runBrowserLocalSyncCfScenario({ scenario: cli.scenario, applicationId: todoApplication.id, options })
+      return runBrowserLocalSyncCfScenario({
+        scenario: options.scenario,
+        applicationId: todoApplication.id,
+        options: runOptions,
+      })
   }
 }
 
-function parseCliOptions(args: ReadonlyArray<string>): CliOptions {
+const parseCliOptions = (args: ReadonlyArray<string>): CliOptions => {
   if (args.includes('--help') === true || args.includes('-h') === true) {
     console.log(`Usage: pnpm scenario:run [options]
 
@@ -101,21 +90,44 @@ Scenarios:
   return { profile, backend, scenario, outputPath: path.resolve(output) }
 }
 
-function readChoice<const TChoices extends ReadonlyArray<string>>(
+const readChoice = <const TChoices extends ReadonlyArray<string>>(
   args: ReadonlyArray<string>,
   name: string,
   choices: TChoices,
-): TChoices[number] | undefined {
+): TChoices[number] | undefined => {
   const value = readOption(args, name)
   if (value === undefined) return undefined
   if (choices.includes(value) === false) throw new Error(`Invalid ${name} '${value}'. Expected: ${choices.join(', ')}`)
   return value
 }
 
-function readOption(args: ReadonlyArray<string>, name: string): string | undefined {
+const readOption = (args: ReadonlyArray<string>, name: string): string | undefined => {
   const index = args.indexOf(name)
   if (index === -1) return undefined
   const value = args[index + 1]
   if (value === undefined || value.startsWith('--') === true) throw new Error(`Missing value for ${name}`)
   return value
 }
+
+const cli = parseCliOptions(process.argv.slice(2))
+
+const program = Effect.gen(function* () {
+  const runOptions = {
+    runId: `${cli.scenario.id}-${cli.profile}-${Date.now()}`,
+    sourceRevision: process.env.GITHUB_SHA ?? 'working-tree',
+  }
+  const artifact = yield* runSelectedScenario(cli, runOptions)
+  const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(ScenarioRunArtifact))(artifact)
+  yield* Effect.tryPromise(async () => {
+    await fs.mkdir(path.dirname(cli.outputPath), { recursive: true })
+    await fs.writeFile(cli.outputPath, `${encoded}\n`, 'utf8')
+  })
+  yield* Effect.sync(() => {
+    console.log(`Scenario ${artifact.status}: ${artifact.descriptor.scenarioId}`)
+    console.log(`Execution: ${cli.profile} + ${cli.backend}`)
+    console.log(`Trace records: ${artifact.trace.length}`)
+    console.log(`Artifact: ${cli.outputPath}`)
+  })
+}).pipe(Effect.withSpan('scenario-cli'), Effect.scoped, Effect.provide(OtelLiveDummy))
+
+PlatformNode.NodeRuntime.runMain(program)
