@@ -23,6 +23,7 @@ import type {
   InspectStateCommand,
   ObservedEvent,
   ParticipantRef,
+  RuntimeFailureObservation,
   SessionLifecycleCommand,
   SetConnectivityCommand,
   SyncObservation,
@@ -55,6 +56,7 @@ export interface ParticipantHost {
     command: ClientLifecycleCommand,
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
   readonly observeSystem: Effect.Effect<HostSystemObservation, HostError, Scope.Scope>
+  readonly drainRuntimeFailures: Effect.Effect<ReadonlyArray<RuntimeFailureObservation>, HostError, Scope.Scope>
   readonly observeSync: (participant: ParticipantRef) => Effect.Effect<SyncObservation, HostError, Scope.Scope>
   readonly inspectState: (command: InspectStateCommand) => Effect.Effect<Schema.Json, HostError>
 }
@@ -263,6 +265,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
       restartSession: unsupportedLifecycle('session restart'),
       restartClient: unsupportedLifecycle('Client restart'),
       observeSystem,
+      drainRuntimeFailures: Effect.succeed([]),
       observeSync,
       inspectState,
     }

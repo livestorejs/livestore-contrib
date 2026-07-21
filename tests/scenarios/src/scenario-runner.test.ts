@@ -12,6 +12,7 @@ import { makeInProcessHost } from './host.ts'
 import { defineScenario, ScenarioRunArtifact } from './model.ts'
 import {
   deriveAdaptiveTimeLayout,
+  deriveConnectivityIntervals,
   deriveEventTimeline,
   deriveExplicitCausalEdges,
   derivePlaybackMoments,
@@ -34,9 +35,8 @@ Vitest.describe('scenario model', () => {
   })
 
   Vitest.it('expands the shared workday into exactly 100 mixed application actions', () => {
-    const actionSteps = sharedTodoWorkday.phases
-      .flatMap((phase) => phase.steps)
-      .filter((step) => step._tag === 'action')
+    const steps = sharedTodoWorkday.phases.flatMap((phase) => phase.steps)
+    const actionSteps = steps.filter((step) => step._tag === 'action')
 
     expect(actionSteps).toHaveLength(100)
     expect(new Set(actionSteps.map((step) => step.action))).toEqual(
@@ -60,6 +60,29 @@ Vitest.describe('scenario model', () => {
         .filter((completed) => completed === false),
     ).toHaveLength(8)
     expect(sharedTodoWorkday.topology.clients).toHaveLength(3)
+
+    const disconnectIndex = steps.findIndex((step) => step._tag === 'disconnect' && step.clientId === 'alice-phone')
+    const reconnectIndex = steps.findIndex((step) => step._tag === 'reconnect' && step.clientId === 'alice-phone')
+    const actionsBeforeDisconnect = steps.slice(0, disconnectIndex).filter((step) => step._tag === 'action')
+    const actionsWhileDisconnected = steps
+      .slice(disconnectIndex + 1, reconnectIndex)
+      .filter((step) => step._tag === 'action')
+    const actionsAfterReconnect = steps.slice(reconnectIndex + 1).filter((step) => step._tag === 'action')
+    const offlinePhoneActions = actionsWhileDisconnected.filter((step) => step.target.clientId === 'alice-phone')
+
+    expect([actionsBeforeDisconnect.length, actionsWhileDisconnected.length, actionsAfterReconnect.length]).toEqual([
+      33, 34, 33,
+    ])
+    expect(offlinePhoneActions).toHaveLength(6)
+    expect(new Set(offlinePhoneActions.map((step) => step.action))).toEqual(
+      new Set(['createTodo', 'editTodo', 'setTodoCompleted', 'deleteTodo']),
+    )
+    expect(
+      steps
+        .slice(disconnectIndex + 1, reconnectIndex)
+        .filter((step) => step._tag === 'settle')
+        .every((step) => step.participants.every((participant) => participant.clientId !== 'alice-phone')),
+    ).toBe(true)
   })
 })
 
@@ -103,6 +126,75 @@ Vitest.describe('in-process host conformance', () => {
         .pipe(Effect.exit)
 
       expect(Exit.isFailure(exit)).toBe(true)
+    }).pipe(Vitest.withTestCtx(test)),
+  )
+
+  Vitest.live('captures a non-convergent settlement as an inspectable failed artifact', (test) =>
+    Effect.gen(function* () {
+      const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
+      const scenario = defineScenario({
+        version: 1,
+        id: 'captured-settlement-failure',
+        description: 'Exercises the failed-settlement artifact contract.',
+        tags: ['failure-capture'],
+        seed: 1442,
+        applicationId: todoApplication.id,
+        requires: ['multiple-clients', 'sync-observation'],
+        topology: {
+          storeId: 'captured-settlement-failure',
+          clients: [{ id: participant.clientId, sessions: [participant.sessionId], initiallyConnected: true }],
+        },
+        phases: [
+          {
+            id: 'failure',
+            description: 'The disconnected participant cannot reach settlement before the short deadline.',
+            steps: [
+              { _tag: 'disconnect', id: 'disconnect-client-a', clientId: participant.clientId },
+              {
+                _tag: 'settle',
+                id: 'must-time-out',
+                participants: [participant],
+                healDisconnectedClients: [],
+                timeoutMs: 10,
+              },
+            ],
+          },
+        ],
+        oracles: [],
+      })
+
+      const artifact = yield* runInProcessScenario({
+        scenario,
+        application: todoApplication,
+        options: { runId: 'captured-settlement-failure-test', sourceRevision: 'test' },
+      })
+
+      expect(artifact.status).toBe('failed')
+      expect(artifact.snapshots).toEqual([])
+      const settlementFailure = artifact.trace.find((record) => record.payload._tag === 'settlement.failed')
+      expect(settlementFailure?.payload).toEqual(
+        expect.objectContaining({
+          _tag: 'settlement.failed',
+          code: 'settlement-timeout',
+          timeoutMs: 10,
+          observations: [
+            expect.objectContaining({ participant: 'client-a/session-a', pendingCount: 0, isSynced: false }),
+          ],
+        }),
+      )
+      expect(artifact.trace.at(-1)?.payload).toEqual(
+        expect.objectContaining({
+          _tag: 'run.failed',
+          code: 'settlement-timeout',
+          phaseId: 'failure',
+          stepId: 'must-time-out',
+        }),
+      )
+      expect(
+        projectTraceAt({ scenario, trace: artifact.trace, cursorIndex: artifact.trace.length - 1 }).runStatus,
+      ).toBe('failed')
+      expect(derivePlaybackMoments({ scenario, trace: artifact.trace }).at(-1)?.kind).toBe('failure')
+      expect(() => Schema.decodeUnknownSync(ScenarioRunArtifact)(artifact)).not.toThrow()
     }).pipe(Vitest.withTestCtx(test)),
   )
 })
@@ -213,6 +305,18 @@ Vitest.describe('offline writer recovery', () => {
         const offlineClient = offlineProjection.clients.find((client) => client.clientId === 'client-a')
         expect(offlineClient?.connected).toBe(false)
 
+        const connectivityIntervals = deriveConnectivityIntervals(artifact.trace)
+        expect(connectivityIntervals).toEqual([
+          {
+            clientId: 'client-a',
+            startRecordIndex: expect.any(Number),
+            endRecordIndex: expect.any(Number),
+            startEvidence: 'explicit-transition',
+            endEvidence: 'explicit-transition',
+          },
+        ])
+        expect(connectivityIntervals[0]!.startRecordIndex).toBeLessThan(connectivityIntervals[0]!.endRecordIndex!)
+
         const markers = deriveEventTimeline(artifact.trace)
         expect(new Set(markers.map((marker) => marker.event.eventRef))).toEqual(new Set(backendRefs))
         expect(markers.some((marker) => marker.event.disposition === 'pending')).toBe(true)
@@ -290,7 +394,7 @@ Vitest.describe('process profile', () => {
 /** Verifies the persisted web topology, browser network boundary, and lifecycle controls. */
 Vitest.describe('browser profile', () => {
   Vitest.live(
-    'runs offline writer recovery through isolated browser Clients and local sync-cf',
+    'captures the browser session rebase materialization failure',
     (test) =>
       Effect.gen(function* () {
         const artifact = yield* runBrowserLocalSyncCfScenario({
@@ -299,13 +403,44 @@ Vitest.describe('browser profile', () => {
           options: { runId: 'offline-writer-recovery-browser', sourceRevision: 'test' },
         })
 
-        expect(artifact.status).toBe('passed')
+        expect(artifact.status).toBe('failed')
         expect(artifact.descriptor.execution).toEqual({
           participantProfile: 'browser',
           syncBackend: 'local-sync-cf',
           stateProfile: 'opfs',
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('browser-shared-worker')
+        const runtimeFailure = artifact.trace.find((record) => record.payload._tag === 'runtime.failure.observed')
+        expect(runtimeFailure).toEqual(
+          expect.objectContaining({
+            clientId: 'client-a',
+            sessionId: 'session-a',
+            phaseId: 'recovery',
+            payload: expect.objectContaining({
+              _tag: 'runtime.failure.observed',
+              source: 'browser-console',
+              message: expect.stringContaining('UNIQUE constraint failed: todos.id'),
+            }),
+          }),
+        )
+        const settlementFailure = artifact.trace.find((record) => record.payload._tag === 'settlement.failed')
+        expect(settlementFailure?.payload).toEqual(
+          expect.objectContaining({
+            _tag: 'settlement.failed',
+            code: 'participant-runtime-failure',
+            observations: expect.arrayContaining([
+              expect.objectContaining({ participant: 'client-a/session-a', localHead: 'e2r1' }),
+            ]),
+          }),
+        )
+        expect(artifact.trace.at(-1)?.payload).toEqual(
+          expect.objectContaining({
+            _tag: 'run.failed',
+            code: 'participant-runtime-failure',
+            phaseId: 'recovery',
+            stepId: 'settle-after-reconnect',
+          }),
+        )
         const participantRecords = artifact.trace.filter((record) => record.emitterId.startsWith('browser-session:'))
         expect(participantRecords.length).toBeGreaterThan(0)
         expect(

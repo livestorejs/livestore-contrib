@@ -52,6 +52,16 @@ export interface TraceCapture {
   readonly recordIndexes: ReadonlyArray<number>
 }
 
+export type ConnectivityBoundaryEvidence = 'explicit-transition' | 'first-observed'
+
+export interface ConnectivityInterval {
+  readonly clientId: string
+  readonly startRecordIndex: number
+  readonly endRecordIndex: number | null
+  readonly startEvidence: ConnectivityBoundaryEvidence
+  readonly endEvidence: ConnectivityBoundaryEvidence | null
+}
+
 export type PlaybackMomentKind =
   | 'run'
   | 'action'
@@ -199,6 +209,60 @@ export const deriveTraceCaptures = (trace: ReadonlyArray<ScenarioTraceRecord>): 
   }))
 }
 
+/**
+ * Derives disconnected intervals from acknowledged transitions, falling back to
+ * sampled connectivity only when the trace did not retain an explicit boundary.
+ */
+export const deriveConnectivityIntervals = (
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): ReadonlyArray<ConnectivityInterval> => {
+  type OpenInterval = Omit<ConnectivityInterval, 'endRecordIndex' | 'endEvidence'>
+  const openByClient = new Map<string, OpenInterval>()
+  const intervals: ConnectivityInterval[] = []
+
+  const open = (record: ScenarioTraceRecord, evidence: ConnectivityBoundaryEvidence): void => {
+    if (record.clientId === null || openByClient.has(record.clientId) === true) return
+    openByClient.set(record.clientId, {
+      clientId: record.clientId,
+      startRecordIndex: record.index,
+      startEvidence: evidence,
+    })
+  }
+  const close = (record: ScenarioTraceRecord, evidence: ConnectivityBoundaryEvidence): void => {
+    if (record.clientId === null) return
+    const interval = openByClient.get(record.clientId)
+    if (interval === undefined) return
+    intervals.push({ ...interval, endRecordIndex: record.index, endEvidence: evidence })
+    openByClient.delete(record.clientId)
+  }
+
+  for (const record of trace) {
+    switch (record.payload._tag) {
+      case 'connectivity.disconnected':
+        open(record, 'explicit-transition')
+        break
+      case 'connectivity.reconnected':
+        close(record, 'explicit-transition')
+        break
+      case 'client.connectivity.observed':
+        if (record.payload.connected === false) open(record, 'first-observed')
+        else close(record, 'first-observed')
+        break
+      default:
+        break
+    }
+  }
+
+  intervals.push(
+    ...[...openByClient.values()].map((interval) => ({
+      ...interval,
+      endRecordIndex: null,
+      endEvidence: null,
+    })),
+  )
+  return intervals.toSorted((left, right) => left.startRecordIndex - right.startRecordIndex)
+}
+
 /** Returns only causal relationships explicitly retained by the trace protocol. */
 export const deriveExplicitCausalEdges = (
   trace: ReadonlyArray<ScenarioTraceRecord>,
@@ -290,6 +354,8 @@ const applyTraceRecord = (state: ObservedSystemState, record: ScenarioTraceRecor
   switch (payload._tag) {
     case 'run.started':
       return { ...state, runStatus: 'running' }
+    case 'run.failed':
+      return { ...state, runStatus: 'failed' }
     case 'run.completed':
       return { ...state, runStatus: payload.status }
     case 'phase.started':
@@ -369,6 +435,10 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
     case 'run.started':
     case 'run.completed':
       return 'run'
+    case 'run.failed':
+    case 'settlement.failed':
+    case 'runtime.failure.observed':
+      return 'failure'
     case 'action.requested':
       return 'action'
     case 'client.created':

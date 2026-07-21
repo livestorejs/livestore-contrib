@@ -17,6 +17,7 @@ export class ScenarioOperationError extends Error {
       | 'invalid-observation-evidence'
       | 'missing-client'
       | 'missing-participant'
+      | 'participant-runtime-failure'
       | 'settlement-timeout'
       | 'unknown-action'
       | 'unknown-inspector',

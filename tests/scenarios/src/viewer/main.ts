@@ -4,6 +4,7 @@ import { type ComponentSyncObservation, type ObservedEvent, ScenarioRunArtifact 
 import {
   backendComponentKey,
   deriveAdaptiveTimeLayout,
+  deriveConnectivityIntervals,
   deriveEventTimeline,
   derivePlaybackMoments,
   deriveTraceCaptures,
@@ -108,6 +109,7 @@ interface ArtifactCatalog {
     readonly label: string
     readonly applicationEventCount: number
     readonly traceRecordCount: number
+    readonly status?: 'passed' | 'failed'
   }>
 }
 
@@ -120,7 +122,7 @@ const loadArtifactCatalog = async (): Promise<void> => {
     ...catalog.entries.map(
       (entry) =>
         new Option(
-          `${entry.label} · ${entry.applicationEventCount} events · ${entry.traceRecordCount} traces`,
+          `${entry.label} · ${entry.applicationEventCount} events · ${entry.traceRecordCount} traces${entry.status === 'failed' ? ' · FAILED' : ''}`,
           entry.file,
         ),
     ),
@@ -346,6 +348,8 @@ const renderTimeline = (): void => {
   const trace = artifact.trace
   const markers = deriveEventTimeline(trace)
   const captures = deriveTraceCaptures(trace)
+  const connectivityIntervals = deriveConnectivityIntervals(trace)
+  const clientsById = new Map(artifact.scenario.topology.clients.map((client) => [client.id, client]))
   const systemCaptureIds = new Set(
     playbackMoments.flatMap((moment) => (moment.captureId === null ? [] : [moment.captureId])),
   )
@@ -521,6 +525,53 @@ const renderTimeline = (): void => {
           .join('')
       : ''
 
+  const offlineBands = connectivityIntervals
+    .map((interval) => {
+      const client = clientsById.get(interval.clientId)
+      if (client === undefined) return ''
+      const intervalStart = normalizedForRecord(interval.startRecordIndex)
+      const endRecordIndex = interval.endRecordIndex ?? trace.at(-1)?.index ?? interval.startRecordIndex
+      const intervalEnd = normalizedForRecord(endRecordIndex)
+      if (intervalEnd < timelineViewport.start || intervalStart > timelineViewport.end) return ''
+      const visibleStart = Math.max(intervalStart, timelineViewport.start)
+      const visibleEnd = Math.min(intervalEnd, timelineViewport.end)
+      const x1 = xForNormalized(visibleStart)
+      const x2 = Math.max(xForNormalized(visibleEnd), x1 + 2)
+      const leaderY = yAt(leaderComponentKey(client.id))
+      const lastSessionId = client.sessions.at(-1)
+      const lastSessionY = lastSessionId === undefined ? leaderY : yAt(sessionComponentKey(client.id, lastSessionId))
+      const y = leaderY - 23
+      const bandHeight = lastSessionY - leaderY + 46
+      const uncertain =
+        interval.startEvidence === 'first-observed' || interval.endEvidence === 'first-observed' ? 'uncertain' : ''
+      const boundaryDescription = `${interval.startEvidence} → ${interval.endEvidence ?? 'still disconnected'}`
+      const label = x2 - x1 >= 92 ? `<text class="offline-period-label" x="${x1 + 6}" y="${y + 12}">OFFLINE</text>` : ''
+      return `
+        <g class="offline-period ${uncertain}">
+          <title>${escapeMarkup(interval.clientId)} offline · ${escapeMarkup(boundaryDescription)}</title>
+          <rect x="${x1}" y="${y}" width="${x2 - x1}" height="${bandHeight}" rx="2" />
+          ${label}
+        </g>`
+    })
+    .join('')
+
+  const settlementFailures = trace.filter((record) => record.payload._tag === 'settlement.failed')
+  const failureRecords =
+    settlementFailures.length > 0 ? settlementFailures : trace.filter((record) => record.payload._tag === 'run.failed')
+  const failureMarkers = failureRecords
+    .filter((record) => isVisibleRecord(record.index))
+    .map((record) => {
+      const x = xForRecord(record.index)
+      const message = 'message' in record.payload ? record.payload.message : 'Scenario execution failed'
+      return `<g class="failure-boundary" data-record-index="${record.index}">
+        <title>${escapeMarkup(message)}</title>
+        <line x1="${x}" x2="${x}" y1="3" y2="${carpetTop - 8}" />
+        <path d="M ${x} 3 l 7 7 l -7 7 l -7 -7 z" />
+        <text x="${x - 7}" y="13" text-anchor="end">FAILED</text>
+      </g>`
+    })
+    .join('')
+
   const captureGuides = captures
     .filter(
       (capture) =>
@@ -603,6 +654,22 @@ const renderTimeline = (): void => {
       return `<rect class="range-density-bar" x="${left + index * barWidth}" y="${34 - barHeight}" width="${Math.max(barWidth - 0.6, 0.8)}" height="${barHeight}" />`
     })
     .join('')
+  const navigatorOfflinePeriods = connectivityIntervals
+    .map((interval) => {
+      const start = normalizedForRecord(interval.startRecordIndex)
+      const endRecordIndex = interval.endRecordIndex ?? trace.at(-1)?.index ?? interval.startRecordIndex
+      const end = normalizedForRecord(endRecordIndex)
+      const x1 = overviewXForNormalized(start)
+      const x2 = Math.max(overviewXForNormalized(end), x1 + 1)
+      return `<rect class="range-offline-period" x="${x1}" y="30" width="${x2 - x1}" height="4"><title>${escapeMarkup(interval.clientId)} offline</title></rect>`
+    })
+    .join('')
+  const navigatorFailures = failureRecords
+    .map((record) => {
+      const x = overviewXForNormalized(normalizedForRecord(record.index))
+      return `<line class="range-failure" x1="${x}" x2="${x}" y1="5" y2="37"><title>${escapeMarkup(record.payload._tag)}</title></line>`
+    })
+    .join('')
   const rangeStartX = overviewXForNormalized(timelineViewport.start)
   const rangeEndX = overviewXForNormalized(timelineViewport.end)
   const rangeWidth = rangeEndX - rangeStartX
@@ -627,6 +694,8 @@ const renderTimeline = (): void => {
       aria-valuetext="${escapeMarkup(recordLabel.textContent ?? '')}"
     >
       ${compressedGaps}
+      ${offlineBands}
+      ${failureMarkers}
       ${hierarchySvg}
       ${lanesSvg}
       ${captureGuides}
@@ -659,6 +728,8 @@ const renderTimeline = (): void => {
       <text class="range-summary" x="${width - right}" y="10" text-anchor="end">${rangeSummary}</text>
       <rect class="range-track" x="${left}" y="7" width="${plotWidth}" height="28" rx="2" data-range-action="track" />
       ${navigatorDensity}
+      ${navigatorOfflinePeriods}
+      ${navigatorFailures}
       <rect
         class="range-window"
         x="${rangeStartX}"

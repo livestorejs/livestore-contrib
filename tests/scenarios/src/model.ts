@@ -278,6 +278,15 @@ export const HostSystemObservation = Schema.Struct({
 })
 export type HostSystemObservation = typeof HostSystemObservation.Type
 
+export const RuntimeFailureObservation = Schema.Struct({
+  clientId: Schema.String,
+  sessionId: Schema.NullOr(Schema.String),
+  source: Schema.String,
+  code: Schema.String,
+  message: Schema.String,
+})
+export type RuntimeFailureObservation = typeof RuntimeFailureObservation.Type
+
 export const SyncObservationPayload = Schema.Struct({
   participant: Schema.String,
   localHead: Schema.String,
@@ -292,6 +301,12 @@ export const ScenarioTracePayload = Schema.Union([
     scenarioId: Schema.String,
     applicationId: Schema.String,
     seed: Schema.Finite,
+  }),
+  Schema.TaggedStruct('run.failed', {
+    code: Schema.String,
+    message: Schema.String,
+    phaseId: Schema.NullOr(Schema.String),
+    stepId: Schema.NullOr(Schema.String),
   }),
   Schema.TaggedStruct('run.completed', { status: Schema.Literals(['passed', 'failed']) }),
   Schema.TaggedStruct('client.create.requested', {
@@ -324,6 +339,17 @@ export const ScenarioTracePayload = Schema.Union([
   Schema.TaggedStruct('settlement.progress', {
     settled: Schema.Boolean,
     observations: Schema.Array(SyncObservationPayload),
+  }),
+  Schema.TaggedStruct('settlement.failed', {
+    code: Schema.String,
+    message: Schema.String,
+    timeoutMs: Schema.Finite,
+    observations: Schema.Array(SyncObservationPayload),
+  }),
+  Schema.TaggedStruct('runtime.failure.observed', {
+    source: Schema.String,
+    code: Schema.String,
+    message: Schema.String,
   }),
   Schema.TaggedStruct('settlement.completed', { observations: Schema.Array(SyncObservationPayload) }),
   Schema.TaggedStruct('sync.snapshot', SyncObservationPayload.fields),

@@ -20,6 +20,7 @@ import {
   type HostObservationOccurrence,
   HostSystemObservation as HostSystemObservationSchema,
   type ParticipantRef,
+  type RuntimeFailureObservation,
   SyncObservation as SyncObservationSchema,
 } from '../model.ts'
 import { makeEventRefRegistry } from '../observations.ts'
@@ -153,6 +154,16 @@ export const makeBrowserHost = (args: {
         [...clients.values()],
         (client) =>
           client.observe.pipe(
+            Effect.tap((observed) =>
+              Effect.sync(() => {
+                if (process.env.SCENARIO_BROWSER_DIAGNOSTICS === '1') {
+                  const sync = observed.observation.sessions[0]?.sync
+                  console.log(
+                    `  browser observation completed: ${client.clientId} · local ${sync?.localHead ?? '?'} · upstream ${sync?.upstreamHead ?? '?'} · ${sync?.pendingCount ?? '?'} pending`,
+                  )
+                }
+              }),
+            ),
             Effect.map((observed) => ({
               ...observed,
               observation: reconcileClientObservation(eventRefs)(observed.observation),
@@ -207,6 +218,10 @@ export const makeBrowserHost = (args: {
         }).pipe(Effect.mapError((cause) => browserError(`Invalid browser sync observation: ${String(cause)}`)))
       })
 
+    const drainRuntimeFailures: ParticipantHost['drainRuntimeFailures'] = Effect.sync(() =>
+      [...clients.values()].flatMap((client) => client.drainRuntimeFailures()),
+    )
+
     const inspectState: ParticipantHost['inspectState'] = (command) =>
       Effect.gen(function* () {
         const client = yield* getClient(clients, command.target.clientId)
@@ -233,6 +248,7 @@ export const makeBrowserHost = (args: {
       restartSession,
       restartClient,
       observeSystem,
+      drainRuntimeFailures,
       observeSync,
       inspectState,
     }
@@ -247,6 +263,7 @@ interface BrowserClientController {
   readonly restartSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
   readonly restart: Effect.Effect<void, ScenarioOperationError>
   readonly observe: Effect.Effect<BrowserClientObservation, ScenarioOperationError>
+  readonly drainRuntimeFailures: () => ReadonlyArray<RuntimeFailureObservation>
   readonly shutdown: Effect.Effect<void, ScenarioOperationError>
 }
 
@@ -274,11 +291,17 @@ const makeBrowserClient = (args: {
         context: yield* launchBrowserContext(userDataDir),
         connected: args.initiallyConnected,
         pages: new Map<string, Page>(),
+        runtimeFailures: [] as RuntimeFailureObservation[],
       }
       let shutdownComplete = false
 
       for (const sessionId of args.sessionIds) {
-        const page = yield* startSessionPage({ ...args, context: state.context, sessionId })
+        const page = yield* startSessionPage({
+          ...args,
+          context: state.context,
+          sessionId,
+          onRuntimeFailure: (failure) => state.runtimeFailures.push(failure),
+        })
         state.pages.set(sessionId, page)
       }
       if (state.connected === false) yield* setContextOffline(state.context, true)
@@ -305,13 +328,25 @@ const makeBrowserClient = (args: {
           if (state.pages.has(sessionId) === true) {
             return yield* Effect.fail(browserError(`Session ${args.clientId}/${sessionId} is already running`))
           }
-          const page = yield* startSessionPage({ ...args, context: state.context, sessionId })
+          const page = yield* startSessionPage({
+            ...args,
+            context: state.context,
+            sessionId,
+            onRuntimeFailure: (failure) => state.runtimeFailures.push(failure),
+          })
           state.pages.set(sessionId, page)
         })
 
       const setConnectivity = (connected: boolean) =>
         setContextOffline(state.context, connected === false).pipe(
-          Effect.tap(() => Effect.sync(() => (state.connected = connected))),
+          Effect.tap(() =>
+            Effect.sync(() => {
+              state.connected = connected
+              if (process.env.SCENARIO_BROWSER_DIAGNOSTICS === '1') {
+                console.log(`  browser context ${args.clientId}: ${connected === true ? 'online' : 'offline'}`)
+              }
+            }),
+          ),
         )
 
       const restart = Effect.gen(function* () {
@@ -319,13 +354,21 @@ const makeBrowserClient = (args: {
         yield* closeContext(state.context)
         state.context = yield* launchBrowserContext(userDataDir)
         for (const sessionId of args.sessionIds) {
-          const page = yield* startSessionPage({ ...args, context: state.context, sessionId })
+          const page = yield* startSessionPage({
+            ...args,
+            context: state.context,
+            sessionId,
+            onRuntimeFailure: (failure) => state.runtimeFailures.push(failure),
+          })
           state.pages.set(sessionId, page)
         }
         if (state.connected === false) yield* setContextOffline(state.context, true)
       })
 
       const observe = Effect.gen(function* () {
+        if (process.env.SCENARIO_BROWSER_DIAGNOSTICS === '1') {
+          console.log(`  browser observation started: ${args.clientId}`)
+        }
         const observations = yield* Effect.forEach(
           [...state.pages.entries()],
           ([sessionId, page]) =>
@@ -372,6 +415,7 @@ const makeBrowserClient = (args: {
         restartSession,
         restart,
         observe,
+        drainRuntimeFailures: () => state.runtimeFailures.splice(0),
         shutdown,
       }
     }),
@@ -384,14 +428,36 @@ const startSessionPage = (args: {
   storeId: string
   clientId: string
   sessionId: string
+  onRuntimeFailure: (failure: RuntimeFailureObservation) => void
 }): Effect.Effect<Page, ScenarioOperationError> =>
   Effect.tryPromise({
     try: async () => {
       const page = await args.context.newPage()
       page.on('console', (message) => {
-        if (message.type() === 'error') console.error(`[browser ${args.clientId}/${args.sessionId}] ${message.text()}`)
+        const text = message.text()
+        if (message.type() === 'error') console.error(`[browser ${args.clientId}/${args.sessionId}] ${text}`)
+        else if (process.env.SCENARIO_BROWSER_DIAGNOSTICS === '1')
+          console.log(`[browser ${args.clientId}/${args.sessionId}:${message.type()}] ${text}`)
+        if (message.type() === 'error' || /\bERROR \(#\d+\):/.test(text) === true) {
+          args.onRuntimeFailure({
+            clientId: args.clientId,
+            sessionId: args.sessionId,
+            source: 'browser-console',
+            code: 'browser-console-error',
+            message: text,
+          })
+        }
       })
-      page.on('pageerror', (error) => console.error(`[browser ${args.clientId}/${args.sessionId}]`, error))
+      page.on('pageerror', (error) => {
+        console.error(`[browser ${args.clientId}/${args.sessionId}]`, error)
+        args.onRuntimeFailure({
+          clientId: args.clientId,
+          sessionId: args.sessionId,
+          source: 'browser-page',
+          code: 'browser-page-error',
+          message: error.stack ?? error.message,
+        })
+      })
       await page.goto(args.baseUrl)
       await page.waitForFunction(() => window.__scenarioBrowser !== undefined)
       const options: BrowserStartOptions = {

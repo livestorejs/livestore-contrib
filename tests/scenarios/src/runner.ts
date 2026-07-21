@@ -167,99 +167,122 @@ export const runScenario = (args: {
     const runId = args.options?.runId ?? `${args.scenario.id}:${args.scenario.seed}:${Date.now()}`
     const trace: ScenarioTraceRecord[] = []
     let logicalTime = 0
+    let activePhaseId: string | undefined
+    let activeStepId: string | undefined
     const record = makeTraceRecorder({ runId, trace, readLogicalTime: () => logicalTime })
 
-    record({
-      origin: 'observation',
-      payload: {
-        _tag: 'run.started',
-        scenarioId: args.scenario.id,
-        applicationId: args.applicationId,
-        seed: args.scenario.seed,
-      },
-    })
-    yield* recordSystemObservation({ host: args.host, record, reason: 'run-started' })
-
-    for (const client of args.scenario.topology.clients) {
-      const operationId = `create:${client.id}`
-      record({
-        origin: 'instruction',
-        correlationId: operationId,
-        clientId: client.id,
-        payload: {
-          _tag: 'client.create.requested',
-          sessions: [...client.sessions],
-          initiallyConnected: client.initiallyConnected,
-        },
-      })
-      yield* args.host.createClient({ operationId, storeId: args.scenario.topology.storeId, client })
-      record({
-        origin: 'acknowledgement',
-        correlationId: operationId,
-        clientId: client.id,
-        payload: { _tag: 'client.created', status: 'acknowledged' },
-      })
-      yield* recordSystemObservation({ host: args.host, record, reason: operationId, correlationId: operationId })
-    }
-
-    const totalSteps = args.scenario.phases.reduce((total, phase) => total + phase.steps.length, 0)
-    let stepNumber = 0
-    for (const phase of args.scenario.phases) {
-      logicalTime += 1
+    const executionEffect = Effect.gen(function* () {
       record({
         origin: 'observation',
-        phaseId: phase.id,
-        payload: { _tag: 'phase.started', description: phase.description },
+        payload: {
+          _tag: 'run.started',
+          scenarioId: args.scenario.id,
+          applicationId: args.applicationId,
+          seed: args.scenario.seed,
+        },
       })
-      for (const step of phase.steps) {
-        stepNumber += 1
-        args.options?.onProgress?.({ stage: 'started', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
-        logicalTime += 1
-        yield* executeStep({ host: args.host, phaseId: phase.id, record, step })
-        yield* recordSystemObservation({
-          host: args.host,
-          record,
-          reason: step.id,
-          correlationId: step.id,
-          phaseId: phase.id,
+      yield* recordSystemObservation({ host: args.host, record, reason: 'run-started' })
+
+      for (const client of args.scenario.topology.clients) {
+        const operationId = `create:${client.id}`
+        record({
+          origin: 'instruction',
+          correlationId: operationId,
+          clientId: client.id,
+          payload: {
+            _tag: 'client.create.requested',
+            sessions: [...client.sessions],
+            initiallyConnected: client.initiallyConnected,
+          },
         })
-        args.options?.onProgress?.({ stage: 'completed', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
+        yield* args.host.createClient({ operationId, storeId: args.scenario.topology.storeId, client })
+        record({
+          origin: 'acknowledgement',
+          correlationId: operationId,
+          clientId: client.id,
+          payload: { _tag: 'client.created', status: 'acknowledged' },
+        })
+        yield* recordSystemObservation({ host: args.host, record, reason: operationId, correlationId: operationId })
       }
-      record({ origin: 'observation', phaseId: phase.id, payload: { _tag: 'phase.completed' } })
-    }
 
-    const snapshotResult = yield* captureSnapshots({ host: args.host, scenario: args.scenario, record })
-    const verdicts = evaluateOracles({
-      oracles: args.scenario.oracles,
-      snapshots: snapshotResult.snapshots,
-      evidenceByParticipant: snapshotResult.evidenceByParticipant,
-      record,
-    })
-    const status = verdicts.every((verdict) => verdict.status === 'passed') === true ? 'passed' : 'failed'
+      const totalSteps = args.scenario.phases.reduce((total, phase) => total + phase.steps.length, 0)
+      let stepNumber = 0
+      for (const phase of args.scenario.phases) {
+        activePhaseId = phase.id
+        logicalTime += 1
+        record({
+          origin: 'observation',
+          phaseId: phase.id,
+          payload: { _tag: 'phase.started', description: phase.description },
+        })
+        for (const step of phase.steps) {
+          activeStepId = step.id
+          stepNumber += 1
+          args.options?.onProgress?.({ stage: 'started', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
+          logicalTime += 1
+          yield* executeStep({ host: args.host, phaseId: phase.id, record, step })
+          yield* recordSystemObservation({
+            host: args.host,
+            record,
+            reason: step.id,
+            correlationId: step.id,
+            phaseId: phase.id,
+          })
+          args.options?.onProgress?.({ stage: 'completed', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
+          activeStepId = undefined
+        }
+        record({ origin: 'observation', phaseId: phase.id, payload: { _tag: 'phase.completed' } })
+        activePhaseId = undefined
+      }
 
-    record({ origin: 'observation', payload: { _tag: 'run.completed', status } })
+      const snapshotResult = yield* captureSnapshots({ host: args.host, scenario: args.scenario, record })
+      const verdicts = evaluateOracles({
+        oracles: args.scenario.oracles,
+        snapshots: snapshotResult.snapshots,
+        evidenceByParticipant: snapshotResult.evidenceByParticipant,
+        record,
+      })
+      const status = verdicts.every((verdict) => verdict.status === 'passed') === true ? 'passed' : 'failed'
 
-    return yield* Schema.decodeUnknownEffect(ScenarioRunArtifact)({
-      artifactVersion: scenarioArtifactVersion,
-      descriptor: {
-        runId,
-        scenarioId: args.scenario.id,
-        scenarioVersion: args.scenario.version,
-        traceVersion: scenarioTraceVersion,
-        applicationId: args.applicationId,
-        sourceRevision: args.options?.sourceRevision ?? 'working-tree',
-        seed: args.scenario.seed,
-        reproductionMode: 'seeded',
+      record({ origin: 'observation', payload: { _tag: 'run.completed', status } })
+
+      return yield* makeScenarioArtifact({
+        args,
         execution,
-        capabilities: args.host.capabilities,
-        componentVersions: args.host.componentVersions,
-      },
-      scenario: args.scenario,
-      trace,
-      verdicts,
-      snapshots: snapshotResult.snapshots,
-      status,
-    }).pipe(Effect.orDie)
+        runId,
+        trace,
+        verdicts,
+        snapshots: snapshotResult.snapshots,
+        status,
+      })
+    })
+
+    return yield* executionEffect.pipe(
+      Effect.catch((error) => {
+        const failure = describeHostError(error)
+        record({
+          origin: 'observation',
+          correlationId: activeStepId,
+          causationId: activeStepId,
+          phaseId: activePhaseId,
+          payload: {
+            _tag: 'run.failed',
+            ...failure,
+            phaseId: activePhaseId ?? null,
+            stepId: activeStepId ?? null,
+          },
+        })
+        return makeScenarioArtifact({
+          args,
+          execution,
+          runId,
+          trace,
+          verdicts: [],
+          snapshots: [],
+          status: 'failed',
+        })
+      }),
+    )
   })
 
 type TraceInput = {
@@ -610,6 +633,35 @@ const recordSystemObservation = (args: {
         })
       }
     }
+
+    const runtimeFailures = yield* args.host.drainRuntimeFailures
+    for (const failure of runtimeFailures) {
+      args.record({
+        origin: 'observation',
+        correlationId: args.correlationId,
+        causationId: args.correlationId,
+        clientId: failure.clientId,
+        sessionId: failure.sessionId ?? undefined,
+        phaseId: args.phaseId,
+        captureId,
+        evidence: 'first-observed',
+        payload: {
+          _tag: 'runtime.failure.observed',
+          source: failure.source,
+          code: failure.code,
+          message: failure.message,
+        },
+      })
+    }
+    const firstFailure = runtimeFailures[0]
+    if (firstFailure !== undefined) {
+      return yield* Effect.fail(
+        new ScenarioOperationError(
+          'participant-runtime-failure',
+          `${firstFailure.clientId}/${firstFailure.sessionId ?? 'Leader'} reported ${firstFailure.code}: ${firstFailure.message}`,
+        ),
+      )
+    }
   })
 
 const awaitSettlement = (args: {
@@ -622,12 +674,20 @@ const awaitSettlement = (args: {
 }): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> => {
   const deadline = Date.now() + args.timeoutMs
   let lastLoggedSignature: string | undefined
+  let lastObservations: ReadonlyArray<SyncObservationPayload> = []
 
   const loop = (
     previousStableSignature: string | undefined,
   ): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> =>
     Effect.gen(function* () {
-      const observationTimeoutMs = Math.min(5_000, args.timeoutMs)
+      // A browser-wide observation can remain busy while a large reconnect is
+      // being applied. Let it consume the remaining settlement budget instead
+      // of imposing a second, shorter deadline on the same bounded operation.
+      const remainingMs = deadline - Date.now()
+      if (remainingMs <= 0) {
+        return yield* Effect.fail(settlementTimeoutError(args.correlationId, args.timeoutMs, lastObservations))
+      }
+      const observationTimeoutMs = remainingMs
       const systemObservation = yield* args.host.observeSystem.pipe(
         Effect.timeoutOrElse({
           duration: observationTimeoutMs,
@@ -645,6 +705,7 @@ const awaitSettlement = (args: {
       )
       const signature = canonicalJson(observations.map(syncObservationPayload))
       const isStable = observationsAreSettled(observations)
+      lastObservations = observations.map(syncObservationPayload)
       if (process.env.SCENARIO_PROGRESS === '1' && signature !== lastLoggedSignature) {
         console.log(`  settlement ${args.correlationId}: ${signature}`)
         lastLoggedSignature = signature
@@ -681,12 +742,7 @@ const awaitSettlement = (args: {
 
       if (isStable === true && previousStableSignature === signature) return observations
       if (Date.now() >= deadline) {
-        return yield* Effect.fail(
-          new ScenarioOperationError(
-            'settlement-timeout',
-            `Settlement ${args.correlationId} did not reach a stable fixed point within ${args.timeoutMs}ms: ${signature}`,
-          ),
-        )
+        return yield* Effect.fail(settlementTimeoutError(args.correlationId, args.timeoutMs, lastObservations))
       }
       // A browser settlement probe crosses every page plus the backend. A
       // moderate cadence leaves room for the sync work being observed.
@@ -694,7 +750,24 @@ const awaitSettlement = (args: {
       return yield* loop(isStable === true ? signature : undefined)
     })
 
-  return Effect.suspend(() => loop(undefined))
+  return Effect.suspend(() => loop(undefined)).pipe(
+    Effect.catch((error) => {
+      const failure = describeHostError(error)
+      args.record({
+        origin: 'observation',
+        correlationId: args.correlationId,
+        causationId: args.correlationId,
+        phaseId: args.phaseId,
+        payload: {
+          _tag: 'settlement.failed',
+          ...failure,
+          timeoutMs: args.timeoutMs,
+          observations: lastObservations,
+        },
+      })
+      return Effect.fail(error)
+    }),
+  )
 }
 
 const deriveSyncObservation = (args: {
@@ -911,6 +984,70 @@ const validateExecution = (args: {
   }
   return Effect.void
 }
+
+const makeScenarioArtifact = (input: {
+  args: {
+    scenario: ScenarioAst
+    applicationId: string
+    host: ParticipantHost
+    options?: RunScenarioOptions
+  }
+  execution: ExecutionConfiguration
+  runId: string
+  trace: ReadonlyArray<ScenarioTraceRecord>
+  verdicts: ReadonlyArray<OracleVerdict>
+  snapshots: ReadonlyArray<ParticipantSnapshot>
+  status: 'passed' | 'failed'
+}): Effect.Effect<ScenarioRunArtifact> =>
+  Schema.decodeUnknownEffect(ScenarioRunArtifact)({
+    artifactVersion: scenarioArtifactVersion,
+    descriptor: {
+      runId: input.runId,
+      scenarioId: input.args.scenario.id,
+      scenarioVersion: input.args.scenario.version,
+      traceVersion: scenarioTraceVersion,
+      applicationId: input.args.applicationId,
+      sourceRevision: input.args.options?.sourceRevision ?? 'working-tree',
+      seed: input.args.scenario.seed,
+      reproductionMode: 'seeded',
+      execution: input.execution,
+      capabilities: input.args.host.capabilities,
+      componentVersions: input.args.host.componentVersions,
+    },
+    scenario: input.args.scenario,
+    trace: input.trace,
+    verdicts: input.verdicts,
+    snapshots: input.snapshots,
+    status: input.status,
+  }).pipe(Effect.orDie)
+
+const describeHostError = (error: HostError): { readonly code: string; readonly message: string } => {
+  if (error instanceof ScenarioOperationError) return { code: error.code, message: error.message }
+  return {
+    code: error._tag,
+    message: error.note ?? formatUnknownFailure(error.cause),
+  }
+}
+
+const formatUnknownFailure = (cause: unknown): string => {
+  if (cause instanceof Error) return cause.message
+  if (typeof cause === 'string') return cause
+  try {
+    return JSON.stringify(cause)
+  } catch {
+    return String(cause)
+  }
+}
+
+const settlementTimeoutError = (
+  correlationId: string,
+  timeoutMs: number,
+  observations: ReadonlyArray<SyncObservationPayload>,
+): ScenarioOperationError =>
+  new ScenarioOperationError(
+    'settlement-timeout',
+    `Settlement ${correlationId} did not reach a stable fixed point within ${timeoutMs}ms: ${canonicalJson(observations)}`,
+  )
 
 const observationsAreSettled = (observations: ReadonlyArray<SyncObservation>): boolean => {
   if (observations.length === 0) return false

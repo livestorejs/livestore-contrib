@@ -191,6 +191,7 @@ export const makeProcessHost = (args: {
       restartSession: unsupportedLifecycle('session restart'),
       restartClient: unsupportedLifecycle('Client restart'),
       observeSystem,
+      drainRuntimeFailures: Effect.succeed([]),
       observeSync,
       inspectState,
       processIds: () => [...clients.values()].map((client) => client.pid),

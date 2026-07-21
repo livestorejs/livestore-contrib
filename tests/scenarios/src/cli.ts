@@ -139,6 +139,7 @@ const program = Effect.gen(function* () {
     console.log(`Execution: ${cli.profile} + ${cli.backend}`)
     console.log(`Trace records: ${artifact.trace.length}`)
     console.log(`Artifact: ${cli.outputPath}`)
+    if (artifact.status === 'failed') process.exitCode = 1
   })
 }).pipe(Effect.withSpan('scenario-cli'), Effect.scoped, Effect.provide(OtelLiveDummy))
 
@@ -150,6 +151,7 @@ interface ArtifactCatalogEntry {
   readonly backend: SyncBackend
   readonly applicationEventCount: number
   readonly traceRecordCount: number
+  readonly status: 'passed' | 'failed'
 }
 
 /** Keeps the viewer catalog derived from the artifacts on disk, including artifacts from earlier runs. */
@@ -175,6 +177,7 @@ const refreshArtifactCatalog = async (outputPath: string): Promise<void> => {
             backend,
             applicationEventCount: artifact.trace.filter((record) => record.payload._tag === 'action.completed').length,
             traceRecordCount: artifact.trace.length,
+            status: artifact.status,
           }
         } catch {
           return undefined

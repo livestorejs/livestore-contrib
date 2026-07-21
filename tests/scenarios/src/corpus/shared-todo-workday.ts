@@ -6,6 +6,7 @@ const alicePhone = { clientId: 'alice-phone', sessionId: 'alice-phone-session' }
 const bobLaptop = { clientId: 'bob-laptop', sessionId: 'bob-laptop-session' } as const
 const allParticipants = [aliceLaptop, alicePhone, bobLaptop] as const
 const onlineDuringCommute = [aliceLaptop, bobLaptop] as const
+const settlementTimeoutMs = 15_000
 let nextTodoNumber = 1
 
 const morning = makePhaseActions({
@@ -26,6 +27,8 @@ const phoneCommute = makePhaseActions({
   counts: { create: 2, edit: 4, complete: 3, reopen: 2, delete: 1 },
   hotspotIds: ['todo-04', 'todo-08', 'todo-12', 'todo-16'],
 })
+const offlinePhoneActions = phoneCommute.filter((_, index) => index < 5 || index === 6)
+const recoveredPhoneActions = phoneCommute.filter((_, index) => index === 5 || index > 6)
 
 const officeDuringCommute = makePhaseActions({
   phase: 'commute-office',
@@ -45,7 +48,7 @@ export const sharedTodoWorkday = defineScenario({
   version: 1,
   id: 'shared-todo-workday',
   description:
-    'Alice uses a laptop and intermittently-offline phone while Bob collaborates on a shared todo list through 100 mixed application events.',
+    'Alice uses a laptop and a phone that stays offline through the middle of a collaborative 100-event workday with Bob.',
   tags: ['sync', 'workload', 'offline', 'collaboration', 'rebase', '100-events'],
   seed: 1442,
   applicationId: 'scenario-todo-app',
@@ -62,49 +65,42 @@ export const sharedTodoWorkday = defineScenario({
     {
       id: 'morning-planning',
       description: '09:00 — Alice plans the day on her laptop and refines the first tasks.',
-      steps: [...morning, settle('settle-morning', allParticipants, [], 15_000)],
+      steps: [...morning, settle('settle-morning', allParticipants, [], settlementTimeoutMs)],
     },
     {
       id: 'team-triage',
-      description: '10:30 — Alice and Bob create, edit, complete, and reopen shared work during triage.',
+      description: '10:30 — Alice and Bob begin triaging shared work while every Client remains online.',
       steps: withSettlementCheckpoints({
-        actions: triage,
+        actions: triage.slice(0, 11),
         every: 1,
         idPrefix: 'triage',
         participants: allParticipants,
-        timeoutMs: 15_000,
+        timeoutMs: settlementTimeoutMs,
       }),
     },
     {
       id: 'offline-commute',
       description:
-        '12:00 — Alice works through intermittent phone connectivity while both online laptops change several of the same hotspot todos.',
+        '12:00 — Alice keeps working on her offline phone while both online laptops change several of the same hotspot todos.',
       steps: makeOfflineCommuteSteps(),
     },
     {
       id: 'phone-recovery',
-      description: '13:00 — Alice reconnects her phone, rebases the offline work, and continues collaborating online.',
+      description: '14:00 — Alice reconnects her phone and rebases the work accumulated through the middle of the day.',
       steps: [
         { _tag: 'reconnect', id: 'reconnect-alice-phone', clientId: alicePhone.clientId },
-        settle('settle-after-phone-reconnect', allParticipants, [], 30_000),
-        ...withSettlementCheckpoints({
-          actions: interleave(phoneCommute.slice(4), officeDuringCommute.slice(6)),
-          every: 1,
-          idPrefix: 'post-recovery',
-          participants: allParticipants,
-          timeoutMs: 20_000,
-        }),
+        settle('settle-after-phone-reconnect', allParticipants, [], settlementTimeoutMs),
       ],
     },
     {
       id: 'afternoon-cleanup',
       description: '15:30 — All three participants finish, reopen, edit, and remove work before the day ends.',
       steps: withSettlementCheckpoints({
-        actions: cleanup,
+        actions: interleaveMany([recoveredPhoneActions, officeDuringCommute.slice(14), cleanup]),
         every: 1,
         idPrefix: 'cleanup',
         participants: allParticipants,
-        timeoutMs: 20_000,
+        timeoutMs: settlementTimeoutMs,
       }),
     },
   ],
@@ -216,17 +212,6 @@ function settle(
   return { _tag: 'settle', id, participants, healDisconnectedClients, timeoutMs }
 }
 
-function interleave(left: ReadonlyArray<ScenarioStep>, right: ReadonlyArray<ScenarioStep>): ScenarioStep[] {
-  const output: ScenarioStep[] = []
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const leftStep = left[index]
-    const rightStep = right[index]
-    if (leftStep !== undefined) output.push(leftStep)
-    if (rightStep !== undefined) output.push(rightStep)
-  }
-  return output
-}
-
 function withSettlementCheckpoints(args: {
   readonly actions: ReadonlyArray<ScenarioStep>
   readonly every: number
@@ -253,13 +238,26 @@ function makeOfflineCommuteSteps(): ScenarioStep[] {
   return [
     { _tag: 'disconnect', id: 'disconnect-alice-phone', clientId: alicePhone.clientId },
     ...withSettlementCheckpoints({
-      actions: interleave(phoneCommute.slice(0, 4), officeDuringCommute.slice(0, 6)),
+      actions: interleaveMany([triage.slice(11), offlinePhoneActions, officeDuringCommute.slice(0, 14)]),
       every: 1,
-      idPrefix: 'commute-online',
+      idPrefix: 'commute-offline',
       participants: onlineDuringCommute,
-      timeoutMs: 15_000,
+      timeoutMs: settlementTimeoutMs,
     }),
   ]
+}
+
+/** Round-robins independent activity streams without changing any stream's internal order. */
+function interleaveMany(groups: ReadonlyArray<ReadonlyArray<ScenarioStep>>): ScenarioStep[] {
+  const output: ScenarioStep[] = []
+  const maximumLength = Math.max(0, ...groups.map((group) => group.length))
+  for (let index = 0; index < maximumLength; index += 1) {
+    for (const group of groups) {
+      const step = group[index]
+      if (step !== undefined) output.push(step)
+    }
+  }
+  return output
 }
 
 function todoId(index: number): string {
