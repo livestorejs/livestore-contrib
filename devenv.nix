@@ -5,11 +5,20 @@
   ...
 }:
 let
-  effectUtils =
-    if builtins.pathExists ./repos/effect-utils/flake.nix then
-      builtins.getFlake (toString ./repos/effect-utils)
-    else
-      inputs.effect-utils;
+  # Resolve effect-utils from the pinned flake input, never from the
+  # megarepo-materialized checkout.
+  #
+  # `repos/` is gitignored, so a git-clean tree says nothing about whether
+  # members match `megarepo.lock`. Reading the checkout made Nix evaluation
+  # depend on untracked state: a drifted member failed with an opaque missing
+  # attribute before the shell could be entered (see livestorejs/livestore#1467,
+  # which hit the identical conditional in core).
+  #
+  # Nothing is lost by using the input: `mr:lock-sync-check` keeps devenv.lock in
+  # step with megarepo.lock, so the pinned input *is* the locked member revision,
+  # and the member's flake is the same content as the input. Every other megarepo
+  # member already resolves effect-utils this way.
+  effectUtils = inputs.effect-utils;
   effectUtilsPackages = effectUtils.packages.${pkgs.system};
   taskModules = effectUtils.devenvModules.tasks;
 
