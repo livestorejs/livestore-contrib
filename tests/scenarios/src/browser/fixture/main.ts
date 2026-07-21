@@ -4,6 +4,7 @@ import { createStorePromise, type Store } from '@livestore/livestore'
 import { Effect } from '@livestore/utils/effect'
 
 import { dispatchApplicationAction, inspectApplicationState } from '../../application.ts'
+import { makeParticipantClock, type ParticipantClock } from '../../clock.ts'
 import { todoApplication } from '../../fixtures/todo-application.ts'
 import type { BrowserPageObservation, BrowserStartOptions, ScenarioBrowserControl } from '../protocol.ts'
 import LiveStoreWorker from './livestore.worker.ts?worker'
@@ -14,6 +15,7 @@ interface BrowserRuntime {
 }
 
 let runtime: BrowserRuntime | undefined
+let participantClock: ParticipantClock | undefined
 
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect)
 
@@ -46,11 +48,14 @@ const start = async (options: BrowserStartOptions): Promise<void> => {
     })
   })
   runtime = { options, store }
+  participantClock = makeParticipantClock(`browser-session:${options.clientId}/${options.sessionId}`)
   document.querySelector('#status')!.textContent = `${options.clientId}/${options.sessionId}`
 }
 
 const observe = async (): Promise<BrowserPageObservation> => {
   const current = requireRuntime()
+  const clock = participantClock
+  if (clock === undefined) throw new Error('Browser participant clock has not started')
   const sync = current.store.syncStatus()
   const participant = { clientId: current.options.clientId, sessionId: current.options.sessionId }
   const component = {
@@ -64,6 +69,7 @@ const observe = async (): Promise<BrowserPageObservation> => {
     leader: component,
     session: component,
     sync: { participant, ...sync },
+    clock: clock.read(),
   }
 }
 
@@ -96,6 +102,7 @@ const control: ScenarioBrowserControl = {
   shutdown: async () => {
     const current = runtime
     runtime = undefined
+    participantClock = undefined
     if (current !== undefined) await current.store.shutdownPromise()
   },
 }

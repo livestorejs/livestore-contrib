@@ -402,6 +402,12 @@ h2 {
   stroke-width: 1;
 }
 
+.timeline .time-uncertainty {
+  opacity: 0.75;
+  stroke: var(--muted);
+  stroke-width: 5;
+}
+
 .timeline .trace-carpet-label {
   fill: var(--muted);
   font-size: 9px;

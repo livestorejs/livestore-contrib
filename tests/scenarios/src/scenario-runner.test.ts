@@ -79,12 +79,16 @@ Vitest.describe('offline writer recovery', () => {
         )
         expect(() => Schema.decodeUnknownSync(ScenarioRunArtifact)(artifact)).not.toThrow()
 
-        expect(artifact.trace.map((record) => record.localSequence)).toEqual(artifact.trace.map((_, index) => index))
-        expect(
-          artifact.trace.every(
-            (record, index) => index === 0 || record.localMonotonicMs >= artifact.trace[index - 1]!.localMonotonicMs,
-          ),
-        ).toBe(true)
+        for (const emitterRecords of Map.groupBy(artifact.trace, (record) => record.emitterId).values()) {
+          expect(
+            emitterRecords.every(
+              (record, index) =>
+                index === 0 ||
+                (record.localSequence >= emitterRecords[index - 1]!.localSequence &&
+                  record.localMonotonicMs >= emitterRecords[index - 1]!.localMonotonicMs),
+            ),
+          ).toBe(true)
+        }
         const sampledRecords = artifact.trace.filter((record) => record.evidence === 'first-observed')
         expect(sampledRecords.length).toBeGreaterThan(0)
         expect(sampledRecords.every((record) => record.captureId !== null)).toBe(true)
@@ -191,6 +195,14 @@ Vitest.describe('process profile', () => {
         expect(artifact.descriptor.capabilities.capabilities).toContain('process-isolation')
         expect(artifact.descriptor.componentVersions.node).toBe(process.version)
         expect(artifact.snapshots).toHaveLength(2)
+        const participantRecords = artifact.trace.filter((record) => record.emitterId.startsWith('process-client:'))
+        expect(participantRecords.length).toBeGreaterThan(0)
+        expect(
+          participantRecords.some(
+            (record) =>
+              record.calibratedTime !== null && record.calibratedTime.latestMs > record.calibratedTime.earliestMs,
+          ),
+        ).toBe(true)
       }).pipe(Vitest.withTestCtx(test)),
     90_000,
   )
@@ -215,6 +227,14 @@ Vitest.describe('browser profile', () => {
           stateProfile: 'opfs',
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('browser-shared-worker')
+        const participantRecords = artifact.trace.filter((record) => record.emitterId.startsWith('browser-session:'))
+        expect(participantRecords.length).toBeGreaterThan(0)
+        expect(
+          participantRecords.some(
+            (record) =>
+              record.calibratedTime !== null && record.calibratedTime.latestMs > record.calibratedTime.earliestMs,
+          ),
+        ).toBe(true)
       }).pipe(Vitest.withTestCtx(test)),
     120_000,
   )

@@ -5,8 +5,15 @@ import { Effect, Exit, Schema, type Scope } from '@livestore/utils/effect'
 
 import { ScenarioOperationError } from '../application.ts'
 import type { ScenarioBackend } from '../backends.ts'
+import { calibrateParticipantReading, makeParticipantClock, readControllerOccurrence } from '../clock.ts'
 import type { ParticipantHost } from '../host.ts'
-import type { ClientSystemObservation, HostAcknowledgement, HostCapabilities, ParticipantRef } from '../model.ts'
+import type {
+  ClientSystemObservation,
+  HostAcknowledgement,
+  HostCapabilities,
+  HostObservationOccurrence,
+  ParticipantRef,
+} from '../model.ts'
 import {
   ClientSystemObservation as ClientSystemObservationSchema,
   SyncObservation as SyncObservationSchema,
@@ -53,6 +60,7 @@ export const makeProcessHost = (args: {
 
     const clients = new Map<string, ProcessClientController>()
     const eventRefs = makeEventRefRegistry()
+    const observationClock = makeParticipantClock('process-host')
     let observedStoreId: string | undefined
 
     yield* Effect.addFinalizer(() =>
@@ -113,13 +121,17 @@ export const makeProcessHost = (args: {
     const observeSystem: ParticipantHost['observeSystem'] = Effect.gen(function* () {
       const backend =
         observedStoreId === undefined ? { connected: true, events: [] } : yield* args.backend.observe(observedStoreId)
-      const clientObservations = yield* Effect.forEach(
+      const observedClients = yield* Effect.forEach(
         [...clients.values()],
         (client) =>
-          client.request({ _tag: 'observe-client' }).pipe(
-            Effect.flatMap(expectResult('client-observation')),
-            Effect.flatMap((result) => decodeClientObservation(result.observation)),
-            Effect.map(reconcileClientObservation(eventRefs)),
+          client.requestWithTiming({ _tag: 'observe-client' }).pipe(
+            Effect.flatMap(({ result, occurrence }) =>
+              expectResult('client-observation')(result).pipe(
+                Effect.flatMap((observationResult) => decodeClientObservation(observationResult.observation)),
+                Effect.map(reconcileClientObservation(eventRefs)),
+                Effect.map((observation) => ({ observation, occurrence })),
+              ),
+            ),
           ),
         { concurrency: 'unbounded' },
       )
@@ -131,7 +143,16 @@ export const makeProcessHost = (args: {
           head: `e${backend.events.at(-1)?.seqNum ?? 0}`,
           events: eventRefs.observeGlobalEvents(backend.events),
         },
-        clients: clientObservations,
+        clients: observedClients.map(({ observation }) => observation),
+        occurrences: {
+          backend: readControllerOccurrence(observationClock),
+          clients: observedClients.map(({ observation, occurrence }) => ({
+            clientId: observation.clientId,
+            connectivity: occurrence,
+            leader: occurrence,
+            sessions: observation.sessions.map((session) => ({ sessionId: session.sessionId, occurrence })),
+          })),
+        },
       }
     })
 
@@ -180,6 +201,12 @@ interface ProcessClientController {
   readonly clientId: string
   readonly pid: number
   readonly request: (command: ProcessClientCommand) => Effect.Effect<ProcessClientResult, ScenarioOperationError>
+  readonly requestWithTiming: (
+    command: ProcessClientCommand,
+  ) => Effect.Effect<
+    { readonly result: ProcessClientResult; readonly occurrence: HostObservationOccurrence },
+    ScenarioOperationError
+  >
   readonly shutdown: Effect.Effect<void, ScenarioOperationError>
 }
 
@@ -234,8 +261,14 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
     pending.clear()
   })
 
-  const request = (command: ProcessClientCommand): Effect.Effect<ProcessClientResult, ScenarioOperationError> =>
-    Effect.tryPromise({
+  const requestWithTiming = (
+    command: ProcessClientCommand,
+  ): Effect.Effect<
+    { readonly result: ProcessClientResult; readonly occurrence: HostObservationOccurrence },
+    ScenarioOperationError
+  > => {
+    const controllerBeforeMonotonicMs = performance.now()
+    return Effect.tryPromise({
       try: () =>
         new Promise<ProcessClientResult>((resolve, reject) => {
           if (child.connected !== true) {
@@ -253,7 +286,21 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
           child.send(message)
         }),
       catch: (cause) => processError(`Client ${clientId} request ${command._tag} failed: ${String(cause)}`),
-    })
+    }).pipe(
+      Effect.map((result) => ({
+        result,
+        occurrence: calibrateParticipantReading({
+          reading: result.clock,
+          controllerBeforeMonotonicMs,
+          controllerAfterMonotonicMs: performance.now(),
+          calibrationId: `${clientId}:${result.clock.localSequence}`,
+        }),
+      })),
+    )
+  }
+
+  const request = (command: ProcessClientCommand): Effect.Effect<ProcessClientResult, ScenarioOperationError> =>
+    requestWithTiming(command).pipe(Effect.map(({ result }) => result))
 
   const shutdown = Effect.gen(function* () {
     if (child.exitCode !== null || child.signalCode !== null) return
@@ -265,7 +312,7 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
   })
 
-  return { clientId, pid: child.pid!, request, shutdown }
+  return { clientId, pid: child.pid!, request, requestWithTiming, shutdown }
 }
 
 const waitForSpawn = (child: ChildProcess) =>

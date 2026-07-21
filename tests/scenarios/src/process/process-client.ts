@@ -18,9 +18,10 @@ import {
 import { dispatchApplicationAction, inspectApplicationState } from '../application.ts'
 import { getScenarioApplication } from '../applications.ts'
 import { makeConnectivityControlledBackend } from '../backends.ts'
+import { makeParticipantClock } from '../clock.ts'
 import type { ClientSystemObservation, ParticipantRef, SyncObservation } from '../model.ts'
 import { collectConfirmedEvents, makeComponentSyncObservation, makeEventRefRegistry } from '../observations.ts'
-import type { ProcessClientRequest, ProcessClientResponse, ProcessClientResult } from './protocol.ts'
+import type { ProcessClientRequest, ProcessClientResponse, ProcessClientResultPayload } from './protocol.ts'
 
 type RegisteredApplication = ReturnType<typeof getScenarioApplication>
 
@@ -35,6 +36,7 @@ interface ClientRuntime {
 const scope = await Effect.runPromise(Scope.make())
 let runtime: ClientRuntime | undefined
 let requestChain = Promise.resolve()
+const participantClock = makeParticipantClock(`process-client:${process.pid}`)
 
 const run = <A, E>(effect: Effect.Effect<A, E, Scope.Scope | OtelTracer.OtelTracer>) =>
   Effect.runPromise(effect.pipe(Scope.provide(scope), Effect.provide(OtelLiveDummy)))
@@ -44,7 +46,7 @@ const requireRuntime = (): ClientRuntime => {
   return runtime
 }
 
-const handle = async (request: ProcessClientRequest): Promise<ProcessClientResult> => {
+const handle = async (request: ProcessClientRequest): Promise<ProcessClientResultPayload> => {
   switch (request.command._tag) {
     case 'initialize': {
       if (runtime !== undefined) throw new Error('Process Client is already initialized')
@@ -180,7 +182,11 @@ process.on('message', (message: ProcessClientRequest) => {
   requestChain = requestChain.then(async () => {
     try {
       const result = await handle(message)
-      respond({ requestId: message.requestId, status: 'success', result })
+      respond({
+        requestId: message.requestId,
+        status: 'success',
+        result: { ...result, clock: participantClock.read() },
+      })
       if (message.command._tag === 'shutdown') process.exit(0)
     } catch (cause) {
       const error = cause instanceof Error ? `${cause.name}: ${cause.message}\n${cause.stack ?? ''}` : String(cause)

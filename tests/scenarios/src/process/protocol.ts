@@ -1,7 +1,13 @@
 import type { Schema } from '@livestore/utils/effect'
 
 import type { SerializedBackendConfig } from '../backends.ts'
-import type { ClientDefinition, ClientSystemObservation, ParticipantRef, SyncObservation } from '../model.ts'
+import type {
+  ClientDefinition,
+  ClientSystemObservation,
+  ParticipantClockReading,
+  ParticipantRef,
+  SyncObservation,
+} from '../model.ts'
 
 export type ProcessClientCommand =
   | {
@@ -28,12 +34,14 @@ export interface ProcessClientRequest {
   readonly command: ProcessClientCommand
 }
 
-export type ProcessClientResult =
+export type ProcessClientResultPayload =
   | { readonly _tag: 'initialized'; readonly pid: number }
   | { readonly _tag: 'acknowledged' }
   | { readonly _tag: 'client-observation'; readonly observation: ClientSystemObservation }
   | { readonly _tag: 'sync-observation'; readonly observation: SyncObservation }
   | { readonly _tag: 'state'; readonly value: Schema.Json }
+
+export type ProcessClientResult = ProcessClientResultPayload & { readonly clock: ParticipantClockReading }
 
 export type ProcessClientResponse =
   | { readonly requestId: string; readonly status: 'success'; readonly result: ProcessClientResult }

@@ -228,6 +228,21 @@ export const BackendObservation = Schema.Struct({
 })
 export type BackendObservation = typeof BackendObservation.Type
 
+export const ParticipantClockReading = Schema.Struct({
+  emitterId: Schema.String,
+  localSequence: Schema.Finite,
+  localMonotonicMs: Schema.Finite,
+})
+export type ParticipantClockReading = typeof ParticipantClockReading.Type
+
+export const HostObservationOccurrence = Schema.Struct({
+  reading: ParticipantClockReading,
+  controllerBeforeMonotonicMs: Schema.Finite,
+  controllerAfterMonotonicMs: Schema.Finite,
+  calibrationId: Schema.String,
+})
+export type HostObservationOccurrence = typeof HostObservationOccurrence.Type
+
 export const ClientSystemObservation = Schema.Struct({
   clientId: Schema.String,
   connected: Schema.Boolean,
@@ -244,6 +259,22 @@ export type ClientSystemObservation = typeof ClientSystemObservation.Type
 export const HostSystemObservation = Schema.Struct({
   backend: BackendObservation,
   clients: Schema.Array(ClientSystemObservation),
+  occurrences: Schema.Struct({
+    backend: HostObservationOccurrence,
+    clients: Schema.Array(
+      Schema.Struct({
+        clientId: Schema.String,
+        connectivity: HostObservationOccurrence,
+        leader: HostObservationOccurrence,
+        sessions: Schema.Array(
+          Schema.Struct({
+            sessionId: Schema.String,
+            occurrence: HostObservationOccurrence,
+          }),
+        ),
+      }),
+    ),
+  }),
 })
 export type HostSystemObservation = typeof HostSystemObservation.Type
 

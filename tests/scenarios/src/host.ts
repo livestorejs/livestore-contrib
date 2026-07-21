@@ -12,6 +12,7 @@ import {
   ScenarioOperationError,
 } from './application.ts'
 import { makeConnectivityControlledBackend, type ScenarioBackend } from './backends.ts'
+import { makeParticipantClock, readControllerOccurrence } from './clock.ts'
 import type {
   CreateClientCommand,
   ClientLifecycleCommand,
@@ -84,6 +85,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
 }): Effect.Effect<ParticipantHost, UnknownError, Scope.Scope> =>
   Effect.gen(function* () {
     const eventRefs = makeEventRefRegistry()
+    const observationClock = makeParticipantClock('in-process-host')
     let observedStoreId: string | undefined
     const clients = new Map<
       string,
@@ -221,6 +223,18 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
           events: eventRefs.observeGlobalEvents(backend.events),
         },
         clients: clientObservations,
+        occurrences: {
+          backend: readControllerOccurrence(observationClock),
+          clients: clientObservations.map((client) => ({
+            clientId: client.clientId,
+            connectivity: readControllerOccurrence(observationClock),
+            leader: readControllerOccurrence(observationClock),
+            sessions: client.sessions.map((session) => ({
+              sessionId: session.sessionId,
+              occurrence: readControllerOccurrence(observationClock),
+            })),
+          })),
+        },
       }
     })
 

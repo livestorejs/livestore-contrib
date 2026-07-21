@@ -239,12 +239,19 @@ const renderTimeline = (): void => {
       ? record.coordinatorReceiptMonotonicMs
       : (record.calibratedTime.earliestMs + record.calibratedTime.latestMs) / 2,
   )
-  const timeMin = Math.min(...recordTimes, 0)
-  const timeMax = Math.max(...recordTimes, timeMin + 1)
+  const timeMin = Math.min(
+    ...artifact.trace.map((record) => record.calibratedTime?.earliestMs ?? record.coordinatorReceiptMonotonicMs),
+    0,
+  )
+  const timeMax = Math.max(
+    ...artifact.trace.map((record) => record.calibratedTime?.latestMs ?? record.coordinatorReceiptMonotonicMs),
+    timeMin + 1,
+  )
+  const xForTime = (time: number): number => left + ((time - timeMin) / (timeMax - timeMin)) * plotWidth
   const xForRecord = (recordIndex: number): number => {
     if (timelineMode === 'flow') return left + ((unitByRecord.get(recordIndex) ?? 0) / flowMax) * plotWidth
     const time = recordTimes[recordIndex] ?? timeMin
-    return left + ((time - timeMin) / (timeMax - timeMin)) * plotWidth
+    return xForTime(time)
   }
   timelineRecordPositions = artifact.trace.map((record) => xForRecord(record.index))
 
@@ -258,7 +265,14 @@ const renderTimeline = (): void => {
       const stack = markerStacks.get(stackKey) ?? 0
       markerStacks.set(stackKey, stack + 1)
       const markerY = yAt(marker.componentKey) - 10 + stack * 7
+      const uncertainty =
+        timelineMode === 'time' &&
+        marker.calibratedTime !== null &&
+        marker.calibratedTime.latestMs > marker.calibratedTime.earliestMs
+          ? `<line class="time-uncertainty" x1="${xForTime(marker.calibratedTime.earliestMs)}" x2="${xForTime(marker.calibratedTime.latestMs)}" y1="${markerY + 10}" y2="${markerY + 10}" />`
+          : ''
       return `
+        ${uncertainty}
         <g
           class="marker ${marker.event.disposition} ${selected}"
           data-event-ref="${escapeMarkup(marker.event.eventRef)}"

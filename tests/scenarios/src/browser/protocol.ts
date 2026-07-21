@@ -1,6 +1,6 @@
 import type { Schema } from '@livestore/utils/effect'
 
-import type { ComponentSyncObservation, ParticipantRef, SyncObservation } from '../model.ts'
+import type { ComponentSyncObservation, ParticipantClockReading, ParticipantRef, SyncObservation } from '../model.ts'
 
 export interface BrowserStartOptions {
   readonly storeId: string
@@ -12,6 +12,7 @@ export interface BrowserPageObservation {
   readonly leader: ComponentSyncObservation
   readonly session: ComponentSyncObservation
   readonly sync: SyncObservation
+  readonly clock: ParticipantClockReading
 }
 
 export interface ScenarioBrowserControl {

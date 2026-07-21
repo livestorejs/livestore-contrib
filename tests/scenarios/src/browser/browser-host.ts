@@ -10,12 +10,15 @@ import { Effect, Schema, type Scope } from '@livestore/utils/effect'
 
 import { ScenarioOperationError } from '../application.ts'
 import type { ScenarioBackend } from '../backends.ts'
+import { calibrateParticipantReading, makeParticipantClock, readControllerOccurrence } from '../clock.ts'
 import type { ParticipantHost } from '../host.ts'
 import {
   type ClientSystemObservation,
   ClientSystemObservation as ClientSystemObservationSchema,
   type HostAcknowledgement,
   type HostCapabilities,
+  type HostObservationOccurrence,
+  HostSystemObservation as HostSystemObservationSchema,
   type ParticipantRef,
   SyncObservation as SyncObservationSchema,
 } from '../model.ts'
@@ -65,6 +68,7 @@ export const makeBrowserHost = (args: {
     })
     const clients = new Map<string, BrowserClientController>()
     const eventRefs = makeEventRefRegistry()
+    const observationClock = makeParticipantClock('browser-host')
     let observedStoreId: string | undefined
 
     yield* Effect.addFinalizer(() =>
@@ -145,34 +149,42 @@ export const makeBrowserHost = (args: {
       const backend =
         observedStoreId === undefined ? { connected: true, events: [] } : yield* args.backend.observe(observedStoreId)
       const backendHead = backend.events.at(-1)?.seqNum ?? 0
-      const clientObservations = yield* Effect.forEach(
+      const observedClients = yield* Effect.forEach(
         [...clients.values()],
         (client) =>
           client.observe.pipe(
-            Effect.map(reconcileClientObservation(eventRefs)),
-            Effect.map((observation) => hydrateConfirmedEvents(observation, backend.events, eventRefs)),
-            Effect.map((observation) => deriveLeaderObservation(observation, backendHead)),
+            Effect.map((observed) => ({
+              ...observed,
+              observation: reconcileClientObservation(eventRefs)(observed.observation),
+            })),
+            Effect.map((observed) => ({
+              ...observed,
+              observation: hydrateConfirmedEvents(observed.observation, backend.events, eventRefs),
+            })),
+            Effect.map((observed) => ({
+              ...observed,
+              observation: deriveLeaderObservation(observed.observation, backendHead),
+            })),
           ),
         { concurrency: 'unbounded' },
       )
-      return yield* Schema.decodeUnknownEffect(
-        Schema.Struct({
-          backend: Schema.Struct({
-            id: Schema.String,
-            connected: Schema.Boolean,
-            head: Schema.String,
-            events: Schema.Array(Schema.Any),
-          }),
-          clients: Schema.Array(ClientSystemObservationSchema),
-        }),
-      )({
+      return yield* Schema.decodeUnknownEffect(HostSystemObservationSchema)({
         backend: {
           id: 'sync-backend',
           connected: backend.connected,
           head: `e${backendHead}`,
           events: eventRefs.observeGlobalEvents(backend.events),
         },
-        clients: clientObservations,
+        clients: observedClients.map(({ observation }) => observation),
+        occurrences: {
+          backend: readControllerOccurrence(observationClock),
+          clients: observedClients.map((observed) => ({
+            clientId: observed.observation.clientId,
+            connectivity: observed.connectivityOccurrence,
+            leader: observed.leaderOccurrence,
+            sessions: observed.sessions,
+          })),
+        },
       }).pipe(Effect.mapError((cause) => browserError(`Invalid browser system observation: ${String(cause)}`)))
     })
 
@@ -234,8 +246,15 @@ interface BrowserClientController {
   readonly stopSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
   readonly restartSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
   readonly restart: Effect.Effect<void, ScenarioOperationError>
-  readonly observe: Effect.Effect<ClientSystemObservation, ScenarioOperationError>
+  readonly observe: Effect.Effect<BrowserClientObservation, ScenarioOperationError>
   readonly shutdown: Effect.Effect<void, ScenarioOperationError>
+}
+
+interface BrowserClientObservation {
+  readonly observation: ClientSystemObservation
+  readonly connectivityOccurrence: HostObservationOccurrence
+  readonly leaderOccurrence: HostObservationOccurrence
+  readonly sessions: ReadonlyArray<{ readonly sessionId: string; readonly occurrence: HostObservationOccurrence }>
 }
 
 const makeBrowserClient = (args: {
@@ -309,18 +328,28 @@ const makeBrowserClient = (args: {
       const observe = Effect.gen(function* () {
         const observations = yield* Effect.forEach(
           [...state.pages.entries()],
-          ([sessionId, page]) => observePage(page).pipe(Effect.map((observation) => ({ sessionId, observation }))),
+          ([sessionId, page]) =>
+            observePageWithTiming(page).pipe(Effect.map((observed) => ({ sessionId, ...observed }))),
           { concurrency: 'unbounded' },
         )
         const leader = observations[0]?.observation.leader
+        const leaderOccurrence = observations[0]?.occurrence
         if (leader === undefined)
           return yield* Effect.fail(browserError(`Client ${args.clientId} has no running session`))
-        return yield* Schema.decodeUnknownEffect(ClientSystemObservationSchema)({
+        if (leaderOccurrence === undefined)
+          return yield* Effect.fail(browserError(`Client ${args.clientId} observation has no timing evidence`))
+        const observation = yield* Schema.decodeUnknownEffect(ClientSystemObservationSchema)({
           clientId: args.clientId,
           connected: state.connected,
           leader,
           sessions: observations.map(({ sessionId, observation }) => ({ sessionId, sync: observation.session })),
         }).pipe(Effect.mapError((cause) => browserError(`Invalid Client observation: ${String(cause)}`)))
+        return {
+          observation,
+          connectivityOccurrence: leaderOccurrence,
+          leaderOccurrence,
+          sessions: observations.map(({ sessionId, occurrence }) => ({ sessionId, occurrence })),
+        }
       })
 
       const shutdown = Effect.gen(function* () {
@@ -413,10 +442,30 @@ const closeContext = (context: BrowserContext) =>
   })
 
 const observePage = (page: Page): Effect.Effect<BrowserPageObservation, ScenarioOperationError> =>
-  Effect.tryPromise({
+  observePageWithTiming(page).pipe(Effect.map(({ observation }) => observation))
+
+const observePageWithTiming = (
+  page: Page,
+): Effect.Effect<
+  { readonly observation: BrowserPageObservation; readonly occurrence: HostObservationOccurrence },
+  ScenarioOperationError
+> => {
+  const controllerBeforeMonotonicMs = performance.now()
+  return Effect.tryPromise({
     try: () => page.evaluate(() => window.__scenarioBrowser.observe()),
     catch: (cause) => browserError(`Browser observation failed: ${String(cause)}`),
-  })
+  }).pipe(
+    Effect.map((observation) => ({
+      observation,
+      occurrence: calibrateParticipantReading({
+        reading: observation.clock,
+        controllerBeforeMonotonicMs,
+        controllerAfterMonotonicMs: performance.now(),
+        calibrationId: `${observation.clock.emitterId}:${observation.clock.localSequence}`,
+      }),
+    })),
+  )
+}
 
 const dispatchPageAction = (
   page: Page,

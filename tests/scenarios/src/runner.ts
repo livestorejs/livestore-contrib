@@ -11,6 +11,7 @@ import { makeInProcessHost, type HostError, type ParticipantHost } from './host.
 import {
   type OracleVerdict,
   type ExecutionConfiguration,
+  type HostObservationOccurrence,
   type ParticipantRef,
   type ParticipantSnapshot,
   participantKey,
@@ -257,6 +258,7 @@ type TraceInput = {
   readonly captureId?: string
   readonly evidence?: ScenarioTraceRecord['evidence']
   readonly causedBy?: ReadonlyArray<number>
+  readonly occurrence?: HostObservationOccurrence
 }
 
 interface TraceRecorder {
@@ -274,7 +276,9 @@ const makeTraceRecorder = (args: {
   const startedAt = performance.now()
   const instructionByCorrelation = new Map<string, number>()
   const record = (input: TraceInput): ScenarioTraceRecord => {
-    const monotonicMs = performance.now() - startedAt
+    const coordinatorReceiptMonotonicMs = performance.now() - startedAt
+    const occurrence = input.occurrence
+    const localMonotonicMs = occurrence?.reading.localMonotonicMs ?? coordinatorReceiptMonotonicMs
     const causedBy =
       input.causedBy ??
       (input.origin === 'acknowledgement' && input.correlationId !== undefined
@@ -294,15 +298,22 @@ const makeTraceRecorder = (args: {
       wallTimeMs: Date.now(),
       captureId: input.captureId ?? null,
       evidence: input.evidence ?? evidenceForOrigin(input.origin),
-      emitterId: 'scenario-controller',
-      localSequence: index,
-      localMonotonicMs: monotonicMs,
-      coordinatorReceiptMonotonicMs: monotonicMs,
-      calibratedTime: {
-        earliestMs: monotonicMs,
-        latestMs: monotonicMs,
-        calibrationId: 'scenario-controller-clock',
-      },
+      emitterId: occurrence?.reading.emitterId ?? 'scenario-controller',
+      localSequence: occurrence?.reading.localSequence ?? index,
+      localMonotonicMs,
+      coordinatorReceiptMonotonicMs,
+      calibratedTime:
+        occurrence === undefined
+          ? {
+              earliestMs: coordinatorReceiptMonotonicMs,
+              latestMs: coordinatorReceiptMonotonicMs,
+              calibrationId: 'scenario-controller-clock',
+            }
+          : {
+              earliestMs: occurrence.controllerBeforeMonotonicMs - startedAt,
+              latestMs: occurrence.controllerAfterMonotonicMs - startedAt,
+              calibrationId: occurrence.calibrationId,
+            },
       causedBy: [...causedBy],
       payload: input.payload,
     }
@@ -524,9 +535,19 @@ const recordSystemObservation = (args: {
       phaseId: args.phaseId,
       captureId,
       evidence: 'first-observed',
+      occurrence: observation.occurrences.backend,
       payload: { _tag: 'backend.observed', reason: args.reason, observation: observation.backend },
     })
     for (const client of observation.clients) {
+      const clientOccurrences = observation.occurrences.clients.find((item) => item.clientId === client.clientId)
+      if (clientOccurrences === undefined) {
+        return yield* Effect.fail(
+          new ScenarioOperationError(
+            'invalid-observation-evidence',
+            `System observation omitted timing evidence for Client ${client.clientId}`,
+          ),
+        )
+      }
       args.record({
         origin: 'observation',
         correlationId: args.correlationId,
@@ -535,6 +556,7 @@ const recordSystemObservation = (args: {
         phaseId: args.phaseId,
         captureId,
         evidence: 'first-observed',
+        occurrence: clientOccurrences.connectivity,
         payload: { _tag: 'client.connectivity.observed', reason: args.reason, connected: client.connected },
       })
       args.record({
@@ -545,9 +567,19 @@ const recordSystemObservation = (args: {
         phaseId: args.phaseId,
         captureId,
         evidence: 'first-observed',
+        occurrence: clientOccurrences.leader,
         payload: { _tag: 'leader.sync.observed', reason: args.reason, observation: client.leader },
       })
       for (const session of client.sessions) {
+        const sessionOccurrence = clientOccurrences.sessions.find((item) => item.sessionId === session.sessionId)
+        if (sessionOccurrence === undefined) {
+          return yield* Effect.fail(
+            new ScenarioOperationError(
+              'invalid-observation-evidence',
+              `System observation omitted timing evidence for ${client.clientId}/${session.sessionId}`,
+            ),
+          )
+        }
         args.record({
           origin: 'observation',
           correlationId: args.correlationId,
@@ -557,6 +589,7 @@ const recordSystemObservation = (args: {
           phaseId: args.phaseId,
           captureId,
           evidence: 'first-observed',
+          occurrence: sessionOccurrence.occurrence,
           payload: { _tag: 'session.sync.observed', reason: args.reason, observation: session.sync },
         })
       }
