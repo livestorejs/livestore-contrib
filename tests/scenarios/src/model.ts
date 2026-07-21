@@ -1,7 +1,7 @@
 import { Schema } from '@livestore/utils/effect'
 
-export const scenarioTraceVersion = 2 as const
-export const scenarioArtifactVersion = 3 as const
+export const scenarioTraceVersion = 3 as const
+export const scenarioArtifactVersion = 4 as const
 
 export const ParticipantProfile = Schema.Literals(['in-process', 'process', 'browser'])
 export type ParticipantProfile = typeof ParticipantProfile.Type
@@ -320,6 +320,22 @@ export const ScenarioTracePayload = Schema.Union([
 ])
 export type ScenarioTracePayload = typeof ScenarioTracePayload.Type
 
+export const TraceEvidenceSemantics = Schema.Literals([
+  'controller-event',
+  'instruction-sent',
+  'acknowledgement-received',
+  'first-observed',
+  'verdict',
+])
+export type TraceEvidenceSemantics = typeof TraceEvidenceSemantics.Type
+
+export const CalibratedScenarioTime = Schema.Struct({
+  earliestMs: Schema.Finite,
+  latestMs: Schema.Finite,
+  calibrationId: Schema.String,
+})
+export type CalibratedScenarioTime = typeof CalibratedScenarioTime.Type
+
 export const ScenarioTraceRecord = Schema.Struct({
   traceVersion: Schema.Literal(scenarioTraceVersion),
   runId: Schema.String,
@@ -332,6 +348,14 @@ export const ScenarioTraceRecord = Schema.Struct({
   phaseId: Schema.NullOr(Schema.String),
   logicalTime: Schema.Finite,
   wallTimeMs: Schema.Finite,
+  captureId: Schema.NullOr(Schema.String),
+  evidence: TraceEvidenceSemantics,
+  emitterId: Schema.String,
+  localSequence: Schema.Finite,
+  localMonotonicMs: Schema.Finite,
+  coordinatorReceiptMonotonicMs: Schema.Finite,
+  calibratedTime: Schema.NullOr(CalibratedScenarioTime),
+  causedBy: Schema.Array(Schema.Finite),
   payload: ScenarioTracePayload,
 })
 export type ScenarioTraceRecord = typeof ScenarioTraceRecord.Type

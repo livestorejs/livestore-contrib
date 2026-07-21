@@ -39,6 +39,22 @@ export interface EventTimelineMarker {
   readonly recordIndex: number
   readonly componentKey: string
   readonly event: ObservedEvent
+  readonly captureId: string
+  readonly captureIndex: number
+  readonly calibratedTime: ScenarioTraceRecord['calibratedTime']
+}
+
+export interface TraceCapture {
+  readonly captureId: string
+  readonly captureIndex: number
+  readonly firstRecordIndex: number
+  readonly lastRecordIndex: number
+  readonly recordIndexes: ReadonlyArray<number>
+}
+
+export interface ExplicitCausalEdge {
+  readonly fromRecordIndex: number
+  readonly toRecordIndex: number
 }
 
 /** Reduces the authoritative trace prefix into the runner's accumulated observed state. */
@@ -157,20 +173,58 @@ export const projectTraceAt = (args: {
 export const deriveEventTimeline = (trace: ReadonlyArray<ScenarioTraceRecord>): ReadonlyArray<EventTimelineMarker> => {
   const previous = new Map<string, string>()
   const markers: EventTimelineMarker[] = []
+  const captureIndexes = new Map(deriveTraceCaptures(trace).map((capture) => [capture.captureId, capture.captureIndex]))
 
   for (const record of trace) {
     const component = observationComponent(record)
-    if (component === undefined) continue
+    if (component === undefined || record.captureId === null) continue
     for (const event of component.events) {
       const key = `${component.key}\u0000${event.eventRef}`
       const signature = `${event.position}\u0000${event.parentPosition}\u0000${event.disposition}`
       if (previous.get(key) === signature) continue
       previous.set(key, signature)
-      markers.push({ recordIndex: record.index, componentKey: component.key, event })
+      markers.push({
+        recordIndex: record.index,
+        componentKey: component.key,
+        event,
+        captureId: record.captureId,
+        captureIndex: captureIndexes.get(record.captureId) ?? 0,
+        calibratedTime: record.calibratedTime,
+      })
     }
   }
 
   return markers
+}
+
+/** Groups sampled facts by collection pass without treating the pass as an atomic distributed moment. */
+export const deriveTraceCaptures = (trace: ReadonlyArray<ScenarioTraceRecord>): ReadonlyArray<TraceCapture> => {
+  const captures = new Map<string, number[]>()
+  for (const record of trace) {
+    if (record.captureId === null) continue
+    const indexes = captures.get(record.captureId) ?? []
+    indexes.push(record.index)
+    captures.set(record.captureId, indexes)
+  }
+  return [...captures.entries()].map(([captureId, recordIndexes], captureIndex) => ({
+    captureId,
+    captureIndex,
+    firstRecordIndex: recordIndexes[0]!,
+    lastRecordIndex: recordIndexes.at(-1)!,
+    recordIndexes,
+  }))
+}
+
+/** Returns only causal relationships explicitly retained by the trace protocol. */
+export const deriveExplicitCausalEdges = (
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): ReadonlyArray<ExplicitCausalEdge> => {
+  const recordIndexes = new Set(trace.map((record) => record.index))
+  return trace.flatMap((record) =>
+    record.causedBy
+      .filter((cause) => recordIndexes.has(cause))
+      .map((cause) => ({ fromRecordIndex: cause, toRecordIndex: record.index })),
+  )
 }
 
 export const backendComponentKey = 'backend'

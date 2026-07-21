@@ -254,9 +254,15 @@ type TraceInput = {
   readonly clientId?: string
   readonly sessionId?: string
   readonly phaseId?: string
+  readonly captureId?: string
+  readonly evidence?: ScenarioTraceRecord['evidence']
+  readonly causedBy?: ReadonlyArray<number>
 }
 
-type TraceRecorder = (input: TraceInput) => ScenarioTraceRecord
+interface TraceRecorder {
+  (input: TraceInput): ScenarioTraceRecord
+  readonly nextCaptureId: (reason: string) => string
+}
 
 const makeTraceRecorder = (args: {
   runId: string
@@ -264,8 +270,17 @@ const makeTraceRecorder = (args: {
   readLogicalTime: () => number
 }): TraceRecorder => {
   let index = 0
-  return (input) => {
-    const record: ScenarioTraceRecord = {
+  let captureIndex = 0
+  const startedAt = performance.now()
+  const instructionByCorrelation = new Map<string, number>()
+  const record = (input: TraceInput): ScenarioTraceRecord => {
+    const monotonicMs = performance.now() - startedAt
+    const causedBy =
+      input.causedBy ??
+      (input.origin === 'acknowledgement' && input.correlationId !== undefined
+        ? [instructionByCorrelation.get(input.correlationId)].filter((value): value is number => value !== undefined)
+        : [])
+    const traceRecord: ScenarioTraceRecord = {
       traceVersion: scenarioTraceVersion,
       runId: args.runId,
       index,
@@ -277,11 +292,42 @@ const makeTraceRecorder = (args: {
       phaseId: input.phaseId ?? null,
       logicalTime: args.readLogicalTime(),
       wallTimeMs: Date.now(),
+      captureId: input.captureId ?? null,
+      evidence: input.evidence ?? evidenceForOrigin(input.origin),
+      emitterId: 'scenario-controller',
+      localSequence: index,
+      localMonotonicMs: monotonicMs,
+      coordinatorReceiptMonotonicMs: monotonicMs,
+      calibratedTime: {
+        earliestMs: monotonicMs,
+        latestMs: monotonicMs,
+        calibrationId: 'scenario-controller-clock',
+      },
+      causedBy: [...causedBy],
       payload: input.payload,
     }
+    if (input.origin === 'instruction' && input.correlationId !== undefined) {
+      instructionByCorrelation.set(input.correlationId, index)
+    }
     index += 1
-    args.trace.push(record)
-    return record
+    args.trace.push(traceRecord)
+    return traceRecord
+  }
+  return Object.assign(record, {
+    nextCaptureId: (reason: string) => `${args.runId}:capture:${captureIndex++}:${reason}`,
+  })
+}
+
+const evidenceForOrigin = (origin: ScenarioTraceRecord['origin']): ScenarioTraceRecord['evidence'] => {
+  switch (origin) {
+    case 'instruction':
+      return 'instruction-sent'
+    case 'acknowledgement':
+      return 'acknowledgement-received'
+    case 'verdict':
+      return 'verdict'
+    case 'observation':
+      return 'controller-event'
   }
 }
 
@@ -469,12 +515,15 @@ const recordSystemObservation = (args: {
   phaseId?: string
 }): Effect.Effect<void, HostError, Scope.Scope> =>
   Effect.gen(function* () {
+    const captureId = args.record.nextCaptureId(args.reason)
     const observation = yield* args.host.observeSystem
     args.record({
       origin: 'observation',
       correlationId: args.correlationId,
       causationId: args.correlationId,
       phaseId: args.phaseId,
+      captureId,
+      evidence: 'first-observed',
       payload: { _tag: 'backend.observed', reason: args.reason, observation: observation.backend },
     })
     for (const client of observation.clients) {
@@ -484,6 +533,8 @@ const recordSystemObservation = (args: {
         causationId: args.correlationId,
         clientId: client.clientId,
         phaseId: args.phaseId,
+        captureId,
+        evidence: 'first-observed',
         payload: { _tag: 'client.connectivity.observed', reason: args.reason, connected: client.connected },
       })
       args.record({
@@ -492,6 +543,8 @@ const recordSystemObservation = (args: {
         causationId: args.correlationId,
         clientId: client.clientId,
         phaseId: args.phaseId,
+        captureId,
+        evidence: 'first-observed',
         payload: { _tag: 'leader.sync.observed', reason: args.reason, observation: client.leader },
       })
       for (const session of client.sessions) {
@@ -502,6 +555,8 @@ const recordSystemObservation = (args: {
           clientId: client.clientId,
           sessionId: session.sessionId,
           phaseId: args.phaseId,
+          captureId,
+          evidence: 'first-observed',
           payload: { _tag: 'session.sync.observed', reason: args.reason, observation: session.sync },
         })
       }

@@ -38,11 +38,18 @@
             <p id="trace-name" class="trace-name">No trace loaded</p>
           </div>
           <div class="timeline-meta">
+            <div class="mode-switch" aria-label="Timeline projection">
+              <button id="mode-flow" type="button" aria-pressed="true">flow</button>
+              <button id="mode-time" type="button" aria-pressed="false">time</button>
+            </div>
             <span id="cursor-label">0 / 0</span>
             <span id="record-label">No observation selected</span>
           </div>
         </div>
-        <p id="event-selection" class="selection-copy">Select an event to highlight its path.</p>
+        <p id="timeline-mode-note" class="selection-copy">
+          Observation captures are aligned; no causal arrows are inferred.
+        </p>
+        <p id="event-selection" class="selection-copy">Select an event to highlight matching observations.</p>
         <div id="timeline" class="timeline empty-state">No trace loaded.</div>
       </section>
 

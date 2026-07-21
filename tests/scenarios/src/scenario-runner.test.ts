@@ -9,7 +9,7 @@ import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { makeInProcessHost } from './host.ts'
 import { defineScenario, ScenarioRunArtifact } from './model.ts'
-import { deriveEventTimeline, projectTraceAt } from './projection.ts'
+import { deriveEventTimeline, deriveExplicitCausalEdges, deriveTraceCaptures, projectTraceAt } from './projection.ts'
 import {
   runBrowserLocalSyncCfScenario,
   runInProcessLocalSyncCfScenario,
@@ -62,8 +62,8 @@ Vitest.describe('offline writer recovery', () => {
         })
 
         expect(artifact.status).toBe('passed')
-        expect(artifact.artifactVersion).toBe(3)
-        expect(artifact.descriptor.traceVersion).toBe(2)
+        expect(artifact.artifactVersion).toBe(4)
+        expect(artifact.descriptor.traceVersion).toBe(3)
         expect(artifact.verdicts).toHaveLength(4)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
         expect(artifact.snapshots).toHaveLength(2)
@@ -78,6 +78,26 @@ Vitest.describe('offline writer recovery', () => {
           ]),
         )
         expect(() => Schema.decodeUnknownSync(ScenarioRunArtifact)(artifact)).not.toThrow()
+
+        expect(artifact.trace.map((record) => record.localSequence)).toEqual(artifact.trace.map((_, index) => index))
+        expect(
+          artifact.trace.every(
+            (record, index) => index === 0 || record.localMonotonicMs >= artifact.trace[index - 1]!.localMonotonicMs,
+          ),
+        ).toBe(true)
+        const sampledRecords = artifact.trace.filter((record) => record.evidence === 'first-observed')
+        expect(sampledRecords.length).toBeGreaterThan(0)
+        expect(sampledRecords.every((record) => record.captureId !== null)).toBe(true)
+        const captures = deriveTraceCaptures(artifact.trace)
+        expect(captures.length).toBeGreaterThan(1)
+        expect(captures.every((capture) => capture.recordIndexes.length > 0)).toBe(true)
+        expect(captures.some((capture) => capture.recordIndexes.length > 1)).toBe(true)
+
+        const acknowledgementRecords = artifact.trace.filter((record) => record.origin === 'acknowledgement')
+        expect(acknowledgementRecords.every((record) => record.causedBy.length === 1)).toBe(true)
+        const causalEdges = deriveExplicitCausalEdges(artifact.trace)
+        expect(causalEdges).toHaveLength(acknowledgementRecords.length)
+        expect(causalEdges.every((edge) => artifact.trace[edge.toRecordIndex]?.origin === 'acknowledgement')).toBe(true)
 
         const finalProjection = projectTraceAt({
           scenario: artifact.scenario,

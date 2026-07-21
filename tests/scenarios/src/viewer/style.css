@@ -169,6 +169,23 @@ h2 {
   justify-content: flex-end;
 }
 
+.mode-switch {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.mode-switch button {
+  border: 0;
+  color: var(--muted);
+  font-size: 10px;
+  padding: 2px 5px;
+}
+
+.mode-switch button[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--background);
+}
+
 #cursor-label {
   color: var(--text);
 }
@@ -340,20 +357,6 @@ h2 {
   font-weight: 600;
 }
 
-.timeline .path {
-  fill: none;
-  opacity: 0.45;
-  stroke: var(--line-strong);
-  stroke-dasharray: 3 4;
-  stroke-width: 1;
-}
-
-.timeline .path.selected {
-  opacity: 1;
-  stroke: var(--good);
-  stroke-width: 2;
-}
-
 .timeline .marker {
   cursor: pointer;
 }
@@ -390,6 +393,40 @@ h2 {
 .timeline .cursor-handle {
   fill: var(--background);
   stroke: #a04ad4;
+  stroke-width: 2;
+}
+
+.timeline .capture-guide {
+  stroke: var(--line);
+  stroke-dasharray: 1 5;
+  stroke-width: 1;
+}
+
+.timeline .trace-carpet-label {
+  fill: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.timeline .trace-dot {
+  cursor: pointer;
+  fill: var(--line-strong);
+}
+
+.timeline .trace-dot.instruction-sent {
+  fill: var(--warn);
+}
+
+.timeline .trace-dot.acknowledgement-received {
+  fill: var(--good);
+}
+
+.timeline .trace-dot.verdict {
+  fill: #a04ad4;
+}
+
+.timeline .trace-dot.selected {
+  stroke: var(--text);
   stroke-width: 2;
 }
 

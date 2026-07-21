@@ -4,6 +4,7 @@ import { type ComponentSyncObservation, type ObservedEvent, ScenarioRunArtifact 
 import {
   backendComponentKey,
   deriveEventTimeline,
+  deriveTraceCaptures,
   leaderComponentKey,
   projectTraceAt,
   sessionComponentKey,
@@ -24,6 +25,9 @@ const runSummary = requireElement('run-summary', HTMLElement)
 const traceName = requireElement('trace-name', HTMLElement)
 const cursorLabel = requireElement('cursor-label', HTMLElement)
 const recordLabel = requireElement('record-label', HTMLElement)
+const modeFlowButton = requireElement('mode-flow', HTMLButtonElement)
+const modeTimeButton = requireElement('mode-time', HTMLButtonElement)
+const timelineModeNote = requireElement('timeline-mode-note', HTMLElement)
 const runStatus = requireElement('run-status', HTMLElement)
 const systemState = requireElement('system-state', HTMLElement)
 const timeline = requireElement('timeline', HTMLElement)
@@ -34,6 +38,11 @@ let artifact: ScenarioRunArtifact | undefined
 let cursorIndex = -1
 let selectedEventRef: string | undefined
 let playTimer: number | undefined
+let timelineMode: 'flow' | 'time' = 'flow'
+let timelineRecordPositions: ReadonlyArray<number> = []
+
+modeFlowButton.addEventListener('click', () => setTimelineMode('flow'))
+modeTimeButton.addEventListener('click', () => setTimelineMode('time'))
 
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0]
@@ -94,6 +103,17 @@ const stopPlayback = (): void => {
   playButton.textContent = 'play'
 }
 
+const setTimelineMode = (mode: 'flow' | 'time'): void => {
+  timelineMode = mode
+  modeFlowButton.setAttribute('aria-pressed', String(mode === 'flow'))
+  modeTimeButton.setAttribute('aria-pressed', String(mode === 'time'))
+  timelineModeNote.textContent =
+    mode === 'flow'
+      ? 'Observation captures are aligned; no causal arrows are inferred.'
+      : 'Position uses calibrated evidence time; current sampled observations use controller receipt time.'
+  render()
+}
+
 const render = (): void => {
   if (artifact === undefined) return
   const projected = projectTraceAt({ scenario: artifact.scenario, trace: artifact.trace, cursorIndex })
@@ -109,6 +129,7 @@ const render = (): void => {
   systemState.innerHTML = renderTopology(projected)
   renderTimeline()
   bindEventSelection()
+  bindTraceSelection()
   bindTimelineScrubber()
 }
 
@@ -180,6 +201,7 @@ const renderRole = (label: string, sync: ComponentSyncObservation | null): strin
 const renderTimeline = (): void => {
   if (artifact === undefined) return
   const markers = deriveEventTimeline(artifact.trace)
+  const captures = deriveTraceCaptures(artifact.trace)
   const lanes = [
     { key: backendComponentKey, label: 'Backend', color: '#4169e1' },
     ...artifact.scenario.topology.clients.flatMap((client, index) => [
@@ -196,35 +218,80 @@ const renderTimeline = (): void => {
   const left = 180
   const right = 35
   const laneHeight = 62
-  const height = lanes.length * laneHeight + 42
-  const traceMax = Math.max(artifact.trace.length - 1, 1)
-  const xAt = (index: number): number => left + (index / traceMax) * (width - left - right)
+  const carpetTop = lanes.length * laneHeight + 36
+  const height = carpetTop + 54
+  const plotWidth = width - left - right
   const yAt = (key: string): number => (laneIndex.get(key) ?? 0) * laneHeight + 30
-  const grouped = Map.groupBy(markers, (marker) => marker.event.eventRef)
+  const projectionUnits = new Map<string, number>()
+  const unitByRecord = new Map<number, number>()
+  for (const record of artifact.trace) {
+    const key = record.captureId === null ? `record:${record.index}` : `capture:${record.captureId}`
+    let unit = projectionUnits.get(key)
+    if (unit === undefined) {
+      unit = projectionUnits.size
+      projectionUnits.set(key, unit)
+    }
+    unitByRecord.set(record.index, unit)
+  }
+  const flowMax = Math.max(projectionUnits.size - 1, 1)
+  const recordTimes = artifact.trace.map((record) =>
+    record.calibratedTime === null
+      ? record.coordinatorReceiptMonotonicMs
+      : (record.calibratedTime.earliestMs + record.calibratedTime.latestMs) / 2,
+  )
+  const timeMin = Math.min(...recordTimes, 0)
+  const timeMax = Math.max(...recordTimes, timeMin + 1)
+  const xForRecord = (recordIndex: number): number => {
+    if (timelineMode === 'flow') return left + ((unitByRecord.get(recordIndex) ?? 0) / flowMax) * plotWidth
+    const time = recordTimes[recordIndex] ?? timeMin
+    return left + ((time - timeMin) / (timeMax - timeMin)) * plotWidth
+  }
+  timelineRecordPositions = artifact.trace.map((record) => xForRecord(record.index))
 
-  const paths = [...grouped.entries()]
-    .filter(([, eventMarkers]) => eventMarkers.length > 1)
-    .map(([eventRef, eventMarkers]) => {
-      const points = eventMarkers.map((marker) => `${xAt(marker.recordIndex)},${yAt(marker.componentKey)}`).join(' ')
-      return `<polyline class="path ${eventRef === selectedEventRef ? 'selected' : ''}" points="${points}" />`
-    })
-    .join('')
+  const markerStacks = new Map<string, number>()
 
   const markerSvg = markers
     .map((marker) => {
       const selected = marker.event.eventRef === selectedEventRef ? 'selected' : ''
       const future = marker.recordIndex > cursorIndex ? 'opacity="0.22"' : ''
+      const stackKey = `${marker.componentKey}\u0000${marker.captureId}`
+      const stack = markerStacks.get(stackKey) ?? 0
+      markerStacks.set(stackKey, stack + 1)
+      const markerY = yAt(marker.componentKey) - 10 + stack * 7
       return `
         <g
           class="marker ${marker.event.disposition} ${selected}"
           data-event-ref="${escapeMarkup(marker.event.eventRef)}"
-          transform="translate(${xAt(marker.recordIndex) - 28} ${yAt(marker.componentKey) - 13})"
+          transform="translate(${xForRecord(marker.recordIndex) - 24} ${markerY})"
           ${future}
         >
-          <title>${escapeMarkup(`${marker.event.name} · ${marker.event.eventRef}`)}</title>
-          <rect width="56" height="26" rx="4" />
-          <text x="28" y="17" text-anchor="middle">${escapeMarkup(marker.event.position)}</text>
+          <title>${escapeMarkup(`${marker.event.name} · ${marker.event.eventRef} · first observed in capture ${marker.captureIndex + 1}`)}</title>
+          <rect width="48" height="20" rx="3" />
+          <text x="24" y="14" text-anchor="middle">${escapeMarkup(marker.event.position)}</text>
         </g>`
+    })
+    .join('')
+
+  const captureGuides = captures
+    .map((capture) => {
+      const x = xForRecord(capture.firstRecordIndex)
+      return `<line class="capture-guide" x1="${x}" x2="${x}" y1="12" y2="${carpetTop - 8}"><title>capture ${capture.captureIndex + 1} · non-atomic sampling pass</title></line>`
+    })
+    .join('')
+
+  const captureStack = new Map<string, number>()
+  const traceCarpet = artifact.trace
+    .map((record) => {
+      const stack = record.captureId === null ? 0 : (captureStack.get(record.captureId) ?? 0)
+      if (record.captureId !== null) captureStack.set(record.captureId, stack + 1)
+      const y = carpetTop + 15 + (stack % 4) * 7
+      return `<circle
+        class="trace-dot ${record.evidence} ${record.index === cursorIndex ? 'selected' : ''}"
+        data-record-index="${record.index}"
+        cx="${xForRecord(record.index)}"
+        cy="${y}"
+        r="2.8"
+      ><title>#${record.index + 1} · ${escapeMarkup(record.payload._tag)} · ${escapeMarkup(record.evidence)}</title></circle>`
     })
     .join('')
 
@@ -249,14 +316,16 @@ const renderTimeline = (): void => {
       aria-valuetext="${escapeMarkup(recordLabel.textContent ?? '')}"
     >
       ${lanesSvg}
-      ${paths}
+      ${captureGuides}
       ${markerSvg}
+      <text class="trace-carpet-label" x="8" y="${carpetTop + 18}">RAW TRACE</text>
+      ${traceCarpet}
       ${
         cursorIndex < 0
           ? ''
           : `<g class="cursor-scrubber" aria-hidden="true">
-              <line class="cursor-line" x1="${xAt(cursorIndex)}" x2="${xAt(cursorIndex)}" y1="10" y2="${height - 10}" />
-              <circle class="cursor-handle" cx="${xAt(cursorIndex)}" cy="9" r="6" />
+              <line class="cursor-line" x1="${xForRecord(cursorIndex)}" x2="${xForRecord(cursorIndex)}" y1="10" y2="${height - 10}" />
+              <circle class="cursor-handle" cx="${xForRecord(cursorIndex)}" cy="9" r="6" />
             </g>`
       }
     </svg>`
@@ -272,6 +341,18 @@ const bindEventSelection = (): void => {
   })
 }
 
+const bindTraceSelection = (): void => {
+  timeline.querySelectorAll<SVGElement>('[data-record-index]').forEach((element) => {
+    element.addEventListener('click', () => {
+      const nextCursor = Number(element.dataset.recordIndex)
+      if (Number.isInteger(nextCursor) === false) return
+      stopPlayback()
+      cursorIndex = nextCursor
+      render()
+    })
+  })
+}
+
 const bindTimelineScrubber = (): void => {
   if (artifact === undefined) return
   const svg = timeline.querySelector('svg')
@@ -279,14 +360,14 @@ const bindTimelineScrubber = (): void => {
 
   const traceMax = Math.max(artifact.trace.length - 1, 0)
   const viewBoxWidth = 1400
-  const plotLeft = 180
-  const plotRight = 35
-  const plotWidth = viewBoxWidth - plotLeft - plotRight
 
   const moveCursor = (clientX: number, bounds: DOMRect): void => {
     const svgX = ((clientX - bounds.left) / bounds.width) * viewBoxWidth
-    const ratio = Math.min(Math.max((svgX - plotLeft) / plotWidth, 0), 1)
-    const nextCursor = Math.round(ratio * traceMax)
+    const nextCursor = timelineRecordPositions.reduce(
+      (closest, position, index) =>
+        Math.abs(position - svgX) < Math.abs((timelineRecordPositions[closest] ?? position) - svgX) ? index : closest,
+      0,
+    )
     if (nextCursor === cursorIndex) return
     stopPlayback()
     cursorIndex = nextCursor
@@ -294,7 +375,11 @@ const bindTimelineScrubber = (): void => {
   }
 
   svg.addEventListener('pointerdown', (event) => {
-    if (event.target instanceof Element && event.target.closest('[data-event-ref]') !== null) return
+    if (
+      event.target instanceof Element &&
+      (event.target.closest('[data-event-ref]') !== null || event.target.closest('[data-record-index]') !== null)
+    )
+      return
     event.preventDefault()
     const bounds = svg.getBoundingClientRect()
     const pointerId = event.pointerId
