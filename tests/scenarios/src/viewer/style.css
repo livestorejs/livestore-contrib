@@ -369,6 +369,21 @@ h2 {
 
 .timeline .marker {
   cursor: pointer;
+  translate: 0 var(--stack-collapsed, 0);
+  transition: translate 130ms ease-out;
+}
+
+.timeline .marker-stack-hit-target {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.timeline .marker-stack.stacked:hover .marker {
+  translate: 0 var(--stack-expanded, 0);
+}
+
+.timeline .marker-stack.stacked:hover .marker rect {
+  stroke-width: 1.5;
 }
 
 .timeline .marker rect {

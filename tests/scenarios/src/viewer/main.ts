@@ -282,39 +282,68 @@ const renderTimeline = (): void => {
       : xForRecord(recordIndex)
   timelineRecordPositions = artifact.trace.map((record) => xForRecord(record.index))
 
-  const markerSlots = new Map<string, number[][]>()
-
-  const markerSvg = markers
-    .map((marker) => {
-      const selected = marker.event.eventRef === selectedEventRef ? 'selected' : ''
-      const future = marker.recordIndex > cursorIndex ? 'opacity="0.22"' : ''
-      const markerX = xForRecord(marker.recordIndex)
-      const slots = markerSlots.get(marker.componentKey) ?? []
-      let stack = slots.findIndex((occupied) => occupied.every((x) => Math.abs(x - markerX) >= 52))
-      if (stack === -1) {
-        stack = slots.length
-        slots.push([])
+  type PositionedMarker = { readonly marker: (typeof markers)[number]; readonly x: number }
+  const markerClusters: PositionedMarker[][] = []
+  for (const laneMarkers of Map.groupBy(markers, (marker) => marker.componentKey).values()) {
+    const positioned = laneMarkers
+      .map((marker) => ({ marker, x: xForRecord(marker.recordIndex) }))
+      .toSorted((left, right) => left.x - right.x)
+    let cluster: PositionedMarker[] = []
+    for (const item of positioned) {
+      const previous = cluster.at(-1)
+      if (previous !== undefined && item.x - previous.x >= 52) {
+        markerClusters.push(cluster)
+        cluster = []
       }
-      slots[stack]!.push(markerX)
-      markerSlots.set(marker.componentKey, slots)
-      const markerY = yAt(marker.componentKey) - 10 + stack * 7
-      const uncertainty =
-        timelineMode === 'time' &&
-        marker.calibratedTime !== null &&
-        marker.calibratedTime.latestMs > marker.calibratedTime.earliestMs
-          ? `<line class="time-uncertainty" x1="${xForTime(marker.calibratedTime.earliestMs)}" x2="${xForTime(marker.calibratedTime.latestMs)}" y1="${markerY + 10}" y2="${markerY + 10}" />`
-          : ''
+      cluster.push(item)
+    }
+    if (cluster.length > 0) markerClusters.push(cluster)
+  }
+
+  const markerSvg = markerClusters
+    .map((cluster, clusterIndex) => {
+      const stacked = cluster.length > 1
+      const expansionStep = cluster.length <= 1 ? 0 : Math.min(22, 36 / (cluster.length - 1))
+      const expandedOffsets = cluster.map((_, index) => (index - (cluster.length - 1) / 2) * expansionStep)
+      const baseY = yAt(cluster[0]!.marker.componentKey) - 10
+      const minimumX = Math.min(...cluster.map(({ x }) => x)) - 29
+      const maximumX = Math.max(...cluster.map(({ x }) => x)) + 29
+      const minimumY = baseY + Math.min(...expandedOffsets) - 5
+      const maximumY = baseY + Math.max(...expandedOffsets) + 25
+      const items = cluster
+        .map(({ marker, x }, index) => {
+          const selected = marker.event.eventRef === selectedEventRef ? 'selected' : ''
+          const future = marker.recordIndex > cursorIndex ? 'opacity="0.22"' : ''
+          const baseX = x - 24
+          const uncertainty =
+            timelineMode === 'time' &&
+            marker.calibratedTime !== null &&
+            marker.calibratedTime.latestMs > marker.calibratedTime.earliestMs
+              ? `<line class="time-uncertainty" x1="${xForTime(marker.calibratedTime.earliestMs) - baseX}" x2="${xForTime(marker.calibratedTime.latestMs) - baseX}" y1="10" y2="10" />`
+              : ''
+          return `
+            <g
+              class="marker ${marker.event.disposition} ${selected}"
+              data-event-ref="${escapeMarkup(marker.event.eventRef)}"
+              transform="translate(${baseX} ${baseY})"
+              style="--stack-collapsed:${index * 4}px;--stack-expanded:${expandedOffsets[index]}px"
+              ${future}
+            >
+              <title>${escapeMarkup(`${marker.event.name} · ${marker.event.eventRef} · first observed in capture ${marker.captureIndex + 1}`)}</title>
+              ${uncertainty}
+              <rect width="48" height="20" rx="3" />
+              <text x="24" y="14" text-anchor="middle">${escapeMarkup(marker.event.position)}</text>
+            </g>`
+        })
+        .join('')
       return `
-        ${uncertainty}
-        <g
-          class="marker ${marker.event.disposition} ${selected}"
-          data-event-ref="${escapeMarkup(marker.event.eventRef)}"
-          transform="translate(${markerX - 24} ${markerY})"
-          ${future}
-        >
-          <title>${escapeMarkup(`${marker.event.name} · ${marker.event.eventRef} · first observed in capture ${marker.captureIndex + 1}`)}</title>
-          <rect width="48" height="20" rx="3" />
-          <text x="24" y="14" text-anchor="middle">${escapeMarkup(marker.event.position)}</text>
+        <g class="marker-stack ${stacked === true ? 'stacked' : ''}" data-marker-stack="${clusterIndex}">
+          ${
+            stacked === true
+              ? `<title>${cluster.length} overlapping observations · hover to expand</title><rect class="marker-stack-hit-target" x="${minimumX}" y="${minimumY}" width="${maximumX - minimumX}" height="${maximumY - minimumY}" rx="5" />`
+              : ''
+          }
+          ${items}
         </g>`
     })
     .join('')
@@ -447,7 +476,9 @@ const bindTimelineScrubber = (): void => {
   svg.addEventListener('pointerdown', (event) => {
     if (
       event.target instanceof Element &&
-      (event.target.closest('[data-event-ref]') !== null || event.target.closest('[data-record-index]') !== null)
+      (event.target.closest('[data-event-ref]') !== null ||
+        event.target.closest('[data-record-index]') !== null ||
+        event.target.closest('[data-marker-stack]') !== null)
     )
       return
     event.preventDefault()
