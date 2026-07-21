@@ -3,10 +3,12 @@ import { Schema } from '@livestore/utils/effect'
 import { type ComponentSyncObservation, type ObservedEvent, ScenarioRunArtifact } from '../model.ts'
 import {
   backendComponentKey,
+  deriveAdaptiveTimeLayout,
   deriveEventTimeline,
   deriveTraceCaptures,
   leaderComponentKey,
   projectTraceAt,
+  projectAdaptiveTime,
   sessionComponentKey,
 } from '../projection.ts'
 import './style.css'
@@ -27,6 +29,9 @@ const cursorLabel = requireElement('cursor-label', HTMLElement)
 const recordLabel = requireElement('record-label', HTMLElement)
 const modeFlowButton = requireElement('mode-flow', HTMLButtonElement)
 const modeTimeButton = requireElement('mode-time', HTMLButtonElement)
+const timeScaleSwitch = requireElement('time-scale-switch', HTMLElement)
+const timeFitButton = requireElement('time-fit', HTMLButtonElement)
+const timeRawButton = requireElement('time-raw', HTMLButtonElement)
 const timelineModeNote = requireElement('timeline-mode-note', HTMLElement)
 const runStatus = requireElement('run-status', HTMLElement)
 const systemState = requireElement('system-state', HTMLElement)
@@ -39,10 +44,13 @@ let cursorIndex = -1
 let selectedEventRef: string | undefined
 let playTimer: number | undefined
 let timelineMode: 'flow' | 'time' = 'flow'
+let timeScaleMode: 'fit' | 'raw' = 'fit'
 let timelineRecordPositions: ReadonlyArray<number> = []
 
 modeFlowButton.addEventListener('click', () => setTimelineMode('flow'))
 modeTimeButton.addEventListener('click', () => setTimelineMode('time'))
+timeFitButton.addEventListener('click', () => setTimeScaleMode('fit'))
+timeRawButton.addEventListener('click', () => setTimeScaleMode('raw'))
 
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0]
@@ -107,12 +115,24 @@ const setTimelineMode = (mode: 'flow' | 'time'): void => {
   timelineMode = mode
   modeFlowButton.setAttribute('aria-pressed', String(mode === 'flow'))
   modeTimeButton.setAttribute('aria-pressed', String(mode === 'time'))
+  timeScaleSwitch.hidden = mode !== 'time'
   timelineModeNote.textContent =
-    mode === 'flow'
-      ? 'Observation captures are aligned; no causal arrows are inferred.'
-      : 'Position uses calibrated evidence time; current sampled observations use controller receipt time.'
+    mode === 'flow' ? 'Observation captures are aligned; no causal arrows are inferred.' : timeScaleDescription()
   render()
 }
+
+const setTimeScaleMode = (mode: 'fit' | 'raw'): void => {
+  timeScaleMode = mode
+  timeFitButton.setAttribute('aria-pressed', String(mode === 'fit'))
+  timeRawButton.setAttribute('aria-pressed', String(mode === 'raw'))
+  timelineModeNote.textContent = timeScaleDescription()
+  render()
+}
+
+const timeScaleDescription = (): string =>
+  timeScaleMode === 'fit'
+    ? 'Calibrated time with labelled long gaps compressed; the trace carpet retains raw elapsed time.'
+    : 'Raw calibrated elapsed time; distances are linear and may produce dense activity clusters.'
 
 const render = (): void => {
   if (artifact === undefined) return
@@ -247,23 +267,36 @@ const renderTimeline = (): void => {
     ...artifact.trace.map((record) => record.calibratedTime?.latestMs ?? record.coordinatorReceiptMonotonicMs),
     timeMin + 1,
   )
-  const xForTime = (time: number): number => left + ((time - timeMin) / (timeMax - timeMin)) * plotWidth
+  const rawXForTime = (time: number): number => left + ((time - timeMin) / (timeMax - timeMin)) * plotWidth
+  const adaptiveTimeLayout = deriveAdaptiveTimeLayout([timeMin, ...recordTimes, timeMax])
+  const fittedXForTime = (time: number): number => left + projectAdaptiveTime(adaptiveTimeLayout, time) * plotWidth
+  const xForTime = timelineMode === 'time' && timeScaleMode === 'fit' ? fittedXForTime : rawXForTime
   const xForRecord = (recordIndex: number): number => {
     if (timelineMode === 'flow') return left + ((unitByRecord.get(recordIndex) ?? 0) / flowMax) * plotWidth
     const time = recordTimes[recordIndex] ?? timeMin
     return xForTime(time)
   }
+  const xForCarpetRecord = (recordIndex: number): number =>
+    timelineMode === 'time' && timeScaleMode === 'fit'
+      ? rawXForTime(recordTimes[recordIndex] ?? timeMin)
+      : xForRecord(recordIndex)
   timelineRecordPositions = artifact.trace.map((record) => xForRecord(record.index))
 
-  const markerStacks = new Map<string, number>()
+  const markerSlots = new Map<string, number[][]>()
 
   const markerSvg = markers
     .map((marker) => {
       const selected = marker.event.eventRef === selectedEventRef ? 'selected' : ''
       const future = marker.recordIndex > cursorIndex ? 'opacity="0.22"' : ''
-      const stackKey = `${marker.componentKey}\u0000${marker.captureId}`
-      const stack = markerStacks.get(stackKey) ?? 0
-      markerStacks.set(stackKey, stack + 1)
+      const markerX = xForRecord(marker.recordIndex)
+      const slots = markerSlots.get(marker.componentKey) ?? []
+      let stack = slots.findIndex((occupied) => occupied.every((x) => Math.abs(x - markerX) >= 52))
+      if (stack === -1) {
+        stack = slots.length
+        slots.push([])
+      }
+      slots[stack]!.push(markerX)
+      markerSlots.set(marker.componentKey, slots)
       const markerY = yAt(marker.componentKey) - 10 + stack * 7
       const uncertainty =
         timelineMode === 'time' &&
@@ -276,7 +309,7 @@ const renderTimeline = (): void => {
         <g
           class="marker ${marker.event.disposition} ${selected}"
           data-event-ref="${escapeMarkup(marker.event.eventRef)}"
-          transform="translate(${xForRecord(marker.recordIndex) - 24} ${markerY})"
+          transform="translate(${markerX - 24} ${markerY})"
           ${future}
         >
           <title>${escapeMarkup(`${marker.event.name} · ${marker.event.eventRef} · first observed in capture ${marker.captureIndex + 1}`)}</title>
@@ -285,6 +318,23 @@ const renderTimeline = (): void => {
         </g>`
     })
     .join('')
+
+  const compressedGaps =
+    timelineMode === 'time' && timeScaleMode === 'fit'
+      ? adaptiveTimeLayout.compressedGaps
+          .filter((gap) => (gap.endPosition - gap.startPosition) * plotWidth >= 38)
+          .map((gap) => {
+            const x1 = fittedXForTime(gap.startMs)
+            const x2 = fittedXForTime(gap.endMs)
+            const midpoint = (x1 + x2) / 2
+            return `
+              <rect class="compressed-gap-band" x="${x1}" y="3" width="${x2 - x1}" height="${carpetTop - 11}" />
+              <line class="compressed-gap-edge" x1="${x1}" x2="${x1}" y1="3" y2="${carpetTop - 8}" />
+              <line class="compressed-gap-edge" x1="${x2}" x2="${x2}" y1="3" y2="${carpetTop - 8}" />
+              <text class="compressed-gap-label" x="${midpoint}" y="11" text-anchor="middle">// ${formatDuration(gap.durationMs)} //</text>`
+          })
+          .join('')
+      : ''
 
   const captureGuides = captures
     .map((capture) => {
@@ -302,7 +352,7 @@ const renderTimeline = (): void => {
       return `<circle
         class="trace-dot ${record.evidence} ${record.index === cursorIndex ? 'selected' : ''}"
         data-record-index="${record.index}"
-        cx="${xForRecord(record.index)}"
+        cx="${xForCarpetRecord(record.index)}"
         cy="${y}"
         r="2.8"
       ><title>#${record.index + 1} · ${escapeMarkup(record.payload._tag)} · ${escapeMarkup(record.evidence)}</title></circle>`
@@ -329,17 +379,23 @@ const renderTimeline = (): void => {
       aria-valuenow="${Math.max(cursorIndex, 0)}"
       aria-valuetext="${escapeMarkup(recordLabel.textContent ?? '')}"
     >
+      ${compressedGaps}
       ${lanesSvg}
       ${captureGuides}
       ${markerSvg}
-      <text class="trace-carpet-label" x="8" y="${carpetTop + 18}">RAW TRACE</text>
+      <text class="trace-carpet-label" x="8" y="${carpetTop + 18}">${timelineMode === 'time' && timeScaleMode === 'fit' ? 'TRACE · RAW TIME' : 'TRACE'}</text>
       ${traceCarpet}
       ${
         cursorIndex < 0
           ? ''
           : `<g class="cursor-scrubber" aria-hidden="true">
-              <line class="cursor-line" x1="${xForRecord(cursorIndex)}" x2="${xForRecord(cursorIndex)}" y1="10" y2="${height - 10}" />
+              <line class="cursor-line" x1="${xForRecord(cursorIndex)}" x2="${xForRecord(cursorIndex)}" y1="10" y2="${timelineMode === 'time' && timeScaleMode === 'fit' ? carpetTop - 8 : height - 10}" />
               <circle class="cursor-handle" cx="${xForRecord(cursorIndex)}" cy="9" r="6" />
+              ${
+                timelineMode === 'time' && timeScaleMode === 'fit'
+                  ? `<line class="carpet-cursor" x1="${xForCarpetRecord(cursorIndex)}" x2="${xForCarpetRecord(cursorIndex)}" y1="${carpetTop + 5}" y2="${height - 7}" />`
+                  : ''
+              }
             </g>`
       }
     </svg>`
@@ -450,6 +506,9 @@ const statusTone = (status: string): string => {
 }
 
 const clientColor = (index: number): string => ['#088361', '#d8662c', '#9c3cc0', '#08759c'][index % 4]!
+
+const formatDuration = (durationMs: number): string =>
+  durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(durationMs >= 10_000 ? 1 : 2)}s` : `${Math.round(durationMs)}ms`
 
 const escapeMarkup = (value: string): string =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
