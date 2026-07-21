@@ -13,6 +13,8 @@ pnpm --dir tests/scenarios scenario:run --profile in-process --backend local-syn
 pnpm --dir tests/scenarios scenario:run --profile process
 pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario browser-multi-session-recovery
+pnpm --dir tests/scenarios scenario:run --profile process --scenario shared-todo-workday --output artifacts/shared-todo-workday-process.json
+pnpm --dir tests/scenarios scenario:run --profile browser --scenario shared-todo-workday --output artifacts/shared-todo-workday-browser.json
 ```
 
 `in-process` defaults to the controlled mock backend. `process` and `browser`
@@ -23,6 +25,8 @@ Client, one page per session, OPFS, a SharedWorker, and Web Locks. Set
 
 Use `--output <path>` to choose the artifact path. By default it is written to
 `tests/scenarios/artifacts/<scenario-id>.json`.
+Set `SCENARIO_PROGRESS=1` to print step and settlement transitions for a long
+run.
 
 ## View the artifact
 
@@ -30,9 +34,9 @@ Use `--output <path>` to choose the artifact path. By default it is written to
 pnpm --dir tests/scenarios viewer
 ```
 
-Open the printed URL. **Load generated run** loads
-`offline-writer-recovery.json`; use the file picker for another artifact such
-as `browser-multi-session-recovery.json`.
+Open the printed URL and choose a generated artifact from **saved runs**. The
+scenario CLI refreshes this local catalog whenever it writes into `artifacts/`;
+the file picker can still open an artifact from elsewhere.
 
 ## Test the profiles
 

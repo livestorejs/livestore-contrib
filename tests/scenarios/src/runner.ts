@@ -12,6 +12,7 @@ import {
   type OracleVerdict,
   type ExecutionConfiguration,
   type HostObservationOccurrence,
+  type HostSystemObservation,
   type ParticipantRef,
   type ParticipantSnapshot,
   participantKey,
@@ -32,6 +33,15 @@ export interface RunScenarioOptions {
   readonly runId?: string
   readonly sourceRevision?: string
   readonly execution?: ExecutionConfiguration
+  readonly onProgress?: (progress: ScenarioRunProgress) => void
+}
+
+export interface ScenarioRunProgress {
+  readonly stage: 'started' | 'completed'
+  readonly phaseId: string
+  readonly stepId: string
+  readonly stepNumber: number
+  readonly totalSteps: number
 }
 
 export const defaultInProcessExecution: ExecutionConfiguration = {
@@ -192,6 +202,8 @@ export const runScenario = (args: {
       yield* recordSystemObservation({ host: args.host, record, reason: operationId, correlationId: operationId })
     }
 
+    const totalSteps = args.scenario.phases.reduce((total, phase) => total + phase.steps.length, 0)
+    let stepNumber = 0
     for (const phase of args.scenario.phases) {
       logicalTime += 1
       record({
@@ -200,6 +212,8 @@ export const runScenario = (args: {
         payload: { _tag: 'phase.started', description: phase.description },
       })
       for (const step of phase.steps) {
+        stepNumber += 1
+        args.options?.onProgress?.({ stage: 'started', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
         logicalTime += 1
         yield* executeStep({ host: args.host, phaseId: phase.id, record, step })
         yield* recordSystemObservation({
@@ -209,6 +223,7 @@ export const runScenario = (args: {
           correlationId: step.id,
           phaseId: phase.id,
         })
+        args.options?.onProgress?.({ stage: 'completed', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
       }
       record({ origin: 'observation', phaseId: phase.id, payload: { _tag: 'phase.completed' } })
     }
@@ -524,10 +539,11 @@ const recordSystemObservation = (args: {
   reason: string
   correlationId?: string
   phaseId?: string
+  observation?: HostSystemObservation
 }): Effect.Effect<void, HostError, Scope.Scope> =>
   Effect.gen(function* () {
     const captureId = args.record.nextCaptureId(args.reason)
-    const observation = yield* args.host.observeSystem
+    const observation = args.observation === undefined ? yield* args.host.observeSystem : args.observation
     args.record({
       origin: 'observation',
       correlationId: args.correlationId,
@@ -605,14 +621,34 @@ const awaitSettlement = (args: {
   correlationId: string
 }): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> => {
   const deadline = Date.now() + args.timeoutMs
+  let lastLoggedSignature: string | undefined
 
   const loop = (
     previousStableSignature: string | undefined,
   ): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> =>
     Effect.gen(function* () {
-      const observations = yield* Effect.forEach(args.participants, args.host.observeSync)
+      const observationTimeoutMs = Math.min(5_000, args.timeoutMs)
+      const systemObservation = yield* args.host.observeSystem.pipe(
+        Effect.timeoutOrElse({
+          duration: observationTimeoutMs,
+          orElse: () =>
+            Effect.fail(
+              new ScenarioOperationError(
+                'settlement-timeout',
+                `Settlement ${args.correlationId} timed out observing the system after ${observationTimeoutMs}ms`,
+              ),
+            ),
+        }),
+      )
+      const observations = yield* Effect.forEach(args.participants, (participant) =>
+        deriveSyncObservation({ observation: systemObservation, participant }),
+      )
       const signature = canonicalJson(observations.map(syncObservationPayload))
       const isStable = observationsAreSettled(observations)
+      if (process.env.SCENARIO_PROGRESS === '1' && signature !== lastLoggedSignature) {
+        console.log(`  settlement ${args.correlationId}: ${signature}`)
+        lastLoggedSignature = signature
+      }
       args.record({
         origin: 'observation',
         correlationId: args.correlationId,
@@ -629,7 +665,19 @@ const awaitSettlement = (args: {
         reason: 'settlement-poll',
         correlationId: args.correlationId,
         phaseId: args.phaseId,
-      })
+        observation: systemObservation,
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: observationTimeoutMs,
+          orElse: () =>
+            Effect.fail(
+              new ScenarioOperationError(
+                'settlement-timeout',
+                `Settlement ${args.correlationId} timed out recording its system observation after ${observationTimeoutMs}ms`,
+              ),
+            ),
+        }),
+      )
 
       if (isStable === true && previousStableSignature === signature) return observations
       if (Date.now() >= deadline) {
@@ -640,11 +688,40 @@ const awaitSettlement = (args: {
           ),
         )
       }
-      yield* Effect.sleep('25 millis')
+      // A browser settlement probe crosses every page plus the backend. A
+      // moderate cadence leaves room for the sync work being observed.
+      yield* Effect.sleep('100 millis')
       return yield* loop(isStable === true ? signature : undefined)
     })
 
   return Effect.suspend(() => loop(undefined))
+}
+
+const deriveSyncObservation = (args: {
+  observation: HostSystemObservation
+  participant: ParticipantRef
+}): Effect.Effect<SyncObservation, ScenarioOperationError> => {
+  const client = args.observation.clients.find((candidate) => candidate.clientId === args.participant.clientId)
+  const session = client?.sessions.find((candidate) => candidate.sessionId === args.participant.sessionId)
+  if (client === undefined || session === undefined) {
+    return Effect.fail(
+      new ScenarioOperationError(
+        'missing-participant',
+        `System observation omitted ${participantKey(args.participant)}`,
+      ),
+    )
+  }
+
+  const localHead = EventSequenceNumber.Client.fromString(session.sync.upstreamHead)
+  const upstreamHead = EventSequenceNumber.Client.fromString(args.observation.backend.head)
+  const pendingCount = Math.max(session.sync.pendingCount, localHead.client)
+  return Effect.succeed({
+    participant: args.participant,
+    localHead: session.sync.upstreamHead,
+    upstreamHead: args.observation.backend.head,
+    pendingCount,
+    isSynced: client.connected === true && pendingCount === 0 && localHead.global === upstreamHead.global,
+  })
 }
 
 const captureSnapshots = (args: {

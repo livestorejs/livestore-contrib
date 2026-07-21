@@ -13,14 +13,17 @@ import {
 } from '../projection.ts'
 import './style.css'
 
-const requireElement = <T extends typeof Element>(id: string, constructor: T): InstanceType<T> => {
+const requireElement = <T extends Element>(id: string, constructor: { new (): T }): T => {
   const element = document.getElementById(id)
   if (element === null || element instanceof constructor === false) throw new Error(`Missing #${id}`)
-  return element as InstanceType<T>
+  return element
 }
 
 const fileInput = requireElement('artifact-file', HTMLInputElement)
-const loadDefaultButton = requireElement('load-default', HTMLButtonElement)
+const exampleArtifactSelectElement = document.getElementById('example-artifact')
+if (exampleArtifactSelectElement instanceof HTMLSelectElement === false) throw new Error('Missing #example-artifact')
+const exampleArtifactSelect = exampleArtifactSelectElement
+const loadExampleButton = requireElement('load-example', HTMLButtonElement)
 const playButton = requireElement('play', HTMLButtonElement)
 const runTitle = requireElement('run-title', HTMLElement)
 const runSummary = requireElement('run-summary', HTMLElement)
@@ -45,7 +48,13 @@ let selectedEventRef: string | undefined
 let playTimer: number | undefined
 let timelineMode: 'flow' | 'time' = 'flow'
 let timeScaleMode: 'fit' | 'raw' = 'fit'
-let timelineRecordPositions: ReadonlyArray<number> = []
+let timelineRecordPositions: ReadonlyArray<{ readonly index: number; readonly x: number }> = []
+let timelineViewport = { start: 0, end: 1 }
+const eventlogScrollStates = new Map<string, { followTail: boolean; scrollLeft: number }>()
+type PositionedTimelineMarker = {
+  readonly marker: ReturnType<typeof deriveEventTimeline>[number]
+  readonly x: number
+}
 
 modeFlowButton.addEventListener('click', () => setTimelineMode('flow'))
 modeTimeButton.addEventListener('click', () => setTimelineMode('time'))
@@ -58,14 +67,51 @@ fileInput.addEventListener('change', () => {
   void file.text().then(loadArtifactJson).catch(showLoadError)
 })
 
-loadDefaultButton.addEventListener('click', () => {
-  void fetch('/offline-writer-recovery.json')
+loadExampleButton.addEventListener('click', () => {
+  const file = exampleArtifactSelect.value
+  if (file.length === 0) return
+  void fetch(`/${encodeURIComponent(file)}`)
     .then(async (response) => {
-      if (response.ok === false) throw new Error('Run the scenario:run command before loading the generated artifact.')
+      if (response.ok === false) throw new Error(`Could not load saved artifact ${file}.`)
       return response.text()
     })
     .then(loadArtifactJson)
     .catch(showLoadError)
+})
+
+exampleArtifactSelect.addEventListener('change', () => {
+  loadExampleButton.disabled = exampleArtifactSelect.value.length === 0
+})
+
+interface ArtifactCatalog {
+  readonly version: 1
+  readonly entries: ReadonlyArray<{
+    readonly file: string
+    readonly label: string
+    readonly applicationEventCount: number
+    readonly traceRecordCount: number
+  }>
+}
+
+const loadArtifactCatalog = async (): Promise<void> => {
+  const response = await fetch('/catalog.json')
+  if (response.ok === false) throw new Error('Run a scenario to generate the saved-run catalog.')
+  const catalog = (await response.json()) as ArtifactCatalog
+  exampleArtifactSelect.replaceChildren(
+    new Option('select saved run', ''),
+    ...catalog.entries.map(
+      (entry) =>
+        new Option(
+          `${entry.label} · ${entry.applicationEventCount} events · ${entry.traceRecordCount} traces`,
+          entry.file,
+        ),
+    ),
+  )
+  exampleArtifactSelect.disabled = catalog.entries.length === 0
+}
+
+void loadArtifactCatalog().catch((cause) => {
+  exampleArtifactSelect.replaceChildren(new Option(cause instanceof Error ? cause.message : String(cause), ''))
 })
 
 playButton.addEventListener('click', () => {
@@ -91,6 +137,8 @@ const loadArtifactJson = (input: string): void => {
   artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(input)
   cursorIndex = artifact.trace.length - 1
   selectedEventRef = undefined
+  timelineViewport = { start: 0, end: 1 }
+  eventlogScrollStates.clear()
   playButton.disabled = false
   runTitle.textContent = artifact.descriptor.scenarioId
   runSummary.textContent = `${artifact.scenario.description} · seed ${artifact.descriptor.seed}`
@@ -113,6 +161,7 @@ const stopPlayback = (): void => {
 
 const setTimelineMode = (mode: 'flow' | 'time'): void => {
   timelineMode = mode
+  timelineViewport = { start: 0, end: 1 }
   modeFlowButton.setAttribute('aria-pressed', String(mode === 'flow'))
   modeTimeButton.setAttribute('aria-pressed', String(mode === 'time'))
   timeScaleSwitch.hidden = mode !== 'time'
@@ -123,6 +172,7 @@ const setTimelineMode = (mode: 'flow' | 'time'): void => {
 
 const setTimeScaleMode = (mode: 'fit' | 'raw'): void => {
   timeScaleMode = mode
+  timelineViewport = { start: 0, end: 1 }
   timeFitButton.setAttribute('aria-pressed', String(mode === 'fit'))
   timeRawButton.setAttribute('aria-pressed', String(mode === 'raw'))
   timelineModeNote.textContent = timeScaleDescription()
@@ -136,6 +186,7 @@ const timeScaleDescription = (): string =>
 
 const render = (): void => {
   if (artifact === undefined) return
+  captureEventlogScrollState()
   const projected = projectTraceAt({ scenario: artifact.scenario, trace: artifact.trace, cursorIndex })
   const record = cursorIndex < 0 ? undefined : artifact.trace[cursorIndex]
 
@@ -147,10 +198,11 @@ const render = (): void => {
   runStatus.className = `badge ${statusTone(projected.runStatus)}`
   systemState.className = 'topology'
   systemState.innerHTML = renderTopology(projected)
+  restoreEventlogScrollState()
   renderTimeline()
   bindEventSelection()
-  bindTraceSelection()
   bindTimelineScrubber()
+  bindRangeNavigator()
 }
 
 const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
@@ -161,7 +213,7 @@ const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
         <h3>Sync backend</h3>
         <span class="badge ${backend?.connected === true ? 'good' : backend === null ? 'neutral' : 'bad'}">${backend === null ? 'unobserved' : backend.connected === true ? 'online' : 'offline'}</span>
       </div>
-      ${renderEventlog(backend?.events ?? [], backend === null ? 'No backend observation yet' : `Authoritative head ${backend.head}`)}
+      ${renderEventlog('backend', backend?.events ?? [], backend === null ? 'No backend observation yet' : `Authoritative head ${backend.head}`)}
     </article>`
 
   const clientCards = state.clients
@@ -174,7 +226,7 @@ const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
             <h3>${escapeMarkup(client.clientId)}</h3>
             <span class="badge ${badge[1]}">${badge[0]}</span>
           </div>
-          ${renderEventlog(client.leader?.events ?? [], client.leader === null ? 'Leader not observed' : `Client eventlog · ${client.leader.pendingCount} pending`)}
+          ${renderEventlog(`client:${client.clientId}`, client.leader?.events ?? [], client.leader === null ? 'Leader not observed' : `Client eventlog · ${client.leader.pendingCount} pending`)}
           <div class="role-list">
             ${renderRole('Leader role', client.leader)}
             ${client.sessions.map((session) => renderRole(`Session ${session.sessionId}`, session.sync)).join('')}
@@ -186,25 +238,27 @@ const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
   return `${backendCard}${clientCards}`
 }
 
-const renderEventlog = (events: ReadonlyArray<ObservedEvent>, label: string): string => `
-  <div>
+const renderEventlog = (key: string, events: ReadonlyArray<ObservedEvent>, label: string): string => `
+  <div class="eventlog-block">
     <p class="eyebrow">${escapeMarkup(label)}</p>
-    <div class="eventlog">
-      ${
-        events.length === 0
-          ? '<span class="summary">No events observed</span>'
-          : events
-              .map(
-                (event) => `
-                  <button
-                    type="button"
-                    class="event-chip ${event.disposition} ${event.eventRef === selectedEventRef ? 'selected' : ''}"
-                    data-event-ref="${escapeMarkup(event.eventRef)}"
-                    title="${escapeMarkup(`${event.name} · ${event.eventRef}`)}"
-                  >${escapeMarkup(event.position)}</button>`,
-              )
-              .join('')
-      }
+    <div class="eventlog" data-eventlog-key="${escapeMarkup(key)}" aria-label="${escapeMarkup(label)}">
+      <div class="eventlog-track">
+        ${
+          events.length === 0
+            ? '<span class="summary">No events observed</span>'
+            : events
+                .map(
+                  (event) => `
+                    <button
+                      type="button"
+                      class="event-chip ${event.disposition} ${event.eventRef === selectedEventRef ? 'selected' : ''}"
+                      data-event-ref="${escapeMarkup(event.eventRef)}"
+                      title="${escapeMarkup(`${event.name} · ${event.eventRef}`)}"
+                    >${escapeMarkup(event.position)}</button>`,
+                )
+                .join('')
+        }
+      </div>
     </div>
   </div>`
 
@@ -267,83 +321,96 @@ const renderTimeline = (): void => {
     ...artifact.trace.map((record) => record.calibratedTime?.latestMs ?? record.coordinatorReceiptMonotonicMs),
     timeMin + 1,
   )
-  const rawXForTime = (time: number): number => left + ((time - timeMin) / (timeMax - timeMin)) * plotWidth
   const adaptiveTimeLayout = deriveAdaptiveTimeLayout([timeMin, ...recordTimes, timeMax])
-  const fittedXForTime = (time: number): number => left + projectAdaptiveTime(adaptiveTimeLayout, time) * plotWidth
-  const xForTime = timelineMode === 'time' && timeScaleMode === 'fit' ? fittedXForTime : rawXForTime
-  const xForRecord = (recordIndex: number): number => {
-    if (timelineMode === 'flow') return left + ((unitByRecord.get(recordIndex) ?? 0) / flowMax) * plotWidth
+  const normalizedRawTime = (time: number): number => (time - timeMin) / (timeMax - timeMin)
+  const normalizedFittedTime = (time: number): number => projectAdaptiveTime(adaptiveTimeLayout, time)
+  const normalizedForRecord = (recordIndex: number): number => {
+    if (timelineMode === 'flow') return (unitByRecord.get(recordIndex) ?? 0) / flowMax
     const time = recordTimes[recordIndex] ?? timeMin
-    return xForTime(time)
+    return timeScaleMode === 'fit' ? normalizedFittedTime(time) : normalizedRawTime(time)
+  }
+  const viewportSpan = timelineViewport.end - timelineViewport.start
+  const xForNormalized = (position: number): number =>
+    left + ((position - timelineViewport.start) / viewportSpan) * plotWidth
+  const overviewXForNormalized = (position: number): number => left + position * plotWidth
+  const isVisibleNormalized = (position: number): boolean =>
+    position >= timelineViewport.start && position <= timelineViewport.end
+  const isVisibleRecord = (recordIndex: number): boolean => isVisibleNormalized(normalizedForRecord(recordIndex))
+  const rawOverviewXForTime = (time: number): number => overviewXForNormalized(normalizedRawTime(time))
+  const xForTime = (time: number): number =>
+    xForNormalized(timeScaleMode === 'fit' ? normalizedFittedTime(time) : normalizedRawTime(time))
+  const xForRecord = (recordIndex: number): number => {
+    return xForNormalized(normalizedForRecord(recordIndex))
   }
   const xForCarpetRecord = (recordIndex: number): number =>
     timelineMode === 'time' && timeScaleMode === 'fit'
-      ? rawXForTime(recordTimes[recordIndex] ?? timeMin)
+      ? rawOverviewXForTime(recordTimes[recordIndex] ?? timeMin)
       : xForRecord(recordIndex)
-  timelineRecordPositions = artifact.trace.map((record) => xForRecord(record.index))
+  timelineRecordPositions = artifact.trace
+    .filter((record) => isVisibleRecord(record.index))
+    .map((record) => ({ index: record.index, x: xForRecord(record.index) }))
 
-  type PositionedMarker = { readonly marker: (typeof markers)[number]; readonly x: number }
-  const markerClusters: PositionedMarker[][] = []
-  for (const laneMarkers of Map.groupBy(markers, (marker) => marker.componentKey).values()) {
-    const positioned = laneMarkers
-      .map((marker) => ({ marker, x: xForRecord(marker.recordIndex) }))
-      .toSorted((left, right) => left.x - right.x)
-    let cluster: PositionedMarker[] = []
-    for (const item of positioned) {
-      const previous = cluster.at(-1)
-      if (previous !== undefined && item.x - previous.x >= 52) {
-        markerClusters.push(cluster)
-        cluster = []
+  const positionedByLane = new Map(
+    [...Map.groupBy(markers, (marker) => marker.componentKey)].map(([componentKey, laneMarkers]) => [
+      componentKey,
+      laneMarkers
+        .filter((marker) => isVisibleRecord(marker.recordIndex))
+        .map((marker) => ({ marker, x: xForRecord(marker.recordIndex) }))
+        .toSorted((left, right) => left.x - right.x),
+    ]),
+  )
+  const maximumLaneMarkerCount = Math.max(0, ...[...positionedByLane.values()].map((laneMarkers) => laneMarkers.length))
+  const averageMarkerSpacing = maximumLaneMarkerCount === 0 ? plotWidth : plotWidth / maximumLaneMarkerCount
+  const markerMode = averageMarkerSpacing >= 54 ? 'label' : averageMarkerSpacing >= 7 ? 'point' : 'aggregate'
+
+  const markerSvg = [...positionedByLane.values()]
+    .flatMap((laneMarkers) => {
+      if (markerMode === 'label') return laneMarkers.map((positioned) => [positioned])
+      return groupMarkersIntoBins({ markers: laneMarkers, left, binWidth: markerMode === 'point' ? 7 : 14 })
+    })
+    .map((group) => {
+      const first = group[0]!
+      const selected = group.some(({ marker }) => marker.event.eventRef === selectedEventRef) === true ? 'selected' : ''
+      const pending = group.some(({ marker }) => marker.event.disposition === 'pending') === true ? 'pending' : ''
+      const future = group.every(({ marker }) => marker.recordIndex > cursorIndex) === true ? 'future' : ''
+      const recordIndex = Math.max(...group.map(({ marker }) => marker.recordIndex))
+      const x = group.reduce((total, item) => total + item.x, 0) / group.length
+      const y = yAt(first.marker.componentKey)
+      const title = escapeMarkup(markerGroupTitle(group))
+      const eventRef = group.length === 1 ? `data-event-ref="${escapeMarkup(first.marker.event.eventRef)}"` : ''
+
+      if (markerMode === 'label') {
+        const marker = first.marker
+        const uncertainty =
+          timelineMode === 'time' &&
+          marker.calibratedTime !== null &&
+          marker.calibratedTime.latestMs > marker.calibratedTime.earliestMs
+            ? `<line class="time-uncertainty" x1="${xForTime(marker.calibratedTime.earliestMs) - (x - 24)}" x2="${xForTime(marker.calibratedTime.latestMs) - (x - 24)}" y1="10" y2="10" />`
+            : ''
+        return `
+          <g
+            class="marker marker-label ${pending} ${selected} ${future}"
+            ${eventRef}
+            data-record-index="${recordIndex}"
+            transform="translate(${x - 24} ${y - 10})"
+          >
+            <title>${title}</title>
+            ${uncertainty}
+            <rect width="48" height="20" rx="3" />
+            <text x="24" y="14" text-anchor="middle">${escapeMarkup(marker.event.position)}</text>
+          </g>`
       }
-      cluster.push(item)
-    }
-    if (cluster.length > 0) markerClusters.push(cluster)
-  }
 
-  const markerSvg = markerClusters
-    .map((cluster, clusterIndex) => {
-      const stacked = cluster.length > 1
-      const expansionStep = cluster.length <= 1 ? 0 : Math.min(22, 36 / (cluster.length - 1))
-      const expandedOffsets = cluster.map((_, index) => (index - (cluster.length - 1) / 2) * expansionStep)
-      const baseY = yAt(cluster[0]!.marker.componentKey) - 10
-      const minimumX = Math.min(...cluster.map(({ x }) => x)) - 29
-      const maximumX = Math.max(...cluster.map(({ x }) => x)) + 29
-      const minimumY = baseY + Math.min(...expandedOffsets) - 5
-      const maximumY = baseY + Math.max(...expandedOffsets) + 25
-      const items = cluster
-        .map(({ marker, x }, index) => {
-          const selected = marker.event.eventRef === selectedEventRef ? 'selected' : ''
-          const future = marker.recordIndex > cursorIndex ? 'opacity="0.22"' : ''
-          const baseX = x - 24
-          const uncertainty =
-            timelineMode === 'time' &&
-            marker.calibratedTime !== null &&
-            marker.calibratedTime.latestMs > marker.calibratedTime.earliestMs
-              ? `<line class="time-uncertainty" x1="${xForTime(marker.calibratedTime.earliestMs) - baseX}" x2="${xForTime(marker.calibratedTime.latestMs) - baseX}" y1="10" y2="10" />`
-              : ''
-          return `
-            <g
-              class="marker ${marker.event.disposition} ${selected}"
-              data-event-ref="${escapeMarkup(marker.event.eventRef)}"
-              transform="translate(${baseX} ${baseY})"
-              style="--stack-collapsed:${index * 4}px;--stack-expanded:${expandedOffsets[index]}px"
-              ${future}
-            >
-              <title>${escapeMarkup(`${marker.event.name} · ${marker.event.eventRef} · first observed in capture ${marker.captureIndex + 1}`)}</title>
-              ${uncertainty}
-              <rect width="48" height="20" rx="3" />
-              <text x="24" y="14" text-anchor="middle">${escapeMarkup(marker.event.position)}</text>
-            </g>`
-        })
-        .join('')
+      const radius = group.length === 1 ? 3.8 : Math.min(8, 3.8 + Math.log2(group.length))
       return `
-        <g class="marker-stack ${stacked === true ? 'stacked' : ''}" data-marker-stack="${clusterIndex}">
-          ${
-            stacked === true
-              ? `<title>${cluster.length} overlapping observations · hover to expand</title><rect class="marker-stack-hit-target" x="${minimumX}" y="${minimumY}" width="${maximumX - minimumX}" height="${maximumY - minimumY}" rx="5" />`
-              : ''
-          }
-          ${items}
+        <g
+          class="marker event-point ${markerMode} ${pending} ${selected} ${future}"
+          ${eventRef}
+          data-record-index="${recordIndex}"
+        >
+          <title>${title}</title>
+          <circle cx="${x}" cy="${y}" r="${radius}" />
+          ${group.length > 1 && radius >= 5.8 ? `<text x="${x}" y="${y + 2.3}" text-anchor="middle">${group.length}</text>` : ''}
         </g>`
     })
     .join('')
@@ -351,10 +418,18 @@ const renderTimeline = (): void => {
   const compressedGaps =
     timelineMode === 'time' && timeScaleMode === 'fit'
       ? adaptiveTimeLayout.compressedGaps
-          .filter((gap) => (gap.endPosition - gap.startPosition) * plotWidth >= 38)
+          .filter(
+            (gap) =>
+              gap.endPosition >= timelineViewport.start &&
+              gap.startPosition <= timelineViewport.end &&
+              ((Math.min(gap.endPosition, timelineViewport.end) - Math.max(gap.startPosition, timelineViewport.start)) /
+                viewportSpan) *
+                plotWidth >=
+                38,
+          )
           .map((gap) => {
-            const x1 = fittedXForTime(gap.startMs)
-            const x2 = fittedXForTime(gap.endMs)
+            const x1 = xForNormalized(Math.max(gap.startPosition, timelineViewport.start))
+            const x2 = xForNormalized(Math.min(gap.endPosition, timelineViewport.end))
             const midpoint = (x1 + x2) / 2
             return `
               <rect class="compressed-gap-band" x="${x1}" y="3" width="${x2 - x1}" height="${carpetTop - 11}" />
@@ -366,6 +441,7 @@ const renderTimeline = (): void => {
       : ''
 
   const captureGuides = captures
+    .filter((capture) => isVisibleRecord(capture.firstRecordIndex))
     .map((capture) => {
       const x = xForRecord(capture.firstRecordIndex)
       return `<line class="capture-guide" x1="${x}" x2="${x}" y1="12" y2="${carpetTop - 8}"><title>capture ${capture.captureIndex + 1} · non-atomic sampling pass</title></line>`
@@ -374,6 +450,7 @@ const renderTimeline = (): void => {
 
   const captureStack = new Map<string, number>()
   const traceCarpet = artifact.trace
+    .filter((record) => (timelineMode === 'time' && timeScaleMode === 'fit') || isVisibleRecord(record.index))
     .map((record) => {
       const stack = record.captureId === null ? 0 : (captureStack.get(record.captureId) ?? 0)
       if (record.captureId !== null) captureStack.set(record.captureId, stack + 1)
@@ -396,9 +473,35 @@ const renderTimeline = (): void => {
     )
     .join('')
 
+  const densityBinCount = 160
+  const densityBins = Array.from({ length: densityBinCount }, () => 0)
+  for (const marker of markers) {
+    const bin = Math.min(Math.floor(normalizedForRecord(marker.recordIndex) * densityBinCount), densityBinCount - 1)
+    densityBins[bin] = (densityBins[bin] ?? 0) + 1
+  }
+  const maximumDensity = Math.max(1, ...densityBins)
+  const navigatorDensity = densityBins
+    .map((count, index) => {
+      if (count === 0) return ''
+      const barWidth = plotWidth / densityBinCount
+      const barHeight = 3 + (Math.log1p(count) / Math.log1p(maximumDensity)) * 18
+      return `<rect class="range-density-bar" x="${left + index * barWidth}" y="${34 - barHeight}" width="${Math.max(barWidth - 0.6, 0.8)}" height="${barHeight}" />`
+    })
+    .join('')
+  const rangeStartX = overviewXForNormalized(timelineViewport.start)
+  const rangeEndX = overviewXForNormalized(timelineViewport.end)
+  const rangeWidth = rangeEndX - rangeStartX
+  const rangeSummary =
+    timelineViewport.start === 0 && timelineViewport.end === 1
+      ? 'full run'
+      : `${Math.round(timelineViewport.start * 100)}–${Math.round(timelineViewport.end * 100)}%`
+  const overviewCursorX = cursorIndex < 0 ? undefined : overviewXForNormalized(normalizedForRecord(cursorIndex))
+  const mainCursorVisible = cursorIndex >= 0 && isVisibleRecord(cursorIndex)
+
   timeline.className = 'timeline'
   timeline.innerHTML = `
     <svg
+      class="timeline-main"
       viewBox="0 0 ${width} ${height}"
       role="slider"
       tabindex="0"
@@ -414,24 +517,59 @@ const renderTimeline = (): void => {
       ${markerSvg}
       <text class="trace-carpet-label" x="8" y="${carpetTop + 18}">${timelineMode === 'time' && timeScaleMode === 'fit' ? 'TRACE · RAW TIME' : 'TRACE'}</text>
       ${traceCarpet}
+      <g class="cursor-scrubber" aria-hidden="true">
+        ${
+          mainCursorVisible === true
+            ? `<line class="cursor-line" x1="${xForRecord(cursorIndex)}" x2="${xForRecord(cursorIndex)}" y1="10" y2="${timelineMode === 'time' && timeScaleMode === 'fit' ? carpetTop - 8 : height - 10}" />
+               <circle class="cursor-handle" cx="${xForRecord(cursorIndex)}" cy="9" r="6" />`
+            : ''
+        }
+        ${
+          cursorIndex >= 0 && timelineMode === 'time' && timeScaleMode === 'fit'
+            ? `<line class="carpet-cursor" x1="${xForCarpetRecord(cursorIndex)}" x2="${xForCarpetRecord(cursorIndex)}" y1="${carpetTop + 5}" y2="${height - 7}" />`
+            : ''
+        }
+      </g>
+    </svg>
+    <svg
+      class="range-navigator"
+      viewBox="0 0 ${width} 44"
+      role="group"
+      tabindex="0"
+      aria-label="Timeline visible range"
+      data-range-navigator
+    >
+      <text class="range-label" x="8" y="26">RANGE</text>
+      <text class="range-summary" x="${width - right}" y="10" text-anchor="end">${rangeSummary}</text>
+      <rect class="range-track" x="${left}" y="7" width="${plotWidth}" height="28" rx="2" data-range-action="track" />
+      ${navigatorDensity}
+      <rect
+        class="range-window"
+        x="${rangeStartX}"
+        y="5"
+        width="${rangeWidth}"
+        height="32"
+        rx="2"
+        data-range-action="window"
+      ><title>Drag to pan the visible timeline range</title></rect>
+      <g class="range-handle start" data-range-action="start">
+        <rect class="range-handle-hit" x="${rangeStartX - 7}" y="2" width="14" height="38" />
+        <line x1="${rangeStartX}" x2="${rangeStartX}" y1="3" y2="39" />
+      </g>
+      <g class="range-handle end" data-range-action="end">
+        <rect class="range-handle-hit" x="${rangeEndX - 7}" y="2" width="14" height="38" />
+        <line x1="${rangeEndX}" x2="${rangeEndX}" y1="3" y2="39" />
+      </g>
       ${
-        cursorIndex < 0
+        overviewCursorX === undefined
           ? ''
-          : `<g class="cursor-scrubber" aria-hidden="true">
-              <line class="cursor-line" x1="${xForRecord(cursorIndex)}" x2="${xForRecord(cursorIndex)}" y1="10" y2="${timelineMode === 'time' && timeScaleMode === 'fit' ? carpetTop - 8 : height - 10}" />
-              <circle class="cursor-handle" cx="${xForRecord(cursorIndex)}" cy="9" r="6" />
-              ${
-                timelineMode === 'time' && timeScaleMode === 'fit'
-                  ? `<line class="carpet-cursor" x1="${xForCarpetRecord(cursorIndex)}" x2="${xForCarpetRecord(cursorIndex)}" y1="${carpetTop + 5}" y2="${height - 7}" />`
-                  : ''
-              }
-            </g>`
+          : `<line class="range-cursor" x1="${overviewCursorX}" x2="${overviewCursorX}" y1="4" y2="39"><title>Current trace cursor</title></line>`
       }
     </svg>`
 }
 
 const bindEventSelection = (): void => {
-  document.querySelectorAll<HTMLElement>('[data-event-ref]').forEach((element) => {
+  systemState.querySelectorAll<HTMLElement>('[data-event-ref]').forEach((element) => {
     element.addEventListener('click', () => {
       selectedEventRef = element.dataset.eventRef
       eventSelection.textContent = selectedEventRef === undefined ? '' : `Highlighting ${selectedEventRef}`
@@ -440,33 +578,21 @@ const bindEventSelection = (): void => {
   })
 }
 
-const bindTraceSelection = (): void => {
-  timeline.querySelectorAll<SVGElement>('[data-record-index]').forEach((element) => {
-    element.addEventListener('click', () => {
-      const nextCursor = Number(element.dataset.recordIndex)
-      if (Number.isInteger(nextCursor) === false) return
-      stopPlayback()
-      cursorIndex = nextCursor
-      render()
-    })
-  })
-}
-
 const bindTimelineScrubber = (): void => {
   if (artifact === undefined) return
-  const svg = timeline.querySelector('svg')
+  const svg = timeline.querySelector<SVGSVGElement>('svg.timeline-main')
   if (svg === null) return
 
   const traceMax = Math.max(artifact.trace.length - 1, 0)
   const viewBoxWidth = 1400
 
   const moveCursor = (clientX: number, bounds: DOMRect): void => {
+    if (timelineRecordPositions.length === 0) return
     const svgX = ((clientX - bounds.left) / bounds.width) * viewBoxWidth
-    const nextCursor = timelineRecordPositions.reduce(
-      (closest, position, index) =>
-        Math.abs(position - svgX) < Math.abs((timelineRecordPositions[closest] ?? position) - svgX) ? index : closest,
-      0,
+    const closest = timelineRecordPositions.reduce((candidate, position) =>
+      Math.abs(position.x - svgX) < Math.abs(candidate.x - svgX) ? position : candidate,
     )
+    const nextCursor = closest.index
     if (nextCursor === cursorIndex) return
     stopPlayback()
     cursorIndex = nextCursor
@@ -474,18 +600,22 @@ const bindTimelineScrubber = (): void => {
   }
 
   svg.addEventListener('pointerdown', (event) => {
-    if (
-      event.target instanceof Element &&
-      (event.target.closest('[data-event-ref]') !== null ||
-        event.target.closest('[data-record-index]') !== null ||
-        event.target.closest('[data-marker-stack]') !== null)
-    )
-      return
     event.preventDefault()
     const bounds = svg.getBoundingClientRect()
     const pointerId = event.pointerId
+    const startX = event.clientX
+    const target = event.target instanceof Element ? event.target : undefined
+    const eventTarget = target?.closest<SVGElement>('[data-event-ref]')
+    const recordTarget = target?.closest<SVGElement>('[data-record-index]')
+    const startsOnMarker =
+      (eventTarget !== null && eventTarget !== undefined) || (recordTarget !== null && recordTarget !== undefined)
+    let scrubbing = startsOnMarker === false
+    if (scrubbing === true) moveCursor(event.clientX, bounds)
+
     const onPointerMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== pointerId || moveEvent.buttons !== 1) return
+      if (scrubbing === false && Math.abs(moveEvent.clientX - startX) >= 4) scrubbing = true
+      if (scrubbing === false) return
       moveCursor(moveEvent.clientX, bounds)
     }
     const onPointerUp = (endEvent: PointerEvent): void => {
@@ -493,11 +623,26 @@ const bindTimelineScrubber = (): void => {
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('pointercancel', onPointerUp)
+      if (scrubbing === true) {
+        moveCursor(endEvent.clientX, bounds)
+        return
+      }
+      const eventRef = eventTarget?.dataset.eventRef
+      if (eventRef !== undefined) {
+        selectedEventRef = eventRef
+        eventSelection.textContent = `Highlighting ${eventRef}`
+        render()
+        return
+      }
+      const nextCursor = Number(recordTarget?.dataset.recordIndex)
+      if (Number.isInteger(nextCursor) === false) return
+      stopPlayback()
+      cursorIndex = nextCursor
+      render()
     }
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
     window.addEventListener('pointercancel', onPointerUp)
-    moveCursor(event.clientX, bounds)
   })
 
   svg.addEventListener('keydown', (event) => {
@@ -516,8 +661,175 @@ const bindTimelineScrubber = (): void => {
     stopPlayback()
     cursorIndex = Math.min(Math.max(nextCursor, 0), traceMax)
     render()
-    timeline.querySelector('svg')?.focus()
+    timeline.querySelector<SVGSVGElement>('svg.timeline-main')?.focus()
   })
+}
+
+const bindRangeNavigator = (): void => {
+  const navigator = timeline.querySelector<SVGSVGElement>('[data-range-navigator]')
+  if (navigator === null) return
+
+  const viewBoxWidth = 1400
+  const plotLeft = 180
+  const plotRight = 35
+  const plotWidth = viewBoxWidth - plotLeft - plotRight
+  const positionAt = (clientX: number, bounds: DOMRect): number =>
+    clamp((((clientX - bounds.left) / bounds.width) * viewBoxWidth - plotLeft) / plotWidth, 0, 1)
+
+  navigator.addEventListener('pointerdown', (event) => {
+    const target = event.target instanceof Element ? event.target.closest<SVGElement>('[data-range-action]') : null
+    const action = target?.dataset.rangeAction
+    if (action === undefined) return
+    event.preventDefault()
+
+    const bounds = navigator.getBoundingClientRect()
+    const pointerId = event.pointerId
+    const pointerStart = positionAt(event.clientX, bounds)
+    const viewportStart = timelineViewport.start
+    const viewportEnd = timelineViewport.end
+    const viewportSpan = viewportEnd - viewportStart
+
+    if (action === 'track') {
+      setTimelineViewport(pointerStart - viewportSpan / 2, pointerStart + viewportSpan / 2)
+      render()
+      return
+    }
+
+    const updateRange = (clientX: number): void => {
+      const position = positionAt(clientX, bounds)
+      if (action === 'start') {
+        setTimelineViewport(Math.min(position, viewportEnd - 0.01), viewportEnd)
+      } else if (action === 'end') {
+        setTimelineViewport(viewportStart, Math.max(position, viewportStart + 0.01))
+      } else {
+        const delta = position - pointerStart
+        setTimelineViewport(viewportStart + delta, viewportEnd + delta)
+      }
+      render()
+    }
+
+    const onPointerMove = (moveEvent: PointerEvent): void => {
+      if (moveEvent.pointerId !== pointerId || moveEvent.buttons !== 1) return
+      updateRange(moveEvent.clientX)
+    }
+    const onPointerUp = (endEvent: PointerEvent): void => {
+      if (endEvent.pointerId !== pointerId) return
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerUp)
+      updateRange(endEvent.clientX)
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerUp)
+  })
+
+  navigator.addEventListener('keydown', (event) => {
+    const span = timelineViewport.end - timelineViewport.start
+    const midpoint = (timelineViewport.start + timelineViewport.end) / 2
+    if (event.key === 'Home') {
+      timelineViewport = { start: 0, end: 1 }
+    } else if (event.key === '+' || event.key === '=') {
+      const nextSpan = span * 0.75
+      setTimelineViewport(midpoint - nextSpan / 2, midpoint + nextSpan / 2)
+    } else if (event.key === '-') {
+      const nextSpan = Math.min(span / 0.75, 1)
+      setTimelineViewport(midpoint - nextSpan / 2, midpoint + nextSpan / 2)
+    } else if (event.key === 'ArrowLeft') {
+      setTimelineViewport(timelineViewport.start - span * 0.1, timelineViewport.end - span * 0.1)
+    } else if (event.key === 'ArrowRight') {
+      setTimelineViewport(timelineViewport.start + span * 0.1, timelineViewport.end + span * 0.1)
+    } else {
+      return
+    }
+    event.preventDefault()
+    render()
+    timeline.querySelector<SVGSVGElement>('[data-range-navigator]')?.focus()
+  })
+}
+
+/** Keeps the overview brush ordered, bounded, and large enough to remain operable. */
+const setTimelineViewport = (requestedStart: number, requestedEnd: number): void => {
+  const minimumSpan = 0.01
+  const requestedSpan = requestedEnd - requestedStart
+  const span = clamp(requestedSpan, minimumSpan, 1)
+  let start = requestedStart
+  if (requestedSpan < minimumSpan) start = (requestedStart + requestedEnd) / 2 - span / 2
+  start = clamp(start, 0, 1 - span)
+  timelineViewport = { start, end: start + span }
+}
+
+const captureEventlogScrollState = (): void => {
+  systemState.querySelectorAll<HTMLElement>('[data-eventlog-key]').forEach((element) => {
+    const key = element.dataset.eventlogKey
+    if (key === undefined) return
+    const maximumScrollLeft = Math.max(element.scrollWidth - element.clientWidth, 0)
+    eventlogScrollStates.set(key, {
+      followTail: maximumScrollLeft - element.scrollLeft <= 2,
+      scrollLeft: element.scrollLeft,
+    })
+  })
+}
+
+const restoreEventlogScrollState = (): void => {
+  systemState.querySelectorAll<HTMLElement>('[data-eventlog-key]').forEach((element) => {
+    const key = element.dataset.eventlogKey
+    if (key === undefined) return
+    const state = eventlogScrollStates.get(key) ?? { followTail: true, scrollLeft: 0 }
+    const maximumScrollLeft = Math.max(element.scrollWidth - element.clientWidth, 0)
+    element.scrollLeft = state.followTail === true ? maximumScrollLeft : Math.min(state.scrollLeft, maximumScrollLeft)
+    eventlogScrollStates.set(key, { followTail: state.followTail, scrollLeft: element.scrollLeft })
+
+    let restoring = true
+    window.requestAnimationFrame(() => {
+      restoring = false
+    })
+    element.addEventListener(
+      'scroll',
+      () => {
+        if (restoring === true) return
+        const nextMaximumScrollLeft = Math.max(element.scrollWidth - element.clientWidth, 0)
+        eventlogScrollStates.set(key, {
+          followTail: nextMaximumScrollLeft - element.scrollLeft <= 2,
+          scrollLeft: element.scrollLeft,
+        })
+      },
+      { passive: true },
+    )
+  })
+}
+
+/** Groups only markers that occupy the same visual bin; adjacency cannot transitively merge a whole lane. */
+const groupMarkersIntoBins = ({
+  markers,
+  left,
+  binWidth,
+}: {
+  readonly markers: ReadonlyArray<PositionedTimelineMarker>
+  readonly left: number
+  readonly binWidth: number
+}): ReadonlyArray<ReadonlyArray<PositionedTimelineMarker>> => {
+  const bins = new Map<number, PositionedTimelineMarker[]>()
+  for (const marker of markers) {
+    const bin = Math.floor((marker.x - left) / binWidth)
+    const group = bins.get(bin) ?? []
+    group.push(marker)
+    bins.set(bin, group)
+  }
+  return [...bins.entries()].toSorted(([leftBin], [rightBin]) => leftBin - rightBin).map(([, group]) => group)
+}
+
+const markerGroupTitle = (group: ReadonlyArray<PositionedTimelineMarker>): string => {
+  if (group.length === 1) {
+    const marker = group[0]!.marker
+    return `${marker.event.name} · ${marker.event.eventRef} · ${marker.event.position} · observed change in capture ${marker.captureIndex + 1}`
+  }
+  const visibleItems = group
+    .slice(0, 8)
+    .map(({ marker }) => `${marker.event.position} · ${marker.event.name} · ${marker.event.eventRef}`)
+    .join('\n')
+  const remainder = group.length > 8 ? `\n… ${group.length - 8} more` : ''
+  return `${group.length} observed event changes\n${visibleItems}${remainder}`
 }
 
 const syncBadge = (sync: ComponentSyncObservation | null): readonly [string, string] => {
@@ -540,6 +852,8 @@ const clientColor = (index: number): string => ['#088361', '#d8662c', '#9c3cc0',
 
 const formatDuration = (durationMs: number): string =>
   durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(durationMs >= 10_000 ? 1 : 2)}s` : `${Math.round(durationMs)}ms`
+
+const clamp = (value: number, minimum: number, maximum: number): number => Math.min(Math.max(value, minimum), maximum)
 
 const escapeMarkup = (value: string): string =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')

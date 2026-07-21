@@ -18,7 +18,10 @@
             open
             <input id="artifact-file" type="file" accept="application/json,.json" />
           </label>
-          <button id="load-default" type="button" title="Load generated offline writer recovery run">example</button>
+          <select id="example-artifact" aria-label="Saved scenario run" disabled>
+            <option>saved runs</option>
+          </select>
+          <button id="load-example" type="button" disabled>load</button>
           <button id="play" type="button" disabled>play</button>
         </div>
       </header>

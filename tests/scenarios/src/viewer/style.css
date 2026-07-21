@@ -45,12 +45,14 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
 button,
-.file-button {
+.file-button,
+select {
   border: 1px solid var(--line-strong);
   border-radius: 2px;
   background: transparent;
@@ -67,6 +69,10 @@ button:hover,
 
 button:disabled {
   cursor: default;
+  opacity: 0.35;
+}
+
+select:disabled {
   opacity: 0.35;
 }
 
@@ -231,10 +237,12 @@ h2 {
 
 .topology {
   display: grid;
+  min-width: 0;
 }
 
 .component-card {
   border-top: 1px solid var(--line);
+  min-width: 0;
   padding: 18px 0 20px;
 }
 
@@ -262,13 +270,35 @@ h2 {
 }
 
 .eventlog {
-  align-items: center;
   border-left: 2px solid var(--component-color, var(--line-strong));
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  max-width: 100%;
   min-height: 28px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
   padding: 3px 0 3px 11px;
+  scrollbar-width: none;
+  width: 100%;
+}
+
+.eventlog-block {
+  min-width: 0;
+  width: 100%;
+}
+
+.eventlog::-webkit-scrollbar {
+  display: none;
+}
+
+.eventlog-track {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  justify-content: flex-end;
+  min-height: 22px;
+  min-width: 100%;
+  width: max-content;
 }
 
 .event-chip {
@@ -277,6 +307,7 @@ h2 {
   background: transparent;
   color: var(--text);
   cursor: pointer;
+  flex: 0 0 auto;
   font-size: 11px;
   padding: 3px 6px;
 }
@@ -344,12 +375,15 @@ h2 {
 }
 
 .timeline svg {
-  cursor: col-resize;
   display: block;
   min-width: 1000px;
   outline: none;
   touch-action: none;
   width: 100%;
+}
+
+.timeline .timeline-main {
+  cursor: col-resize;
 }
 
 .timeline svg:focus-visible {
@@ -369,39 +403,58 @@ h2 {
 
 .timeline .marker {
   cursor: pointer;
-  translate: 0 var(--stack-collapsed, 0);
-  transition: translate 130ms ease-out;
 }
 
-.timeline .marker-stack-hit-target {
-  fill: transparent;
-  pointer-events: all;
+.timeline .marker.future {
+  opacity: 0.22;
 }
 
-.timeline .marker-stack.stacked:hover .marker {
-  translate: 0 var(--stack-expanded, 0);
-}
-
-.timeline .marker-stack.stacked:hover .marker rect {
-  stroke-width: 1.5;
-}
-
-.timeline .marker rect {
+.timeline .marker-label rect {
   fill: var(--background);
   stroke: var(--line-strong);
 }
 
-.timeline .marker.pending rect {
+.timeline .marker-label.pending rect {
   fill: var(--background);
   stroke: var(--warn);
 }
 
-.timeline .marker.selected rect {
+.timeline .marker-label.selected rect {
   fill: var(--text);
   stroke: var(--text);
 }
 
-.timeline .marker.selected text {
+.timeline .marker-label.selected text {
+  fill: var(--background);
+}
+
+.timeline .event-point circle {
+  fill: var(--background);
+  stroke: var(--line-strong);
+  stroke-width: 1.35;
+}
+
+.timeline .event-point.pending circle {
+  stroke: var(--warn);
+}
+
+.timeline .event-point.aggregate circle {
+  fill: var(--code-background);
+}
+
+.timeline .event-point.selected circle {
+  fill: var(--text);
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.timeline .event-point text {
+  fill: var(--muted);
+  font-size: 6px;
+  pointer-events: none;
+}
+
+.timeline .event-point.selected text {
   fill: var(--background);
 }
 
@@ -481,6 +534,62 @@ h2 {
 .timeline .trace-dot.selected {
   stroke: var(--text);
   stroke-width: 2;
+}
+
+.timeline .range-navigator {
+  cursor: default;
+  margin-top: 6px;
+}
+
+.timeline .range-track {
+  fill: var(--code-background);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.timeline .range-density-bar {
+  fill: var(--line-strong);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.timeline .range-window {
+  cursor: grab;
+  fill: #a04ad4;
+  fill-opacity: 0.08;
+  stroke: #a04ad4;
+  stroke-width: 1.25;
+}
+
+.timeline .range-window:active {
+  cursor: grabbing;
+}
+
+.timeline .range-handle {
+  cursor: ew-resize;
+}
+
+.timeline .range-handle-hit {
+  fill: transparent;
+}
+
+.timeline .range-handle line {
+  stroke: #a04ad4;
+  stroke-width: 2.5;
+}
+
+.timeline .range-cursor {
+  pointer-events: none;
+  stroke: var(--text);
+  stroke-dasharray: 2 3;
+  stroke-width: 1.25;
+}
+
+.timeline .range-label,
+.timeline .range-summary {
+  fill: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
 }
 
 .details {

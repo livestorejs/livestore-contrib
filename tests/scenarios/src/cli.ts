@@ -7,9 +7,11 @@ import { PlatformNode } from '@livestore/utils/node'
 
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
+import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
+  type RunScenarioOptions,
   runBrowserLocalSyncCfScenario,
   runInProcessLocalSyncCfScenario,
   runInProcessScenario,
@@ -29,9 +31,10 @@ interface CliOptions {
 const scenarios: Readonly<Record<string, ScenarioAst>> = {
   [offlineWriterRecovery.id]: offlineWriterRecovery,
   [browserMultiSessionRecovery.id]: browserMultiSessionRecovery,
+  [sharedTodoWorkday.id]: sharedTodoWorkday,
 }
 
-const runSelectedScenario = (options: CliOptions, runOptions: { runId: string; sourceRevision: string }) => {
+const runSelectedScenario = (options: CliOptions, runOptions: RunScenarioOptions) => {
   switch (options.profile) {
     case 'in-process':
       return options.backend === 'mock'
@@ -115,12 +118,21 @@ const program = Effect.gen(function* () {
   const runOptions = {
     runId: `${cli.scenario.id}-${cli.profile}-${Date.now()}`,
     sourceRevision: process.env.GITHUB_SHA ?? 'working-tree',
+    onProgress:
+      process.env.SCENARIO_PROGRESS === '1'
+        ? (progress: Parameters<NonNullable<RunScenarioOptions['onProgress']>>[0]) => {
+            console.log(
+              `${progress.stage === 'started' ? '→' : '✓'} ${progress.stepNumber}/${progress.totalSteps} ${progress.phaseId}/${progress.stepId}`,
+            )
+          }
+        : undefined,
   }
   const artifact = yield* runSelectedScenario(cli, runOptions)
   const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(ScenarioRunArtifact))(artifact)
   yield* Effect.tryPromise(async () => {
     await fs.mkdir(path.dirname(cli.outputPath), { recursive: true })
     await fs.writeFile(cli.outputPath, `${encoded}\n`, 'utf8')
+    await refreshArtifactCatalog(cli.outputPath)
   })
   yield* Effect.sync(() => {
     console.log(`Scenario ${artifact.status}: ${artifact.descriptor.scenarioId}`)
@@ -129,5 +141,53 @@ const program = Effect.gen(function* () {
     console.log(`Artifact: ${cli.outputPath}`)
   })
 }).pipe(Effect.withSpan('scenario-cli'), Effect.scoped, Effect.provide(OtelLiveDummy))
+
+interface ArtifactCatalogEntry {
+  readonly file: string
+  readonly label: string
+  readonly scenarioId: string
+  readonly profile: ParticipantProfile
+  readonly backend: SyncBackend
+  readonly applicationEventCount: number
+  readonly traceRecordCount: number
+}
+
+/** Keeps the viewer catalog derived from the artifacts on disk, including artifacts from earlier runs. */
+const refreshArtifactCatalog = async (outputPath: string): Promise<void> => {
+  const artifactDirectory = path.resolve(import.meta.dirname, '../artifacts')
+  if (path.dirname(outputPath) !== artifactDirectory) return
+
+  const entries = await Promise.all(
+    (await fs.readdir(artifactDirectory, { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'catalog.json')
+      .map(async (entry): Promise<ArtifactCatalogEntry | undefined> => {
+        try {
+          const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(
+            await fs.readFile(path.join(artifactDirectory, entry.name), 'utf8'),
+          )
+          const profile = artifact.descriptor.execution.participantProfile
+          const backend = artifact.descriptor.execution.syncBackend
+          return {
+            file: entry.name,
+            label: `${artifact.descriptor.scenarioId} · ${profile} · ${backend}`,
+            scenarioId: artifact.descriptor.scenarioId,
+            profile,
+            backend,
+            applicationEventCount: artifact.trace.filter((record) => record.payload._tag === 'action.completed').length,
+            traceRecordCount: artifact.trace.length,
+          }
+        } catch {
+          return undefined
+        }
+      }),
+  )
+  const catalog = {
+    version: 1,
+    entries: entries
+      .filter((entry): entry is ArtifactCatalogEntry => entry !== undefined)
+      .toSorted((left, right) => left.label.localeCompare(right.label) || left.file.localeCompare(right.file)),
+  }
+  await fs.writeFile(path.join(artifactDirectory, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`, 'utf8')
+}
 
 PlatformNode.NodeRuntime.runMain(program)

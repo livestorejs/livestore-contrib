@@ -6,6 +6,7 @@ import { Effect, Exit, Schema } from '@livestore/utils/effect'
 import { makeMockScenarioBackend } from './backends.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
+import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { makeInProcessHost } from './host.ts'
 import { defineScenario, ScenarioRunArtifact } from './model.ts'
@@ -29,6 +30,35 @@ Vitest.describe('scenario model', () => {
   Vitest.it('validates and round-trips the versioned serializable AST', () => {
     const encoded = JSON.parse(JSON.stringify(offlineWriterRecovery))
     expect(defineScenario(encoded)).toEqual(offlineWriterRecovery)
+  })
+
+  Vitest.it('expands the shared workday into exactly 100 mixed application actions', () => {
+    const actionSteps = sharedTodoWorkday.phases
+      .flatMap((phase) => phase.steps)
+      .filter((step) => step._tag === 'action')
+
+    expect(actionSteps).toHaveLength(100)
+    expect(new Set(actionSteps.map((step) => step.action))).toEqual(
+      new Set(['createTodo', 'editTodo', 'setTodoCompleted', 'deleteTodo']),
+    )
+    expect(
+      Object.fromEntries(
+        [...Map.groupBy(actionSteps, (step) => step.action).entries()].map(([key, value]) => [key, value.length]),
+      ),
+    ).toEqual({
+      createTodo: 30,
+      editTodo: 28,
+      setTodoCompleted: 32,
+      deleteTodo: 10,
+    })
+    const completionInput = Schema.Struct({ id: Schema.String, completed: Schema.Boolean })
+    expect(
+      actionSteps
+        .filter((step) => step.action === 'setTodoCompleted')
+        .map((step) => Schema.decodeUnknownSync(completionInput)(step.input).completed)
+        .filter((completed) => completed === false),
+    ).toHaveLength(8)
+    expect(sharedTodoWorkday.topology.clients).toHaveLength(3)
   })
 })
 

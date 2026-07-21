@@ -8,6 +8,18 @@ export const todoEvents = {
     name: 'v1.TodoCreated',
     schema: Schema.Struct({ id: Schema.String, text: Schema.String }),
   }),
+  textChanged: Events.synced({
+    name: 'v1.TodoTextChanged',
+    schema: Schema.Struct({ id: Schema.String, text: Schema.String }),
+  }),
+  completionChanged: Events.synced({
+    name: 'v1.TodoCompletionChanged',
+    schema: Schema.Struct({ id: Schema.String, completed: Schema.Boolean }),
+  }),
+  deleted: Events.synced({
+    name: 'v1.TodoDeleted',
+    schema: Schema.Struct({ id: Schema.String }),
+  }),
 }
 
 export const todosTable = State.SQLite.table({
@@ -21,6 +33,9 @@ export const todosTable = State.SQLite.table({
 
 const materializers = State.SQLite.materializers(todoEvents, {
   'v1.TodoCreated': ({ id, text }) => todosTable.insert({ id, text, completed: false }),
+  'v1.TodoTextChanged': ({ id, text }) => todosTable.update({ text }).where({ id }),
+  'v1.TodoCompletionChanged': ({ id, completed }) => todosTable.update({ completed }).where({ id }),
+  'v1.TodoDeleted': ({ id }) => todosTable.delete().where({ id }),
 })
 
 export const todoSchema = makeSchema({
@@ -28,16 +43,31 @@ export const todoSchema = makeSchema({
   state: State.SQLite.makeState({ tables: { todos: todosTable }, materializers }),
 })
 
-const TodoActionInput = Schema.Struct({ id: Schema.String, text: Schema.String })
+const CreateTodoInput = Schema.Struct({ id: Schema.String, text: Schema.String })
+const EditTodoInput = Schema.Struct({ id: Schema.String, text: Schema.String })
+const SetTodoCompletedInput = Schema.Struct({ id: Schema.String, completed: Schema.Boolean })
+const DeleteTodoInput = Schema.Struct({ id: Schema.String })
 const TodoRows = Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, completed: Schema.Boolean }))
 
 export const todoApplication = defineApplication({
   id: 'scenario-todo-app',
   schema: todoSchema,
   actions: {
-    createTodo: defineAction<typeof todoSchema, typeof TodoActionInput>({
-      input: TodoActionInput,
+    createTodo: defineAction<typeof todoSchema, typeof CreateTodoInput>({
+      input: CreateTodoInput,
       run: ({ store, input }) => Effect.sync(() => store.commit(todoEvents.created(input))),
+    }),
+    editTodo: defineAction<typeof todoSchema, typeof EditTodoInput>({
+      input: EditTodoInput,
+      run: ({ store, input }) => Effect.sync(() => store.commit(todoEvents.textChanged(input))),
+    }),
+    setTodoCompleted: defineAction<typeof todoSchema, typeof SetTodoCompletedInput>({
+      input: SetTodoCompletedInput,
+      run: ({ store, input }) => Effect.sync(() => store.commit(todoEvents.completionChanged(input))),
+    }),
+    deleteTodo: defineAction<typeof todoSchema, typeof DeleteTodoInput>({
+      input: DeleteTodoInput,
+      run: ({ store, input }) => Effect.sync(() => store.commit(todoEvents.deleted(input))),
     }),
   },
   inspectors: {
