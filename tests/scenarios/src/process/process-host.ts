@@ -289,7 +289,7 @@ const waitForExit = (child: ChildProcess): Effect.Effect<void, ScenarioOperation
   })
 
 const processClientEntry = (): string => {
-  const extension = import.meta.url.endsWith('.ts') ? 'ts' : 'js'
+  const extension = import.meta.url.endsWith('.ts') === true ? 'ts' : 'js'
   return fileURLToPath(new URL(`./process-client.${extension}`, import.meta.url))
 }
 

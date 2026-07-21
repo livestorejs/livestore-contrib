@@ -2,7 +2,8 @@ import { makeInMemoryAdapter } from '@livestore/adapter-web'
 import { SyncBackend, type UnknownError } from '@livestore/common'
 import type { LiveStoreSchema } from '@livestore/common/schema'
 import { createStore, type Store } from '@livestore/livestore'
-import { Effect, type OtelTracer, Schema, type Scope, SubscriptionRef } from '@livestore/utils/effect'
+import type { Schema } from '@livestore/utils/effect'
+import { Effect, type OtelTracer, type Scope, SubscriptionRef } from '@livestore/utils/effect'
 
 import {
   dispatchApplicationAction,

@@ -11,6 +11,7 @@ import {
   type FileSystem,
   type HttpClient,
   KeyValueStore,
+  Layer,
   Option,
   type Schema,
   type Scope,
@@ -88,8 +89,7 @@ export const makeLocalSyncCfScenarioBackend: Effect.Effect<
   const makeWsBackend = makeWsSync({ url: server.url })
   const makeBackend = (args: SyncBackend.MakeBackendArgs) =>
     makeWsBackend({ ...args, storeId: physicalStoreId(args.storeId) }).pipe(
-      Effect.provide(FetchHttpClient.layer),
-      Effect.provide(KeyValueStore.layerMemory),
+      Effect.provide(Layer.mergeAll(FetchHttpClient.layer, KeyValueStore.layerMemory)),
     )
   const observers = new Map<string, SyncBackend.SyncBackend<SyncMessage.SyncMetadata>>()
 

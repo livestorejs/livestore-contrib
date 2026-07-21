@@ -58,6 +58,9 @@
       "path": "../../packages/@livestore/sqlite-wasm"
     },
     {
+      "path": "../../packages/@livestore/sync-cf"
+    },
+    {
       "path": "../../packages/@livestore/utils"
     },
     {

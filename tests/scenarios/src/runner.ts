@@ -1,7 +1,7 @@
 import type { LiveStoreSchema } from '@livestore/common/schema'
 import { EventSequenceNumber } from '@livestore/common/schema'
-import { WranglerDevServer } from '@livestore/utils-dev/wrangler'
-import { Effect, FetchHttpClient, type OtelTracer, Schema, type Scope } from '@livestore/utils/effect'
+import type { WranglerDevServer } from '@livestore/utils-dev/wrangler'
+import { Effect, FetchHttpClient, Layer, type OtelTracer, Schema, type Scope } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
 import { type ApplicationDefinition, ScenarioOperationError } from './application.ts'
@@ -66,8 +66,7 @@ export const runInProcessLocalSyncCfScenario = <TSchema extends LiveStoreSchema>
 > =>
   Effect.gen(function* () {
     const backend = yield* makeLocalSyncCfScenarioBackend.pipe(
-      Effect.provide(PlatformNode.NodeServices.layer),
-      Effect.provide(FetchHttpClient.layer),
+      Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer, FetchHttpClient.layer)),
     )
     const host = yield* makeInProcessHost({ application: args.application, backend })
     return yield* runScenario({
@@ -96,8 +95,7 @@ export const runProcessLocalSyncCfScenario = (args: {
 > =>
   Effect.gen(function* () {
     const backend = yield* makeLocalSyncCfScenarioBackend.pipe(
-      Effect.provide(PlatformNode.NodeServices.layer),
-      Effect.provide(FetchHttpClient.layer),
+      Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer, FetchHttpClient.layer)),
     )
     const host = yield* makeProcessHost({ applicationId: args.applicationId, backend })
     return yield* runScenario({
@@ -126,8 +124,7 @@ export const runBrowserLocalSyncCfScenario = (args: {
 > =>
   Effect.gen(function* () {
     const backend = yield* makeLocalSyncCfScenarioBackend.pipe(
-      Effect.provide(PlatformNode.NodeServices.layer),
-      Effect.provide(FetchHttpClient.layer),
+      Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer, FetchHttpClient.layer)),
     )
     const host = yield* makeBrowserHost({ applicationId: args.applicationId, backend })
     return yield* runScenario({
@@ -345,9 +342,10 @@ const executeStep = (args: {
           clientId: step.target.clientId,
           sessionId: step.target.sessionId,
           phaseId: args.phaseId,
-          payload: restarting
-            ? { _tag: 'lifecycle.session-restart.requested' }
-            : { _tag: 'lifecycle.session-stop.requested' },
+          payload:
+            restarting === true
+              ? { _tag: 'lifecycle.session-restart.requested' }
+              : { _tag: 'lifecycle.session-stop.requested' },
         })
         const command = { operationId: step.id, target: step.target }
         if (restarting === true) yield* args.host.restartSession(command)
@@ -358,7 +356,8 @@ const executeStep = (args: {
           clientId: step.target.clientId,
           sessionId: step.target.sessionId,
           phaseId: args.phaseId,
-          payload: restarting ? { _tag: 'lifecycle.session-restarted' } : { _tag: 'lifecycle.session-stopped' },
+          payload:
+            restarting === true ? { _tag: 'lifecycle.session-restarted' } : { _tag: 'lifecycle.session-stopped' },
         })
       })
     }

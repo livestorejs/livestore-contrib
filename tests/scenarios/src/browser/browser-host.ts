@@ -12,6 +12,7 @@ import { ScenarioOperationError } from '../application.ts'
 import type { ScenarioBackend } from '../backends.ts'
 import type { ParticipantHost } from '../host.ts'
 import {
+  type ClientSystemObservation,
   ClientSystemObservation as ClientSystemObservationSchema,
   type HostAcknowledgement,
   type HostCapabilities,
@@ -233,7 +234,7 @@ interface BrowserClientController {
   readonly stopSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
   readonly restartSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
   readonly restart: Effect.Effect<void, ScenarioOperationError>
-  readonly observe: Effect.Effect<typeof ClientSystemObservationSchema.Type, ScenarioOperationError>
+  readonly observe: Effect.Effect<ClientSystemObservation, ScenarioOperationError>
   readonly shutdown: Effect.Effect<void, ScenarioOperationError>
 }
 
@@ -444,8 +445,8 @@ const startFixtureServer = (args: {
           logLevel: 'error',
           server: { host: '127.0.0.1', port: 0 },
           define: {
-            __SCENARIO_SYNC_URL__: JSON.stringify(args.backendUrl),
-            __SCENARIO_STORE_SUFFIX__: JSON.stringify(args.storeIdSuffix),
+            __SCENARIO_SYNC_URL__: jsonStringify(args.backendUrl),
+            __SCENARIO_STORE_SUFFIX__: jsonStringify(args.storeIdSuffix),
           },
         })
         await server.listen()
@@ -477,7 +478,7 @@ const getClient = (
 
 const reconcileClientObservation =
   (eventRefs: ReturnType<typeof makeEventRefRegistry>) =>
-  (client: typeof ClientSystemObservationSchema.Type): typeof ClientSystemObservationSchema.Type => ({
+  (client: ClientSystemObservation): ClientSystemObservation => ({
     ...client,
     leader: { ...client.leader, events: eventRefs.reconcileObservedEvents(client.leader.events) },
     sessions: client.sessions.map((session) => ({
@@ -487,10 +488,10 @@ const reconcileClientObservation =
   })
 
 const hydrateConfirmedEvents = (
-  client: typeof ClientSystemObservationSchema.Type,
+  client: ClientSystemObservation,
   backendEvents: ReadonlyArray<LiveStoreEvent.Global.Encoded>,
   eventRefs: ReturnType<typeof makeEventRefRegistry>,
-): typeof ClientSystemObservationSchema.Type => {
+): ClientSystemObservation => {
   const confirmedThrough = (head: string) => {
     const globalHead = EventSequenceNumber.Client.fromString(head).global
     return eventRefs.observeGlobalEvents(backendEvents.filter((event) => event.seqNum <= globalHead))
@@ -512,10 +513,7 @@ const hydrateConfirmedEvents = (
   }
 }
 
-const deriveLeaderObservation = (
-  client: typeof ClientSystemObservationSchema.Type,
-  backendHead: number,
-): typeof ClientSystemObservationSchema.Type => {
+const deriveLeaderObservation = (client: ClientSystemObservation, backendHead: number): ClientSystemObservation => {
   const localHead = EventSequenceNumber.Client.fromString(client.leader.upstreamHead)
   return {
     ...client,
@@ -527,6 +525,8 @@ const deriveLeaderObservation = (
     },
   }
 }
+
+const jsonStringify = Schema.encodeSync(Schema.UnknownFromJsonString)
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 

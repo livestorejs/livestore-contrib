@@ -9,6 +9,7 @@ import {
   Exit,
   FetchHttpClient,
   KeyValueStore,
+  Layer,
   type OtelTracer,
   Scope,
   SubscriptionRef,
@@ -64,7 +65,7 @@ const handle = async (request: ProcessClientRequest): Promise<ProcessClientResul
           storeId: `${request.command.storeId}-${request.command.backend.storeIdSuffix}`,
           clientId,
           payload: undefined,
-        }).pipe(Effect.provide(FetchHttpClient.layer), Effect.provide(KeyValueStore.layerMemory)),
+        }).pipe(Effect.provide(Layer.mergeAll(FetchHttpClient.layer, KeyValueStore.layerMemory))),
       )
       const backend = makeConnectivityControlledBackend({ clientId, connectivity, underlying })
       const store = await run(
