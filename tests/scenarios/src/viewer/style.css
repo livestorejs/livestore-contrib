@@ -109,6 +109,11 @@ section[aria-labelledby] {
   padding-top: 4px;
 }
 
+.toolbar-copy {
+  flex: 1 1 auto;
+  min-width: 240px;
+}
+
 h1,
 h2,
 p {
@@ -141,9 +146,42 @@ h2 {
 
 .controls {
   align-items: center;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  flex: 0 1 660px;
   gap: 7px;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  min-width: 0;
+}
+
+.select-control {
+  color: var(--muted);
+  min-width: 0;
+  position: relative;
+}
+
+.select-control::after {
+  border-bottom: 1px solid currentColor;
+  border-right: 1px solid currentColor;
+  content: '';
+  height: 6px;
+  pointer-events: none;
+  position: absolute;
+  right: 13px;
+  top: calc(50% - 5px);
+  transform: rotate(45deg);
+  width: 6px;
+}
+
+#example-artifact {
+  appearance: none;
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 34px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
 }
 
 .section-heading {
@@ -154,6 +192,12 @@ h2 {
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+.timeline-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  width: 100%;
 }
 
 .trace-name {
@@ -169,10 +213,21 @@ h2 {
   align-items: center;
   color: var(--muted);
   display: flex;
-  flex-wrap: wrap;
   font-size: 11px;
   gap: 14px;
-  justify-content: flex-end;
+  justify-content: center;
+  justify-self: center;
+  white-space: nowrap;
+}
+
+#record-label {
+  justify-self: end;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mode-switch {
@@ -295,7 +350,7 @@ h2 {
   display: flex;
   flex-wrap: nowrap;
   gap: 5px;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-height: 22px;
   min-width: 100%;
   width: max-content;
@@ -626,6 +681,21 @@ h2 {
 
   .section-heading {
     margin-bottom: 14px;
+  }
+
+  .timeline-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .timeline-meta,
+  #record-label {
+    justify-self: start;
+  }
+
+  .controls {
+    flex: none;
+    grid-template-columns: auto minmax(0, 1fr);
+    width: 100%;
   }
 
   .role-row {

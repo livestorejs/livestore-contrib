@@ -9,7 +9,7 @@
   <body>
     <main class="shell">
       <header class="toolbar">
-        <div>
+        <div class="toolbar-copy">
           <h1 id="run-title">scenario</h1>
           <p id="run-summary" class="summary">Load a completed run artifact to begin.</p>
         </div>
@@ -18,9 +18,11 @@
             open
             <input id="artifact-file" type="file" accept="application/json,.json" />
           </label>
-          <select id="example-artifact" aria-label="Saved scenario run" disabled>
-            <option>saved runs</option>
-          </select>
+          <div class="select-control">
+            <select id="example-artifact" aria-label="Saved scenario run" disabled>
+              <option>saved runs</option>
+            </select>
+          </div>
           <button id="load-example" type="button" disabled>load</button>
           <button id="play" type="button" disabled>play</button>
         </div>
@@ -35,7 +37,7 @@
       </section>
 
       <section aria-labelledby="timeline-heading">
-        <div class="section-heading">
+        <div class="section-heading timeline-heading">
           <div class="timeline-heading-copy">
             <h2 id="timeline-heading">Timeline</h2>
             <p id="trace-name" class="trace-name">No trace loaded</p>
@@ -50,8 +52,8 @@
               <button id="time-raw" type="button" aria-pressed="false">raw</button>
             </div>
             <span id="cursor-label">0 / 0</span>
-            <span id="record-label">No observation selected</span>
           </div>
+          <span id="record-label">No observation selected</span>
         </div>
         <p id="timeline-mode-note" class="selection-copy">
           Observation captures are aligned; no causal arrows are inferred.
