@@ -5,6 +5,7 @@ import {
   backendComponentKey,
   deriveAdaptiveTimeLayout,
   deriveEventTimeline,
+  derivePlaybackMoments,
   deriveTraceCaptures,
   leaderComponentKey,
   projectTraceAt,
@@ -35,6 +36,10 @@ const modeTimeButton = requireElement('mode-time', HTMLButtonElement)
 const timeScaleSwitch = requireElement('time-scale-switch', HTMLElement)
 const timeFitButton = requireElement('time-fit', HTMLButtonElement)
 const timeRawButton = requireElement('time-raw', HTMLButtonElement)
+const visibilitySystemButton = requireElement('visibility-system', HTMLButtonElement)
+const visibilityAllButton = requireElement('visibility-all', HTMLButtonElement)
+const playbackMomentsButton = requireElement('playback-moments', HTMLButtonElement)
+const playbackRecordsButton = requireElement('playback-records', HTMLButtonElement)
 const timelineModeNote = requireElement('timeline-mode-note', HTMLElement)
 const runStatus = requireElement('run-status', HTMLElement)
 const systemState = requireElement('system-state', HTMLElement)
@@ -48,6 +53,9 @@ let selectedEventRef: string | undefined
 let playTimer: number | undefined
 let timelineMode: 'flow' | 'time' = 'flow'
 let timeScaleMode: 'fit' | 'raw' = 'fit'
+let traceVisibility: 'system' | 'all' = 'system'
+let playbackMode: 'moments' | 'records' = 'moments'
+let playbackMoments: ReturnType<typeof derivePlaybackMoments> = []
 let timelineRecordPositions: ReadonlyArray<{ readonly index: number; readonly x: number }> = []
 let timelineViewport = { start: 0, end: 1 }
 const eventlogScrollStates = new Map<string, { followTail: boolean; scrollLeft: number }>()
@@ -55,11 +63,21 @@ type PositionedTimelineMarker = {
   readonly marker: ReturnType<typeof deriveEventTimeline>[number]
   readonly x: number
 }
+type TimelineLane = {
+  readonly key: string
+  readonly label: string
+  readonly color: string
+  readonly role: 'backend' | 'leader' | 'session'
+}
 
 modeFlowButton.addEventListener('click', () => setTimelineMode('flow'))
 modeTimeButton.addEventListener('click', () => setTimelineMode('time'))
 timeFitButton.addEventListener('click', () => setTimeScaleMode('fit'))
 timeRawButton.addEventListener('click', () => setTimeScaleMode('raw'))
+visibilitySystemButton.addEventListener('click', () => setTraceVisibility('system'))
+visibilityAllButton.addEventListener('click', () => setTraceVisibility('all'))
+playbackMomentsButton.addEventListener('click', () => setPlaybackMode('moments'))
+playbackRecordsButton.addEventListener('click', () => setPlaybackMode('records'))
 
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0]
@@ -120,14 +138,20 @@ playButton.addEventListener('click', () => {
     return
   }
   if (artifact === undefined) return
-  if (cursorIndex >= artifact.trace.length - 1) cursorIndex = -1
+  const indexes = playbackCursorIndexes()
+  if (cursorIndex >= (indexes.at(-1) ?? -1)) cursorIndex = -1
   playButton.textContent = 'pause'
   playTimer = window.setInterval(() => {
-    if (artifact === undefined || cursorIndex >= artifact.trace.length - 1) {
+    if (artifact === undefined) {
       stopPlayback()
       return
     }
-    cursorIndex += 1
+    const nextCursor = playbackCursorIndexes().find((index) => index > cursorIndex)
+    if (nextCursor === undefined) {
+      stopPlayback()
+      return
+    }
+    cursorIndex = nextCursor
     render()
   }, 180)
 })
@@ -135,6 +159,7 @@ playButton.addEventListener('click', () => {
 const loadArtifactJson = (input: string): void => {
   stopPlayback()
   artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(input)
+  playbackMoments = derivePlaybackMoments({ scenario: artifact.scenario, trace: artifact.trace })
   cursorIndex = artifact.trace.length - 1
   selectedEventRef = undefined
   timelineViewport = { start: 0, end: 1 }
@@ -179,6 +204,29 @@ const setTimeScaleMode = (mode: 'fit' | 'raw'): void => {
   render()
 }
 
+const setTraceVisibility = (visibility: 'system' | 'all'): void => {
+  traceVisibility = visibility
+  visibilitySystemButton.setAttribute('aria-pressed', String(visibility === 'system'))
+  visibilityAllButton.setAttribute('aria-pressed', String(visibility === 'all'))
+  render()
+}
+
+const setPlaybackMode = (mode: 'moments' | 'records'): void => {
+  stopPlayback()
+  playbackMode = mode
+  playbackMomentsButton.setAttribute('aria-pressed', String(mode === 'moments'))
+  playbackRecordsButton.setAttribute('aria-pressed', String(mode === 'records'))
+  render()
+}
+
+const playbackCursorIndexes = (): ReadonlyArray<number> => {
+  if (artifact === undefined) return []
+  if (playbackMode === 'moments' && playbackMoments.length > 0) {
+    return playbackMoments.map((moment) => moment.recordIndex)
+  }
+  return artifact.trace.map((record) => record.index)
+}
+
 const timeScaleDescription = (): string =>
   timeScaleMode === 'fit'
     ? 'Calibrated time with labelled long gaps compressed; the trace carpet retains raw elapsed time.'
@@ -186,14 +234,35 @@ const timeScaleDescription = (): string =>
 
 const render = (): void => {
   if (artifact === undefined) return
+  const trace = artifact.trace
   captureEventlogScrollState()
-  const projected = projectTraceAt({ scenario: artifact.scenario, trace: artifact.trace, cursorIndex })
-  const record = cursorIndex < 0 ? undefined : artifact.trace[cursorIndex]
+  const projected = projectTraceAt({ scenario: artifact.scenario, trace, cursorIndex })
+  const record = cursorIndex < 0 ? undefined : trace[cursorIndex]
+  const selectedMoment = playbackMoments.find((moment) => moment.recordIndex === cursorIndex)
+  const momentPosition = playbackMoments.findLastIndex((moment) => moment.recordIndex <= cursorIndex) + 1
+  const recordPosition = cursorIndex < 0 ? 0 : cursorIndex + 1
 
   cursorLabel.textContent =
-    cursorIndex < 0 ? `0 / ${artifact.trace.length}` : `${cursorIndex + 1} / ${artifact.trace.length}`
-  recordLabel.textContent = record?.payload._tag ?? 'No observation applied'
-  recordDetails.textContent = record === undefined ? 'No trace record selected.' : JSON.stringify(record, null, 2)
+    playbackMode === 'moments'
+      ? `${momentPosition} / ${playbackMoments.length} moments · ${recordPosition} / ${artifact.trace.length} records`
+      : `${recordPosition} / ${artifact.trace.length} records`
+  recordLabel.textContent =
+    playbackMode === 'moments' && selectedMoment !== undefined
+      ? selectedMoment.label
+      : (record?.payload._tag ?? 'No observation applied')
+  recordDetails.textContent =
+    record === undefined
+      ? 'No trace record selected.'
+      : selectedMoment !== undefined && selectedMoment.recordIndexes.length > 1
+        ? JSON.stringify(
+            {
+              moment: selectedMoment,
+              records: selectedMoment.recordIndexes.map((index) => trace[index]),
+            },
+            null,
+            2,
+          )
+        : JSON.stringify(record, null, 2)
   runStatus.textContent = projected.runStatus
   runStatus.className = `badge ${statusTone(projected.runStatus)}`
   systemState.className = 'topology'
@@ -274,16 +343,26 @@ const renderRole = (label: string, sync: ComponentSyncObservation | null): strin
 
 const renderTimeline = (): void => {
   if (artifact === undefined) return
-  const markers = deriveEventTimeline(artifact.trace)
-  const captures = deriveTraceCaptures(artifact.trace)
-  const lanes = [
-    { key: backendComponentKey, label: 'Backend', color: '#4169e1' },
+  const trace = artifact.trace
+  const markers = deriveEventTimeline(trace)
+  const captures = deriveTraceCaptures(trace)
+  const systemCaptureIds = new Set(
+    playbackMoments.flatMap((moment) => (moment.captureId === null ? [] : [moment.captureId])),
+  )
+  const lanes: ReadonlyArray<TimelineLane> = [
+    { key: backendComponentKey, label: 'Backend', color: '#4169e1', role: 'backend' },
     ...artifact.scenario.topology.clients.flatMap((client, index) => [
-      { key: leaderComponentKey(client.id), label: `${client.id} · Leader`, color: clientColor(index) },
+      {
+        key: leaderComponentKey(client.id),
+        label: `${client.id} · Leader`,
+        color: clientColor(index),
+        role: 'leader' as const,
+      },
       ...client.sessions.map((sessionId) => ({
         key: sessionComponentKey(client.id, sessionId),
-        label: `${client.id} · ${sessionId}`,
+        label: sessionId,
         color: clientColor(index),
+        role: 'session' as const,
       })),
     ]),
   ]
@@ -346,9 +425,11 @@ const renderTimeline = (): void => {
     timelineMode === 'time' && timeScaleMode === 'fit'
       ? rawOverviewXForTime(recordTimes[recordIndex] ?? timeMin)
       : xForRecord(recordIndex)
-  timelineRecordPositions = artifact.trace
-    .filter((record) => isVisibleRecord(record.index))
-    .map((record) => ({ index: record.index, x: xForRecord(record.index) }))
+  const scrubRecordIndexes =
+    traceVisibility === 'system'
+      ? playbackMoments.map((moment) => moment.recordIndex)
+      : artifact.trace.map((record) => record.index)
+  timelineRecordPositions = scrubRecordIndexes.filter(isVisibleRecord).map((index) => ({ index, x: xForRecord(index) }))
 
   const positionedByLane = new Map(
     [...Map.groupBy(markers, (marker) => marker.componentKey)].map(([componentKey, laneMarkers]) => [
@@ -441,34 +522,68 @@ const renderTimeline = (): void => {
       : ''
 
   const captureGuides = captures
-    .filter((capture) => isVisibleRecord(capture.firstRecordIndex))
+    .filter(
+      (capture) =>
+        (traceVisibility === 'all' || systemCaptureIds.has(capture.captureId)) &&
+        isVisibleRecord(traceVisibility === 'system' ? capture.lastRecordIndex : capture.firstRecordIndex),
+    )
     .map((capture) => {
-      const x = xForRecord(capture.firstRecordIndex)
+      const x = xForRecord(traceVisibility === 'system' ? capture.lastRecordIndex : capture.firstRecordIndex)
       return `<line class="capture-guide" x1="${x}" x2="${x}" y1="12" y2="${carpetTop - 8}"><title>capture ${capture.captureIndex + 1} · non-atomic sampling pass</title></line>`
     })
     .join('')
 
   const captureStack = new Map<string, number>()
-  const traceCarpet = artifact.trace
-    .filter((record) => (timelineMode === 'time' && timeScaleMode === 'fit') || isVisibleRecord(record.index))
-    .map((record) => {
-      const stack = record.captureId === null ? 0 : (captureStack.get(record.captureId) ?? 0)
-      if (record.captureId !== null) captureStack.set(record.captureId, stack + 1)
-      const y = carpetTop + 15 + (stack % 4) * 7
-      return `<circle
-        class="trace-dot ${record.evidence} ${record.index === cursorIndex ? 'selected' : ''}"
-        data-record-index="${record.index}"
-        cx="${xForCarpetRecord(record.index)}"
-        cy="${y}"
-        r="2.8"
-      ><title>#${record.index + 1} · ${escapeMarkup(record.payload._tag)} · ${escapeMarkup(record.evidence)}</title></circle>`
+  const traceCarpet =
+    traceVisibility === 'system'
+      ? playbackMoments
+          .filter(
+            (moment) => (timelineMode === 'time' && timeScaleMode === 'fit') || isVisibleRecord(moment.recordIndex),
+          )
+          .map((moment) => {
+            const record = trace[moment.recordIndex]!
+            return `<circle
+              class="trace-dot system-moment ${record.evidence} ${moment.recordIndexes.includes(cursorIndex) === true ? 'selected' : ''}"
+              data-record-index="${moment.recordIndex}"
+              cx="${xForCarpetRecord(moment.recordIndex)}"
+              cy="${carpetTop + 15}"
+              r="3.2"
+            ><title>moment ${moment.momentIndex + 1} · ${escapeMarkup(moment.label)} · record ${moment.recordIndex + 1}</title></circle>`
+          })
+          .join('')
+      : artifact.trace
+          .filter((record) => (timelineMode === 'time' && timeScaleMode === 'fit') || isVisibleRecord(record.index))
+          .map((record) => {
+            const stack = record.captureId === null ? 0 : (captureStack.get(record.captureId) ?? 0)
+            if (record.captureId !== null) captureStack.set(record.captureId, stack + 1)
+            const y = carpetTop + 15 + (stack % 4) * 7
+            return `<circle
+              class="trace-dot ${record.evidence} ${record.index === cursorIndex ? 'selected' : ''}"
+              data-record-index="${record.index}"
+              cx="${xForCarpetRecord(record.index)}"
+              cy="${y}"
+              r="2.8"
+            ><title>#${record.index + 1} · ${escapeMarkup(record.payload._tag)} · ${escapeMarkup(record.evidence)}</title></circle>`
+          })
+          .join('')
+
+  const hierarchySvg = artifact.scenario.topology.clients
+    .map((client) => {
+      if (client.sessions.length === 0) return ''
+      const leaderY = yAt(leaderComponentKey(client.id))
+      const sessionYs = client.sessions.map((sessionId) => yAt(sessionComponentKey(client.id, sessionId)))
+      const connectorX = 19
+      const branchEndX = 30
+      return `
+        <path class="lane-hierarchy" d="M ${connectorX} ${leaderY + 11} V ${sessionYs.at(-1)!}" />
+        ${sessionYs.map((sessionY) => `<path class="lane-hierarchy" d="M ${connectorX} ${sessionY} H ${branchEndX}" />`).join('')}`
     })
     .join('')
 
   const lanesSvg = lanes
     .map(
       (lane) => `
-        <text class="lane-label" x="8" y="${yAt(lane.key) + 4}">${escapeMarkup(lane.label)}</text>
+        <text class="lane-label ${lane.role}" x="${lane.role === 'session' ? 36 : 8}" y="${yAt(lane.key) + 4}">${escapeMarkup(lane.label)}</text>
         <line x1="${left}" x2="${width - right}" y1="${yAt(lane.key)}" y2="${yAt(lane.key)}" stroke="${lane.color}" stroke-width="2" />`,
     )
     .join('')
@@ -512,10 +627,11 @@ const renderTimeline = (): void => {
       aria-valuetext="${escapeMarkup(recordLabel.textContent ?? '')}"
     >
       ${compressedGaps}
+      ${hierarchySvg}
       ${lanesSvg}
       ${captureGuides}
       ${markerSvg}
-      <text class="trace-carpet-label" x="8" y="${carpetTop + 18}">${timelineMode === 'time' && timeScaleMode === 'fit' ? 'TRACE · RAW TIME' : 'TRACE'}</text>
+      <text class="trace-carpet-label" x="8" y="${carpetTop + 18}">${traceVisibility === 'system' ? 'SYSTEM' : 'TRACE'}${timelineMode === 'time' && timeScaleMode === 'fit' ? ' · RAW TIME' : ''}</text>
       ${traceCarpet}
       <g class="cursor-scrubber" aria-hidden="true">
         ${
@@ -583,7 +699,6 @@ const bindTimelineScrubber = (): void => {
   const svg = timeline.querySelector<SVGSVGElement>('svg.timeline-main')
   if (svg === null) return
 
-  const traceMax = Math.max(artifact.trace.length - 1, 0)
   const viewBoxWidth = 1400
 
   const moveCursor = (clientX: number, bounds: DOMRect): void => {
@@ -646,20 +761,21 @@ const bindTimelineScrubber = (): void => {
   })
 
   svg.addEventListener('keydown', (event) => {
+    const indexes = playbackCursorIndexes()
     const nextCursor =
       event.key === 'ArrowLeft'
-        ? cursorIndex - 1
+        ? indexes.findLast((index) => index < cursorIndex)
         : event.key === 'ArrowRight'
-          ? cursorIndex + 1
+          ? indexes.find((index) => index > cursorIndex)
           : event.key === 'Home'
-            ? 0
+            ? indexes[0]
             : event.key === 'End'
-              ? traceMax
+              ? indexes.at(-1)
               : undefined
     if (nextCursor === undefined) return
     event.preventDefault()
     stopPlayback()
-    cursorIndex = Math.min(Math.max(nextCursor, 0), traceMax)
+    cursorIndex = nextCursor
     render()
     timeline.querySelector<SVGSVGElement>('svg.timeline-main')?.focus()
   })

@@ -43,13 +43,30 @@
             <p id="trace-name" class="trace-name">No trace loaded</p>
           </div>
           <div class="timeline-meta">
-            <div class="mode-switch" aria-label="Timeline projection">
-              <button id="mode-flow" type="button" aria-pressed="true">flow</button>
-              <button id="mode-time" type="button" aria-pressed="false">time</button>
+            <div class="mode-control">
+              <span class="mode-label">show</span>
+              <div class="mode-switch" aria-label="Trace visibility">
+                <button id="visibility-system" type="button" aria-pressed="true">system</button>
+                <button id="visibility-all" type="button" aria-pressed="false">all</button>
+              </div>
             </div>
-            <div id="time-scale-switch" class="mode-switch time-scale-switch" aria-label="Time scale" hidden>
-              <button id="time-fit" type="button" aria-pressed="true">fit</button>
-              <button id="time-raw" type="button" aria-pressed="false">raw</button>
+            <div class="mode-control">
+              <span class="mode-label">play</span>
+              <div class="mode-switch" aria-label="Playback stepping">
+                <button id="playback-moments" type="button" aria-pressed="true">moments</button>
+                <button id="playback-records" type="button" aria-pressed="false">records</button>
+              </div>
+            </div>
+            <div class="mode-control">
+              <span class="mode-label">layout</span>
+              <div class="mode-switch" aria-label="Timeline projection">
+                <button id="mode-flow" type="button" aria-pressed="true">flow</button>
+                <button id="mode-time" type="button" aria-pressed="false">time</button>
+              </div>
+              <div id="time-scale-switch" class="mode-switch time-scale-switch" aria-label="Time scale" hidden>
+                <button id="time-fit" type="button" aria-pressed="true">fit</button>
+                <button id="time-raw" type="button" aria-pressed="false">raw</button>
+              </div>
             </div>
             <span id="cursor-label">0 / 0</span>
           </div>

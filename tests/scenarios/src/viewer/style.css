@@ -214,10 +214,23 @@ h2 {
   color: var(--muted);
   display: flex;
   font-size: 11px;
-  gap: 14px;
+  gap: 12px;
   justify-content: center;
   justify-self: center;
   white-space: nowrap;
+}
+
+.mode-control {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.mode-label {
+  color: var(--line-strong);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 #record-label {
@@ -292,22 +305,15 @@ h2 {
 
 .topology {
   display: grid;
+  gap: 12px;
   min-width: 0;
 }
 
 .component-card {
-  border-top: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 2px;
   min-width: 0;
-  padding: 18px 0 20px;
-}
-
-.component-card:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.component-card:last-child {
-  padding-bottom: 0;
+  padding: 14px 16px 16px;
 }
 
 .component-title {
@@ -454,6 +460,17 @@ h2 {
 
 .timeline .lane-label {
   font-weight: 600;
+}
+
+.timeline .lane-label.session {
+  font-weight: 500;
+}
+
+.timeline .lane-hierarchy {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .timeline .marker {
@@ -690,6 +707,11 @@ h2 {
   .timeline-meta,
   #record-label {
     justify-self: start;
+  }
+
+  .timeline-meta {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .controls {

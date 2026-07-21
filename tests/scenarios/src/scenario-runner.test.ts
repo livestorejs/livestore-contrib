@@ -14,6 +14,7 @@ import {
   deriveAdaptiveTimeLayout,
   deriveEventTimeline,
   deriveExplicitCausalEdges,
+  derivePlaybackMoments,
   deriveTraceCaptures,
   projectAdaptiveTime,
   projectTraceAt,
@@ -156,6 +157,24 @@ Vitest.describe('offline writer recovery', () => {
         expect(captures.length).toBeGreaterThan(1)
         expect(captures.every((capture) => capture.recordIndexes.length > 0)).toBe(true)
         expect(captures.some((capture) => capture.recordIndexes.length > 1)).toBe(true)
+
+        const playbackMoments = derivePlaybackMoments({ scenario: artifact.scenario, trace: artifact.trace })
+        expect(playbackMoments.length).toBeLessThan(artifact.trace.length)
+        expect(playbackMoments[0]).toEqual(expect.objectContaining({ recordIndex: 0, kind: 'run' }))
+        expect(playbackMoments.at(-1)).toEqual(
+          expect.objectContaining({ recordIndex: artifact.trace.length - 1, kind: 'run' }),
+        )
+        expect(playbackMoments.some((moment) => moment.kind === 'action')).toBe(true)
+        expect(playbackMoments.some((moment) => moment.kind === 'connectivity')).toBe(true)
+        expect(playbackMoments.some((moment) => moment.kind === 'capture')).toBe(true)
+        expect(playbackMoments.map((moment) => moment.recordIndex)).toEqual(
+          playbackMoments.map((moment) => moment.recordIndex).toSorted((left, right) => left - right),
+        )
+        for (const moment of playbackMoments.filter((candidate) => candidate.kind === 'capture')) {
+          const capture = captures.find((candidate) => candidate.captureId === moment.captureId)
+          expect(moment.recordIndex).toBe(capture?.lastRecordIndex)
+          expect(moment.recordIndexes).toEqual(capture?.recordIndexes)
+        }
 
         const acknowledgementRecords = artifact.trace.filter((record) => record.origin === 'acknowledgement')
         expect(acknowledgementRecords.every((record) => record.causedBy.length === 1)).toBe(true)

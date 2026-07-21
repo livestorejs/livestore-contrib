@@ -52,6 +52,25 @@ export interface TraceCapture {
   readonly recordIndexes: ReadonlyArray<number>
 }
 
+export type PlaybackMomentKind =
+  | 'run'
+  | 'action'
+  | 'topology'
+  | 'connectivity'
+  | 'lifecycle'
+  | 'capture'
+  | 'settlement'
+  | 'failure'
+
+export interface PlaybackMoment {
+  readonly momentIndex: number
+  readonly recordIndex: number
+  readonly recordIndexes: ReadonlyArray<number>
+  readonly captureId: string | null
+  readonly kind: PlaybackMomentKind
+  readonly label: string
+}
+
 export interface ExplicitCausalEdge {
   readonly fromRecordIndex: number
   readonly toRecordIndex: number
@@ -82,109 +101,56 @@ export const projectTraceAt = (args: {
   cursorIndex: number
 }): ObservedSystemState => {
   const cursorIndex = Math.min(Math.max(args.cursorIndex, -1), args.trace.length - 1)
-  let state: ObservedSystemState = {
-    cursorIndex,
-    runStatus: 'not-started',
-    activePhaseId: null,
-    backend: null,
-    clients: args.scenario.topology.clients.map((client) => ({
-      clientId: client.id,
-      lifecycle: 'declared',
-      connected: null,
-      leader: null,
-      sessions: client.sessions.map((sessionId) => ({ sessionId, lifecycle: 'declared', sync: null })),
-    })),
-    verdicts: [],
-  }
+  let state = initialObservedSystemState(args.scenario, cursorIndex)
 
   for (const record of args.trace.slice(0, cursorIndex + 1)) {
-    const payload = record.payload
-    switch (payload._tag) {
-      case 'run.started':
-        state = { ...state, runStatus: 'running' }
-        break
-      case 'run.completed':
-        state = { ...state, runStatus: payload.status }
-        break
-      case 'phase.started':
-        state = { ...state, activePhaseId: record.phaseId }
-        break
-      case 'phase.completed':
-        state = { ...state, activePhaseId: null }
-        break
-      case 'client.created':
-        if (record.clientId !== null) {
-          state = updateClient(state, record.clientId, (client) => ({
-            ...client,
-            lifecycle: 'created',
-            sessions: client.sessions.map((session) => ({ ...session, lifecycle: 'created' })),
-          }))
-        }
-        break
-      case 'lifecycle.session-stopped':
-        if (record.clientId !== null && record.sessionId !== null) {
-          state = updateClient(state, record.clientId, (client) => ({
-            ...client,
-            sessions: client.sessions.map((session) =>
-              session.sessionId === record.sessionId ? { ...session, lifecycle: 'stopped' } : session,
-            ),
-          }))
-        }
-        break
-      case 'lifecycle.session-restarted':
-        if (record.clientId !== null && record.sessionId !== null) {
-          state = updateClient(state, record.clientId, (client) => ({
-            ...client,
-            sessions: client.sessions.map((session) =>
-              session.sessionId === record.sessionId ? { ...session, lifecycle: 'created' } : session,
-            ),
-          }))
-        }
-        break
-      case 'backend.observed':
-        state = { ...state, backend: payload.observation }
-        break
-      case 'client.connectivity.observed':
-        if (record.clientId !== null) {
-          state = updateClient(state, record.clientId, (client) => ({ ...client, connected: payload.connected }))
-        }
-        break
-      case 'leader.sync.observed':
-        if (record.clientId !== null) {
-          state = updateClient(state, record.clientId, (client) => ({ ...client, leader: payload.observation }))
-        }
-        break
-      case 'session.sync.observed':
-        if (record.clientId !== null && record.sessionId !== null) {
-          state = updateClient(state, record.clientId, (client) => ({
-            ...client,
-            sessions: client.sessions.map((session) =>
-              session.sessionId === record.sessionId ? { ...session, sync: payload.observation } : session,
-            ),
-          }))
-        }
-        break
-      case 'oracle.verdict':
-        state = {
-          ...state,
-          verdicts: [
-            ...state.verdicts.filter((verdict) => verdict.oracleId !== payload.oracleId),
-            {
-              oracleId: payload.oracleId,
-              oracle: payload.oracle,
-              status: payload.status,
-              summary: payload.summary,
-              evidence: payload.evidence,
-            },
-          ],
-        }
-        break
-      default:
-        break
-    }
+    state = applyTraceRecord(state, record)
   }
 
   return Schema.decodeUnknownSync(ObservedSystemState)(state)
+}
+
+/** Derives material navigation points while retaining a raw observation-index boundary for every moment. */
+export const derivePlaybackMoments = (args: {
+  scenario: ScenarioAst
+  trace: ReadonlyArray<ScenarioTraceRecord>
+}): ReadonlyArray<PlaybackMoment> => {
+  const captures = deriveTraceCaptures(args.trace)
+  const captureByLastRecord = new Map(captures.map((capture) => [capture.lastRecordIndex, capture]))
+  const moments: Omit<PlaybackMoment, 'momentIndex'>[] = []
+  let state = initialObservedSystemState(args.scenario, -1)
+  let materialSignature = materialSystemSignature(state)
+
+  for (const record of args.trace) {
+    state = applyTraceRecord({ ...state, cursorIndex: record.index }, record)
+    const kind = semanticMomentKind(record)
+    if (kind !== undefined) {
+      moments.push({
+        recordIndex: record.index,
+        recordIndexes: [record.index],
+        captureId: null,
+        kind,
+        label: record.payload._tag,
+      })
+      materialSignature = materialSystemSignature(state)
+      continue
+    }
+
+    const capture = captureByLastRecord.get(record.index)
+    if (capture === undefined) continue
+    const nextSignature = materialSystemSignature(state)
+    if (nextSignature === materialSignature) continue
+    moments.push({
+      recordIndex: capture.lastRecordIndex,
+      recordIndexes: capture.recordIndexes,
+      captureId: capture.captureId,
+      kind: 'capture',
+      label: `capture ${capture.captureIndex + 1} · ${capture.recordIndexes.length} records`,
+    })
+    materialSignature = nextSignature
+  }
+
+  return moments.map((moment, momentIndex) => ({ ...moment, momentIndex }))
 }
 
 /** Emits a marker only when one event's observed component position or disposition changes. */
@@ -303,6 +269,125 @@ export const projectAdaptiveTime = (layout: AdaptiveTimeLayout, timeMs: number):
 export const backendComponentKey = 'backend'
 export const leaderComponentKey = (clientId: string): string => `leader:${clientId}`
 export const sessionComponentKey = (clientId: string, sessionId: string): string => `session:${clientId}/${sessionId}`
+
+const initialObservedSystemState = (scenario: ScenarioAst, cursorIndex: number): ObservedSystemState => ({
+  cursorIndex,
+  runStatus: 'not-started',
+  activePhaseId: null,
+  backend: null,
+  clients: scenario.topology.clients.map((client) => ({
+    clientId: client.id,
+    lifecycle: 'declared',
+    connected: null,
+    leader: null,
+    sessions: client.sessions.map((sessionId) => ({ sessionId, lifecycle: 'declared', sync: null })),
+  })),
+  verdicts: [],
+})
+
+const applyTraceRecord = (state: ObservedSystemState, record: ScenarioTraceRecord): ObservedSystemState => {
+  const payload = record.payload
+  switch (payload._tag) {
+    case 'run.started':
+      return { ...state, runStatus: 'running' }
+    case 'run.completed':
+      return { ...state, runStatus: payload.status }
+    case 'phase.started':
+      return { ...state, activePhaseId: record.phaseId }
+    case 'phase.completed':
+      return { ...state, activePhaseId: null }
+    case 'client.created':
+      return record.clientId === null
+        ? state
+        : updateClient(state, record.clientId, (client) => ({
+            ...client,
+            lifecycle: 'created',
+            sessions: client.sessions.map((session) => ({ ...session, lifecycle: 'created' })),
+          }))
+    case 'lifecycle.session-stopped':
+      return record.clientId === null || record.sessionId === null
+        ? state
+        : updateClient(state, record.clientId, (client) => ({
+            ...client,
+            sessions: client.sessions.map((session) =>
+              session.sessionId === record.sessionId ? { ...session, lifecycle: 'stopped' } : session,
+            ),
+          }))
+    case 'lifecycle.session-restarted':
+      return record.clientId === null || record.sessionId === null
+        ? state
+        : updateClient(state, record.clientId, (client) => ({
+            ...client,
+            sessions: client.sessions.map((session) =>
+              session.sessionId === record.sessionId ? { ...session, lifecycle: 'created' } : session,
+            ),
+          }))
+    case 'backend.observed':
+      return { ...state, backend: payload.observation }
+    case 'client.connectivity.observed':
+      return record.clientId === null
+        ? state
+        : updateClient(state, record.clientId, (client) => ({ ...client, connected: payload.connected }))
+    case 'leader.sync.observed':
+      return record.clientId === null
+        ? state
+        : updateClient(state, record.clientId, (client) => ({ ...client, leader: payload.observation }))
+    case 'session.sync.observed':
+      return record.clientId === null || record.sessionId === null
+        ? state
+        : updateClient(state, record.clientId, (client) => ({
+            ...client,
+            sessions: client.sessions.map((session) =>
+              session.sessionId === record.sessionId ? { ...session, sync: payload.observation } : session,
+            ),
+          }))
+    case 'oracle.verdict':
+      return {
+        ...state,
+        verdicts: [
+          ...state.verdicts.filter((verdict) => verdict.oracleId !== payload.oracleId),
+          {
+            oracleId: payload.oracleId,
+            oracle: payload.oracle,
+            status: payload.status,
+            summary: payload.summary,
+            evidence: payload.evidence,
+          },
+        ],
+      }
+    default:
+      return state
+  }
+}
+
+/** Excludes runner lifecycle and verdict bookkeeping from material system-state comparison. */
+const materialSystemSignature = (state: ObservedSystemState): string =>
+  JSON.stringify({ backend: state.backend, clients: state.clients })
+
+const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | undefined => {
+  switch (record.payload._tag) {
+    case 'run.started':
+    case 'run.completed':
+      return 'run'
+    case 'action.requested':
+      return 'action'
+    case 'client.created':
+      return 'topology'
+    case 'connectivity.disconnected':
+    case 'connectivity.reconnected':
+      return 'connectivity'
+    case 'lifecycle.session-stopped':
+    case 'lifecycle.session-restarted':
+    case 'lifecycle.client-restarted':
+      return 'lifecycle'
+    case 'settlement.completed':
+      return 'settlement'
+    case 'oracle.verdict':
+      return record.payload.status === 'failed' ? 'failure' : undefined
+    default:
+      return undefined
+  }
+}
 
 const updateClient = (
   state: ObservedSystemState,
