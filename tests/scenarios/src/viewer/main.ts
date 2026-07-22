@@ -424,9 +424,9 @@ const renderSemanticRecord = (record: ScenarioTraceRecord): string => {
           <div><dt>Emitter</dt><dd>${escapeMarkup(record.emitterId)}</dd></div>
           <div><dt>Local sequence</dt><dd>${record.localSequence}</dd></div>
           <div><dt>Logical time</dt><dd>${record.logicalTime}</dd></div>
-          <div><dt>Correlation</dt><dd>${escapeMarkup(record.correlationId ?? 'none')}</dd></div>
-          <div><dt>Causation</dt><dd>${escapeMarkup(record.causationId ?? 'none')}</dd></div>
-          <div><dt>Explicit causes</dt><dd>${record.causedBy.length === 0 ? 'none' : record.causedBy.map((index) => `#${index + 1}`).join(', ')}</dd></div>
+          <div><dt>Correlation (association)</dt><dd>${escapeMarkup(record.correlationId ?? 'none')}</dd></div>
+          <div><dt>Legacy causation label</dt><dd>${escapeMarkup(record.causationId ?? 'none')}</dd></div>
+          <div><dt>Explicit dependencies</dt><dd>${record.causedBy.length === 0 ? 'none' : record.causedBy.map((index) => `#${index + 1}`).join(', ')}</dd></div>
         </dl>
       </details>
       <details class="raw-json-tree" data-inspector-section="raw-json" ${traceInspectorExpansion.rawJsonOpen === true ? 'open' : ''}>
@@ -451,6 +451,13 @@ const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact
       return [
         { label: 'Code', value: payload.code, tone: 'bad' },
         { label: 'Step', value: payload.stepId ?? 'unknown' },
+        { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
+      ]
+    case 'operation.outcome':
+      return [
+        { label: 'Outcome', value: payload.status, tone: 'bad' },
+        { label: 'Code', value: payload.code, tone: 'bad' },
+        { label: 'Boundary', value: payload.status === 'indefinite' ? 'completion not observed' : 'failure reported' },
         { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
       ]
     case 'phase.started':
@@ -482,16 +489,20 @@ const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact
     case 'settlement.requested':
       return [
         { label: 'Participants', value: payload.participants.join(', ') },
-        { label: 'Heal', value: payload.healDisconnectedClients.join(', ') || 'none' },
+        { label: 'Fault removal', value: payload.healDisconnectedClients.join(', ') || 'none' },
         { label: 'Timeout', value: `${payload.timeoutMs} ms` },
       ]
     case 'settlement.progress':
       return [
-        { label: 'Settled', value: String(payload.settled), tone: payload.settled === true ? 'good' : 'warn' },
+        {
+          label: 'Convergence predicate',
+          value: String(payload.settled),
+          tone: payload.settled === true ? 'good' : 'warn',
+        },
         { label: 'Observations', value: `${payload.observations.length} participants` },
       ]
     case 'settlement.completed':
-      return [{ label: 'Observations', value: `${payload.observations.length} settled participants`, tone: 'good' }]
+      return [{ label: 'Observations', value: `${payload.observations.length} converged participants`, tone: 'good' }]
     case 'settlement.failed':
       return [
         { label: 'Code', value: payload.code, tone: 'bad' },

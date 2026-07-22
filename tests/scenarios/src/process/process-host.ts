@@ -257,7 +257,9 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
   child.on('exit', (code, signal) => {
     for (const waiter of pending.values()) {
       clearTimeout(waiter.timeout)
-      waiter.reject(new Error(`Client ${clientId} exited (${code ?? signal ?? 'unknown'})\n${stderr}`))
+      waiter.reject(
+        new IndefiniteProcessRequestError(`Client ${clientId} exited (${code ?? signal ?? 'unknown'})\n${stderr}`),
+      )
     }
     pending.clear()
   })
@@ -280,13 +282,15 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
           nextRequest += 1
           const timeout = setTimeout(() => {
             pending.delete(requestId)
-            reject(new Error(`Client ${clientId} timed out handling ${command._tag}\n${stderr}`))
+            reject(
+              new IndefiniteProcessRequestError(`Client ${clientId} timed out handling ${command._tag}\n${stderr}`),
+            )
           }, 20_000)
           pending.set(requestId, { resolve, reject, timeout })
           const message: ProcessClientRequest = { requestId, command }
           child.send(message)
         }),
-      catch: (cause) => processError(`Client ${clientId} request ${command._tag} failed: ${String(cause)}`),
+      catch: (cause) => processRequestError(clientId, command._tag, cause),
     }).pipe(
       Effect.map((result) => ({
         result,
@@ -376,7 +380,21 @@ const reconcileClientObservation =
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 
-const processError = (message: string) => new ScenarioOperationError('capability-unavailable', message)
+class IndefiniteProcessRequestError extends Error {}
+
+const processRequestError = (clientId: string, operation: string, cause: unknown): ScenarioOperationError =>
+  cause instanceof IndefiniteProcessRequestError
+    ? new ScenarioOperationError(
+        'host-request-indefinite',
+        `Client ${clientId} request ${operation} lost its completion boundary: ${String(cause)}`,
+        'indefinite',
+      )
+    : new ScenarioOperationError(
+        'host-request-failed',
+        `Client ${clientId} request ${operation} failed: ${String(cause)}`,
+      )
+
+const processError = (message: string) => new ScenarioOperationError('host-request-failed', message)
 
 const unsupportedLifecycle = (operation: string) => (_command: { operationId: string }) =>
   Effect.fail(new ScenarioOperationError('capability-unavailable', `Process host does not support ${operation}`))

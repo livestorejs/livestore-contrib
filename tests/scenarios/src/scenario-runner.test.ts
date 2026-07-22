@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
+
 import { expect } from 'vitest'
 
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { Effect, Exit, Schema } from '@livestore/utils/effect'
 
+import { ScenarioOperationError } from './application.ts'
 import { makeMockScenarioBackend } from './backends.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
@@ -18,6 +22,7 @@ import {
   deriveLaneActivityIntervals,
   derivePlaybackMoments,
   deriveRuntimeFailureIntervals,
+  deriveScenarioOperationHistory,
   deriveTraceCaptures,
   projectAdaptiveTime,
   projectTraceAt,
@@ -27,6 +32,7 @@ import {
   runInProcessLocalSyncCfScenario,
   runInProcessScenario,
   runProcessLocalSyncCfScenario,
+  runScenario,
 } from './runner.ts'
 
 /** Verifies: LS.SYS.VER.SCEN-R01, LS.SYS.VER.SCEN-R03, LS.SYS.VER.SCEN-R06 */
@@ -85,6 +91,18 @@ Vitest.describe('scenario model', () => {
         .filter((step) => step._tag === 'settle')
         .every((step) => step.participants.every((participant) => participant.clientId !== 'alice-phone')),
     ).toBe(true)
+  })
+
+  Vitest.it('decodes the tracked version-3/version-4 reference artifacts without migration', () => {
+    for (const name of [
+      'reference-offline-writer-recovery-browser-failure.json.gz',
+      'reference-shared-todo-workday-browser-failure.json.gz',
+    ]) {
+      const json = gunzipSync(readFileSync(new URL(`../artifacts/${name}`, import.meta.url))).toString('utf8')
+      const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(json)
+      expect(artifact.artifactVersion).toBe(4)
+      expect(artifact.descriptor.traceVersion).toBe(3)
+    }
   })
 })
 
@@ -192,11 +210,77 @@ Vitest.describe('in-process host conformance', () => {
           stepId: 'must-time-out',
         }),
       )
+      const operationHistory = deriveScenarioOperationHistory(artifact.trace)
+      expect(operationHistory.find((operation) => operation.operationId === 'must-time-out')).toEqual(
+        expect.objectContaining({ status: 'definite-failure', outcomeRecordIndex: expect.any(Number) }),
+      )
+      expect(artifact.trace.find((record) => record.payload._tag === 'operation.outcome')?.causedBy).toHaveLength(1)
       expect(
         projectTraceAt({ scenario, trace: artifact.trace, cursorIndex: artifact.trace.length - 1 }).runStatus,
       ).toBe('failed')
       expect(derivePlaybackMoments({ scenario, trace: artifact.trace }).at(-1)?.kind).toBe('failure')
       expect(() => Schema.decodeUnknownSync(ScenarioRunArtifact)(artifact)).not.toThrow()
+    }).pipe(Vitest.withTestCtx(test)),
+  )
+
+  Vitest.live('retains an indefinite operation outcome when the host loses completion evidence', (test) =>
+    Effect.gen(function* () {
+      const scenario = defineScenario({
+        version: 1,
+        id: 'indefinite-operation-outcome',
+        description: 'Exercises ambiguous participant-host completion.',
+        tags: ['failure-capture'],
+        seed: 7,
+        applicationId: todoApplication.id,
+        requires: [],
+        topology: {
+          storeId: 'indefinite-operation-outcome',
+          clients: [{ id: 'client-a', sessions: ['session-a'], initiallyConnected: true }],
+        },
+        phases: [
+          {
+            id: 'operation',
+            description: 'Lose the host completion response.',
+            steps: [
+              {
+                _tag: 'action',
+                id: 'ambiguous-action',
+                target: { clientId: 'client-a', sessionId: 'session-a' },
+                action: 'createTodo',
+                input: { id: 'ambiguous', text: 'possibly committed' },
+              },
+            ],
+          },
+        ],
+        oracles: [],
+      })
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      const artifact = yield* runScenario({
+        scenario,
+        applicationId: todoApplication.id,
+        host: {
+          ...host,
+          dispatchAction: () =>
+            Effect.fail(
+              new ScenarioOperationError(
+                'host-request-indefinite',
+                'The request may have completed before its response was lost',
+                'indefinite',
+              ),
+            ),
+        },
+        options: { runId: 'indefinite-operation-outcome-test', sourceRevision: 'test' },
+      })
+
+      expect(
+        deriveScenarioOperationHistory(artifact.trace).find(
+          (operation) => operation.operationId === 'ambiguous-action',
+        ),
+      ).toEqual(expect.objectContaining({ status: 'indefinite', outcomeRecordIndex: expect.any(Number) }))
+      expect(artifact.trace.find((record) => record.payload._tag === 'operation.outcome')?.payload).toEqual(
+        expect.objectContaining({ status: 'indefinite', code: 'host-request-indefinite' }),
+      )
     }).pipe(Vitest.withTestCtx(test)),
   )
 })
@@ -299,6 +383,14 @@ Vitest.describe('offline writer recovery', () => {
         const causalEdges = deriveExplicitCausalEdges(artifact.trace)
         expect(causalEdges).toHaveLength(acknowledgementRecords.length)
         expect(causalEdges.every((edge) => artifact.trace[edge.toRecordIndex]?.origin === 'acknowledgement')).toBe(true)
+        const operationHistory = deriveScenarioOperationHistory(artifact.trace)
+        expect(operationHistory.length).toBeGreaterThan(0)
+        expect(operationHistory.every((operation) => operation.status === 'succeeded')).toBe(true)
+        expect(
+          artifact.trace
+            .filter((record) => record.evidence === 'first-observed')
+            .every((record) => record.causationId === null),
+        ).toBe(true)
 
         const finalProjection = projectTraceAt({
           scenario: artifact.scenario,

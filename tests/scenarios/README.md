@@ -45,6 +45,14 @@ Tracked `.json.gz` reference artifacts are also included in the saved-run
 catalog. They preserve diagnostically useful failures without adding the full
 uncompressed traces to the repository.
 
+Host acknowledgements mean only that the participant host completed handling
+the controller request at its advertised boundary. They do not confirm backend
+acceptance or propagation. The viewer keeps correlation (related evidence)
+separate from explicit `causedBy` dependencies. The current operation-history
+projection covers serial runner instructions and their retained control
+acknowledgements or failure outcomes; it is not yet a complete concurrent
+history.
+
 ## Test the profiles
 
 ```sh

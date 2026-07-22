@@ -105,6 +105,13 @@ export interface ExplicitCausalEdge {
   readonly toRecordIndex: number
 }
 
+export interface ScenarioOperationHistoryEntry {
+  readonly operationId: string
+  readonly invocationRecordIndex: number
+  readonly outcomeRecordIndex: number | null
+  readonly status: 'pending' | 'succeeded' | 'definite-failure' | 'indefinite'
+}
+
 export interface TimeScalePoint {
   readonly timeMs: number
   readonly position: number
@@ -417,6 +424,40 @@ export const deriveExplicitCausalEdges = (
 }
 
 /**
+ * Projects runner instructions and their retained outcomes without claiming a
+ * complete concurrent history or inventing boundaries absent from the trace.
+ */
+export const deriveScenarioOperationHistory = (
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): ReadonlyArray<ScenarioOperationHistoryEntry> => {
+  const outcomes = new Map<
+    string,
+    { readonly recordIndex: number; readonly status: ScenarioOperationHistoryEntry['status'] }
+  >()
+  for (const record of trace) {
+    if (record.correlationId === null) continue
+    if (record.origin === 'acknowledgement') {
+      outcomes.set(record.correlationId, { recordIndex: record.index, status: 'succeeded' })
+    } else if (record.payload._tag === 'operation.outcome') {
+      outcomes.set(record.correlationId, { recordIndex: record.index, status: record.payload.status })
+    }
+  }
+
+  return trace.flatMap((record) => {
+    if (record.origin !== 'instruction' || record.correlationId === null) return []
+    const outcome = outcomes.get(record.correlationId)
+    return [
+      {
+        operationId: record.correlationId,
+        invocationRecordIndex: record.index,
+        outcomeRecordIndex: outcome?.recordIndex ?? null,
+        status: outcome?.status ?? 'pending',
+      },
+    ]
+  })
+}
+
+/**
  * Preserves short elapsed-time distances while capping the visual width of long gaps.
  * Every distortion remains available as an explicit gap annotation.
  */
@@ -615,6 +656,7 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
     case 'run.completed':
       return 'run'
     case 'run.failed':
+    case 'operation.outcome':
     case 'settlement.failed':
     case 'runtime.failure.observed':
       return 'failure'
@@ -650,6 +692,8 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return `Run completed: ${record.payload.status}`
     case 'run.failed':
       return `Run failed: ${summarizeFailureMessage(record.payload.message)}`
+    case 'operation.outcome':
+      return `Operation ${record.correlationId ?? 'unknown'} ${record.payload.status}: ${summarizeFailureMessage(record.payload.message)}`
     case 'phase.started':
       return `Phase ${record.phaseId ?? 'unknown'} started: ${record.payload.description}`
     case 'phase.completed':
@@ -659,7 +703,7 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
     case 'action.requested':
       return scoped(`requested ${record.payload.action}`)
     case 'action.completed':
-      return scoped(`${record.payload.action} acknowledged`)
+      return scoped(`${record.payload.action} control acknowledged`)
     case 'client.created':
       return scoped('created')
     case 'connectivity.disconnect.requested':

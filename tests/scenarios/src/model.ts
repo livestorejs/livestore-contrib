@@ -186,6 +186,7 @@ export const InspectStateCommand = Schema.Struct({
 })
 export type InspectStateCommand = typeof InspectStateCommand.Type
 
+/** Host-side request handling completed; this does not confirm backend receipt or propagation. */
 export const HostAcknowledgement = Schema.Struct({
   operationId: Schema.String,
   status: Schema.Literal('acknowledged'),
@@ -309,6 +310,11 @@ export const ScenarioTracePayload = Schema.Union([
     stepId: Schema.NullOr(Schema.String),
   }),
   Schema.TaggedStruct('run.completed', { status: Schema.Literals(['passed', 'failed']) }),
+  Schema.TaggedStruct('operation.outcome', {
+    status: Schema.Literals(['definite-failure', 'indefinite']),
+    code: Schema.String,
+    message: Schema.String,
+  }),
   Schema.TaggedStruct('client.create.requested', {
     sessions: Schema.Array(Schema.String),
     initiallyConnected: Schema.Boolean,

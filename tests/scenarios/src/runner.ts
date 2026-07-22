@@ -169,6 +169,7 @@ export const runScenario = (args: {
     let logicalTime = 0
     let activePhaseId: string | undefined
     let activeStepId: string | undefined
+    let activeOperationId: string | undefined
     const record = makeTraceRecorder({ runId, trace, readLogicalTime: () => logicalTime })
 
     const executionEffect = Effect.gen(function* () {
@@ -185,6 +186,7 @@ export const runScenario = (args: {
 
       for (const client of args.scenario.topology.clients) {
         const operationId = `create:${client.id}`
+        activeOperationId = operationId
         record({
           origin: 'instruction',
           correlationId: operationId,
@@ -202,6 +204,7 @@ export const runScenario = (args: {
           clientId: client.id,
           payload: { _tag: 'client.created', status: 'acknowledged' },
         })
+        activeOperationId = undefined
         yield* recordSystemObservation({ host: args.host, record, reason: operationId, correlationId: operationId })
       }
 
@@ -217,10 +220,12 @@ export const runScenario = (args: {
         })
         for (const step of phase.steps) {
           activeStepId = step.id
+          activeOperationId = step.id
           stepNumber += 1
           args.options?.onProgress?.({ stage: 'started', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
           logicalTime += 1
           yield* executeStep({ host: args.host, phaseId: phase.id, record, step })
+          activeOperationId = undefined
           yield* recordSystemObservation({
             host: args.host,
             record,
@@ -260,10 +265,22 @@ export const runScenario = (args: {
     return yield* executionEffect.pipe(
       Effect.catch((error) => {
         const failure = describeHostError(error)
+        if (activeOperationId !== undefined) {
+          record({
+            origin: 'observation',
+            correlationId: activeOperationId,
+            phaseId: activePhaseId,
+            causedBy: record.instructionIndex(activeOperationId),
+            payload: {
+              _tag: 'operation.outcome',
+              status: operationOutcome(error),
+              ...failure,
+            },
+          })
+        }
         record({
           origin: 'observation',
           correlationId: activeStepId,
-          causationId: activeStepId,
           phaseId: activePhaseId,
           payload: {
             _tag: 'run.failed',
@@ -302,6 +319,7 @@ type TraceInput = {
 interface TraceRecorder {
   (input: TraceInput): ScenarioTraceRecord
   readonly nextCaptureId: (reason: string) => string
+  readonly instructionIndex: (correlationId: string) => ReadonlyArray<number>
 }
 
 const makeTraceRecorder = (args: {
@@ -364,6 +382,10 @@ const makeTraceRecorder = (args: {
   }
   return Object.assign(record, {
     nextCaptureId: (reason: string) => `${args.runId}:capture:${captureIndex++}:${reason}`,
+    instructionIndex: (correlationId: string) => {
+      const instructionIndex = instructionByCorrelation.get(correlationId)
+      return instructionIndex === undefined ? [] : [instructionIndex]
+    },
   })
 }
 
@@ -570,7 +592,6 @@ const recordSystemObservation = (args: {
     args.record({
       origin: 'observation',
       correlationId: args.correlationId,
-      causationId: args.correlationId,
       phaseId: args.phaseId,
       captureId,
       evidence: 'first-observed',
@@ -590,7 +611,6 @@ const recordSystemObservation = (args: {
       args.record({
         origin: 'observation',
         correlationId: args.correlationId,
-        causationId: args.correlationId,
         clientId: client.clientId,
         phaseId: args.phaseId,
         captureId,
@@ -601,7 +621,6 @@ const recordSystemObservation = (args: {
       args.record({
         origin: 'observation',
         correlationId: args.correlationId,
-        causationId: args.correlationId,
         clientId: client.clientId,
         phaseId: args.phaseId,
         captureId,
@@ -622,7 +641,6 @@ const recordSystemObservation = (args: {
         args.record({
           origin: 'observation',
           correlationId: args.correlationId,
-          causationId: args.correlationId,
           clientId: client.clientId,
           sessionId: session.sessionId,
           phaseId: args.phaseId,
@@ -639,7 +657,6 @@ const recordSystemObservation = (args: {
       args.record({
         origin: 'observation',
         correlationId: args.correlationId,
-        causationId: args.correlationId,
         clientId: failure.clientId,
         sessionId: failure.sessionId ?? undefined,
         phaseId: args.phaseId,
@@ -756,7 +773,6 @@ const awaitSettlement = (args: {
       args.record({
         origin: 'observation',
         correlationId: args.correlationId,
-        causationId: args.correlationId,
         phaseId: args.phaseId,
         payload: {
           _tag: 'settlement.failed',
@@ -1028,6 +1044,9 @@ const describeHostError = (error: HostError): { readonly code: string; readonly 
     message: error.note ?? formatUnknownFailure(error.cause),
   }
 }
+
+const operationOutcome = (error: HostError): 'definite-failure' | 'indefinite' =>
+  error instanceof ScenarioOperationError ? error.operationOutcome : 'indefinite'
 
 const formatUnknownFailure = (cause: unknown): string => {
   if (cause instanceof Error) return cause.message

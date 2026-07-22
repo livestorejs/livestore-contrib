@@ -488,7 +488,7 @@ const setClientSyncConnectivity = (pages: ReadonlyMap<string, Page>, connected: 
       if (page === undefined) throw new Error('Client has no running session to control its sync latch')
       await page.evaluate((value) => window.__scenarioBrowser.setConnectivity(value), connected)
     },
-    catch: (cause) => browserError(`Failed to set browser connected=${connected}: ${String(cause)}`),
+    catch: (cause) => browserIndefiniteError(`Failed to confirm browser connected=${connected}: ${String(cause)}`),
   })
 
 const persistPageDiagnostics = (args: { pages: ReadonlyMap<string, Page>; clientId: string; directory: string }) =>
@@ -562,7 +562,7 @@ const dispatchPageAction = (
 ): Effect.Effect<void, ScenarioOperationError> =>
   Effect.tryPromise({
     try: () => page.evaluate((args) => window.__scenarioBrowser.dispatchAction(args), input),
-    catch: (cause) => browserError(`Browser action failed: ${String(cause)}`),
+    catch: (cause) => browserIndefiniteError(`Browser action completion was not observed: ${String(cause)}`),
   })
 
 const inspectPageState = (page: Page, input: Parameters<Window['__scenarioBrowser']['inspectState']>[0]) =>
@@ -629,4 +629,7 @@ const jsonStringify = Schema.encodeSync(Schema.UnknownFromJsonString)
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 
-const browserError = (message: string) => new ScenarioOperationError('capability-unavailable', message)
+const browserError = (message: string) => new ScenarioOperationError('host-request-failed', message)
+
+const browserIndefiniteError = (message: string) =>
+  new ScenarioOperationError('host-request-indefinite', message, 'indefinite')

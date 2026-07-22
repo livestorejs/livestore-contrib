@@ -15,6 +15,8 @@ export class ScenarioOperationError extends Error {
       | 'invalid-action-input'
       | 'invalid-inspector-output'
       | 'invalid-observation-evidence'
+      | 'host-request-failed'
+      | 'host-request-indefinite'
       | 'missing-client'
       | 'missing-participant'
       | 'participant-runtime-failure'
@@ -22,6 +24,8 @@ export class ScenarioOperationError extends Error {
       | 'unknown-action'
       | 'unknown-inspector',
     message: string,
+    /** Whether the controller knows that request handling failed or lost the response boundary. */
+    readonly operationOutcome: 'definite-failure' | 'indefinite' = 'definite-failure',
   ) {
     super(message)
     this.name = 'ScenarioOperationError'
