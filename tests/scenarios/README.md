@@ -27,6 +27,9 @@ Use `--output <path>` to choose the artifact path. By default it is written to
 `tests/scenarios/artifacts/<scenario-id>.json`.
 Set `SCENARIO_PROGRESS=1` to print step and settlement transitions for a long
 run.
+Set `SCENARIO_BROWSER_DB_SNAPSHOT_DIR=<directory>` to export the first session,
+leader, and eventlog databases immediately before each browser Client
+reconnects.
 
 ## View the artifact
 
@@ -37,6 +40,10 @@ pnpm --dir tests/scenarios viewer
 Open the printed URL and choose a generated artifact from **saved runs**. The
 scenario CLI refreshes this local catalog whenever it writes into `artifacts/`;
 the file picker can still open an artifact from elsewhere.
+
+Tracked `.json.gz` reference artifacts are also included in the saved-run
+catalog. They preserve diagnostically useful failures without adding the full
+uncompressed traces to the repository.
 
 ## Test the profiles
 

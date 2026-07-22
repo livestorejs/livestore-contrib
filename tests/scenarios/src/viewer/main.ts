@@ -6,7 +6,9 @@ import {
   deriveAdaptiveTimeLayout,
   deriveConnectivityIntervals,
   deriveEventTimeline,
+  deriveLaneActivityIntervals,
   derivePlaybackMoments,
+  deriveRuntimeFailureIntervals,
   deriveTraceCaptures,
   leaderComponentKey,
   projectTraceAt,
@@ -290,7 +292,12 @@ const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
   const clientCards = state.clients
     .map((client, index) => {
       const color = clientColor(index)
-      const badge = client.connected === false ? ['offline', 'bad'] : syncBadge(client.leader)
+      const badge =
+        client.health === 'failed' || client.health === 'degraded'
+          ? [client.health, 'bad']
+          : client.connected === false
+            ? ['offline', 'bad']
+            : syncBadge(client.leader)
       return `
         <article class="component-card" style="--component-color:${color}">
           <div class="component-title">
@@ -299,8 +306,8 @@ const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
           </div>
           ${renderEventlog(`client:${client.clientId}`, client.leader?.events ?? [], client.leader === null ? 'Leader not observed' : `Client eventlog · ${client.leader.pendingCount} pending`)}
           <div class="role-list">
-            ${renderRole('Leader role', client.leader)}
-            ${client.sessions.map((session) => renderRole(`Session ${session.sessionId}`, session.sync)).join('')}
+            ${renderRole('Leader role', client.leader, client.health === 'failed' ? 'failed' : undefined)}
+            ${client.sessions.map((session) => renderRole(`Session ${session.sessionId}`, session.sync, session.health)).join('')}
           </div>
         </article>`
     })
@@ -333,14 +340,18 @@ const renderEventlog = (key: string, events: ReadonlyArray<ObservedEvent>, label
     </div>
   </div>`
 
-const renderRole = (label: string, sync: ComponentSyncObservation | null): string => `
-  <div class="role-row">
+const renderRole = (
+  label: string,
+  sync: ComponentSyncObservation | null,
+  health?: 'unknown' | 'healthy' | 'failed',
+): string => `
+  <div class="role-row ${health === 'failed' ? 'runtime-failed' : ''}">
     <strong>${escapeMarkup(label)}</strong>
     <span>${
       sync === null
         ? 'not observed'
         : `local ${escapeMarkup(sync.localHead)} · upstream ${escapeMarkup(sync.upstreamHead)} · ${sync.pendingCount} pending`
-    }</span>
+    }${health === 'failed' ? ' · <em class="runtime-health">runtime failed</em>' : ''}</span>
   </div>`
 
 const renderTimeline = (): void => {
@@ -349,6 +360,8 @@ const renderTimeline = (): void => {
   const markers = deriveEventTimeline(trace)
   const captures = deriveTraceCaptures(trace)
   const connectivityIntervals = deriveConnectivityIntervals(trace)
+  const laneActivityIntervals = deriveLaneActivityIntervals({ scenario: artifact.scenario, trace })
+  const runtimeFailureIntervals = deriveRuntimeFailureIntervals(trace)
   const clientsById = new Map(artifact.scenario.topology.clients.map((client) => [client.id, client]))
   const systemCaptureIds = new Set(
     playbackMoments.flatMap((moment) => (moment.captureId === null ? [] : [moment.captureId])),
@@ -567,8 +580,112 @@ const renderTimeline = (): void => {
         <title>${escapeMarkup(message)}</title>
         <line x1="${x}" x2="${x}" y1="3" y2="${carpetTop - 8}" />
         <path d="M ${x} 3 l 7 7 l -7 7 l -7 -7 z" />
-        <text x="${x - 7}" y="13" text-anchor="end">FAILED</text>
+        <text x="${x - 7}" y="13" text-anchor="end">RUN FAILED</text>
       </g>`
+    })
+    .join('')
+
+  const momentByRecordIndex = new Map(playbackMoments.map((moment) => [moment.recordIndex, moment]))
+  const participantMilestones = trace
+    .filter((record) => isVisibleRecord(record.index))
+    .map((record) => {
+      const x = xForRecord(record.index)
+      const title = escapeMarkup(momentByRecordIndex.get(record.index)?.summary ?? record.payload._tag)
+      const client = record.clientId === null ? undefined : clientsById.get(record.clientId)
+      const leaderY = client === undefined ? undefined : yAt(leaderComponentKey(client.id))
+      const lastSessionId = client?.sessions.at(-1)
+      const groupEndY =
+        client === undefined || leaderY === undefined
+          ? undefined
+          : lastSessionId === undefined
+            ? leaderY
+            : yAt(sessionComponentKey(client.id, lastSessionId))
+
+      switch (record.payload._tag) {
+        case 'client.created':
+          return leaderY === undefined || groupEndY === undefined
+            ? ''
+            : `<g class="participant-milestone topology" data-record-index="${record.index}">
+                <title>${title}</title>
+                <line class="group-boundary" x1="${x}" x2="${x}" y1="${leaderY - 10}" y2="${groupEndY + 10}" />
+                <path d="M ${x} ${leaderY - 6} l 6 6 l -6 6 l -6 -6 z" />
+              </g>`
+        case 'action.requested': {
+          if (record.clientId === null) return ''
+          const componentKey =
+            record.sessionId === null
+              ? leaderComponentKey(record.clientId)
+              : sessionComponentKey(record.clientId, record.sessionId)
+          const y = yAt(componentKey)
+          return `<g class="participant-milestone action" data-record-index="${record.index}">
+              <title>${title}</title>
+              <line x1="${x}" x2="${x}" y1="${y - 8}" y2="${y + 8}" />
+              <path d="M ${x} ${y - 10} l 5 6 h -10 z" />
+            </g>`
+        }
+        case 'connectivity.disconnected':
+        case 'connectivity.reconnected':
+          return leaderY === undefined || groupEndY === undefined
+            ? ''
+            : `<g class="participant-milestone connectivity ${record.payload._tag === 'connectivity.disconnected' ? 'disconnected' : 'reconnected'}" data-record-index="${record.index}">
+                <title>${title}</title>
+                <line x1="${x}" x2="${x}" y1="${leaderY - 7}" y2="${groupEndY + 7}" />
+                <circle cx="${x}" cy="${leaderY}" r="3.5" />
+              </g>`
+        case 'lifecycle.session-stopped':
+        case 'lifecycle.session-restarted': {
+          if (record.clientId === null || record.sessionId === null) return ''
+          const y = yAt(sessionComponentKey(record.clientId, record.sessionId))
+          const restarted = record.payload._tag === 'lifecycle.session-restarted'
+          return `<g class="participant-milestone lifecycle ${restarted === true ? 'restarted' : 'stopped'}" data-record-index="${record.index}">
+              <title>${title}</title>
+              <line x1="${x}" x2="${x}" y1="${y - 8}" y2="${y + 8}" />
+              <circle cx="${x}" cy="${y}" r="4" />
+            </g>`
+        }
+        case 'lifecycle.client-restarted':
+          return leaderY === undefined || groupEndY === undefined
+            ? ''
+            : `<g class="participant-milestone lifecycle restarted" data-record-index="${record.index}">
+                <title>${title}</title>
+                <line x1="${x}" x2="${x}" y1="${leaderY - 8}" y2="${groupEndY + 8}" />
+                <circle cx="${x}" cy="${leaderY}" r="4" />
+              </g>`
+        default:
+          return ''
+      }
+    })
+    .join('')
+
+  const runtimeFailureSvg = runtimeFailureIntervals
+    .map((interval) => {
+      const start = normalizedForRecord(interval.startRecordIndex)
+      const endRecordIndex = interval.endRecordIndex ?? trace.at(-1)?.index ?? interval.startRecordIndex
+      const end = normalizedForRecord(endRecordIndex)
+      if (end < timelineViewport.start || start > timelineViewport.end) return ''
+      const visibleStart = Math.max(start, timelineViewport.start)
+      const visibleEnd = Math.min(Math.max(start, end), timelineViewport.end)
+      const x1 = xForNormalized(visibleStart)
+      const x2 = Math.max(xForNormalized(visibleEnd), x1 + 2)
+      const y = yAt(interval.componentKey)
+      const failureTrackY = y + 23
+      const originVisible = start >= timelineViewport.start && start <= timelineViewport.end
+      const terminalStartX = originVisible === true ? Math.min(x1 + 7, x2) : x1
+      const duplicateCount = interval.recordIndexes.length
+      const title = `${interval.clientId}${interval.sessionId === null ? '' : `/${interval.sessionId}`}: runtime failure: ${interval.summary}${duplicateCount > 1 ? ` · ${duplicateCount} related records` : ''}`
+      return `<g class="runtime-failure-interval">
+          <title>${escapeMarkup(title)}</title>
+          <line class="runtime-failure-terminal" x1="${terminalStartX}" x2="${x2}" y1="${failureTrackY}" y2="${failureTrackY}" />
+          ${
+            originVisible === false
+              ? ''
+              : `<g class="runtime-failure-callout" data-record-index="${interval.startRecordIndex}">
+                  <line x1="${x1}" x2="${x1}" y1="${y + 12}" y2="${failureTrackY - 5}" />
+                  <path d="M ${x1} ${failureTrackY - 5} l 5 5 l -5 5 l -5 -5 z" />
+                  <text x="${x1 - 8}" y="${y + 40}" text-anchor="end">RUNTIME FAILURE</text>
+                </g>`
+          }
+        </g>`
     })
     .join('')
 
@@ -593,13 +710,14 @@ const renderTimeline = (): void => {
           )
           .map((moment) => {
             const record = trace[moment.recordIndex]!
+            const radius = moment.kind === 'capture' ? 2.1 : moment.kind === 'failure' ? 3.8 : 3.2
             return `<circle
-              class="trace-dot system-moment ${record.evidence} ${moment.recordIndexes.includes(cursorIndex) === true ? 'selected' : ''}"
+              class="trace-dot system-moment moment-${moment.kind} ${record.evidence} ${moment.recordIndexes.includes(cursorIndex) === true ? 'selected' : ''}"
               data-record-index="${moment.recordIndex}"
               cx="${xForCarpetRecord(moment.recordIndex)}"
               cy="${carpetTop + 15}"
-              r="3.2"
-            ><title>moment ${moment.momentIndex + 1} · ${escapeMarkup(moment.label)} · record ${moment.recordIndex + 1}</title></circle>`
+              r="${radius}"
+            ><title>moment ${moment.momentIndex + 1} · ${escapeMarkup(moment.label)} · ${escapeMarkup(moment.summary)} · record ${moment.recordIndex + 1}</title></circle>`
           })
           .join('')
       : artifact.trace
@@ -632,11 +750,25 @@ const renderTimeline = (): void => {
     .join('')
 
   const lanesSvg = lanes
-    .map(
-      (lane) => `
+    .map((lane) => {
+      const activeSegments = laneActivityIntervals
+        .filter((interval) => interval.componentKey === lane.key)
+        .map((interval) => {
+          const intervalStart = normalizedForRecord(interval.startRecordIndex)
+          const intervalEnd = interval.endRecordIndex === null ? 1 : normalizedForRecord(interval.endRecordIndex)
+          const start = Math.min(intervalStart, intervalEnd)
+          const end = Math.max(intervalStart, intervalEnd)
+          if (end < timelineViewport.start || start > timelineViewport.end) return ''
+          const x1 = xForNormalized(Math.max(start, timelineViewport.start))
+          const x2 = xForNormalized(Math.min(end, timelineViewport.end))
+          return `<line class="lane-track active" x1="${x1}" x2="${Math.max(x2, x1 + 1)}" y1="${yAt(lane.key)}" y2="${yAt(lane.key)}" stroke="${lane.color}" />`
+        })
+        .join('')
+      return `
         <text class="lane-label ${lane.role}" x="${lane.role === 'session' ? 36 : 8}" y="${yAt(lane.key) + 4}">${escapeMarkup(lane.label)}</text>
-        <line x1="${left}" x2="${width - right}" y1="${yAt(lane.key)}" y2="${yAt(lane.key)}" stroke="${lane.color}" stroke-width="2" />`,
-    )
+        <line class="lane-track declared" x1="${left}" x2="${width - right}" y1="${yAt(lane.key)}" y2="${yAt(lane.key)}" stroke="${lane.color}" />
+        ${activeSegments}`
+    })
     .join('')
 
   const densityBinCount = 160
@@ -670,6 +802,13 @@ const renderTimeline = (): void => {
       return `<line class="range-failure" x1="${x}" x2="${x}" y1="5" y2="37"><title>${escapeMarkup(record.payload._tag)}</title></line>`
     })
     .join('')
+  const navigatorRuntimeFailures = runtimeFailureIntervals
+    .map((interval) => {
+      const x = overviewXForNormalized(normalizedForRecord(interval.startRecordIndex))
+      const participant = `${interval.clientId}${interval.sessionId === null ? '' : `/${interval.sessionId}`}`
+      return `<line class="range-runtime-failure" x1="${x}" x2="${x}" y1="18" y2="36"><title>${escapeMarkup(`${participant}: ${interval.summary}`)}</title></line>`
+    })
+    .join('')
   const rangeStartX = overviewXForNormalized(timelineViewport.start)
   const rangeEndX = overviewXForNormalized(timelineViewport.end)
   const rangeWidth = rangeEndX - rangeStartX
@@ -698,8 +837,10 @@ const renderTimeline = (): void => {
       ${failureMarkers}
       ${hierarchySvg}
       ${lanesSvg}
+      ${participantMilestones}
       ${captureGuides}
       ${markerSvg}
+      ${runtimeFailureSvg}
       <text class="trace-carpet-label" x="8" y="${carpetTop + 18}">${traceVisibility === 'system' ? 'SYSTEM' : 'TRACE'}${timelineMode === 'time' && timeScaleMode === 'fit' ? ' · RAW TIME' : ''}</text>
       ${traceCarpet}
       <g class="cursor-scrubber" aria-hidden="true">
@@ -729,6 +870,7 @@ const renderTimeline = (): void => {
       <rect class="range-track" x="${left}" y="7" width="${plotWidth}" height="28" rx="2" data-range-action="track" />
       ${navigatorDensity}
       ${navigatorOfflinePeriods}
+      ${navigatorRuntimeFailures}
       ${navigatorFailures}
       <rect
         class="range-window"

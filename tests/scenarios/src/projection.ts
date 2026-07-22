@@ -12,6 +12,7 @@ import {
 export const ProjectedSession = Schema.Struct({
   sessionId: Schema.String,
   lifecycle: Schema.Literals(['declared', 'created', 'stopped']),
+  health: Schema.Literals(['unknown', 'healthy', 'failed']),
   sync: Schema.NullOr(ComponentSyncObservation),
 })
 export type ProjectedSession = typeof ProjectedSession.Type
@@ -19,6 +20,7 @@ export type ProjectedSession = typeof ProjectedSession.Type
 export const ProjectedClient = Schema.Struct({
   clientId: Schema.String,
   lifecycle: Schema.Literals(['declared', 'created']),
+  health: Schema.Literals(['unknown', 'healthy', 'degraded', 'failed']),
   connected: Schema.NullOr(Schema.Boolean),
   leader: Schema.NullOr(ComponentSyncObservation),
   sessions: Schema.Array(ProjectedSession),
@@ -62,6 +64,22 @@ export interface ConnectivityInterval {
   readonly endEvidence: ConnectivityBoundaryEvidence | null
 }
 
+export interface LaneActivityInterval {
+  readonly componentKey: string
+  readonly startRecordIndex: number
+  readonly endRecordIndex: number | null
+}
+
+export interface RuntimeFailureInterval {
+  readonly componentKey: string
+  readonly clientId: string
+  readonly sessionId: string | null
+  readonly startRecordIndex: number
+  readonly endRecordIndex: number | null
+  readonly recordIndexes: ReadonlyArray<number>
+  readonly summary: string
+}
+
 export type PlaybackMomentKind =
   | 'run'
   | 'action'
@@ -79,6 +97,7 @@ export interface PlaybackMoment {
   readonly captureId: string | null
   readonly kind: PlaybackMomentKind
   readonly label: string
+  readonly summary: string
 }
 
 export interface ExplicitCausalEdge {
@@ -129,6 +148,7 @@ export const derivePlaybackMoments = (args: {
   const captureByLastRecord = new Map(captures.map((capture) => [capture.lastRecordIndex, capture]))
   const moments: Omit<PlaybackMoment, 'momentIndex'>[] = []
   let state = initialObservedSystemState(args.scenario, -1)
+  let materialState = state
   let materialSignature = materialSystemSignature(state)
 
   for (const record of args.trace) {
@@ -141,7 +161,9 @@ export const derivePlaybackMoments = (args: {
         captureId: null,
         kind,
         label: record.payload._tag,
+        summary: summarizeSemanticMoment(record),
       })
+      materialState = state
       materialSignature = materialSystemSignature(state)
       continue
     }
@@ -156,7 +178,9 @@ export const derivePlaybackMoments = (args: {
       captureId: capture.captureId,
       kind: 'capture',
       label: `capture ${capture.captureIndex + 1} · ${capture.recordIndexes.length} records`,
+      summary: summarizeMaterialSystemChange(materialState, state),
     })
+    materialState = state
     materialSignature = nextSignature
   }
 
@@ -263,6 +287,123 @@ export const deriveConnectivityIntervals = (
   return intervals.toSorted((left, right) => left.startRecordIndex - right.startRecordIndex)
 }
 
+/** Projects acknowledged creation and session lifecycle boundaries onto stable topology lanes. */
+export const deriveLaneActivityIntervals = (args: {
+  scenario: ScenarioAst
+  trace: ReadonlyArray<ScenarioTraceRecord>
+}): ReadonlyArray<LaneActivityInterval> => {
+  const intervals: LaneActivityInterval[] = []
+  const openByComponent = new Map<string, number>()
+  const clientsById = new Map(args.scenario.topology.clients.map((client) => [client.id, client]))
+
+  const open = (componentKey: string, recordIndex: number): void => {
+    if (openByComponent.has(componentKey) === false) openByComponent.set(componentKey, recordIndex)
+  }
+  const close = (componentKey: string, recordIndex: number): void => {
+    const startRecordIndex = openByComponent.get(componentKey)
+    if (startRecordIndex === undefined) return
+    intervals.push({ componentKey, startRecordIndex, endRecordIndex: recordIndex })
+    openByComponent.delete(componentKey)
+  }
+
+  for (const record of args.trace) {
+    switch (record.payload._tag) {
+      case 'backend.observed':
+        open(backendComponentKey, record.index)
+        break
+      case 'client.created': {
+        if (record.clientId === null) break
+        const client = clientsById.get(record.clientId)
+        if (client === undefined) break
+        open(leaderComponentKey(client.id), record.index)
+        for (const sessionId of client.sessions) open(sessionComponentKey(client.id, sessionId), record.index)
+        break
+      }
+      case 'lifecycle.session-stopped':
+        if (record.clientId !== null && record.sessionId !== null) {
+          close(sessionComponentKey(record.clientId, record.sessionId), record.index)
+        }
+        break
+      case 'lifecycle.session-restarted':
+        if (record.clientId !== null && record.sessionId !== null) {
+          open(sessionComponentKey(record.clientId, record.sessionId), record.index)
+        }
+        break
+      default:
+        break
+    }
+  }
+
+  intervals.push(
+    ...[...openByComponent.entries()].map(([componentKey, startRecordIndex]) => ({
+      componentKey,
+      startRecordIndex,
+      endRecordIndex: null,
+    })),
+  )
+  return intervals.toSorted((left, right) => left.startRecordIndex - right.startRecordIndex)
+}
+
+/** Groups repeated runtime errors into participant-scoped unhealthy intervals. */
+export const deriveRuntimeFailureIntervals = (
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): ReadonlyArray<RuntimeFailureInterval> => {
+  type OpenFailure = Omit<RuntimeFailureInterval, 'endRecordIndex'>
+  const intervals: RuntimeFailureInterval[] = []
+  const openByComponent = new Map<string, OpenFailure>()
+
+  const close = (componentKey: string, endRecordIndex: number): void => {
+    const interval = openByComponent.get(componentKey)
+    if (interval === undefined) return
+    intervals.push({ ...interval, endRecordIndex })
+    openByComponent.delete(componentKey)
+  }
+
+  for (const record of trace) {
+    switch (record.payload._tag) {
+      case 'runtime.failure.observed': {
+        if (record.clientId === null) break
+        const componentKey =
+          record.sessionId === null
+            ? leaderComponentKey(record.clientId)
+            : sessionComponentKey(record.clientId, record.sessionId)
+        const open = openByComponent.get(componentKey)
+        if (open === undefined) {
+          openByComponent.set(componentKey, {
+            componentKey,
+            clientId: record.clientId,
+            sessionId: record.sessionId,
+            startRecordIndex: record.index,
+            recordIndexes: [record.index],
+            summary: summarizeFailureMessage(record.payload.message),
+          })
+        } else {
+          openByComponent.set(componentKey, { ...open, recordIndexes: [...open.recordIndexes, record.index] })
+        }
+        break
+      }
+      case 'lifecycle.session-restarted':
+        if (record.clientId !== null && record.sessionId !== null) {
+          close(sessionComponentKey(record.clientId, record.sessionId), record.index)
+        }
+        break
+      case 'lifecycle.client-restarted':
+        if (record.clientId !== null) {
+          close(leaderComponentKey(record.clientId), record.index)
+          for (const componentKey of openByComponent.keys()) {
+            if (componentKey.startsWith(`session:${record.clientId}/`) === true) close(componentKey, record.index)
+          }
+        }
+        break
+      default:
+        break
+    }
+  }
+
+  intervals.push(...[...openByComponent.values()].map((interval) => ({ ...interval, endRecordIndex: null })))
+  return intervals.toSorted((left, right) => left.startRecordIndex - right.startRecordIndex)
+}
+
 /** Returns only causal relationships explicitly retained by the trace protocol. */
 export const deriveExplicitCausalEdges = (
   trace: ReadonlyArray<ScenarioTraceRecord>,
@@ -342,9 +483,15 @@ const initialObservedSystemState = (scenario: ScenarioAst, cursorIndex: number):
   clients: scenario.topology.clients.map((client) => ({
     clientId: client.id,
     lifecycle: 'declared',
+    health: 'unknown',
     connected: null,
     leader: null,
-    sessions: client.sessions.map((sessionId) => ({ sessionId, lifecycle: 'declared', sync: null })),
+    sessions: client.sessions.map((sessionId) => ({
+      sessionId,
+      lifecycle: 'declared',
+      health: 'unknown',
+      sync: null,
+    })),
   })),
   verdicts: [],
 })
@@ -368,26 +515,58 @@ const applyTraceRecord = (state: ObservedSystemState, record: ScenarioTraceRecor
         : updateClient(state, record.clientId, (client) => ({
             ...client,
             lifecycle: 'created',
-            sessions: client.sessions.map((session) => ({ ...session, lifecycle: 'created' })),
+            health: 'healthy',
+            sessions: client.sessions.map((session) => ({ ...session, lifecycle: 'created', health: 'healthy' })),
           }))
     case 'lifecycle.session-stopped':
       return record.clientId === null || record.sessionId === null
         ? state
-        : updateClient(state, record.clientId, (client) => ({
-            ...client,
-            sessions: client.sessions.map((session) =>
-              session.sessionId === record.sessionId ? { ...session, lifecycle: 'stopped' } : session,
-            ),
-          }))
+        : updateClient(state, record.clientId, (client) => {
+            const sessions = client.sessions.map((session) =>
+              session.sessionId === record.sessionId
+                ? {
+                    ...session,
+                    lifecycle: 'stopped' as const,
+                    health: session.health === 'failed' ? ('failed' as const) : ('unknown' as const),
+                  }
+                : session,
+            )
+            return { ...client, health: deriveClientHealth(client, sessions), sessions }
+          })
     case 'lifecycle.session-restarted':
       return record.clientId === null || record.sessionId === null
         ? state
+        : updateClient(state, record.clientId, (client) => {
+            const sessions = client.sessions.map((session) =>
+              session.sessionId === record.sessionId
+                ? { ...session, lifecycle: 'created' as const, health: 'healthy' as const }
+                : session,
+            )
+            return { ...client, health: deriveClientHealth(client, sessions), sessions }
+          })
+    case 'lifecycle.client-restarted':
+      return record.clientId === null
+        ? state
         : updateClient(state, record.clientId, (client) => ({
             ...client,
-            sessions: client.sessions.map((session) =>
-              session.sessionId === record.sessionId ? { ...session, lifecycle: 'created' } : session,
-            ),
+            lifecycle: 'created',
+            health: 'healthy',
+            sessions: client.sessions.map((session) => ({
+              ...session,
+              lifecycle: 'created',
+              health: 'healthy',
+            })),
           }))
+    case 'runtime.failure.observed':
+      return record.clientId === null
+        ? state
+        : updateClient(state, record.clientId, (client) => {
+            if (record.sessionId === null) return { ...client, health: 'failed' }
+            const sessions = client.sessions.map((session) =>
+              session.sessionId === record.sessionId ? { ...session, health: 'failed' as const } : session,
+            )
+            return { ...client, health: 'degraded', sessions }
+          })
     case 'backend.observed':
       return { ...state, backend: payload.observation }
     case 'client.connectivity.observed':
@@ -457,6 +636,179 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
     default:
       return undefined
   }
+}
+
+/** Explains a semantic boundary without requiring the viewer to decode its payload shape. */
+const summarizeSemanticMoment = (record: ScenarioTraceRecord): string => {
+  const scope = [record.clientId, record.sessionId].filter((value) => value !== null).join('/')
+  const scoped = (description: string): string => (scope.length === 0 ? description : `${scope}: ${description}`)
+
+  switch (record.payload._tag) {
+    case 'run.started':
+      return 'Run started'
+    case 'run.completed':
+      return `Run completed: ${record.payload.status}`
+    case 'run.failed':
+      return `Run failed: ${summarizeFailureMessage(record.payload.message)}`
+    case 'action.requested':
+      return scoped(`requested ${record.payload.action}`)
+    case 'client.created':
+      return scoped('created')
+    case 'connectivity.disconnected':
+      return scoped('disconnected')
+    case 'connectivity.reconnected':
+      return scoped('reconnected')
+    case 'lifecycle.session-stopped':
+      return scoped('stopped')
+    case 'lifecycle.session-restarted':
+      return scoped('restarted')
+    case 'lifecycle.client-restarted':
+      return scoped('restarted')
+    case 'settlement.completed':
+      return 'Settlement completed'
+    case 'settlement.failed':
+      return `Settlement failed: ${summarizeFailureMessage(record.payload.message)}`
+    case 'runtime.failure.observed':
+      return scoped(`runtime failure: ${summarizeFailureMessage(record.payload.message)}`)
+    case 'oracle.verdict':
+      return `Oracle ${record.payload.oracleId} ${record.payload.status}: ${record.payload.summary}`
+    default:
+      return record.payload._tag
+  }
+}
+
+/** Summarizes only facts that changed across a material observation capture. */
+const summarizeMaterialSystemChange = (before: ObservedSystemState, after: ObservedSystemState): string => {
+  const changes: string[] = []
+  const backendChange = describeBackendChange(before.backend, after.backend)
+  if (backendChange !== undefined) changes.push(backendChange)
+
+  const beforeClients = new Map(before.clients.map((client) => [client.clientId, client]))
+  for (const client of after.clients) {
+    const previous = beforeClients.get(client.clientId)
+    if (previous === undefined) {
+      changes.push(`${client.clientId} appeared`)
+      continue
+    }
+    if (previous.lifecycle !== client.lifecycle) {
+      changes.push(`${client.clientId} lifecycle ${previous.lifecycle} → ${client.lifecycle}`)
+    }
+    if (previous.health !== client.health) {
+      changes.push(`${client.clientId} health ${previous.health} → ${client.health}`)
+    }
+    if (previous.connected !== client.connected) {
+      changes.push(
+        previous.connected === null
+          ? `${client.clientId} first observed ${connectivityLabel(client.connected)}`
+          : `${client.clientId} observed ${connectivityLabel(previous.connected)} → ${connectivityLabel(client.connected)}`,
+      )
+    }
+    const leaderChange = describeSyncChange(`${client.clientId} Leader`, previous.leader, client.leader)
+    if (leaderChange !== undefined) changes.push(leaderChange)
+
+    const beforeSessions = new Map(previous.sessions.map((session) => [session.sessionId, session]))
+    for (const session of client.sessions) {
+      const previousSession = beforeSessions.get(session.sessionId)
+      if (previousSession === undefined) {
+        changes.push(`${client.clientId}/${session.sessionId} appeared`)
+        continue
+      }
+      if (previousSession.lifecycle !== session.lifecycle) {
+        changes.push(
+          `${client.clientId}/${session.sessionId} lifecycle ${previousSession.lifecycle} → ${session.lifecycle}`,
+        )
+      }
+      if (previousSession.health !== session.health) {
+        changes.push(`${client.clientId}/${session.sessionId} health ${previousSession.health} → ${session.health}`)
+      }
+      const sessionChange = describeSyncChange(session.sessionId, previousSession.sync, session.sync)
+      if (sessionChange !== undefined) changes.push(sessionChange)
+    }
+  }
+
+  return changes.length === 0 ? 'Observed system state changed' : changes.join(' · ')
+}
+
+const describeBackendChange = (
+  before: BackendObservation | null,
+  after: BackendObservation | null,
+): string | undefined => {
+  if (before === null && after === null) return undefined
+  if (before === null && after !== null) {
+    return `Backend first observed ${connectivityLabel(after.connected)} at ${after.head}`
+  }
+  if (before !== null && after === null) return 'Backend observation became unavailable'
+  if (before === null || after === null) return undefined
+
+  const changes: string[] = []
+  if (before.connected !== after.connected) {
+    changes.push(`${connectivityLabel(before.connected)} → ${connectivityLabel(after.connected)}`)
+  }
+  if (before.head !== after.head) changes.push(`head ${before.head} → ${after.head}`)
+  changes.push(...describeEventChanges(before.events, after.events))
+  return changes.length === 0 ? undefined : `Backend: ${changes.join(', ')}`
+}
+
+const describeSyncChange = (
+  label: string,
+  before: ComponentSyncObservation | null,
+  after: ComponentSyncObservation | null,
+): string | undefined => {
+  if (before === null && after === null) return undefined
+  if (before === null && after !== null) {
+    return `${label} first observed: local ${after.localHead}, upstream ${after.upstreamHead}, ${after.pendingCount} pending`
+  }
+  if (before !== null && after === null) return `${label} observation became unavailable`
+  if (before === null || after === null) return undefined
+
+  const changes: string[] = []
+  if (before.localHead !== after.localHead) changes.push(`local ${before.localHead} → ${after.localHead}`)
+  if (before.upstreamHead !== after.upstreamHead)
+    changes.push(`upstream ${before.upstreamHead} → ${after.upstreamHead}`)
+  if (before.pendingCount !== after.pendingCount) changes.push(`pending ${before.pendingCount} → ${after.pendingCount}`)
+  changes.push(...describeEventChanges(before.events, after.events))
+  return changes.length === 0 ? undefined : `${label}: ${changes.join(', ')}`
+}
+
+const describeEventChanges = (
+  before: ReadonlyArray<ObservedEvent>,
+  after: ReadonlyArray<ObservedEvent>,
+): ReadonlyArray<string> => {
+  const beforeByRef = new Map(before.map((event) => [event.eventRef, event]))
+  const afterByRef = new Map(after.map((event) => [event.eventRef, event]))
+  const added = after.filter((event) => beforeByRef.has(event.eventRef) === false).map((event) => event.position)
+  const removed = before.filter((event) => afterByRef.has(event.eventRef) === false).map((event) => event.position)
+  const changed = after.flatMap((event) => {
+    const previous = beforeByRef.get(event.eventRef)
+    if (previous === undefined || JSON.stringify(previous) === JSON.stringify(event)) return []
+    return [
+      previous.position === event.position ? `${event.position} updated` : `${previous.position} → ${event.position}`,
+    ]
+  })
+  return [
+    ...(added.length === 0 ? [] : [`events +${added.join(', ')}`]),
+    ...(removed.length === 0 ? [] : [`events −${removed.join(', ')}`]),
+    ...changed,
+  ]
+}
+
+const connectivityLabel = (connected: boolean | null): string =>
+  connected === null ? 'unknown' : connected === true ? 'online' : 'offline'
+
+const summarizeFailureMessage = (message: string): string => {
+  const constraintFailure = message.match(/(?:UNIQUE|NOT NULL|FOREIGN KEY|CHECK) constraint failed:[^)\]\n]+/u)?.[0]
+  if (constraintFailure !== undefined) return constraintFailure.trim()
+  const firstLine = message.split('\n', 1)[0]?.trim() ?? message.trim()
+  return firstLine.length <= 180 ? firstLine : `${firstLine.slice(0, 179)}…`
+}
+
+const deriveClientHealth = (
+  client: ProjectedClient,
+  sessions: ReadonlyArray<ProjectedSession>,
+): ProjectedClient['health'] => {
+  if (client.health === 'failed') return 'failed'
+  if (sessions.some((session) => session.health === 'failed') === true) return 'degraded'
+  return client.lifecycle === 'declared' ? 'unknown' : 'healthy'
 }
 
 const updateClient = (

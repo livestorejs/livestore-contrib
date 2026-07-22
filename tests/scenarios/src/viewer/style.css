@@ -154,9 +154,9 @@ h2 {
 .controls {
   align-items: center;
   display: grid;
-  flex: 0 1 660px;
+  flex: 0 1 600px;
   gap: 7px;
-  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
   min-width: 0;
 }
 
@@ -203,7 +203,7 @@ h2 {
 
 .timeline-heading {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   width: 100%;
 }
 
@@ -216,15 +216,29 @@ h2 {
   white-space: nowrap;
 }
 
-.timeline-meta {
+.timeline-actions {
   align-items: center;
+  border-bottom: 1px solid var(--line);
   color: var(--muted);
   display: flex;
   font-size: 11px;
-  gap: 12px;
-  justify-content: center;
-  justify-self: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 10px 0;
   white-space: nowrap;
+}
+
+.timeline-play {
+  min-width: 58px;
+}
+
+.timeline-action-settings {
+  align-items: center;
+  border-left: 1px solid var(--line);
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+  padding-left: 16px;
 }
 
 .mode-control {
@@ -279,6 +293,7 @@ h2 {
 
 #cursor-label {
   color: var(--text);
+  margin-left: auto;
 }
 
 .badge {
@@ -415,6 +430,17 @@ h2 {
   font-weight: 600;
 }
 
+.role-row.runtime-failed {
+  color: var(--bad);
+}
+
+.runtime-health {
+  color: var(--bad);
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .eyebrow {
   color: var(--muted);
   font-size: 10px;
@@ -478,6 +504,124 @@ h2 {
   stroke: var(--line-strong);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
+}
+
+.timeline .lane-track {
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .lane-track.declared {
+  opacity: 0.34;
+  stroke-dasharray: 3 5;
+  stroke-width: 1;
+}
+
+.timeline .lane-track.active {
+  stroke-width: 2;
+}
+
+.timeline .participant-milestone {
+  cursor: pointer;
+}
+
+.timeline .participant-milestone line,
+.timeline .participant-milestone path,
+.timeline .participant-milestone circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .participant-milestone.topology {
+  color: var(--good);
+}
+
+.timeline .participant-milestone.topology .group-boundary {
+  opacity: 0.55;
+  stroke: currentcolor;
+  stroke-dasharray: 2 3;
+  stroke-width: 1;
+}
+
+.timeline .participant-milestone.topology path {
+  fill: var(--background);
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.timeline .participant-milestone.action {
+  color: var(--warn);
+}
+
+.timeline .participant-milestone.action line {
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.timeline .participant-milestone.action path {
+  fill: currentcolor;
+}
+
+.timeline .runtime-failure-interval {
+  color: var(--bad);
+}
+
+.timeline .runtime-failure-terminal {
+  stroke: currentcolor;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .runtime-failure-callout {
+  cursor: pointer;
+}
+
+.timeline .runtime-failure-callout line {
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .runtime-failure-callout path {
+  fill: currentcolor;
+}
+
+.timeline .runtime-failure-callout text {
+  fill: currentcolor;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.timeline .participant-milestone.connectivity line {
+  opacity: 0.72;
+  stroke: currentcolor;
+  stroke-dasharray: 2 3;
+  stroke-width: 1;
+}
+
+.timeline .participant-milestone.connectivity circle,
+.timeline .participant-milestone.lifecycle circle {
+  fill: var(--background);
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.timeline .participant-milestone.connectivity.disconnected,
+.timeline .participant-milestone.lifecycle.stopped {
+  color: var(--bad);
+}
+
+.timeline .participant-milestone.connectivity.reconnected,
+.timeline .participant-milestone.lifecycle.restarted {
+  color: var(--good);
+}
+
+.timeline .participant-milestone.lifecycle line {
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.timeline .participant-milestone.lifecycle.restarted circle {
+  fill: currentcolor;
 }
 
 .timeline .offline-period rect {
@@ -654,7 +798,19 @@ h2 {
   fill: #a04ad4;
 }
 
+.timeline .trace-dot.moment-capture {
+  fill: var(--background);
+  opacity: 0.68;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.timeline .trace-dot.moment-failure {
+  fill: var(--bad);
+}
+
 .timeline .trace-dot.selected {
+  opacity: 1;
   stroke: var(--text);
   stroke-width: 2;
 }
@@ -684,6 +840,12 @@ h2 {
 
 .timeline .range-failure {
   stroke: #d63b32;
+  stroke-width: 2;
+}
+
+.timeline .range-runtime-failure {
+  stroke: var(--bad);
+  stroke-dasharray: 2 2;
   stroke-width: 2;
 }
 
@@ -766,14 +928,22 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .timeline-meta,
   #record-label {
     justify-self: start;
   }
 
-  .timeline-meta {
+  .timeline-actions,
+  .timeline-action-settings {
     flex-wrap: wrap;
-    justify-content: flex-start;
+  }
+
+  .timeline-action-settings {
+    flex: 1 1 calc(100% - 80px);
+  }
+
+  #cursor-label {
+    flex-basis: 100%;
+    margin-left: 0;
   }
 
   .controls {

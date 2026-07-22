@@ -9,13 +9,15 @@ import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { makeInProcessHost } from './host.ts'
-import { defineScenario, ScenarioRunArtifact } from './model.ts'
+import { defineScenario, ScenarioRunArtifact, type ScenarioTraceRecord } from './model.ts'
 import {
   deriveAdaptiveTimeLayout,
   deriveConnectivityIntervals,
   deriveEventTimeline,
   deriveExplicitCausalEdges,
+  deriveLaneActivityIntervals,
   derivePlaybackMoments,
+  deriveRuntimeFailureIntervals,
   deriveTraceCaptures,
   projectAdaptiveTime,
   projectTraceAt,
@@ -252,13 +254,21 @@ Vitest.describe('offline writer recovery', () => {
 
         const playbackMoments = derivePlaybackMoments({ scenario: artifact.scenario, trace: artifact.trace })
         expect(playbackMoments.length).toBeLessThan(artifact.trace.length)
-        expect(playbackMoments[0]).toEqual(expect.objectContaining({ recordIndex: 0, kind: 'run' }))
+        expect(playbackMoments[0]).toEqual(
+          expect.objectContaining({ recordIndex: 0, kind: 'run', summary: 'Run started' }),
+        )
         expect(playbackMoments.at(-1)).toEqual(
           expect.objectContaining({ recordIndex: artifact.trace.length - 1, kind: 'run' }),
         )
         expect(playbackMoments.some((moment) => moment.kind === 'action')).toBe(true)
         expect(playbackMoments.some((moment) => moment.kind === 'connectivity')).toBe(true)
         expect(playbackMoments.some((moment) => moment.kind === 'capture')).toBe(true)
+        expect(playbackMoments.every((moment) => moment.summary.length > 0)).toBe(true)
+        expect(
+          playbackMoments
+            .filter((moment) => moment.kind === 'capture')
+            .some((moment) => moment.summary.includes('first observed')),
+        ).toBe(true)
         expect(playbackMoments.map((moment) => moment.recordIndex)).toEqual(
           playbackMoments.map((moment) => moment.recordIndex).toSorted((left, right) => left - right),
         )
@@ -267,6 +277,21 @@ Vitest.describe('offline writer recovery', () => {
           expect(moment.recordIndex).toBe(capture?.lastRecordIndex)
           expect(moment.recordIndexes).toEqual(capture?.recordIndexes)
         }
+
+        const laneActivityIntervals = deriveLaneActivityIntervals({
+          scenario: artifact.scenario,
+          trace: artifact.trace,
+        })
+        expect(new Set(laneActivityIntervals.map((interval) => interval.componentKey))).toEqual(
+          new Set([
+            'backend',
+            'leader:client-a',
+            'session:client-a/session-a',
+            'leader:client-b',
+            'session:client-b/session-b',
+          ]),
+        )
+        expect(laneActivityIntervals.every((interval) => interval.endRecordIndex === null)).toBe(true)
 
         const acknowledgementRecords = artifact.trace.filter((record) => record.origin === 'acknowledgement')
         expect(acknowledgementRecords.every((record) => record.causedBy.length === 1)).toBe(true)
@@ -280,6 +305,10 @@ Vitest.describe('offline writer recovery', () => {
           cursorIndex: artifact.trace.length - 1,
         })
         expect(finalProjection.runStatus).toBe('passed')
+        expect(finalProjection.clients.every((client) => client.health === 'healthy')).toBe(true)
+        expect(
+          finalProjection.clients.flatMap((client) => client.sessions).every((session) => session.health === 'healthy'),
+        ).toBe(true)
         expect(finalProjection.backend?.events).toHaveLength(2)
         expect(finalProjection.clients.every((client) => client.leader?.pendingCount === 0)).toBe(true)
         expect(finalProjection.clients.every((client) => client.leader?.events.length === 2)).toBe(true)
@@ -327,6 +356,80 @@ Vitest.describe('offline writer recovery', () => {
             markers.filter((marker) => marker.event.eventRef === rebasedRef).map((marker) => marker.event.position),
           ).size,
         ).toBeGreaterThan(1)
+        expect(deriveRuntimeFailureIntervals(artifact.trace)).toEqual([])
+
+        const traceBeforeCompletion = artifact.trace.slice(0, -1)
+        const terminalRecord = artifact.trace.at(-1)!
+        const runtimeFailure: ScenarioTraceRecord = {
+          ...terminalRecord,
+          index: traceBeforeCompletion.length,
+          origin: 'observation',
+          clientId: 'client-a',
+          sessionId: 'session-a',
+          payload: {
+            _tag: 'runtime.failure.observed',
+            source: 'browser-console',
+            code: 'browser-console-error',
+            message: 'SQLite error: UNIQUE constraint failed: todos.id',
+          },
+        }
+        const repeatedRuntimeFailure: ScenarioTraceRecord = {
+          ...runtimeFailure,
+          index: runtimeFailure.index + 1,
+          localSequence: runtimeFailure.localSequence + 1,
+        }
+        const runFailure: ScenarioTraceRecord = {
+          ...terminalRecord,
+          index: repeatedRuntimeFailure.index + 1,
+          payload: {
+            _tag: 'run.failed',
+            code: 'participant-runtime-failure',
+            message: 'client-a/session-a reported a runtime failure',
+            phaseId: terminalRecord.phaseId,
+            stepId: null,
+          },
+        }
+        const failedTrace = [...traceBeforeCompletion, runtimeFailure, repeatedRuntimeFailure, runFailure]
+        const failureProjection = projectTraceAt({
+          scenario: artifact.scenario,
+          trace: failedTrace,
+          cursorIndex: runFailure.index,
+        })
+        const failedClient = failureProjection.clients.find((client) => client.clientId === 'client-a')!
+
+        expect(failedClient.health).toBe('degraded')
+        expect(failedClient.sessions.find((session) => session.sessionId === 'session-a')?.health).toBe('failed')
+        expect(failedClient.leader?.events).toEqual(finalProjection.clients[0]?.leader?.events)
+        expect(deriveRuntimeFailureIntervals(failedTrace)).toEqual([
+          expect.objectContaining({
+            componentKey: 'session:client-a/session-a',
+            clientId: 'client-a',
+            sessionId: 'session-a',
+            startRecordIndex: runtimeFailure.index,
+            endRecordIndex: null,
+            recordIndexes: [runtimeFailure.index, repeatedRuntimeFailure.index],
+            summary: 'UNIQUE constraint failed: todos.id',
+          }),
+        ])
+
+        const sessionRestart: ScenarioTraceRecord = {
+          ...repeatedRuntimeFailure,
+          index: repeatedRuntimeFailure.index + 1,
+          origin: 'acknowledgement',
+          localSequence: repeatedRuntimeFailure.localSequence + 1,
+          payload: { _tag: 'lifecycle.session-restarted' },
+        }
+        const recoveredTrace = [...traceBeforeCompletion, runtimeFailure, repeatedRuntimeFailure, sessionRestart]
+        const recoveredProjection = projectTraceAt({
+          scenario: artifact.scenario,
+          trace: recoveredTrace,
+          cursorIndex: sessionRestart.index,
+        })
+        const recoveredClient = recoveredProjection.clients.find((client) => client.clientId === 'client-a')!
+
+        expect(recoveredClient.health).toBe('healthy')
+        expect(recoveredClient.sessions.find((session) => session.sessionId === 'session-a')?.health).toBe('healthy')
+        expect(deriveRuntimeFailureIntervals(recoveredTrace)[0]?.endRecordIndex).toBe(sessionRestart.index)
       }).pipe(Vitest.withTestCtx(test)),
     15_000,
   )
@@ -394,7 +497,7 @@ Vitest.describe('process profile', () => {
 /** Verifies the persisted web topology, browser network boundary, and lifecycle controls. */
 Vitest.describe('browser profile', () => {
   Vitest.live(
-    'captures the browser session rebase materialization failure',
+    'runs the offline writer recovery through the browser SharedWorker topology',
     (test) =>
       Effect.gen(function* () {
         const artifact = yield* runBrowserLocalSyncCfScenario({
@@ -403,44 +506,16 @@ Vitest.describe('browser profile', () => {
           options: { runId: 'offline-writer-recovery-browser', sourceRevision: 'test' },
         })
 
-        expect(artifact.status).toBe('failed')
+        expect(artifact.status).toBe('passed')
         expect(artifact.descriptor.execution).toEqual({
           participantProfile: 'browser',
           syncBackend: 'local-sync-cf',
           stateProfile: 'opfs',
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('browser-shared-worker')
-        const runtimeFailure = artifact.trace.find((record) => record.payload._tag === 'runtime.failure.observed')
-        expect(runtimeFailure).toEqual(
-          expect.objectContaining({
-            clientId: 'client-a',
-            sessionId: 'session-a',
-            phaseId: 'recovery',
-            payload: expect.objectContaining({
-              _tag: 'runtime.failure.observed',
-              source: 'browser-console',
-              message: expect.stringContaining('UNIQUE constraint failed: todos.id'),
-            }),
-          }),
-        )
-        const settlementFailure = artifact.trace.find((record) => record.payload._tag === 'settlement.failed')
-        expect(settlementFailure?.payload).toEqual(
-          expect.objectContaining({
-            _tag: 'settlement.failed',
-            code: 'participant-runtime-failure',
-            observations: expect.arrayContaining([
-              expect.objectContaining({ participant: 'client-a/session-a', localHead: 'e2r1' }),
-            ]),
-          }),
-        )
-        expect(artifact.trace.at(-1)?.payload).toEqual(
-          expect.objectContaining({
-            _tag: 'run.failed',
-            code: 'participant-runtime-failure',
-            phaseId: 'recovery',
-            stepId: 'settle-after-reconnect',
-          }),
-        )
+        expect(artifact.snapshots).toHaveLength(2)
+        expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)
+        expect(artifact.trace.at(-1)?.payload).toEqual(expect.objectContaining({ _tag: 'run.completed' }))
         const participantRecords = artifact.trace.filter((record) => record.emitterId.startsWith('browser-session:'))
         expect(participantRecords.length).toBeGreaterThan(0)
         expect(

@@ -15,8 +15,17 @@ export interface BrowserPageObservation {
   readonly clock: ParticipantClockReading
 }
 
+export interface BrowserDatabaseDiagnostics {
+  readonly sessionStateBase64: string
+  readonly leaderStateBase64: string
+  readonly eventlogBase64: string
+  readonly syncStates: { readonly session: unknown; readonly leader: unknown }
+}
+
 export interface ScenarioBrowserControl {
   readonly start: (options: BrowserStartOptions) => Promise<void>
+  readonly setConnectivity: (connected: boolean) => Promise<void>
+  readonly captureDatabaseDiagnostics: () => Promise<BrowserDatabaseDiagnostics>
   readonly dispatchAction: (args: { target: ParticipantRef; action: string; input: Schema.Json }) => Promise<void>
   readonly observe: () => Promise<BrowserPageObservation>
   readonly inspectState: (args: { participant: ParticipantRef; inspector: string }) => Promise<Schema.Json>

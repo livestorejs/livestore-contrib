@@ -47,7 +47,7 @@ export const makeConnectivityControlledBackend = <TSyncMetadata>(args: {
 }): SyncBackend.SyncBackend<TSyncMetadata> =>
   SyncBackend.of({
     ...args.underlying,
-    connect: SubscriptionRef.set(args.connectivity, true),
+    connect: args.underlying.connect,
     isConnected: args.connectivity,
     metadata: {
       ...args.underlying.metadata,

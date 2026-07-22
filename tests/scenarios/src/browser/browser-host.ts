@@ -304,7 +304,7 @@ const makeBrowserClient = (args: {
         })
         state.pages.set(sessionId, page)
       }
-      if (state.connected === false) yield* setContextOffline(state.context, true)
+      if (state.connected === false) yield* setClientSyncConnectivity(state.pages, false)
 
       const getSession = (sessionId: string): Effect.Effect<Page, ScenarioOperationError> => {
         const page = state.pages.get(sessionId)
@@ -338,7 +338,16 @@ const makeBrowserClient = (args: {
         })
 
       const setConnectivity = (connected: boolean) =>
-        setContextOffline(state.context, connected === false).pipe(
+        Effect.gen(function* () {
+          if (connected === true && process.env.SCENARIO_BROWSER_DB_SNAPSHOT_DIR !== undefined) {
+            yield* persistPageDiagnostics({
+              pages: state.pages,
+              clientId: args.clientId,
+              directory: process.env.SCENARIO_BROWSER_DB_SNAPSHOT_DIR,
+            })
+          }
+          yield* setClientSyncConnectivity(state.pages, connected)
+        }).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
               state.connected = connected
@@ -362,7 +371,7 @@ const makeBrowserClient = (args: {
           })
           state.pages.set(sessionId, page)
         }
-        if (state.connected === false) yield* setContextOffline(state.context, true)
+        if (state.connected === false) yield* setClientSyncConnectivity(state.pages, false)
       })
 
       const observe = Effect.gen(function* () {
@@ -480,10 +489,32 @@ const launchBrowserContext = (userDataDir: string): Effect.Effect<BrowserContext
     catch: (cause) => browserError(`Failed to launch Chromium: ${String(cause)}`),
   })
 
-const setContextOffline = (context: BrowserContext, offline: boolean) =>
+const setClientSyncConnectivity = (pages: ReadonlyMap<string, Page>, connected: boolean) =>
   Effect.tryPromise({
-    try: () => context.setOffline(offline),
-    catch: (cause) => browserError(`Failed to set browser offline=${offline}: ${String(cause)}`),
+    try: async () => {
+      const page = pages.values().next().value
+      if (page === undefined) throw new Error('Client has no running session to control its sync latch')
+      await page.evaluate((value) => window.__scenarioBrowser.setConnectivity(value), connected)
+    },
+    catch: (cause) => browserError(`Failed to set browser connected=${connected}: ${String(cause)}`),
+  })
+
+const persistPageDiagnostics = (args: { pages: ReadonlyMap<string, Page>; clientId: string; directory: string }) =>
+  Effect.tryPromise({
+    try: async () => {
+      const [sessionId, page] = args.pages.entries().next().value ?? []
+      if (sessionId === undefined || page === undefined) throw new Error('Client has no running session to inspect')
+      const diagnostics = await page.evaluate(() => window.__scenarioBrowser.captureDatabaseDiagnostics())
+      await fs.mkdir(args.directory, { recursive: true })
+      const prefix = path.join(args.directory, `${args.clientId}-${sessionId}-before-reconnect`)
+      await Promise.all([
+        fs.writeFile(`${prefix}-session.db`, Buffer.from(diagnostics.sessionStateBase64, 'base64')),
+        fs.writeFile(`${prefix}-leader.db`, Buffer.from(diagnostics.leaderStateBase64, 'base64')),
+        fs.writeFile(`${prefix}-eventlog.db`, Buffer.from(diagnostics.eventlogBase64, 'base64')),
+        fs.writeFile(`${prefix}-sync-states.json`, `${jsonStringify(diagnostics.syncStates)}\n`, 'utf8'),
+      ])
+    },
+    catch: (cause) => browserError(`Failed to persist browser database diagnostics: ${String(cause)}`),
   })
 
 const shutdownPage = (page: Page) =>

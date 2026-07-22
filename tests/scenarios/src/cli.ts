@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { gunzipSync } from 'node:zlib'
 
 import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
@@ -161,17 +162,23 @@ const refreshArtifactCatalog = async (outputPath: string): Promise<void> => {
 
   const entries = await Promise.all(
     (await fs.readdir(artifactDirectory, { withFileTypes: true }))
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'catalog.json')
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          (entry.name.endsWith('.json') || entry.name.endsWith('.json.gz')) &&
+          entry.name !== 'catalog.json',
+      )
       .map(async (entry): Promise<ArtifactCatalogEntry | undefined> => {
         try {
-          const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(
-            await fs.readFile(path.join(artifactDirectory, entry.name), 'utf8'),
-          )
+          const fileData = await fs.readFile(path.join(artifactDirectory, entry.name))
+          const artifactJson =
+            entry.name.endsWith('.gz') === true ? gunzipSync(fileData).toString('utf8') : fileData.toString('utf8')
+          const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(artifactJson)
           const profile = artifact.descriptor.execution.participantProfile
           const backend = artifact.descriptor.execution.syncBackend
           return {
             file: entry.name,
-            label: `${artifact.descriptor.scenarioId} · ${profile} · ${backend}`,
+            label: `${artifact.descriptor.scenarioId} · ${profile} · ${backend}${entry.name.startsWith('reference-') === true ? ' · reference' : ''}`,
             scenarioId: artifact.descriptor.scenarioId,
             profile,
             backend,
