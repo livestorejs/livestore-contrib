@@ -4,6 +4,15 @@ import { Effect, Schema } from '@livestore/utils/effect'
 
 import type { ParticipantRef } from './model.ts'
 
+export type ScenarioOperationFailureOutcome = 'definite-failure' | 'indefinite'
+
+export type ParticipantHostFailureCode =
+  | 'host-infrastructure-failure'
+  | 'host-request-rejected'
+  | 'host-response-invalid'
+  | 'host-response-timeout'
+  | 'host-transport-failure'
+
 export class ScenarioOperationError extends Error {
   readonly _tag = 'ScenarioOperationError'
 
@@ -12,11 +21,10 @@ export class ScenarioOperationError extends Error {
       | 'application-mismatch'
       | 'capability-unavailable'
       | 'duplicate-client'
+      | ParticipantHostFailureCode
       | 'invalid-action-input'
       | 'invalid-inspector-output'
       | 'invalid-observation-evidence'
-      | 'host-request-failed'
-      | 'host-request-indefinite'
       | 'missing-client'
       | 'missing-participant'
       | 'operations-in-flight'
@@ -26,12 +34,22 @@ export class ScenarioOperationError extends Error {
       | 'unknown-inspector',
     message: string,
     /** Whether the controller knows that request handling failed or lost the response boundary. */
-    readonly operationOutcome: 'definite-failure' | 'indefinite' = 'definite-failure',
+    readonly operationOutcome: ScenarioOperationFailureOutcome = 'definite-failure',
   ) {
     super(message)
     this.name = 'ScenarioOperationError'
   }
 }
+
+/**
+ * Creates a portable participant-host failure without coupling its category to
+ * what the controller knows about the Scenario operation's completion.
+ */
+export const participantHostFailure = (args: {
+  code: ParticipantHostFailureCode
+  message: string
+  operationOutcome: ScenarioOperationFailureOutcome
+}): ScenarioOperationError => new ScenarioOperationError(args.code, args.message, args.operationOutcome)
 
 export interface ApplicationAction<TSchema extends LiveStoreSchema> {
   readonly dispatch: (store: Store<TSchema>, input: Schema.Json) => Effect.Effect<void, ScenarioOperationError>

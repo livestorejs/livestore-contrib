@@ -3,7 +3,12 @@ import { fileURLToPath } from 'node:url'
 
 import { Effect, Exit, Schema, type Scope } from '@livestore/utils/effect'
 
-import { ScenarioOperationError } from '../application.ts'
+import {
+  participantHostFailure,
+  ScenarioOperationError,
+  type ParticipantHostFailureCode,
+  type ScenarioOperationFailureOutcome,
+} from '../application.ts'
 import type { ScenarioBackend } from '../backends.ts'
 import { calibrateParticipantReading, makeParticipantClock, readControllerOccurrence } from '../clock.ts'
 import type { ParticipantHost } from '../host.ts'
@@ -163,7 +168,7 @@ export const makeProcessHost = (args: {
           .request({ _tag: 'observe-sync', participant })
           .pipe(Effect.flatMap(expectResult('sync-observation')))
         return yield* Schema.decodeUnknownEffect(SyncObservationSchema)(result.observation).pipe(
-          Effect.mapError((cause) => processError(`Invalid sync observation: ${String(cause)}`)),
+          Effect.mapError((cause) => processResponseInvalid(`Invalid sync observation: ${String(cause)}`)),
         )
       })
 
@@ -225,7 +230,7 @@ const spawnProcessClient = (
         await waitForSpawn(child)
         return makeController(clientId, child)
       },
-      catch: (cause) => processError(`Failed to spawn Client ${clientId}: ${String(cause)}`),
+      catch: (cause) => processInfrastructureFailure(`Failed to spawn Client ${clientId}: ${String(cause)}`),
     }),
     (controller) => controller.shutdown.pipe(Effect.ignore),
   )
@@ -252,13 +257,17 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
     clearTimeout(waiter.timeout)
     pending.delete(message.requestId)
     if (message.status === 'success') waiter.resolve(message.result)
-    else waiter.reject(new Error(message.error))
+    else waiter.reject(new ProcessRequestFailure('host-request-rejected', 'definite-failure', message.error))
   })
   child.on('exit', (code, signal) => {
     for (const waiter of pending.values()) {
       clearTimeout(waiter.timeout)
       waiter.reject(
-        new IndefiniteProcessRequestError(`Client ${clientId} exited (${code ?? signal ?? 'unknown'})\n${stderr}`),
+        new ProcessRequestFailure(
+          'host-transport-failure',
+          'indefinite',
+          `Client ${clientId} exited (${code ?? signal ?? 'unknown'})\n${stderr}`,
+        ),
       )
     }
     pending.clear()
@@ -275,7 +284,13 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
       try: () =>
         new Promise<ProcessClientResult>((resolve, reject) => {
           if (child.connected !== true) {
-            reject(new Error(`Client ${clientId} IPC channel is closed`))
+            reject(
+              new ProcessRequestFailure(
+                'host-transport-failure',
+                'definite-failure',
+                `Client ${clientId} IPC channel is closed`,
+              ),
+            )
             return
           }
           const requestId = `${clientId}:${nextRequest}`
@@ -283,7 +298,11 @@ const makeController = (clientId: string, child: ChildProcess): ProcessClientCon
           const timeout = setTimeout(() => {
             pending.delete(requestId)
             reject(
-              new IndefiniteProcessRequestError(`Client ${clientId} timed out handling ${command._tag}\n${stderr}`),
+              new ProcessRequestFailure(
+                'host-response-timeout',
+                'indefinite',
+                `Client ${clientId} timed out handling ${command._tag}\n${stderr}`,
+              ),
             )
           }, 20_000)
           pending.set(requestId, { resolve, reject, timeout })
@@ -337,7 +356,7 @@ const waitForExit = (child: ChildProcess): Effect.Effect<void, ScenarioOperation
         if (child.exitCode !== null || child.signalCode !== null) resolve()
         else child.once('exit', () => resolve())
       }),
-    catch: (cause) => processError(`Failed while waiting for process exit: ${String(cause)}`),
+    catch: (cause) => processInfrastructureFailure(`Failed while waiting for process exit: ${String(cause)}`),
   })
 
 const processClientEntry = (): string => {
@@ -360,11 +379,11 @@ const expectResult =
   (result: ProcessClientResult): Effect.Effect<Extract<ProcessClientResult, { _tag: TTag }>, ScenarioOperationError> =>
     result._tag === tag
       ? Effect.succeed(result as Extract<ProcessClientResult, { _tag: TTag }>)
-      : Effect.fail(processError(`Expected ${tag} response, received ${result._tag}`))
+      : Effect.fail(processResponseInvalid(`Expected ${tag} response, received ${result._tag}`))
 
 const decodeClientObservation = (input: unknown) =>
   Schema.decodeUnknownEffect(ClientSystemObservationSchema)(input).pipe(
-    Effect.mapError((cause) => processError(`Invalid Client observation: ${String(cause)}`)),
+    Effect.mapError((cause) => processResponseInvalid(`Invalid Client observation: ${String(cause)}`)),
   )
 
 const reconcileClientObservation =
@@ -380,21 +399,38 @@ const reconcileClientObservation =
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 
-class IndefiniteProcessRequestError extends Error {}
+class ProcessRequestFailure extends Error {
+  constructor(
+    readonly code: ParticipantHostFailureCode,
+    readonly operationOutcome: ScenarioOperationFailureOutcome,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ProcessRequestFailure'
+  }
+}
 
-const processRequestError = (clientId: string, operation: string, cause: unknown): ScenarioOperationError =>
-  cause instanceof IndefiniteProcessRequestError
-    ? new ScenarioOperationError(
-        'host-request-indefinite',
-        `Client ${clientId} request ${operation} lost its completion boundary: ${String(cause)}`,
-        'indefinite',
-      )
-    : new ScenarioOperationError(
-        'host-request-failed',
-        `Client ${clientId} request ${operation} failed: ${String(cause)}`,
-      )
+const processRequestError = (clientId: string, operation: string, cause: unknown): ScenarioOperationError => {
+  const classification =
+    cause instanceof ProcessRequestFailure
+      ? cause
+      : new ProcessRequestFailure(
+          'host-transport-failure',
+          'indefinite',
+          `Unexpected process request failure: ${String(cause)}`,
+        )
+  return participantHostFailure({
+    code: classification.code,
+    operationOutcome: classification.operationOutcome,
+    message: `Client ${clientId} request ${operation} failed: ${classification.message}`,
+  })
+}
 
-const processError = (message: string) => new ScenarioOperationError('host-request-failed', message)
+const processInfrastructureFailure = (message: string) =>
+  participantHostFailure({ code: 'host-infrastructure-failure', message, operationOutcome: 'definite-failure' })
+
+const processResponseInvalid = (message: string) =>
+  participantHostFailure({ code: 'host-response-invalid', message, operationOutcome: 'definite-failure' })
 
 const unsupportedLifecycle = (operation: string) => (_command: { operationId: string }) =>
   Effect.fail(new ScenarioOperationError('capability-unavailable', `Process host does not support ${operation}`))

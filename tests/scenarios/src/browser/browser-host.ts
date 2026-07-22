@@ -8,7 +8,7 @@ import { createServer, type ViteDevServer } from 'vite'
 import { EventSequenceNumber } from '@livestore/common/schema'
 import { Effect, Schema, type Scope } from '@livestore/utils/effect'
 
-import { ScenarioOperationError } from '../application.ts'
+import { participantHostFailure, ScenarioOperationError, type ScenarioOperationFailureOutcome } from '../application.ts'
 import type { ScenarioBackend } from '../backends.ts'
 import { calibrateParticipantReading, makeParticipantClock, readControllerOccurrence } from '../clock.ts'
 import type { ParticipantHost } from '../host.ts'
@@ -188,7 +188,9 @@ export const makeBrowserHost = (args: {
             sessions: observed.sessions,
           })),
         },
-      }).pipe(Effect.mapError((cause) => browserError(`Invalid browser system observation: ${String(cause)}`)))
+      }).pipe(
+        Effect.mapError((cause) => browserResponseInvalid(`Invalid browser system observation: ${String(cause)}`)),
+      )
     })
 
     const observeSync: ParticipantHost['observeSync'] = (participant) =>
@@ -196,7 +198,8 @@ export const makeBrowserHost = (args: {
         const client = yield* getClient(clients, participant.clientId)
         const page = yield* client.getSession(participant.sessionId)
         const observation = yield* observePage(page)
-        if (observedStoreId === undefined) return yield* Effect.fail(browserError('Browser store is not initialized'))
+        if (observedStoreId === undefined)
+          return yield* Effect.fail(browserRequestRejected('Browser store is not initialized'))
         const backend = yield* args.backend.observe(observedStoreId)
         const backendHead = backend.events.at(-1)?.seqNum ?? 0
         const leaderHead = EventSequenceNumber.Client.fromString(observation.sync.upstreamHead)
@@ -207,7 +210,9 @@ export const makeBrowserHost = (args: {
           upstreamHead: `e${backendHead}`,
           pendingCount,
           isSynced: client.connected() === true && pendingCount === 0 && leaderHead.global === backendHead,
-        }).pipe(Effect.mapError((cause) => browserError(`Invalid browser sync observation: ${String(cause)}`)))
+        }).pipe(
+          Effect.mapError((cause) => browserResponseInvalid(`Invalid browser sync observation: ${String(cause)}`)),
+        )
       })
 
     const drainRuntimeFailures: ParticipantHost['drainRuntimeFailures'] = Effect.sync(() =>
@@ -277,7 +282,7 @@ const makeBrowserClient = (args: {
     Effect.gen(function* () {
       const userDataDir = yield* Effect.tryPromise({
         try: () => fs.mkdtemp(path.join(os.tmpdir(), `livestore-scenario-${args.clientId}-`)),
-        catch: (cause) => browserError(`Failed to create browser profile: ${String(cause)}`),
+        catch: (cause) => browserInfrastructureFailure(`Failed to create browser profile: ${String(cause)}`),
       })
       const state = {
         context: yield* launchBrowserContext(userDataDir),
@@ -301,7 +306,7 @@ const makeBrowserClient = (args: {
       const getSession = (sessionId: string): Effect.Effect<Page, ScenarioOperationError> => {
         const page = state.pages.get(sessionId)
         return page === undefined
-          ? Effect.fail(browserError(`Session ${args.clientId}/${sessionId} is not running`))
+          ? Effect.fail(browserRequestRejected(`Session ${args.clientId}/${sessionId} is not running`))
           : Effect.succeed(page)
       }
 
@@ -315,10 +320,12 @@ const makeBrowserClient = (args: {
       const restartSession = (sessionId: string) =>
         Effect.gen(function* () {
           if (args.sessionIds.includes(sessionId) === false) {
-            return yield* Effect.fail(browserError(`Unknown session ${args.clientId}/${sessionId}`))
+            return yield* Effect.fail(browserRequestRejected(`Unknown session ${args.clientId}/${sessionId}`))
           }
           if (state.pages.has(sessionId) === true) {
-            return yield* Effect.fail(browserError(`Session ${args.clientId}/${sessionId} is already running`))
+            return yield* Effect.fail(
+              browserRequestRejected(`Session ${args.clientId}/${sessionId} is already running`),
+            )
           }
           const page = yield* startSessionPage({
             ...args,
@@ -379,15 +386,17 @@ const makeBrowserClient = (args: {
         const leader = observations[0]?.observation.leader
         const leaderOccurrence = observations[0]?.occurrence
         if (leader === undefined)
-          return yield* Effect.fail(browserError(`Client ${args.clientId} has no running session`))
+          return yield* Effect.fail(browserRequestRejected(`Client ${args.clientId} has no running session`))
         if (leaderOccurrence === undefined)
-          return yield* Effect.fail(browserError(`Client ${args.clientId} observation has no timing evidence`))
+          return yield* Effect.fail(
+            browserResponseInvalid(`Client ${args.clientId} observation has no timing evidence`),
+          )
         const observation = yield* Schema.decodeUnknownEffect(ClientSystemObservationSchema)({
           clientId: args.clientId,
           connected: state.connected,
           leader,
           sessions: observations.map(({ sessionId, observation }) => ({ sessionId, sync: observation.session })),
-        }).pipe(Effect.mapError((cause) => browserError(`Invalid Client observation: ${String(cause)}`)))
+        }).pipe(Effect.mapError((cause) => browserResponseInvalid(`Invalid Client observation: ${String(cause)}`)))
         return {
           observation,
           connectivityOccurrence: leaderOccurrence,
@@ -403,7 +412,8 @@ const makeBrowserClient = (args: {
         yield* closeContext(state.context)
         yield* Effect.tryPromise({
           try: () => fs.rm(userDataDir, { recursive: true, force: true }),
-          catch: (cause) => browserError(`Failed to remove browser profile ${userDataDir}: ${String(cause)}`),
+          catch: (cause) =>
+            browserInfrastructureFailure(`Failed to remove browser profile ${userDataDir}: ${String(cause)}`),
         })
       })
 
@@ -431,45 +441,56 @@ const startSessionPage = (args: {
   sessionId: string
   onRuntimeFailure: (failure: RuntimeFailureObservation) => void
 }): Effect.Effect<Page, ScenarioOperationError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const page = await args.context.newPage()
-      page.on('console', (message) => {
-        const text = message.text()
-        if (message.type() === 'error') console.error(`[browser ${args.clientId}/${args.sessionId}] ${text}`)
-        else if (process.env.SCENARIO_BROWSER_DIAGNOSTICS === '1')
-          console.log(`[browser ${args.clientId}/${args.sessionId}:${message.type()}] ${text}`)
-        if (message.type() === 'error' || /\bERROR \(#\d+\):/.test(text) === true) {
+  Effect.gen(function* () {
+    const page = yield* Effect.tryPromise({
+      try: async () => {
+        const page = await args.context.newPage()
+        page.on('console', (message) => {
+          const text = message.text()
+          if (message.type() === 'error') console.error(`[browser ${args.clientId}/${args.sessionId}] ${text}`)
+          else if (process.env.SCENARIO_BROWSER_DIAGNOSTICS === '1')
+            console.log(`[browser ${args.clientId}/${args.sessionId}:${message.type()}] ${text}`)
+          if (message.type() === 'error' || /\bERROR \(#\d+\):/.test(text) === true) {
+            args.onRuntimeFailure({
+              clientId: args.clientId,
+              sessionId: args.sessionId,
+              source: 'browser-console',
+              code: 'browser-console-error',
+              message: text,
+            })
+          }
+        })
+        page.on('pageerror', (error) => {
+          console.error(`[browser ${args.clientId}/${args.sessionId}]`, error)
           args.onRuntimeFailure({
             clientId: args.clientId,
             sessionId: args.sessionId,
-            source: 'browser-console',
-            code: 'browser-console-error',
-            message: text,
+            source: 'browser-page',
+            code: 'browser-page-error',
+            message: error.stack ?? error.message,
           })
-        }
-      })
-      page.on('pageerror', (error) => {
-        console.error(`[browser ${args.clientId}/${args.sessionId}]`, error)
-        args.onRuntimeFailure({
-          clientId: args.clientId,
-          sessionId: args.sessionId,
-          source: 'browser-page',
-          code: 'browser-page-error',
-          message: error.stack ?? error.message,
         })
-      })
-      await page.goto(args.baseUrl)
-      await page.waitForFunction(() => window.__scenarioBrowser !== undefined)
-      const options: BrowserStartOptions = {
-        storeId: args.storeId,
-        clientId: args.clientId,
-        sessionId: args.sessionId,
-      }
-      await page.evaluate((input) => window.__scenarioBrowser.start(input), options)
-      return page
-    },
-    catch: (cause) => browserError(`Failed to start ${args.clientId}/${args.sessionId}: ${String(cause)}`),
+        await page.goto(args.baseUrl)
+        await page.waitForFunction(() => window.__scenarioBrowser !== undefined)
+        return page
+      },
+      catch: (cause) =>
+        browserInfrastructureFailure(`Failed to start ${args.clientId}/${args.sessionId}: ${String(cause)}`),
+    })
+    const options: BrowserStartOptions = {
+      storeId: args.storeId,
+      clientId: args.clientId,
+      sessionId: args.sessionId,
+    }
+    yield* Effect.tryPromise({
+      try: () => page.evaluate((input) => window.__scenarioBrowser.start(input), options),
+      catch: (cause) =>
+        browserTransportFailure(
+          `Browser start completion was not observed for ${args.clientId}/${args.sessionId}: ${String(cause)}`,
+          'indefinite',
+        ),
+    })
+    return page
   })
 
 const launchBrowserContext = (userDataDir: string): Effect.Effect<BrowserContext, ScenarioOperationError> =>
@@ -478,35 +499,45 @@ const launchBrowserContext = (userDataDir: string): Effect.Effect<BrowserContext
       chromium.launchPersistentContext(userDataDir, {
         headless: process.env.SCENARIO_BROWSER_HEADLESS !== '0',
       }),
-    catch: (cause) => browserError(`Failed to launch Chromium: ${String(cause)}`),
+    catch: (cause) => browserInfrastructureFailure(`Failed to launch Chromium: ${String(cause)}`),
   })
 
 const setClientSyncConnectivity = (pages: ReadonlyMap<string, Page>, connected: boolean) =>
-  Effect.tryPromise({
-    try: async () => {
-      const page = pages.values().next().value
-      if (page === undefined) throw new Error('Client has no running session to control its sync latch')
-      await page.evaluate((value) => window.__scenarioBrowser.setConnectivity(value), connected)
-    },
-    catch: (cause) => browserIndefiniteError(`Failed to confirm browser connected=${connected}: ${String(cause)}`),
+  Effect.gen(function* () {
+    const page = pages.values().next().value
+    if (page === undefined)
+      return yield* Effect.fail(browserRequestRejected('Client has no running session to control its sync latch'))
+    yield* Effect.tryPromise({
+      try: () => page.evaluate((value) => window.__scenarioBrowser.setConnectivity(value), connected),
+      catch: (cause) =>
+        browserTransportFailure(`Failed to confirm browser connected=${connected}: ${String(cause)}`, 'indefinite'),
+    })
   })
 
 const persistPageDiagnostics = (args: { pages: ReadonlyMap<string, Page>; clientId: string; directory: string }) =>
-  Effect.tryPromise({
-    try: async () => {
-      const [sessionId, page] = args.pages.entries().next().value ?? []
-      if (sessionId === undefined || page === undefined) throw new Error('Client has no running session to inspect')
-      const diagnostics = await page.evaluate(() => window.__scenarioBrowser.captureDatabaseDiagnostics())
-      await fs.mkdir(args.directory, { recursive: true })
-      const prefix = path.join(args.directory, `${args.clientId}-${sessionId}-before-reconnect`)
-      await Promise.all([
-        fs.writeFile(`${prefix}-session.db`, Buffer.from(diagnostics.sessionStateBase64, 'base64')),
-        fs.writeFile(`${prefix}-leader.db`, Buffer.from(diagnostics.leaderStateBase64, 'base64')),
-        fs.writeFile(`${prefix}-eventlog.db`, Buffer.from(diagnostics.eventlogBase64, 'base64')),
-        fs.writeFile(`${prefix}-sync-states.json`, `${jsonStringify(diagnostics.syncStates)}\n`, 'utf8'),
-      ])
-    },
-    catch: (cause) => browserError(`Failed to persist browser database diagnostics: ${String(cause)}`),
+  Effect.gen(function* () {
+    const [sessionId, page] = args.pages.entries().next().value ?? []
+    if (sessionId === undefined || page === undefined)
+      return yield* Effect.fail(browserRequestRejected('Client has no running session to inspect'))
+    const diagnostics = yield* Effect.tryPromise({
+      try: () => page.evaluate(() => window.__scenarioBrowser.captureDatabaseDiagnostics()),
+      catch: (cause) =>
+        browserTransportFailure(`Failed to capture browser database diagnostics: ${String(cause)}`, 'definite-failure'),
+    })
+    yield* Effect.tryPromise({
+      try: async () => {
+        await fs.mkdir(args.directory, { recursive: true })
+        const prefix = path.join(args.directory, `${args.clientId}-${sessionId}-before-reconnect`)
+        await Promise.all([
+          fs.writeFile(`${prefix}-session.db`, Buffer.from(diagnostics.sessionStateBase64, 'base64')),
+          fs.writeFile(`${prefix}-leader.db`, Buffer.from(diagnostics.leaderStateBase64, 'base64')),
+          fs.writeFile(`${prefix}-eventlog.db`, Buffer.from(diagnostics.eventlogBase64, 'base64')),
+          fs.writeFile(`${prefix}-sync-states.json`, `${jsonStringify(diagnostics.syncStates)}\n`, 'utf8'),
+        ])
+      },
+      catch: (cause) =>
+        browserInfrastructureFailure(`Failed to persist browser database diagnostics: ${String(cause)}`),
+    })
   })
 
 const shutdownPage = (page: Page) =>
@@ -516,7 +547,7 @@ const shutdownPage = (page: Page) =>
       await page.evaluate(() => window.__scenarioBrowser.shutdown()).catch(() => undefined)
       await page.close()
     },
-    catch: (cause) => browserError(`Failed to close browser session: ${String(cause)}`),
+    catch: (cause) => browserInfrastructureFailure(`Failed to close browser session: ${String(cause)}`, 'indefinite'),
   })
 
 const closePages = (pages: Map<string, Page>) =>
@@ -527,7 +558,7 @@ const closePages = (pages: Map<string, Page>) =>
 const closeContext = (context: BrowserContext) =>
   Effect.tryPromise({
     try: () => context.close(),
-    catch: (cause) => browserError(`Failed to close browser Client: ${String(cause)}`),
+    catch: (cause) => browserInfrastructureFailure(`Failed to close browser Client: ${String(cause)}`, 'indefinite'),
   })
 
 const observePage = (page: Page): Effect.Effect<BrowserPageObservation, ScenarioOperationError> =>
@@ -542,7 +573,7 @@ const observePageWithTiming = (
   const controllerBeforeMonotonicMs = performance.now()
   return Effect.tryPromise({
     try: () => page.evaluate(() => window.__scenarioBrowser.observe()),
-    catch: (cause) => browserError(`Browser observation failed: ${String(cause)}`),
+    catch: (cause) => browserTransportFailure(`Browser observation failed: ${String(cause)}`, 'definite-failure'),
   }).pipe(
     Effect.map((observation) => ({
       observation,
@@ -562,13 +593,14 @@ const dispatchPageAction = (
 ): Effect.Effect<void, ScenarioOperationError> =>
   Effect.tryPromise({
     try: () => page.evaluate((args) => window.__scenarioBrowser.dispatchAction(args), input),
-    catch: (cause) => browserIndefiniteError(`Browser action completion was not observed: ${String(cause)}`),
+    catch: (cause) =>
+      browserTransportFailure(`Browser action completion was not observed: ${String(cause)}`, 'indefinite'),
   })
 
 const inspectPageState = (page: Page, input: Parameters<Window['__scenarioBrowser']['inspectState']>[0]) =>
   Effect.tryPromise({
     try: () => page.evaluate((args) => window.__scenarioBrowser.inspectState(args), input),
-    catch: (cause) => browserError(`Browser state inspection failed: ${String(cause)}`),
+    catch: (cause) => browserTransportFailure(`Browser state inspection failed: ${String(cause)}`, 'definite-failure'),
   })
 
 const startFixtureServer = (args: {
@@ -595,12 +627,12 @@ const startFixtureServer = (args: {
         }
         return { baseUrl: `http://127.0.0.1:${address.port}`, server }
       },
-      catch: (cause) => browserError(`Failed to start browser fixture: ${String(cause)}`),
+      catch: (cause) => browserInfrastructureFailure(`Failed to start browser fixture: ${String(cause)}`),
     }),
     ({ server }) =>
       Effect.tryPromise({
         try: () => server.close(),
-        catch: (cause) => browserError(`Failed to close browser fixture: ${String(cause)}`),
+        catch: (cause) => browserInfrastructureFailure(`Failed to close browser fixture: ${String(cause)}`),
       }).pipe(Effect.ignore),
   )
 
@@ -629,7 +661,16 @@ const jsonStringify = Schema.encodeSync(Schema.UnknownFromJsonString)
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 
-const browserError = (message: string) => new ScenarioOperationError('host-request-failed', message)
+const browserInfrastructureFailure = (
+  message: string,
+  operationOutcome: ScenarioOperationFailureOutcome = 'definite-failure',
+) => participantHostFailure({ code: 'host-infrastructure-failure', message, operationOutcome })
 
-const browserIndefiniteError = (message: string) =>
-  new ScenarioOperationError('host-request-indefinite', message, 'indefinite')
+const browserRequestRejected = (message: string) =>
+  participantHostFailure({ code: 'host-request-rejected', message, operationOutcome: 'definite-failure' })
+
+const browserResponseInvalid = (message: string) =>
+  participantHostFailure({ code: 'host-response-invalid', message, operationOutcome: 'definite-failure' })
+
+const browserTransportFailure = (message: string, operationOutcome: ScenarioOperationFailureOutcome) =>
+  participantHostFailure({ code: 'host-transport-failure', message, operationOutcome })

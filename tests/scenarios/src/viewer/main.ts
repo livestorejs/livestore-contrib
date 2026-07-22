@@ -456,7 +456,7 @@ const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact
     case 'operation.outcome':
       return [
         { label: 'Outcome', value: payload.status, tone: 'bad' },
-        { label: 'Code', value: payload.code, tone: 'bad' },
+        { label: 'Failure category', value: payload.code, tone: 'bad' },
         { label: 'Boundary', value: payload.status === 'indefinite' ? 'completion not observed' : 'failure reported' },
         { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
       ]

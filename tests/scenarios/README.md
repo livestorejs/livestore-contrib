@@ -53,6 +53,12 @@ projection covers serial runner instructions and their retained control
 acknowledgements or failure outcomes; it is not yet a complete concurrent
 history.
 
+Participant-host failures carry a portable category for host infrastructure,
+request rejection, invalid response, response timeout, or transport failure.
+That category is independent from outcome certainty: a timeout or transport
+loss after dispatch remains indefinite, while a known rejection or transport
+failure before send is definite. Adapter-native details remain in the message.
+
 Disconnect faults are injected or removed only when a system observation
 confirms the state requested through the host. Settlement records quiescence
 from the runner's in-flight operation projection, then retains recovery samples

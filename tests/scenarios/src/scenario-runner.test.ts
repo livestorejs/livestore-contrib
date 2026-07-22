@@ -6,7 +6,11 @@ import { expect } from 'vitest'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { Effect, Exit, Schema } from '@livestore/utils/effect'
 
-import { ScenarioOperationError } from './application.ts'
+import {
+  participantHostFailure,
+  type ParticipantHostFailureCode,
+  type ScenarioOperationFailureOutcome,
+} from './application.ts'
 import { makeMockScenarioBackend } from './backends.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
@@ -127,6 +131,29 @@ Vitest.describe('elapsed-time projection', () => {
 
     expect(layout.compressedGaps).toEqual([])
     expect(projectAdaptiveTime(layout, 50)).toBe(0.5)
+  })
+})
+
+Vitest.describe('participant-host failure conformance', () => {
+  Vitest.it('keeps portable failure category independent from operation certainty', () => {
+    const cases: ReadonlyArray<{
+      code: ParticipantHostFailureCode
+      operationOutcome: ScenarioOperationFailureOutcome
+    }> = [
+      { code: 'host-infrastructure-failure', operationOutcome: 'definite-failure' },
+      { code: 'host-request-rejected', operationOutcome: 'definite-failure' },
+      { code: 'host-response-invalid', operationOutcome: 'definite-failure' },
+      { code: 'host-response-timeout', operationOutcome: 'indefinite' },
+      { code: 'host-transport-failure', operationOutcome: 'definite-failure' },
+      { code: 'host-transport-failure', operationOutcome: 'indefinite' },
+    ]
+
+    expect(
+      cases.map(({ code, operationOutcome }) => {
+        const error = participantHostFailure({ code, message: 'profile-specific detail', operationOutcome })
+        return { code: error.code, operationOutcome: error.operationOutcome }
+      }),
+    ).toEqual(cases)
   })
 })
 
@@ -305,11 +332,11 @@ Vitest.describe('in-process host conformance', () => {
           ...host,
           dispatchAction: () =>
             Effect.fail(
-              new ScenarioOperationError(
-                'host-request-indefinite',
-                'The request may have completed before its response was lost',
-                'indefinite',
-              ),
+              participantHostFailure({
+                code: 'host-response-timeout',
+                message: 'The request may have completed before its response was lost',
+                operationOutcome: 'indefinite',
+              }),
             ),
         },
         options: { runId: 'indefinite-operation-outcome-test', sourceRevision: 'test' },
@@ -328,7 +355,7 @@ Vitest.describe('in-process host conformance', () => {
       ])
       expect(deriveInFlightScenarioOperationIds(artifact.trace)).toEqual([])
       expect(artifact.trace.find((record) => record.payload._tag === 'operation.outcome')?.payload).toEqual(
-        expect.objectContaining({ status: 'indefinite', code: 'host-request-indefinite' }),
+        expect.objectContaining({ status: 'indefinite', code: 'host-response-timeout' }),
       )
     }).pipe(Vitest.withTestCtx(test)),
   )
