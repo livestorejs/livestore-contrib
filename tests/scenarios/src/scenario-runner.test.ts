@@ -221,6 +221,7 @@ Vitest.describe('offline writer recovery', () => {
         expect(artifact.descriptor.traceVersion).toBe(3)
         expect(artifact.verdicts).toHaveLength(4)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
+        expectOfflineEventConfirmationLifecycle(artifact)
         expect(artifact.snapshots).toHaveLength(2)
         expect(artifact.trace.map((record) => record.payload._tag)).toEqual(
           expect.arrayContaining([
@@ -479,6 +480,7 @@ Vitest.describe('process profile', () => {
           stateProfile: 'sqlite',
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('process-isolation')
+        expectOfflineEventConfirmationLifecycle(artifact)
         expect(artifact.descriptor.componentVersions.node).toBe(process.version)
         expect(artifact.snapshots).toHaveLength(2)
         const participantRecords = artifact.trace.filter((record) => record.emitterId.startsWith('process-client:'))
@@ -513,6 +515,7 @@ Vitest.describe('browser profile', () => {
           stateProfile: 'opfs',
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('browser-shared-worker')
+        expectOfflineEventConfirmationLifecycle(artifact)
         expect(artifact.snapshots).toHaveLength(2)
         expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)
         expect(artifact.trace.at(-1)?.payload).toEqual(expect.objectContaining({ _tag: 'run.completed' }))
@@ -552,3 +555,43 @@ Vitest.describe('browser profile', () => {
     180_000,
   )
 })
+
+/** Ensures every participant profile preserves a pending event until backend confirmation. */
+const expectOfflineEventConfirmationLifecycle = (artifact: ScenarioRunArtifact): void => {
+  const reconnectIndex = artifact.trace.find(
+    (record) => record.clientId === 'client-a' && record.payload._tag === 'connectivity.reconnected',
+  )?.index
+  expect(reconnectIndex).toBeDefined()
+  const offlineObservation = artifact.trace.find(
+    (record) =>
+      reconnectIndex !== undefined &&
+      record.index < reconnectIndex &&
+      record.clientId === 'client-a' &&
+      record.payload._tag === 'leader.sync.observed' &&
+      record.payload.observation.events.some(
+        (event) => event.origin.clientId === 'client-a' && event.disposition === 'pending',
+      ),
+  )
+  expect(offlineObservation?.payload._tag).toBe('leader.sync.observed')
+  if (offlineObservation?.payload._tag !== 'leader.sync.observed') return
+
+  const pendingEvent = offlineObservation.payload.observation.events.find(
+    (event) => event.origin.clientId === 'client-a' && event.disposition === 'pending',
+  )
+  expect(pendingEvent).toBeDefined()
+  expect(offlineObservation.payload.observation.pendingCount).toBeGreaterThan(0)
+
+  const recoveredObservation = artifact.trace.findLast(
+    (record) =>
+      record.clientId === 'client-a' &&
+      record.payload._tag === 'leader.sync.observed' &&
+      record.payload.reason === 'settle-after-reconnect',
+  )
+  expect(recoveredObservation?.payload._tag).toBe('leader.sync.observed')
+  if (pendingEvent === undefined || recoveredObservation?.payload._tag !== 'leader.sync.observed') return
+
+  expect(recoveredObservation.payload.observation.pendingCount).toBe(0)
+  expect(recoveredObservation.payload.observation.events).toContainEqual(
+    expect.objectContaining({ eventRef: pendingEvent.eventRef, disposition: 'confirmed' }),
+  )
+}

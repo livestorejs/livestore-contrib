@@ -323,7 +323,7 @@ const renderTraceInspector = (args: {
             ? `RECORD ${selectedRecord.index + 1}`
             : `MOMENT ${momentOrdinal} · ${escapeMarkup(args.selectedMoment!.kind.toUpperCase())}`
         }</p>
-        <h3>${escapeMarkup(momentTitle)}</h3>
+        <h3 title="${escapeMarkup(momentTitle)}">${escapeMarkup(momentTitle)}</h3>
       </div>
       <span>${records.length} ${records.length === 1 ? 'record' : 'records'}</span>
     </header>
@@ -693,13 +693,18 @@ const renderEventlog = (key: string, events: ReadonlyArray<ObservedEvent>, label
             ? '<span class="summary">No events observed</span>'
             : events
                 .map(
-                  (event) => `
+                  (event, index) => `
+                    ${
+                      event.disposition === 'pending' && events[index - 1]?.disposition !== 'pending'
+                        ? '<span class="eventlog-pending-boundary" title="Events after this marker are pending backend confirmation" aria-hidden="true"></span>'
+                        : ''
+                    }
                     <button
                       type="button"
                       class="event-chip ${event.disposition} ${event.eventRef === selectedEventRef ? 'selected' : ''}"
                       data-event-ref="${escapeMarkup(event.eventRef)}"
-                      title="${escapeMarkup(`${event.name} · ${event.eventRef}`)}"
-                    >${escapeMarkup(event.position)}</button>`,
+                      title="${escapeMarkup(`${event.name} · ${event.eventRef} · ${event.disposition}`)}"
+                    >${escapeMarkup(displayEventPosition(event))}</button>`,
                 )
                 .join('')
         }
@@ -862,7 +867,7 @@ const renderTimeline = (): void => {
             <title>${title}</title>
             ${uncertainty}
             <rect width="48" height="20" rx="3" />
-            <text x="24" y="14" text-anchor="middle">${escapeMarkup(marker.event.position)}</text>
+            <text x="24" y="14" text-anchor="middle">${escapeMarkup(displayEventPosition(marker.event))}</text>
           </g>`
       }
 
@@ -977,19 +982,6 @@ const renderTimeline = (): void => {
                 <line class="group-boundary" x1="${x}" x2="${x}" y1="${leaderY - 10}" y2="${groupEndY + 10}" />
                 <path d="M ${x} ${leaderY - 6} l 6 6 l -6 6 l -6 -6 z" />
               </g>`
-        case 'action.requested': {
-          if (record.clientId === null) return ''
-          const componentKey =
-            record.sessionId === null
-              ? leaderComponentKey(record.clientId)
-              : sessionComponentKey(record.clientId, record.sessionId)
-          const y = yAt(componentKey)
-          return `<g class="participant-milestone action" data-record-index="${record.index}">
-              <title>${title}</title>
-              <line x1="${x}" x2="${x}" y1="${y - 8}" y2="${y + 8}" />
-              <path d="M ${x} ${y - 10} l 5 6 h -10 z" />
-            </g>`
-        }
         case 'connectivity.disconnected':
         case 'connectivity.reconnected':
           return leaderY === undefined || groupEndY === undefined
@@ -1518,11 +1510,11 @@ const groupMarkersIntoBins = ({
 const markerGroupTitle = (group: ReadonlyArray<PositionedTimelineMarker>): string => {
   if (group.length === 1) {
     const marker = group[0]!.marker
-    return `${marker.event.name} · ${marker.event.eventRef} · ${marker.event.position} · observed change in capture ${marker.captureIndex + 1}`
+    return `${marker.event.name} · ${marker.event.eventRef} · ${displayEventPosition(marker.event)} · observed change in capture ${marker.captureIndex + 1}`
   }
   const visibleItems = group
     .slice(0, 8)
-    .map(({ marker }) => `${marker.event.position} · ${marker.event.name} · ${marker.event.eventRef}`)
+    .map(({ marker }) => `${displayEventPosition(marker.event)} · ${marker.event.name} · ${marker.event.eventRef}`)
     .join('\n')
   const remainder = group.length > 8 ? `\n… ${group.length - 8} more` : ''
   return `${group.length} observed event changes\n${visibleItems}${remainder}`
@@ -1550,6 +1542,9 @@ const formatDuration = (durationMs: number): string =>
   durationMs >= 1_000 ? `${(durationMs / 1_000).toFixed(durationMs >= 10_000 ? 1 : 2)}s` : `${Math.round(durationMs)}ms`
 
 const clamp = (value: number, minimum: number, maximum: number): number => Math.min(Math.max(value, minimum), maximum)
+
+const displayEventPosition = (event: Pick<ObservedEvent, 'position' | 'disposition'>): string =>
+  event.disposition === 'pending' ? `${event.position}'` : event.position
 
 const escapeMarkup = (value: string): string =>
   value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')

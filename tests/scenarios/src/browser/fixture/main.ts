@@ -6,6 +6,7 @@ import { Effect } from '@livestore/utils/effect'
 import { dispatchApplicationAction, inspectApplicationState } from '../../application.ts'
 import { makeParticipantClock, type ParticipantClock } from '../../clock.ts'
 import { todoApplication } from '../../fixtures/todo-application.ts'
+import { collectConfirmedEvents, makeComponentSyncObservation, makeEventRefRegistry } from '../../observations.ts'
 import type { BrowserPageObservation, BrowserStartOptions, ScenarioBrowserControl } from '../protocol.ts'
 import LiveStoreWorker from './livestore.worker.ts?worker'
 
@@ -58,17 +59,29 @@ const observe = async (): Promise<BrowserPageObservation> => {
   const clock = participantClock
   if (clock === undefined) throw new Error('Browser participant clock has not started')
   const sync = current.store.syncStatus()
+  const syncStates = await current.store._dev.syncStates()
+  const eventRefs = makeEventRefRegistry()
+  const leaderConfirmed = await run(collectConfirmedEvents(current.store, syncStates.leader.upstreamHead))
+  const sessionConfirmed = leaderConfirmed.filter(
+    (event) => event.seqNum.global <= syncStates.session.upstreamHead.global,
+  )
   const participant = { clientId: current.options.clientId, sessionId: current.options.sessionId }
-  const component = {
-    localHead: sync.localHead,
-    upstreamHead: sync.upstreamHead,
-    pendingCount: sync.pendingCount,
-    events: [],
-  }
 
   return {
-    leader: component,
-    session: component,
+    leader: makeComponentSyncObservation({
+      confirmed: leaderConfirmed,
+      pending: syncStates.leader.pending,
+      localHead: syncStates.leader.localHead,
+      upstreamHead: syncStates.leader.upstreamHead,
+      eventRefs,
+    }),
+    session: makeComponentSyncObservation({
+      confirmed: sessionConfirmed,
+      pending: syncStates.session.pending,
+      localHead: syncStates.session.localHead,
+      upstreamHead: syncStates.session.upstreamHead,
+      eventRefs,
+    }),
     sync: { participant, ...sync },
     clock: clock.read(),
   }

@@ -396,8 +396,15 @@ h2 {
 }
 
 .event-chip.pending {
-  border-color: var(--warn);
-  color: var(--warn);
+  border-color: var(--line-strong);
+  border-style: dashed;
+  color: var(--text);
+}
+
+.eventlog-pending-boundary {
+  border-left: 1px dashed var(--line-strong);
+  height: 18px;
+  margin: 0 4px;
 }
 
 .event-chip.selected {
@@ -545,19 +552,6 @@ h2 {
   fill: var(--background);
   stroke: currentcolor;
   stroke-width: 1.5;
-}
-
-.timeline .participant-milestone.action {
-  color: var(--warn);
-}
-
-.timeline .participant-milestone.action line {
-  stroke: currentcolor;
-  stroke-width: 1.5;
-}
-
-.timeline .participant-milestone.action path {
-  fill: currentcolor;
 }
 
 .timeline .runtime-failure-interval {
@@ -787,15 +781,15 @@ h2 {
 }
 
 .timeline .trace-dot.instruction-sent {
-  fill: var(--warn);
+  fill: var(--muted);
 }
 
 .timeline .trace-dot.acknowledgement-received {
-  fill: var(--good);
+  fill: var(--line-strong);
 }
 
 .timeline .trace-dot.verdict {
-  fill: #a04ad4;
+  fill: var(--muted);
 }
 
 .timeline .trace-dot.moment-capture {
@@ -915,11 +909,22 @@ h2 {
   padding: 14px 16px;
 }
 
+.trace-inspector-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+
 .trace-inspector-heading h3,
 .semantic-record-heading h3 {
   font-size: 13px;
   font-weight: 650;
   margin: 4px 0 0;
+}
+
+.trace-inspector-heading h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trace-inspector-heading > span {

@@ -5,7 +5,7 @@ import path from 'node:path'
 import { chromium, type BrowserContext, type Page } from '@playwright/test'
 import { createServer, type ViteDevServer } from 'vite'
 
-import { EventSequenceNumber, type LiveStoreEvent } from '@livestore/common/schema'
+import { EventSequenceNumber } from '@livestore/common/schema'
 import { Effect, Schema, type Scope } from '@livestore/utils/effect'
 
 import { ScenarioOperationError } from '../application.ts'
@@ -167,14 +167,6 @@ export const makeBrowserHost = (args: {
             Effect.map((observed) => ({
               ...observed,
               observation: reconcileClientObservation(eventRefs)(observed.observation),
-            })),
-            Effect.map((observed) => ({
-              ...observed,
-              observation: hydrateConfirmedEvents(observed.observation, backend.events, eventRefs),
-            })),
-            Effect.map((observed) => ({
-              ...observed,
-              observation: deriveLeaderObservation(observed.observation, backendHead),
             })),
           ),
         { concurrency: 'unbounded' },
@@ -632,45 +624,6 @@ const reconcileClientObservation =
       sync: { ...session.sync, events: eventRefs.reconcileObservedEvents(session.sync.events) },
     })),
   })
-
-const hydrateConfirmedEvents = (
-  client: ClientSystemObservation,
-  backendEvents: ReadonlyArray<LiveStoreEvent.Global.Encoded>,
-  eventRefs: ReturnType<typeof makeEventRefRegistry>,
-): ClientSystemObservation => {
-  const confirmedThrough = (head: string) => {
-    const globalHead = EventSequenceNumber.Client.fromString(head).global
-    return eventRefs.observeGlobalEvents(backendEvents.filter((event) => event.seqNum <= globalHead))
-  }
-
-  return {
-    ...client,
-    leader: {
-      ...client.leader,
-      events: [...confirmedThrough(client.leader.upstreamHead), ...client.leader.events],
-    },
-    sessions: client.sessions.map((session) => ({
-      ...session,
-      sync: {
-        ...session.sync,
-        events: [...confirmedThrough(session.sync.upstreamHead), ...session.sync.events],
-      },
-    })),
-  }
-}
-
-const deriveLeaderObservation = (client: ClientSystemObservation, backendHead: number): ClientSystemObservation => {
-  const localHead = EventSequenceNumber.Client.fromString(client.leader.upstreamHead)
-  return {
-    ...client,
-    leader: {
-      ...client.leader,
-      localHead: client.leader.upstreamHead,
-      upstreamHead: `e${backendHead}`,
-      pendingCount: Math.max(client.leader.pendingCount, localHead.client),
-    },
-  }
-}
 
 const jsonStringify = Schema.encodeSync(Schema.UnknownFromJsonString)
 
