@@ -25,18 +25,24 @@ export const offlineWriterRecovery = defineScenario({
       steps: [
         { _tag: 'disconnect', id: 'disconnect-client-a', clientId: clientA.clientId },
         {
-          _tag: 'action',
-          id: 'client-a-offline-write',
-          target: clientA,
-          action: 'createTodo',
-          input: { id: 'todo-offline-a', text: 'Written while Client A is offline' },
-        },
-        {
-          _tag: 'action',
-          id: 'client-b-online-write',
-          target: clientB,
-          action: 'createTodo',
-          input: { id: 'todo-online-b', text: 'Written while Client B is online' },
+          _tag: 'parallel',
+          id: 'concurrent-writes',
+          operations: [
+            {
+              _tag: 'action',
+              id: 'client-a-offline-write',
+              target: clientA,
+              action: 'createTodo',
+              input: { id: 'todo-offline-a', text: 'Written while Client A is offline' },
+            },
+            {
+              _tag: 'action',
+              id: 'client-b-online-write',
+              target: clientB,
+              action: 'createTodo',
+              input: { id: 'todo-online-b', text: 'Written while Client B is online' },
+            },
+          ],
         },
         {
           _tag: 'settle',
@@ -62,6 +68,13 @@ export const offlineWriterRecovery = defineScenario({
     },
   ],
   oracles: [
+    {
+      _tag: 'operation-history',
+      id: 'writes-overlapped',
+      operationIds: ['client-a-offline-write', 'client-b-online-write'],
+      requireOverlap: true,
+      allowIndefinite: false,
+    },
     { _tag: 'pending-resolution', id: 'pending-resolved', participants: [clientA, clientB] },
     { _tag: 'eventlog-convergence', id: 'eventlogs-converged', participants: [clientA, clientB] },
     {

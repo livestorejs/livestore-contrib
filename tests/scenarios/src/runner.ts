@@ -1,7 +1,16 @@
 import type { LiveStoreSchema } from '@livestore/common/schema'
 import { EventSequenceNumber } from '@livestore/common/schema'
 import type { WranglerDevServer } from '@livestore/utils-dev/wrangler'
-import { Effect, FetchHttpClient, Layer, type OtelTracer, Schema, type Scope } from '@livestore/utils/effect'
+import {
+  Deferred,
+  Effect,
+  Exit,
+  FetchHttpClient,
+  Layer,
+  type OtelTracer,
+  Schema,
+  type Scope,
+} from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
 import { type ApplicationDefinition, ScenarioOperationError } from './application.ts'
@@ -13,6 +22,8 @@ import {
   type ExecutionConfiguration,
   type HostObservationOccurrence,
   type HostSystemObservation,
+  type OperationHistoryOracle,
+  type ParallelOperationStep,
   type ParticipantRef,
   type ParticipantSnapshot,
   participantKey,
@@ -28,6 +39,7 @@ import {
   type SyncObservation,
 } from './model.ts'
 import { makeProcessHost } from './process/process-host.ts'
+import { deriveOverlappingScenarioOperationPairs, deriveScenarioOperationHistoryProjection } from './projection.ts'
 
 export interface RunScenarioOptions {
   readonly runId?: string
@@ -227,11 +239,24 @@ export const runScenario = (args: {
         })
         for (const step of phase.steps) {
           activeStepId = step.id
-          activeOperationId = step.id
+          activeOperationId = step._tag === 'parallel' ? undefined : step.id
           stepNumber += 1
           args.options?.onProgress?.({ stage: 'started', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
           logicalTime += 1
-          yield* executeStep({ host: args.host, phaseId: phase.id, record, step, faultState })
+          if (step._tag === 'parallel') {
+            yield* executeParallelStep({
+              host: args.host,
+              phaseId: phase.id,
+              record,
+              operations: step.operations,
+              faultState,
+              onFailure: (operationId) => {
+                activeStepId = operationId
+              },
+            })
+          } else {
+            yield* executeStep({ host: args.host, phaseId: phase.id, record, step, faultState })
+          }
           activeOperationId = undefined
           yield* recordSystemObservation({
             host: args.host,
@@ -253,6 +278,7 @@ export const runScenario = (args: {
         oracles: args.scenario.oracles,
         snapshots: snapshotResult.snapshots,
         evidenceByParticipant: snapshotResult.evidenceByParticipant,
+        trace,
         record,
       })
       const status = verdicts.every((verdict) => verdict.status === 'passed') === true ? 'passed' : 'failed'
@@ -274,17 +300,7 @@ export const runScenario = (args: {
       Effect.catch((error) => {
         const failure = describeHostError(error)
         if (activeOperationId !== undefined) {
-          record({
-            origin: 'observation',
-            correlationId: activeOperationId,
-            phaseId: activePhaseId,
-            causedBy: record.instructionIndex(activeOperationId),
-            payload: {
-              _tag: 'operation.outcome',
-              status: operationOutcome(error),
-              ...failure,
-            },
-          })
+          recordOperationFailure({ record, operationId: activeOperationId, phaseId: activePhaseId, error })
         }
         record({
           origin: 'observation',
@@ -422,12 +438,56 @@ const evidenceForOrigin = (origin: ScenarioTraceRecord['origin']): ScenarioTrace
   }
 }
 
+const executeParallelStep = (args: {
+  host: ParticipantHost
+  phaseId: string
+  record: TraceRecorder
+  operations: ReadonlyArray<ParallelOperationStep>
+  faultState: ScenarioFaultState
+  onFailure: (operationId: string) => void
+}): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
+  Effect.gen(function* () {
+    const allInvoked = yield* Deferred.make<void>()
+    let invocationCount = 0
+    const onInvoked = () =>
+      Effect.gen(function* () {
+        invocationCount += 1
+        if (invocationCount === args.operations.length) yield* Deferred.succeed(allInvoked, undefined)
+        yield* Deferred.await(allInvoked)
+      })
+    const results = yield* Effect.forEach(
+      args.operations,
+      (operation) =>
+        executeStep({ ...args, step: operation, onInvoked }).pipe(
+          Effect.tapError((error) =>
+            Effect.sync(() =>
+              recordOperationFailure({
+                record: args.record,
+                operationId: operation.id,
+                phaseId: args.phaseId,
+                error,
+              }),
+            ),
+          ),
+          Effect.exit,
+          Effect.map((exit) => ({ operationId: operation.id, exit })),
+        ),
+      { concurrency: 'unbounded' },
+    )
+    const firstFailure = results.find((result) => Exit.isFailure(result.exit))
+    if (firstFailure !== undefined && Exit.isFailure(firstFailure.exit) === true) {
+      args.onFailure(firstFailure.operationId)
+      return yield* Effect.failCause(firstFailure.exit.cause)
+    }
+  })
+
 const executeStep = (args: {
   host: ParticipantHost
   phaseId: string
   record: TraceRecorder
-  step: ScenarioStep
+  step: Exclude<ScenarioStep, { readonly _tag: 'parallel' }>
   faultState: ScenarioFaultState
+  onInvoked?: () => Effect.Effect<void>
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> => {
   switch (args.step._tag) {
     case 'action': {
@@ -441,6 +501,7 @@ const executeStep = (args: {
           phaseId: args.phaseId,
           payload: { _tag: 'action.requested', action: step.action, input: step.input },
         })
+        if (args.onInvoked !== undefined) yield* args.onInvoked()
         yield* args.host.dispatchAction({
           operationId: step.id,
           target: step.target,
@@ -468,6 +529,7 @@ const executeStep = (args: {
         operationId: args.step.id,
         connected,
         faultState: args.faultState,
+        onInvoked: args.onInvoked,
       })
     }
     case 'stop-session':
@@ -486,6 +548,7 @@ const executeStep = (args: {
               ? { _tag: 'lifecycle.session-restart.requested' }
               : { _tag: 'lifecycle.session-stop.requested' },
         })
+        if (args.onInvoked !== undefined) yield* args.onInvoked()
         const command = { operationId: step.id, target: step.target }
         if (restarting === true) yield* args.host.restartSession(command)
         else yield* args.host.stopSession(command)
@@ -510,6 +573,7 @@ const executeStep = (args: {
           phaseId: args.phaseId,
           payload: { _tag: 'lifecycle.client-restart.requested' },
         })
+        if (args.onInvoked !== undefined) yield* args.onInvoked()
         yield* args.host.restartClient({ operationId: step.id, clientId: step.clientId })
         args.record({
           origin: 'acknowledgement',
@@ -535,15 +599,21 @@ const executeStep = (args: {
           },
         })
         for (const clientId of step.healDisconnectedClients) {
+          const operationId = `${step.id}:heal:${clientId}`
           yield* setConnectivity({
             host: args.host,
             phaseId: args.phaseId,
             record: args.record,
             clientId,
-            operationId: `${step.id}:heal:${clientId}`,
+            operationId,
             connected: true,
             faultState: args.faultState,
-          })
+          }).pipe(
+            Effect.catch((error) => {
+              recordOperationFailure({ record: args.record, operationId, phaseId: args.phaseId, error })
+              return Effect.fail(error)
+            }),
+          )
         }
         const inFlightOperationIds = args.record.pendingOperationIds([step.id])
         if (inFlightOperationIds.length > 0) {
@@ -589,6 +659,7 @@ const setConnectivity = (args: {
   operationId: string
   connected: boolean
   faultState: ScenarioFaultState
+  onInvoked?: () => Effect.Effect<void>
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
     args.record({
@@ -601,6 +672,7 @@ const setConnectivity = (args: {
           ? { _tag: 'connectivity.reconnect.requested', connected: true }
           : { _tag: 'connectivity.disconnect.requested', connected: false },
     })
+    if (args.onInvoked !== undefined) yield* args.onInvoked()
     yield* args.host.setConnectivity({
       operationId: args.operationId,
       clientId: args.clientId,
@@ -970,16 +1042,22 @@ const evaluateOracles = (args: {
   oracles: ReadonlyArray<ScenarioOracle>
   snapshots: ReadonlyArray<ParticipantSnapshot>
   evidenceByParticipant: ReadonlyMap<string, ReadonlyArray<number>>
+  trace: ReadonlyArray<ScenarioTraceRecord>
   record: TraceRecorder
 }): ReadonlyArray<OracleVerdict> =>
   args.oracles.map((oracle) => {
-    const selected = oracle.participants.map((participant) =>
-      args.snapshots.find((snapshot) => participantKey(snapshot.participant) === participantKey(participant)),
-    )
-    const evidence = oracle.participants.flatMap(
-      (participant) => args.evidenceByParticipant.get(participantKey(participant)) ?? [],
-    )
-    const verdict = evaluateOracle(oracle, selected, evidence)
+    const verdict =
+      oracle._tag === 'operation-history'
+        ? evaluateOperationHistoryOracle(oracle, args.trace)
+        : evaluateSnapshotOracle(
+            oracle,
+            oracle.participants.map((participant) =>
+              args.snapshots.find((snapshot) => participantKey(snapshot.participant) === participantKey(participant)),
+            ),
+            oracle.participants.flatMap(
+              (participant) => args.evidenceByParticipant.get(participantKey(participant)) ?? [],
+            ),
+          )
     args.record({
       origin: 'verdict',
       correlationId: oracle.id,
@@ -995,8 +1073,8 @@ const evaluateOracles = (args: {
     return verdict
   })
 
-const evaluateOracle = (
-  oracle: ScenarioOracle,
+const evaluateSnapshotOracle = (
+  oracle: Exclude<ScenarioOracle, OperationHistoryOracle>,
   selected: ReadonlyArray<ParticipantSnapshot | undefined>,
   evidence: ReadonlyArray<number>,
 ): OracleVerdict => {
@@ -1043,6 +1121,47 @@ const evaluateOracle = (
         : failedVerdict(oracle, evidence, `Missing IDs (${missingByParticipant.join('; ')})`)
     }
   }
+}
+
+const evaluateOperationHistoryOracle = (
+  oracle: OperationHistoryOracle,
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): OracleVerdict => {
+  const history = deriveScenarioOperationHistoryProjection(trace)
+  const selected = oracle.operationIds.map((operationId) =>
+    history.operations.find((operation) => operation.operationId === operationId),
+  )
+  const evidence = selected.flatMap((operation) =>
+    operation === undefined
+      ? []
+      : [operation.invocationRecordIndex, operation.outcomeRecordIndex].filter(
+          (index): index is number => index !== null,
+        ),
+  )
+  const missing = oracle.operationIds.filter((_operationId, index) => selected[index] === undefined)
+  if (missing.length > 0) {
+    return failedVerdict(oracle, evidence, `Operation history omitted: ${missing.join(', ')}`)
+  }
+  const operations = selected.filter((operation) => operation !== undefined)
+  const unacceptable = operations.filter(
+    (operation) =>
+      operation.status === 'pending' || (operation.status === 'indefinite' && oracle.allowIndefinite === false),
+  )
+  if (unacceptable.length > 0) {
+    return failedVerdict(
+      oracle,
+      evidence,
+      `Operation history has unacceptable outcomes: ${unacceptable.map((operation) => `${operation.operationId}=${operation.status}`).join(', ')}`,
+    )
+  }
+  if (oracle.requireOverlap === true && deriveOverlappingScenarioOperationPairs(operations).length === 0) {
+    return failedVerdict(oracle, evidence, 'Selected operations did not overlap')
+  }
+  return passedVerdict(
+    oracle,
+    evidence,
+    `${operations.length} selected operations have terminal${oracle.allowIndefinite === true ? '' : ', non-indefinite'} outcomes${oracle.requireOverlap === true ? ' and overlapping invocation intervals' : ''}`,
+  )
 }
 
 const validateExecution = (args: {
@@ -1219,6 +1338,24 @@ const selectedRecoveryFaults = (
     selectedClientIds.has(clientId) === true ? [{ clientId, ...fault }] : [],
   )
 }
+
+const recordOperationFailure = (args: {
+  record: TraceRecorder
+  operationId: string
+  phaseId?: string
+  error: HostError
+}): ScenarioTraceRecord =>
+  args.record({
+    origin: 'observation',
+    correlationId: args.operationId,
+    phaseId: args.phaseId,
+    causedBy: args.record.instructionIndex(args.operationId),
+    payload: {
+      _tag: 'operation.outcome',
+      status: operationOutcome(args.error),
+      ...describeHostError(args.error),
+    },
+  })
 
 const operationOutcome = (error: HostError): 'definite-failure' | 'indefinite' =>
   error instanceof ScenarioOperationError ? error.operationOutcome : 'indefinite'

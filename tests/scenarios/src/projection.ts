@@ -6,6 +6,7 @@ import {
   type ObservedEvent,
   OracleVerdict,
   type ScenarioAst,
+  type ScenarioTracePayload,
   type ScenarioTraceRecord,
 } from './model.ts'
 
@@ -107,9 +108,48 @@ export interface ExplicitCausalEdge {
 
 export interface ScenarioOperationHistoryEntry {
   readonly operationId: string
+  readonly family: ScenarioOperationHistoryFamily
+  readonly participant: string | null
   readonly invocationRecordIndex: number
   readonly outcomeRecordIndex: number | null
   readonly status: 'pending' | 'succeeded' | 'definite-failure' | 'indefinite'
+}
+
+export type ScenarioOperationHistoryFamily =
+  | 'client-create'
+  | 'application-action'
+  | 'connectivity'
+  | 'session-lifecycle'
+  | 'client-lifecycle'
+  | 'settlement'
+
+export interface ScenarioOperationHistoryCoverage {
+  readonly includedFamilies: ReadonlyArray<ScenarioOperationHistoryFamily>
+  readonly excludedInteractions: ReadonlyArray<'system-observation' | 'sync-observation' | 'state-inspection'>
+  readonly concurrencyBoundary: 'instruction-to-control-outcome'
+}
+
+export interface ScenarioOperationHistoryProjection {
+  readonly coverage: ScenarioOperationHistoryCoverage
+  readonly operations: ReadonlyArray<ScenarioOperationHistoryEntry>
+}
+
+export interface OverlappingScenarioOperationPair {
+  readonly leftOperationId: string
+  readonly rightOperationId: string
+}
+
+export const scenarioOperationHistoryCoverage: ScenarioOperationHistoryCoverage = {
+  includedFamilies: [
+    'client-create',
+    'application-action',
+    'connectivity',
+    'session-lifecycle',
+    'client-lifecycle',
+    'settlement',
+  ],
+  excludedInteractions: ['system-observation', 'sync-observation', 'state-inspection'],
+  concurrencyBoundary: 'instruction-to-control-outcome',
 }
 
 export interface TimeScalePoint {
@@ -445,10 +485,19 @@ export const deriveScenarioOperationHistory = (
 
   return trace.flatMap((record) => {
     if (record.origin !== 'instruction' || record.correlationId === null) return []
+    const family = operationFamily(record.payload)
+    if (family === undefined) return []
     const outcome = outcomes.get(record.correlationId)
     return [
       {
         operationId: record.correlationId,
+        family,
+        participant:
+          record.clientId === null
+            ? null
+            : record.sessionId === null
+              ? record.clientId
+              : `${record.clientId}/${record.sessionId}`,
         invocationRecordIndex: record.index,
         outcomeRecordIndex: outcome?.recordIndex ?? null,
         status: outcome?.status ?? 'pending',
@@ -456,6 +505,26 @@ export const deriveScenarioOperationHistory = (
     ]
   })
 }
+
+export const deriveScenarioOperationHistoryProjection = (
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): ScenarioOperationHistoryProjection => ({
+  coverage: scenarioOperationHistoryCoverage,
+  operations: deriveScenarioOperationHistory(trace),
+})
+
+export const deriveOverlappingScenarioOperationPairs = (
+  operations: ReadonlyArray<ScenarioOperationHistoryEntry>,
+): ReadonlyArray<OverlappingScenarioOperationPair> =>
+  operations.flatMap((left, leftIndex) =>
+    operations.slice(leftIndex + 1).flatMap((right) => {
+      const leftOutcome = left.outcomeRecordIndex ?? Number.POSITIVE_INFINITY
+      const rightOutcome = right.outcomeRecordIndex ?? Number.POSITIVE_INFINITY
+      return left.invocationRecordIndex < rightOutcome && right.invocationRecordIndex < leftOutcome
+        ? [{ leftOperationId: left.operationId, rightOperationId: right.operationId }]
+        : []
+    }),
+  )
 
 /** Returns operation IDs whose retained instruction has no outcome at this trace prefix. */
 export const deriveInFlightScenarioOperationIds = (
@@ -942,6 +1011,27 @@ const observationComponent = (
             key: sessionComponentKey(record.clientId, record.sessionId),
             events: record.payload.observation.events,
           }
+    default:
+      return undefined
+  }
+}
+
+const operationFamily = (payload: ScenarioTracePayload): ScenarioOperationHistoryFamily | undefined => {
+  switch (payload._tag) {
+    case 'client.create.requested':
+      return 'client-create'
+    case 'action.requested':
+      return 'application-action'
+    case 'connectivity.disconnect.requested':
+    case 'connectivity.reconnect.requested':
+      return 'connectivity'
+    case 'lifecycle.session-stop.requested':
+    case 'lifecycle.session-restart.requested':
+      return 'session-lifecycle'
+    case 'lifecycle.client-restart.requested':
+      return 'client-lifecycle'
+    case 'settlement.requested':
+      return 'settlement'
     default:
       return undefined
   }

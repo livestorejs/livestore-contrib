@@ -49,9 +49,16 @@ Host acknowledgements mean only that the participant host completed handling
 the controller request at its advertised boundary. They do not confirm backend
 acceptance or propagation. The viewer keeps correlation (related evidence)
 separate from explicit `causedBy` dependencies. The current operation-history
-projection covers serial runner instructions and their retained control
-acknowledgements or failure outcomes; it is not yet a complete concurrent
-history.
+projection declares its application/control families and projects their
+retained Control acknowledgements or failure outcomes across
+instruction-to-outcome intervals. System/sync sampling and State inspection are
+explicitly outside that coverage.
+
+A `parallel` step schedules two or more ordinary non-settlement operations. It
+records every child invocation before releasing the host requests, preserves
+each child outcome, and joins the group before the next step. The
+`operation-history` oracle can require named operations to have terminal,
+non-indefinite outcomes and overlapping intervals.
 
 Participant-host failures carry a portable category for host infrastructure,
 request rejection, invalid response, response timeout, or transport failure.

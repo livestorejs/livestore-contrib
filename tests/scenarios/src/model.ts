@@ -64,6 +64,21 @@ export const RestartClientStep = Schema.TaggedStruct('restart-client', {
   clientId: Schema.String,
 })
 
+export const ParallelOperationStep = Schema.Union([
+  ActionStep,
+  DisconnectStep,
+  ReconnectStep,
+  StopSessionStep,
+  RestartSessionStep,
+  RestartClientStep,
+])
+export type ParallelOperationStep = typeof ParallelOperationStep.Type
+
+export const ParallelStep = Schema.TaggedStruct('parallel', {
+  id: Schema.String,
+  operations: Schema.Array(ParallelOperationStep),
+})
+
 export const SettleStep = Schema.TaggedStruct('settle', {
   id: Schema.String,
   participants: Schema.Array(ParticipantRef),
@@ -78,6 +93,7 @@ export const ScenarioStep = Schema.Union([
   StopSessionStep,
   RestartSessionStep,
   RestartClientStep,
+  ParallelStep,
   SettleStep,
 ])
 export type ScenarioStep = typeof ScenarioStep.Type
@@ -112,11 +128,20 @@ export const StateContainsIdsOracle = Schema.TaggedStruct('state-contains-ids', 
   expectedIds: Schema.Array(Schema.String),
 })
 
+export const OperationHistoryOracle = Schema.TaggedStruct('operation-history', {
+  id: Schema.String,
+  operationIds: Schema.Array(Schema.String),
+  requireOverlap: Schema.Boolean,
+  allowIndefinite: Schema.Boolean,
+})
+export type OperationHistoryOracle = typeof OperationHistoryOracle.Type
+
 export const ScenarioOracle = Schema.Union([
   PendingResolutionOracle,
   EventlogConvergenceOracle,
   StateConvergenceOracle,
   StateContainsIdsOracle,
+  OperationHistoryOracle,
 ])
 export type ScenarioOracle = typeof ScenarioOracle.Type
 
@@ -524,14 +549,32 @@ export const defineScenario = (input: unknown): ScenarioAst => {
   }
 
   const stepIds = new Set<string>()
+  const operationIds = new Set<string>()
+  const validateOperation = (step: ParallelOperationStep) => {
+    if (stepIds.has(step.id) === true) throw new ScenarioValidationError(`Duplicate step id: ${step.id}`)
+    stepIds.add(step.id)
+    operationIds.add(step.id)
+    if (step._tag === 'action') assertParticipant(step.target)
+    if (step._tag === 'stop-session' || step._tag === 'restart-session') assertParticipant(step.target)
+    if (step._tag === 'restart-client') assertClient(step.clientId)
+    if (step._tag === 'disconnect' || step._tag === 'reconnect') assertClient(step.clientId)
+  }
   for (const phase of scenario.phases) {
     for (const step of phase.steps) {
       if (stepIds.has(step.id) === true) throw new ScenarioValidationError(`Duplicate step id: ${step.id}`)
       stepIds.add(step.id)
-      if (step._tag === 'action') assertParticipant(step.target)
-      if (step._tag === 'stop-session' || step._tag === 'restart-session') assertParticipant(step.target)
-      if (step._tag === 'restart-client') assertClient(step.clientId)
-      if (step._tag === 'disconnect' || step._tag === 'reconnect') assertClient(step.clientId)
+      if (step._tag === 'parallel') {
+        if (step.operations.length < 2) {
+          throw new ScenarioValidationError(`Parallel step must contain at least two operations: ${step.id}`)
+        }
+        step.operations.forEach(validateOperation)
+      } else {
+        operationIds.add(step.id)
+        if (step._tag === 'action') assertParticipant(step.target)
+        if (step._tag === 'stop-session' || step._tag === 'restart-session') assertParticipant(step.target)
+        if (step._tag === 'restart-client') assertClient(step.clientId)
+        if (step._tag === 'disconnect' || step._tag === 'reconnect') assertClient(step.clientId)
+      }
       if (step._tag === 'settle') {
         if (step.timeoutMs <= 0) throw new ScenarioValidationError(`Settle timeout must be positive: ${step.id}`)
         step.participants.forEach(assertParticipant)
@@ -540,7 +583,25 @@ export const defineScenario = (input: unknown): ScenarioAst => {
     }
   }
 
-  for (const oracle of scenario.oracles) oracle.participants.forEach(assertParticipant)
+  for (const oracle of scenario.oracles) {
+    if (oracle._tag === 'operation-history') {
+      if (oracle.operationIds.length === 0) {
+        throw new ScenarioValidationError(`Operation-history oracle must select at least one operation: ${oracle.id}`)
+      }
+      if (oracle.requireOverlap === true && oracle.operationIds.length < 2) {
+        throw new ScenarioValidationError(
+          `Operation-history oracle requires at least two operations to check overlap: ${oracle.id}`,
+        )
+      }
+      for (const operationId of oracle.operationIds) {
+        if (operationIds.has(operationId) === false) {
+          throw new ScenarioValidationError(`Unknown operation reference: ${operationId}`)
+        }
+      }
+    } else {
+      oracle.participants.forEach(assertParticipant)
+    }
+  }
   return scenario
 }
 
