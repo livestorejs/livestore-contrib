@@ -1,6 +1,11 @@
 import { Schema } from '@livestore/utils/effect'
 
-import { type ComponentSyncObservation, type ObservedEvent, ScenarioRunArtifact } from '../model.ts'
+import {
+  type ComponentSyncObservation,
+  type ObservedEvent,
+  ScenarioRunArtifact,
+  type ScenarioTraceRecord,
+} from '../model.ts'
 import {
   backendComponentKey,
   deriveAdaptiveTimeLayout,
@@ -14,6 +19,7 @@ import {
   projectTraceAt,
   projectAdaptiveTime,
   sessionComponentKey,
+  summarizeTraceRecord,
 } from '../projection.ts'
 import './style.css'
 
@@ -52,6 +58,7 @@ const recordDetails = requireElement('record-details', HTMLElement)
 
 let artifact: ScenarioRunArtifact | undefined
 let cursorIndex = -1
+let selectedDetailRecordIndex: number | undefined
 let selectedEventRef: string | undefined
 let playTimer: number | undefined
 let timelineMode: 'flow' | 'time' = 'flow'
@@ -61,6 +68,11 @@ let playbackMode: 'moments' | 'records' = 'moments'
 let playbackMoments: ReturnType<typeof derivePlaybackMoments> = []
 let timelineRecordPositions: ReadonlyArray<{ readonly index: number; readonly x: number }> = []
 let timelineViewport = { start: 0, end: 1 }
+const traceInspectorExpansion = {
+  traceMetadataOpen: false,
+  rawJsonOpen: false,
+  jsonBranchesByRecord: new Map<string, Set<string>>(),
+}
 const eventlogScrollStates = new Map<string, { followTail: boolean; scrollLeft: number }>()
 type PositionedTimelineMarker = {
   readonly marker: ReturnType<typeof deriveEventTimeline>[number]
@@ -165,6 +177,7 @@ const loadArtifactJson = (input: string): void => {
   artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(input)
   playbackMoments = derivePlaybackMoments({ scenario: artifact.scenario, trace: artifact.trace })
   cursorIndex = artifact.trace.length - 1
+  selectedDetailRecordIndex = undefined
   selectedEventRef = undefined
   timelineViewport = { start: 0, end: 1 }
   eventlogScrollStates.clear()
@@ -242,7 +255,8 @@ const render = (): void => {
   captureEventlogScrollState()
   const projected = projectTraceAt({ scenario: artifact.scenario, trace, cursorIndex })
   const record = cursorIndex < 0 ? undefined : trace[cursorIndex]
-  const selectedMoment = playbackMoments.find((moment) => moment.recordIndex === cursorIndex)
+  const selectedMoment =
+    playbackMode === 'moments' ? playbackMoments.find((moment) => moment.recordIndex === cursorIndex) : undefined
   const momentPosition = playbackMoments.findLastIndex((moment) => moment.recordIndex <= cursorIndex) + 1
   const recordPosition = cursorIndex < 0 ? 0 : cursorIndex + 1
 
@@ -254,19 +268,20 @@ const render = (): void => {
     playbackMode === 'moments' && selectedMoment !== undefined
       ? selectedMoment.label
       : (record?.payload._tag ?? 'No observation applied')
-  recordDetails.textContent =
+  const detailRecordIndexes = selectedMoment?.recordIndexes ?? (record === undefined ? [] : [record.index])
+  if (selectedDetailRecordIndex === undefined || detailRecordIndexes.includes(selectedDetailRecordIndex) === false) {
+    selectedDetailRecordIndex = detailRecordIndexes.at(-1)
+  }
+  recordDetails.className = record === undefined ? 'trace-inspector-empty' : 'trace-inspector'
+  recordDetails.innerHTML =
     record === undefined
       ? 'No trace record selected.'
-      : selectedMoment !== undefined && selectedMoment.recordIndexes.length > 1
-        ? JSON.stringify(
-            {
-              moment: selectedMoment,
-              records: selectedMoment.recordIndexes.map((index) => trace[index]),
-            },
-            null,
-            2,
-          )
-        : JSON.stringify(record, null, 2)
+      : renderTraceInspector({
+          trace,
+          selectedMoment,
+          recordIndexes: detailRecordIndexes,
+          selectedRecordIndex: selectedDetailRecordIndex ?? record.index,
+        })
   runStatus.textContent = projected.runStatus
   runStatus.className = `badge ${statusTone(projected.runStatus)}`
   systemState.className = 'topology'
@@ -274,9 +289,361 @@ const render = (): void => {
   restoreEventlogScrollState()
   renderTimeline()
   bindEventSelection()
+  bindTraceInspector()
   bindTimelineScrubber()
   bindRangeNavigator()
 }
+
+type SelectedPlaybackMoment = ReturnType<typeof derivePlaybackMoments>[number]
+type RecordFact = { readonly label: string; readonly value: string; readonly tone?: 'good' | 'warn' | 'bad' }
+
+const renderTraceInspector = (args: {
+  readonly trace: ReadonlyArray<ScenarioTraceRecord>
+  readonly selectedMoment: SelectedPlaybackMoment | undefined
+  readonly recordIndexes: ReadonlyArray<number>
+  readonly selectedRecordIndex: number
+}): string => {
+  const records = args.recordIndexes.flatMap((index) => {
+    const record = args.trace[index]
+    return record === undefined ? [] : [record]
+  })
+  const selectedRecord = args.trace[args.selectedRecordIndex] ?? records.at(-1)
+  if (selectedRecord === undefined) return 'No trace record selected.'
+
+  const momentOrdinal = args.selectedMoment === undefined ? undefined : args.selectedMoment.momentIndex + 1
+  const momentTitle =
+    args.selectedMoment?.summary ?? `${summarizeTraceRecord(selectedRecord)} · record ${selectedRecord.index + 1}`
+  const groupedRecords = groupDetailRecords(records)
+
+  return `
+    <header class="trace-inspector-heading">
+      <div>
+        <p class="trace-inspector-kicker">${
+          momentOrdinal === undefined
+            ? `RECORD ${selectedRecord.index + 1}`
+            : `MOMENT ${momentOrdinal} · ${escapeMarkup(args.selectedMoment!.kind.toUpperCase())}`
+        }</p>
+        <h3>${escapeMarkup(momentTitle)}</h3>
+      </div>
+      <span>${records.length} ${records.length === 1 ? 'record' : 'records'}</span>
+    </header>
+    <div class="trace-inspector-layout">
+      <nav class="moment-record-browser" aria-label="Records represented by this moment">
+        ${groupedRecords
+          .map(
+            (group) => `
+              <section class="moment-record-group">
+                <h4>${escapeMarkup(group.label)}</h4>
+                ${group.records
+                  .map((record) => renderDetailRecordButton(record, record.index === selectedRecord.index))
+                  .join('')}
+              </section>`,
+          )
+          .join('')}
+      </nav>
+      ${renderSemanticRecord(selectedRecord)}
+    </div>`
+}
+
+const groupDetailRecords = (
+  records: ReadonlyArray<ScenarioTraceRecord>,
+): ReadonlyArray<{ readonly label: string; readonly records: ReadonlyArray<ScenarioTraceRecord> }> => {
+  const groups = new Map<string, { label: string; records: ScenarioTraceRecord[] }>()
+  for (const record of records) {
+    const [key, label] =
+      record.payload._tag === 'backend.observed'
+        ? ['backend', 'Sync backend']
+        : record.clientId !== null
+          ? [`client:${record.clientId}`, record.clientId]
+          : ['system', 'Scenario system']
+    const group = groups.get(key) ?? { label, records: [] }
+    group.records.push(record)
+    groups.set(key, group)
+  }
+  return [...groups.values()]
+}
+
+const renderDetailRecordButton = (record: ScenarioTraceRecord, selected: boolean): string => {
+  const scope = detailRecordScope(record)
+  return `
+    <button
+      type="button"
+      class="moment-record ${selected === true ? 'selected' : ''} origin-${record.origin}"
+      data-detail-record-index="${record.index}"
+      aria-pressed="${selected}"
+    >
+      <span class="moment-record-index">#${record.index + 1}</span>
+      <span class="moment-record-copy">
+        <strong>${escapeMarkup(scope)}</strong>
+        <span>${escapeMarkup(record.payload._tag)}</span>
+        <small>${escapeMarkup(summarizeTraceRecord(record))}</small>
+      </span>
+    </button>`
+}
+
+const detailRecordScope = (record: ScenarioTraceRecord): string => {
+  if (record.payload._tag === 'backend.observed') return 'Backend'
+  if (record.sessionId !== null) return record.sessionId
+  if (record.clientId !== null && record.payload._tag === 'leader.sync.observed') return 'Leader'
+  if (record.clientId !== null) return 'Client'
+  return 'System'
+}
+
+const renderSemanticRecord = (record: ScenarioTraceRecord): string => {
+  const facts = traceRecordFacts(record)
+  const participant = [record.clientId, record.sessionId].filter((value) => value !== null).join(' / ')
+  const openJsonPaths = traceRecordOpenJsonPaths(record)
+  return `
+    <article class="semantic-record">
+      <header class="semantic-record-heading">
+        <div>
+          <p class="trace-inspector-kicker">#${record.index + 1} · ${escapeMarkup(record.origin.toUpperCase())}</p>
+          <h3>${escapeMarkup(record.payload._tag)}</h3>
+          <p>${escapeMarkup(summarizeTraceRecord(record))}</p>
+        </div>
+        <span class="evidence-chip">${escapeMarkup(record.evidence)}</span>
+      </header>
+      <div class="record-context">
+        ${participant.length === 0 ? '' : `<span>scope <strong>${escapeMarkup(participant)}</strong></span>`}
+        ${record.phaseId === null ? '' : `<span>phase <strong>${escapeMarkup(record.phaseId)}</strong></span>`}
+        ${record.captureId === null ? '' : `<span>capture <strong>${escapeMarkup(record.captureId)}</strong></span>`}
+      </div>
+      ${
+        facts.length === 0
+          ? ''
+          : `<dl class="record-facts">${facts
+              .map(
+                (fact) =>
+                  `<div class="${fact.tone ?? ''}"><dt>${escapeMarkup(fact.label)}</dt><dd>${escapeMarkup(fact.value)}</dd></div>`,
+              )
+              .join('')}</dl>`
+      }
+      <details class="trace-metadata" data-inspector-section="trace-metadata" ${traceInspectorExpansion.traceMetadataOpen === true ? 'open' : ''}>
+        <summary>Trace metadata</summary>
+        <dl class="record-facts compact">
+          <div><dt>Emitter</dt><dd>${escapeMarkup(record.emitterId)}</dd></div>
+          <div><dt>Local sequence</dt><dd>${record.localSequence}</dd></div>
+          <div><dt>Logical time</dt><dd>${record.logicalTime}</dd></div>
+          <div><dt>Correlation</dt><dd>${escapeMarkup(record.correlationId ?? 'none')}</dd></div>
+          <div><dt>Causation</dt><dd>${escapeMarkup(record.causationId ?? 'none')}</dd></div>
+          <div><dt>Explicit causes</dt><dd>${record.causedBy.length === 0 ? 'none' : record.causedBy.map((index) => `#${index + 1}`).join(', ')}</dd></div>
+        </dl>
+      </details>
+      <details class="raw-json-tree" data-inspector-section="raw-json" ${traceInspectorExpansion.rawJsonOpen === true ? 'open' : ''}>
+        <summary>Raw JSON</summary>
+        ${renderJsonTree(record, 'record', 'record', openJsonPaths)}
+      </details>
+    </article>`
+}
+
+const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact> => {
+  const payload = record.payload
+  switch (payload._tag) {
+    case 'run.started':
+      return [
+        { label: 'Scenario', value: payload.scenarioId },
+        { label: 'Application', value: payload.applicationId },
+        { label: 'Seed', value: String(payload.seed) },
+      ]
+    case 'run.completed':
+      return [{ label: 'Status', value: payload.status, tone: payload.status === 'passed' ? 'good' : 'bad' }]
+    case 'run.failed':
+      return [
+        { label: 'Code', value: payload.code, tone: 'bad' },
+        { label: 'Step', value: payload.stepId ?? 'unknown' },
+        { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
+      ]
+    case 'phase.started':
+      return [{ label: 'Description', value: payload.description }]
+    case 'client.create.requested':
+      return [
+        { label: 'Sessions', value: payload.sessions.join(', ') || 'none' },
+        { label: 'Initially connected', value: String(payload.initiallyConnected) },
+      ]
+    case 'client.created':
+      return [{ label: 'Status', value: payload.status, tone: 'good' }]
+    case 'action.completed':
+      return [
+        { label: 'Action', value: payload.action },
+        { label: 'Status', value: payload.status, tone: 'good' },
+      ]
+    case 'action.requested':
+      return [
+        { label: 'Action', value: payload.action },
+        { label: 'Input', value: jsonValueSummary(payload.input) },
+      ]
+    case 'connectivity.disconnect.requested':
+    case 'connectivity.reconnect.requested':
+    case 'connectivity.disconnected':
+    case 'connectivity.reconnected':
+      return [
+        { label: 'Connected', value: String(payload.connected), tone: payload.connected === true ? 'good' : 'warn' },
+      ]
+    case 'settlement.requested':
+      return [
+        { label: 'Participants', value: payload.participants.join(', ') },
+        { label: 'Heal', value: payload.healDisconnectedClients.join(', ') || 'none' },
+        { label: 'Timeout', value: `${payload.timeoutMs} ms` },
+      ]
+    case 'settlement.progress':
+      return [
+        { label: 'Settled', value: String(payload.settled), tone: payload.settled === true ? 'good' : 'warn' },
+        { label: 'Observations', value: `${payload.observations.length} participants` },
+      ]
+    case 'settlement.completed':
+      return [{ label: 'Observations', value: `${payload.observations.length} settled participants`, tone: 'good' }]
+    case 'settlement.failed':
+      return [
+        { label: 'Code', value: payload.code, tone: 'bad' },
+        { label: 'Timeout', value: `${payload.timeoutMs} ms` },
+        { label: 'Observations', value: `${payload.observations.length} participants` },
+        { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
+      ]
+    case 'runtime.failure.observed':
+      return [
+        { label: 'Source', value: payload.source },
+        { label: 'Code', value: payload.code, tone: 'bad' },
+        { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
+      ]
+    case 'sync.snapshot':
+      return syncObservationFacts(payload)
+    case 'state.snapshot':
+      return [
+        { label: 'Inspector', value: payload.inspector },
+        { label: 'Value', value: jsonValueSummary(payload.value) },
+      ]
+    case 'backend.observed':
+      return [
+        { label: 'Reason', value: payload.reason },
+        { label: 'Connected', value: String(payload.observation.connected) },
+        { label: 'Head', value: payload.observation.head },
+        { label: 'Events', value: `${payload.observation.events.length} observed` },
+      ]
+    case 'client.connectivity.observed':
+      return [
+        { label: 'Reason', value: payload.reason },
+        { label: 'Connected', value: String(payload.connected), tone: payload.connected === true ? 'good' : 'warn' },
+      ]
+    case 'leader.sync.observed':
+    case 'session.sync.observed':
+      return [{ label: 'Reason', value: payload.reason }, ...componentObservationFacts(payload.observation)]
+    case 'oracle.verdict':
+      return [
+        { label: 'Oracle', value: payload.oracle },
+        { label: 'Status', value: payload.status, tone: payload.status === 'passed' ? 'good' : 'bad' },
+        { label: 'Summary', value: payload.summary },
+        { label: 'Evidence', value: `${payload.evidence.length} records` },
+      ]
+    default:
+      return []
+  }
+}
+
+const syncObservationFacts = (observation: {
+  readonly participant: string
+  readonly localHead: string
+  readonly upstreamHead: string
+  readonly pendingCount: number
+  readonly isSynced: boolean
+}): ReadonlyArray<RecordFact> => [
+  { label: 'Participant', value: observation.participant },
+  { label: 'Local head', value: observation.localHead },
+  { label: 'Upstream head', value: observation.upstreamHead },
+  { label: 'Pending', value: String(observation.pendingCount), tone: observation.pendingCount === 0 ? 'good' : 'warn' },
+  { label: 'Synced', value: String(observation.isSynced), tone: observation.isSynced === true ? 'good' : 'warn' },
+]
+
+const componentObservationFacts = (observation: ComponentSyncObservation): ReadonlyArray<RecordFact> => [
+  { label: 'Local head', value: observation.localHead },
+  { label: 'Upstream head', value: observation.upstreamHead },
+  { label: 'Pending', value: String(observation.pendingCount), tone: observation.pendingCount === 0 ? 'good' : 'warn' },
+  { label: 'Events', value: `${observation.events.length} observed` },
+]
+
+const conciseText = (value: string): string => {
+  const firstLine = value.split('\n', 1)[0]?.trim() ?? value.trim()
+  return firstLine.length <= 220 ? firstLine : `${firstLine.slice(0, 219)}…`
+}
+
+const jsonValueSummary = (value: unknown): string => {
+  if (Array.isArray(value) === true) return `Array(${value.length})`
+  if (value !== null && typeof value === 'object') return `Object(${Object.keys(value).length})`
+  if (typeof value === 'string') return conciseText(value)
+  return String(value)
+}
+
+const renderJsonTree = (value: unknown, label: string, path: string, openPaths: ReadonlySet<string>): string => {
+  if (value === null || typeof value !== 'object') {
+    const type = value === null ? 'null' : typeof value
+    const renderedValue = typeof value === 'string' ? `“${value}”` : String(value)
+    return `<div class="json-leaf"><span class="json-key">${escapeMarkup(label)}</span><span class="json-value ${type}">${escapeMarkup(renderedValue)}</span></div>`
+  }
+
+  const isArray = Array.isArray(value)
+  const entries = isArray === true ? value.map((item, index) => [String(index), item] as const) : Object.entries(value)
+  const shape = isArray === true ? `Array(${entries.length})` : `Object(${entries.length})`
+  if (entries.length === 0) {
+    return `<div class="json-leaf"><span class="json-key">${escapeMarkup(label)}</span><span class="json-shape">${shape}</span></div>`
+  }
+  return `
+    <details class="json-branch" data-json-path="${escapeMarkup(path)}" ${openPaths.has(path) === true ? 'open' : ''}>
+      <summary><span class="json-key">${escapeMarkup(label)}</span><span class="json-shape">${shape}</span></summary>
+      <div class="json-children">
+        ${entries
+          .map(([key, child]) => renderJsonTree(child, key, `${path}/${escapeJsonPointerSegment(key)}`, openPaths))
+          .join('')}
+      </div>
+    </details>`
+}
+
+const bindTraceInspector = (): void => {
+  recordDetails.querySelectorAll<HTMLDetailsElement>('[data-inspector-section]').forEach((details) => {
+    details.addEventListener('toggle', () => {
+      if (details.dataset.inspectorSection === 'trace-metadata') {
+        traceInspectorExpansion.traceMetadataOpen = details.open
+      } else if (details.dataset.inspectorSection === 'raw-json') {
+        traceInspectorExpansion.rawJsonOpen = details.open
+      }
+    })
+  })
+
+  const selectedRecord =
+    artifact === undefined || selectedDetailRecordIndex === undefined
+      ? undefined
+      : artifact.trace[selectedDetailRecordIndex]
+  if (selectedRecord !== undefined) {
+    const openJsonPaths = traceRecordOpenJsonPaths(selectedRecord)
+    recordDetails.querySelectorAll<HTMLDetailsElement>('[data-json-path]').forEach((details) => {
+      details.addEventListener('toggle', () => {
+        const path = details.dataset.jsonPath
+        if (path === undefined) return
+        if (details.open === true) openJsonPaths.add(path)
+        else openJsonPaths.delete(path)
+      })
+    })
+  }
+
+  recordDetails.querySelectorAll<HTMLButtonElement>('[data-detail-record-index]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const recordIndex = Number(button.dataset.detailRecordIndex)
+      if (Number.isInteger(recordIndex) === false || recordIndex === selectedDetailRecordIndex) return
+      selectedDetailRecordIndex = recordIndex
+      render()
+    })
+  })
+}
+
+/** Keeps raw-tree expansion local to one record without persisting viewer state across refreshes. */
+const traceRecordOpenJsonPaths = (record: ScenarioTraceRecord): Set<string> => {
+  const key = `${record.runId}:${record.index}`
+  const existing = traceInspectorExpansion.jsonBranchesByRecord.get(key)
+  if (existing !== undefined) return existing
+  const initial = new Set(['record'])
+  traceInspectorExpansion.jsonBranchesByRecord.set(key, initial)
+  return initial
+}
+
+const escapeJsonPointerSegment = (segment: string): string => segment.replaceAll('~', '~0').replaceAll('/', '~1')
 
 const renderTopology = (state: ReturnType<typeof projectTraceAt>): string => {
   const backend = state.backend

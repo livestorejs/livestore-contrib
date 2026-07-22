@@ -161,7 +161,7 @@ export const derivePlaybackMoments = (args: {
         captureId: null,
         kind,
         label: record.payload._tag,
-        summary: summarizeSemanticMoment(record),
+        summary: summarizeTraceRecord(record),
       })
       materialState = state
       materialSignature = materialSystemSignature(state)
@@ -639,7 +639,7 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
 }
 
 /** Explains a semantic boundary without requiring the viewer to decode its payload shape. */
-const summarizeSemanticMoment = (record: ScenarioTraceRecord): string => {
+export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
   const scope = [record.clientId, record.sessionId].filter((value) => value !== null).join('/')
   const scoped = (description: string): string => (scope.length === 0 ? description : `${scope}: ${description}`)
 
@@ -650,30 +650,66 @@ const summarizeSemanticMoment = (record: ScenarioTraceRecord): string => {
       return `Run completed: ${record.payload.status}`
     case 'run.failed':
       return `Run failed: ${summarizeFailureMessage(record.payload.message)}`
+    case 'phase.started':
+      return `Phase ${record.phaseId ?? 'unknown'} started: ${record.payload.description}`
+    case 'phase.completed':
+      return `Phase ${record.phaseId ?? 'unknown'} completed`
+    case 'client.create.requested':
+      return scoped(`create requested with ${record.payload.sessions.length} sessions`)
     case 'action.requested':
       return scoped(`requested ${record.payload.action}`)
+    case 'action.completed':
+      return scoped(`${record.payload.action} acknowledged`)
     case 'client.created':
       return scoped('created')
+    case 'connectivity.disconnect.requested':
+      return scoped('disconnect requested')
+    case 'connectivity.reconnect.requested':
+      return scoped('reconnect requested')
     case 'connectivity.disconnected':
       return scoped('disconnected')
     case 'connectivity.reconnected':
       return scoped('reconnected')
+    case 'lifecycle.session-stop.requested':
+      return scoped('session stop requested')
     case 'lifecycle.session-stopped':
       return scoped('stopped')
+    case 'lifecycle.session-restart.requested':
+      return scoped('session restart requested')
     case 'lifecycle.session-restarted':
       return scoped('restarted')
+    case 'lifecycle.client-restart.requested':
+      return scoped('Client restart requested')
     case 'lifecycle.client-restarted':
       return scoped('restarted')
+    case 'settlement.requested':
+      return `Settlement requested for ${record.payload.participants.length} participants`
+    case 'settlement.progress':
+      return `Settlement ${record.payload.settled === true ? 'reached' : 'pending'} · ${record.payload.observations.length} observations`
     case 'settlement.completed':
       return 'Settlement completed'
     case 'settlement.failed':
       return `Settlement failed: ${summarizeFailureMessage(record.payload.message)}`
     case 'runtime.failure.observed':
       return scoped(`runtime failure: ${summarizeFailureMessage(record.payload.message)}`)
+    case 'sync.snapshot':
+      return `${record.payload.participant}: local ${record.payload.localHead} · upstream ${record.payload.upstreamHead} · ${record.payload.pendingCount} pending`
+    case 'state.snapshot':
+      return scoped(`captured ${record.payload.inspector} state`)
+    case 'backend.observed':
+      return `Backend observed at ${record.payload.observation.head} · ${record.payload.observation.events.length} events`
+    case 'client.connectivity.observed':
+      return scoped(`observed ${record.payload.connected === true ? 'online' : 'offline'}`)
+    case 'leader.sync.observed':
+      return scoped(
+        `Leader local ${record.payload.observation.localHead} · upstream ${record.payload.observation.upstreamHead} · ${record.payload.observation.pendingCount} pending`,
+      )
+    case 'session.sync.observed':
+      return scoped(
+        `session local ${record.payload.observation.localHead} · upstream ${record.payload.observation.upstreamHead} · ${record.payload.observation.pendingCount} pending`,
+      )
     case 'oracle.verdict':
       return `Oracle ${record.payload.oracleId} ${record.payload.status}: ${record.payload.summary}`
-    default:
-      return record.payload._tag
   }
 }
 

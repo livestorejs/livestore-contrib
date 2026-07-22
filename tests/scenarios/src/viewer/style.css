@@ -892,20 +892,324 @@ h2 {
   border-bottom: 0;
 }
 
-.details pre {
+.trace-inspector-empty {
   border-left: 2px solid var(--line-strong);
-  background: var(--code-background);
-  color: var(--text);
+  color: var(--muted);
   font-size: 11px;
-  line-height: 1.55;
-  margin: 0;
-  max-height: 360px;
-  max-width: 100%;
-  overflow: auto;
-  overflow-wrap: anywhere;
   padding: 12px 14px;
-  white-space: pre-wrap;
+}
+
+.trace-inspector {
+  border: 1px solid var(--line);
+  max-width: 100%;
+  min-width: 0;
   width: 100%;
+}
+
+.trace-inspector-heading {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.trace-inspector-heading h3,
+.semantic-record-heading h3 {
+  font-size: 13px;
+  font-weight: 650;
+  margin: 4px 0 0;
+}
+
+.trace-inspector-heading > span {
+  color: var(--muted);
+  flex: none;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.trace-inspector-kicker {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.trace-inspector-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.moment-record-browser {
+  border-right: 1px solid var(--line);
+  max-height: 640px;
+  min-width: 0;
+  overflow: auto;
+}
+
+.moment-record-group + .moment-record-group {
+  border-top: 1px solid var(--line);
+}
+
+.moment-record-group h4 {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  margin: 0;
+  padding: 11px 12px 6px;
+  text-transform: uppercase;
+}
+
+.moment-record {
+  align-items: start;
+  border: 0;
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  padding: 8px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.moment-record + .moment-record {
+  border-top: 1px dotted var(--line);
+}
+
+.moment-record:hover,
+.moment-record.selected {
+  background: var(--code-background);
+}
+
+.moment-record.selected {
+  border-left-color: var(--text);
+}
+
+.moment-record.origin-instruction {
+  border-left-color: var(--warn);
+}
+
+.moment-record.origin-acknowledgement {
+  border-left-color: var(--good);
+}
+
+.moment-record.origin-verdict {
+  border-left-color: #a04ad4;
+}
+
+.moment-record-index {
+  color: var(--muted);
+  font-size: 9px;
+  padding-top: 2px;
+}
+
+.moment-record-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.moment-record-copy strong,
+.moment-record-copy span,
+.moment-record-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moment-record-copy strong {
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.moment-record-copy span {
+  color: var(--text);
+  font-size: 10px;
+}
+
+.moment-record-copy small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.semantic-record {
+  min-width: 0;
+  padding: 16px 18px 20px;
+}
+
+.semantic-record-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.semantic-record-heading p:last-child {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.evidence-chip {
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  flex: none;
+  font-size: 9px;
+  padding: 3px 5px;
+}
+
+.record-context {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 9px;
+  gap: 8px 16px;
+  margin-top: 13px;
+}
+
+.record-context strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.record-facts {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 16px 0 0;
+}
+
+.record-facts > div {
+  border-bottom: 1px dotted var(--line);
+  min-width: 0;
+  padding: 9px 12px 9px 0;
+}
+
+.record-facts dt {
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.record-facts dd {
+  font-size: 10px;
+  line-height: 1.45;
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.record-facts .good dd {
+  color: var(--good);
+}
+
+.record-facts .warn dd {
+  color: var(--warn);
+}
+
+.record-facts .bad dd {
+  color: var(--bad);
+}
+
+.trace-metadata,
+.raw-json-tree {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 10px;
+}
+
+.trace-metadata > summary,
+.raw-json-tree > summary,
+.json-branch > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.trace-metadata > summary,
+.raw-json-tree > summary {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.trace-metadata > summary::before,
+.raw-json-tree > summary::before,
+.json-branch > summary::before {
+  content: '›';
+  display: inline-block;
+  margin-right: 7px;
+  transform-origin: center;
+}
+
+.trace-metadata[open] > summary::before,
+.raw-json-tree[open] > summary::before,
+.json-branch[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.record-facts.compact {
+  margin-top: 8px;
+}
+
+.raw-json-tree > .json-branch {
+  margin-top: 10px;
+}
+
+.json-branch,
+.json-leaf {
+  font-size: 10px;
+  line-height: 1.5;
+  min-width: 0;
+}
+
+.json-branch > summary,
+.json-leaf {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  min-height: 21px;
+}
+
+.json-children {
+  border-left: 1px solid var(--line);
+  margin-left: 4px;
+  padding-left: 14px;
+}
+
+.json-key {
+  color: var(--text);
+  flex: none;
+}
+
+.json-shape {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.json-value {
+  color: var(--warn);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.json-value.string {
+  color: var(--good);
+}
+
+.json-value.boolean,
+.json-value.number {
+  color: #a04ad4;
+}
+
+.json-value.null,
+.json-value.undefined {
+  color: var(--muted);
 }
 
 @media (max-width: 720px) {
@@ -926,6 +1230,16 @@ h2 {
 
   .timeline-heading {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trace-inspector-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .moment-record-browser {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+    max-height: 300px;
   }
 
   #record-label {
