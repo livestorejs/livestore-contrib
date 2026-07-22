@@ -19,6 +19,7 @@ export class ScenarioOperationError extends Error {
       | 'host-request-indefinite'
       | 'missing-client'
       | 'missing-participant'
+      | 'operations-in-flight'
       | 'participant-runtime-failure'
       | 'settlement-timeout'
       | 'unknown-action'

@@ -19,6 +19,7 @@ import {
   deriveConnectivityIntervals,
   deriveEventTimeline,
   deriveExplicitCausalEdges,
+  deriveInFlightScenarioOperationIds,
   deriveLaneActivityIntervals,
   derivePlaybackMoments,
   deriveRuntimeFailureIntervals,
@@ -167,14 +168,21 @@ Vitest.describe('in-process host conformance', () => {
         phases: [
           {
             id: 'failure',
-            description: 'The disconnected participant cannot reach settlement before the short deadline.',
+            description: 'Fault removal is acknowledged but the participant does not recover before the deadline.',
             steps: [
               { _tag: 'disconnect', id: 'disconnect-client-a', clientId: participant.clientId },
+              {
+                _tag: 'action',
+                id: 'offline-write-that-cannot-recover',
+                target: participant,
+                action: 'createTodo',
+                input: { id: 'stuck-offline', text: 'Recovery remains pending' },
+              },
               {
                 _tag: 'settle',
                 id: 'must-time-out',
                 participants: [participant],
-                healDisconnectedClients: [],
+                healDisconnectedClients: [participant.clientId],
                 timeoutMs: 10,
               },
             ],
@@ -183,9 +191,34 @@ Vitest.describe('in-process host conformance', () => {
         oracles: [],
       })
 
-      const artifact = yield* runInProcessScenario({
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      let removalAcknowledged = false
+      const artifact = yield* runScenario({
         scenario,
-        application: todoApplication,
+        applicationId: todoApplication.id,
+        host: {
+          ...host,
+          setConnectivity: (command) =>
+            command.connected === true
+              ? Effect.sync(() => {
+                  removalAcknowledged = true
+                  return { operationId: command.operationId, status: 'acknowledged' as const }
+                })
+              : host.setConnectivity(command),
+          observeSystem: host.observeSystem.pipe(
+            Effect.map((observation) =>
+              removalAcknowledged === false
+                ? observation
+                : {
+                    ...observation,
+                    clients: observation.clients.map((client) =>
+                      client.clientId === participant.clientId ? { ...client, connected: true } : client,
+                    ),
+                  },
+            ),
+          ),
+        },
         options: { runId: 'captured-settlement-failure-test', sourceRevision: 'test' },
       })
 
@@ -198,7 +231,7 @@ Vitest.describe('in-process host conformance', () => {
           code: 'settlement-timeout',
           timeoutMs: 10,
           observations: [
-            expect.objectContaining({ participant: 'client-a/session-a', pendingCount: 0, isSynced: false }),
+            expect.objectContaining({ participant: 'client-a/session-a', pendingCount: 1, isSynced: false }),
           ],
         }),
       )
@@ -215,6 +248,15 @@ Vitest.describe('in-process host conformance', () => {
         expect.objectContaining({ status: 'definite-failure', outcomeRecordIndex: expect.any(Number) }),
       )
       expect(artifact.trace.find((record) => record.payload._tag === 'operation.outcome')?.causedBy).toHaveLength(1)
+      expect(artifact.trace.find((record) => record.payload._tag === 'fault.removed')).toBeDefined()
+      const recoveryObservations = artifact.trace.filter((record) => record.payload._tag === 'recovery.observed')
+      expect(recoveryObservations.length).toBeGreaterThan(0)
+      expect(
+        recoveryObservations.every(
+          (record) => record.payload._tag === 'recovery.observed' && record.payload.converged === false,
+        ),
+      ).toBe(true)
+      expect(artifact.trace.some((record) => record.payload._tag === 'recovery.completed')).toBe(false)
       expect(
         projectTraceAt({ scenario, trace: artifact.trace, cursorIndex: artifact.trace.length - 1 }).runStatus,
       ).toBe('failed')
@@ -278,6 +320,13 @@ Vitest.describe('in-process host conformance', () => {
           (operation) => operation.operationId === 'ambiguous-action',
         ),
       ).toEqual(expect.objectContaining({ status: 'indefinite', outcomeRecordIndex: expect.any(Number) }))
+      const invocation = artifact.trace.find(
+        (record) => record.payload._tag === 'action.requested' && record.correlationId === 'ambiguous-action',
+      )
+      expect(deriveInFlightScenarioOperationIds(artifact.trace.slice(0, (invocation?.index ?? -1) + 1))).toEqual([
+        'ambiguous-action',
+      ])
+      expect(deriveInFlightScenarioOperationIds(artifact.trace)).toEqual([])
       expect(artifact.trace.find((record) => record.payload._tag === 'operation.outcome')?.payload).toEqual(
         expect.objectContaining({ status: 'indefinite', code: 'host-request-indefinite' }),
       )
@@ -312,6 +361,11 @@ Vitest.describe('offline writer recovery', () => {
             'client.created',
             'connectivity.disconnected',
             'connectivity.reconnected',
+            'fault.injected',
+            'fault.removed',
+            'quiescence.reached',
+            'recovery.observed',
+            'recovery.completed',
             'settlement.completed',
             'state.snapshot',
             'oracle.verdict',
@@ -381,8 +435,9 @@ Vitest.describe('offline writer recovery', () => {
         const acknowledgementRecords = artifact.trace.filter((record) => record.origin === 'acknowledgement')
         expect(acknowledgementRecords.every((record) => record.causedBy.length === 1)).toBe(true)
         const causalEdges = deriveExplicitCausalEdges(artifact.trace)
-        expect(causalEdges).toHaveLength(acknowledgementRecords.length)
-        expect(causalEdges.every((edge) => artifact.trace[edge.toRecordIndex]?.origin === 'acknowledgement')).toBe(true)
+        expect(
+          causalEdges.filter((edge) => artifact.trace[edge.toRecordIndex]?.origin === 'acknowledgement'),
+        ).toHaveLength(acknowledgementRecords.length)
         const operationHistory = deriveScenarioOperationHistory(artifact.trace)
         expect(operationHistory.length).toBeGreaterThan(0)
         expect(operationHistory.every((operation) => operation.status === 'succeeded')).toBe(true)
@@ -391,6 +446,35 @@ Vitest.describe('offline writer recovery', () => {
             .filter((record) => record.evidence === 'first-observed')
             .every((record) => record.causationId === null),
         ).toBe(true)
+
+        const injectedFault = artifact.trace.find((record) => record.payload._tag === 'fault.injected')
+        const removedFault = artifact.trace.find((record) => record.payload._tag === 'fault.removed')
+        const quiescence = artifact.trace.find(
+          (record) => record.payload._tag === 'quiescence.reached' && record.correlationId === 'settle-after-reconnect',
+        )
+        const recoveryObservations = artifact.trace.filter((record) => record.payload._tag === 'recovery.observed')
+        const recoveryCompleted = artifact.trace.find((record) => record.payload._tag === 'recovery.completed')
+        const settlementCompleted = artifact.trace.find(
+          (record) =>
+            record.payload._tag === 'settlement.completed' && record.correlationId === 'settle-after-reconnect',
+        )
+        expect(injectedFault?.payload).toEqual(
+          expect.objectContaining({ faultId: 'disconnect-client-a', fault: 'client-disconnected' }),
+        )
+        expect(removedFault?.payload).toEqual(
+          expect.objectContaining({ faultId: 'disconnect-client-a', fault: 'client-disconnected' }),
+        )
+        expect(quiescence?.payload).toEqual(expect.objectContaining({ inFlightOperationIds: [] }))
+        expect(
+          deriveInFlightScenarioOperationIds(artifact.trace.slice(0, (quiescence?.index ?? -1) + 1), [
+            'settle-after-reconnect',
+          ]),
+        ).toEqual([])
+        expect(recoveryObservations.length).toBeGreaterThan(0)
+        expect(recoveryObservations.at(-1)?.payload).toEqual(expect.objectContaining({ converged: true }))
+        expect(recoveryCompleted?.index).toBeLessThan(settlementCompleted?.index ?? 0)
+        expect(injectedFault?.index).toBeLessThan(removedFault?.index ?? 0)
+        expect(removedFault?.index).toBeLessThan(recoveryCompleted?.index ?? 0)
 
         const finalProjection = projectTraceAt({
           scenario: artifact.scenario,

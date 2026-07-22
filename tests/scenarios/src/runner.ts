@@ -170,6 +170,7 @@ export const runScenario = (args: {
     let activePhaseId: string | undefined
     let activeStepId: string | undefined
     let activeOperationId: string | undefined
+    const faultState = makeFaultState()
     const record = makeTraceRecorder({ runId, trace, readLogicalTime: () => logicalTime })
 
     const executionEffect = Effect.gen(function* () {
@@ -182,7 +183,7 @@ export const runScenario = (args: {
           seed: args.scenario.seed,
         },
       })
-      yield* recordSystemObservation({ host: args.host, record, reason: 'run-started' })
+      yield* recordSystemObservation({ host: args.host, record, reason: 'run-started', faultState })
 
       for (const client of args.scenario.topology.clients) {
         const operationId = `create:${client.id}`
@@ -205,7 +206,13 @@ export const runScenario = (args: {
           payload: { _tag: 'client.created', status: 'acknowledged' },
         })
         activeOperationId = undefined
-        yield* recordSystemObservation({ host: args.host, record, reason: operationId, correlationId: operationId })
+        yield* recordSystemObservation({
+          host: args.host,
+          record,
+          reason: operationId,
+          correlationId: operationId,
+          faultState,
+        })
       }
 
       const totalSteps = args.scenario.phases.reduce((total, phase) => total + phase.steps.length, 0)
@@ -224,7 +231,7 @@ export const runScenario = (args: {
           stepNumber += 1
           args.options?.onProgress?.({ stage: 'started', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
           logicalTime += 1
-          yield* executeStep({ host: args.host, phaseId: phase.id, record, step })
+          yield* executeStep({ host: args.host, phaseId: phase.id, record, step, faultState })
           activeOperationId = undefined
           yield* recordSystemObservation({
             host: args.host,
@@ -232,6 +239,7 @@ export const runScenario = (args: {
             reason: step.id,
             correlationId: step.id,
             phaseId: phase.id,
+            faultState,
           })
           args.options?.onProgress?.({ stage: 'completed', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
           activeStepId = undefined
@@ -320,6 +328,7 @@ interface TraceRecorder {
   (input: TraceInput): ScenarioTraceRecord
   readonly nextCaptureId: (reason: string) => string
   readonly instructionIndex: (correlationId: string) => ReadonlyArray<number>
+  readonly pendingOperationIds: (excluding?: ReadonlyArray<string>) => ReadonlyArray<string>
 }
 
 const makeTraceRecorder = (args: {
@@ -331,6 +340,7 @@ const makeTraceRecorder = (args: {
   let captureIndex = 0
   const startedAt = performance.now()
   const instructionByCorrelation = new Map<string, number>()
+  const pendingOperationIds = new Set<string>()
   const record = (input: TraceInput): ScenarioTraceRecord => {
     const coordinatorReceiptMonotonicMs = performance.now() - startedAt
     const occurrence = input.occurrence
@@ -375,6 +385,12 @@ const makeTraceRecorder = (args: {
     }
     if (input.origin === 'instruction' && input.correlationId !== undefined) {
       instructionByCorrelation.set(input.correlationId, index)
+      pendingOperationIds.add(input.correlationId)
+    } else if (
+      input.correlationId !== undefined &&
+      (input.origin === 'acknowledgement' || input.payload._tag === 'operation.outcome')
+    ) {
+      pendingOperationIds.delete(input.correlationId)
     }
     index += 1
     args.trace.push(traceRecord)
@@ -385,6 +401,10 @@ const makeTraceRecorder = (args: {
     instructionIndex: (correlationId: string) => {
       const instructionIndex = instructionByCorrelation.get(correlationId)
       return instructionIndex === undefined ? [] : [instructionIndex]
+    },
+    pendingOperationIds: (excluding: ReadonlyArray<string> = []) => {
+      const excluded = new Set(excluding)
+      return [...pendingOperationIds].filter((operationId) => excluded.has(operationId) === false)
     },
   })
 }
@@ -407,6 +427,7 @@ const executeStep = (args: {
   phaseId: string
   record: TraceRecorder
   step: ScenarioStep
+  faultState: ScenarioFaultState
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> => {
   switch (args.step._tag) {
     case 'action': {
@@ -446,6 +467,7 @@ const executeStep = (args: {
         clientId: args.step.clientId,
         operationId: args.step.id,
         connected,
+        faultState: args.faultState,
       })
     }
     case 'stop-session':
@@ -520,8 +542,25 @@ const executeStep = (args: {
             clientId,
             operationId: `${step.id}:heal:${clientId}`,
             connected: true,
+            faultState: args.faultState,
           })
         }
+        const inFlightOperationIds = args.record.pendingOperationIds([step.id])
+        if (inFlightOperationIds.length > 0) {
+          return yield* Effect.fail(
+            new ScenarioOperationError(
+              'operations-in-flight',
+              `Settlement ${step.id} cannot establish quiescence with operations in flight: ${inFlightOperationIds.join(', ')}`,
+            ),
+          )
+        }
+        args.record({
+          origin: 'observation',
+          correlationId: step.id,
+          phaseId: args.phaseId,
+          causedBy: args.record.instructionIndex(step.id),
+          payload: { _tag: 'quiescence.reached', inFlightOperationIds },
+        })
         const settled = yield* awaitSettlement({
           host: args.host,
           participants: step.participants,
@@ -529,6 +568,7 @@ const executeStep = (args: {
           record: args.record,
           phaseId: args.phaseId,
           correlationId: step.id,
+          faultState: args.faultState,
         })
         args.record({
           origin: 'acknowledgement',
@@ -548,6 +588,7 @@ const setConnectivity = (args: {
   clientId: string
   operationId: string
   connected: boolean
+  faultState: ScenarioFaultState
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
     args.record({
@@ -565,7 +606,7 @@ const setConnectivity = (args: {
       clientId: args.clientId,
       connected: args.connected,
     })
-    args.record({
+    const acknowledgement = args.record({
       origin: 'acknowledgement',
       correlationId: args.operationId,
       clientId: args.clientId,
@@ -575,6 +616,15 @@ const setConnectivity = (args: {
           ? { _tag: 'connectivity.reconnected', connected: true }
           : { _tag: 'connectivity.disconnected', connected: false },
     })
+    const faultId = args.connected === false ? args.operationId : args.faultState.activeByClient.get(args.clientId)
+    if (faultId !== undefined) {
+      args.faultState.pendingByClient.set(args.clientId, {
+        operationId: args.operationId,
+        connected: args.connected,
+        faultId,
+        acknowledgementRecordIndex: acknowledgement.index,
+      })
+    }
   })
 
 /** Records component-scoped facts so every cursor advances one observed component at a time. */
@@ -585,6 +635,7 @@ const recordSystemObservation = (args: {
   correlationId?: string
   phaseId?: string
   observation?: HostSystemObservation
+  faultState: ScenarioFaultState
 }): Effect.Effect<void, HostError, Scope.Scope> =>
   Effect.gen(function* () {
     const captureId = args.record.nextCaptureId(args.reason)
@@ -608,7 +659,7 @@ const recordSystemObservation = (args: {
           ),
         )
       }
-      args.record({
+      const connectivityRecord = args.record({
         origin: 'observation',
         correlationId: args.correlationId,
         clientId: client.clientId,
@@ -617,6 +668,16 @@ const recordSystemObservation = (args: {
         evidence: 'first-observed',
         occurrence: clientOccurrences.connectivity,
         payload: { _tag: 'client.connectivity.observed', reason: args.reason, connected: client.connected },
+      })
+      recordObservedFaultTransition({
+        clientId: client.clientId,
+        connected: client.connected,
+        connectivityRecord,
+        faultState: args.faultState,
+        record: args.record,
+        phaseId: args.phaseId,
+        captureId,
+        occurrence: clientOccurrences.connectivity,
       })
       args.record({
         origin: 'observation',
@@ -688,6 +749,7 @@ const awaitSettlement = (args: {
   record: TraceRecorder
   phaseId: string
   correlationId: string
+  faultState: ScenarioFaultState
 }): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> => {
   const deadline = Date.now() + args.timeoutMs
   let lastLoggedSignature: string | undefined
@@ -727,7 +789,7 @@ const awaitSettlement = (args: {
         console.log(`  settlement ${args.correlationId}: ${signature}`)
         lastLoggedSignature = signature
       }
-      args.record({
+      const progress = args.record({
         origin: 'observation',
         correlationId: args.correlationId,
         phaseId: args.phaseId,
@@ -744,6 +806,7 @@ const awaitSettlement = (args: {
         correlationId: args.correlationId,
         phaseId: args.phaseId,
         observation: systemObservation,
+        faultState: args.faultState,
       }).pipe(
         Effect.timeoutOrElse({
           duration: observationTimeoutMs,
@@ -757,7 +820,40 @@ const awaitSettlement = (args: {
         }),
       )
 
-      if (isStable === true && previousStableSignature === signature) return observations
+      const recoveryFaults = selectedRecoveryFaults(args.faultState, args.participants)
+      const recoveryObservation =
+        recoveryFaults.length === 0
+          ? undefined
+          : args.record({
+              origin: 'observation',
+              correlationId: args.correlationId,
+              phaseId: args.phaseId,
+              causedBy: [...recoveryFaults.map((fault) => fault.removalRecordIndex), progress.index],
+              payload: {
+                _tag: 'recovery.observed',
+                faultIds: recoveryFaults.map((fault) => fault.faultId),
+                converged: isStable,
+                observations: lastObservations,
+              },
+            })
+
+      if (isStable === true && previousStableSignature === signature) {
+        if (recoveryObservation !== undefined) {
+          args.record({
+            origin: 'observation',
+            correlationId: args.correlationId,
+            phaseId: args.phaseId,
+            causedBy: [recoveryObservation.index],
+            payload: {
+              _tag: 'recovery.completed',
+              faultIds: recoveryFaults.map((fault) => fault.faultId),
+              observations: lastObservations,
+            },
+          })
+          for (const fault of recoveryFaults) args.faultState.recoveringByClient.delete(fault.clientId)
+        }
+        return observations
+      }
       if (Date.now() >= deadline) {
         return yield* Effect.fail(settlementTimeoutError(args.correlationId, args.timeoutMs, lastObservations))
       }
@@ -1043,6 +1139,85 @@ const describeHostError = (error: HostError): { readonly code: string; readonly 
     code: error._tag,
     message: error.note ?? formatUnknownFailure(error.cause),
   }
+}
+
+interface RecoveringFault {
+  readonly clientId: string
+  readonly faultId: string
+  readonly removalRecordIndex: number
+}
+
+interface ScenarioFaultState {
+  readonly activeByClient: Map<string, string>
+  readonly recoveringByClient: Map<string, Omit<RecoveringFault, 'clientId'>>
+  readonly pendingByClient: Map<string, PendingFaultTransition>
+}
+
+interface PendingFaultTransition {
+  readonly operationId: string
+  readonly connected: boolean
+  readonly faultId: string
+  readonly acknowledgementRecordIndex: number
+}
+
+const makeFaultState = (): ScenarioFaultState => ({
+  activeByClient: new Map(),
+  recoveringByClient: new Map(),
+  pendingByClient: new Map(),
+})
+
+const recordObservedFaultTransition = (args: {
+  clientId: string
+  connected: boolean
+  connectivityRecord: ScenarioTraceRecord
+  faultState: ScenarioFaultState
+  record: TraceRecorder
+  phaseId?: string
+  captureId: string
+  occurrence: HostObservationOccurrence
+}): void => {
+  const pending = args.faultState.pendingByClient.get(args.clientId)
+  if (pending === undefined || pending.connected !== args.connected) return
+  args.faultState.pendingByClient.delete(args.clientId)
+
+  const input = {
+    origin: 'observation' as const,
+    correlationId: pending.operationId,
+    clientId: args.clientId,
+    phaseId: args.phaseId,
+    captureId: args.captureId,
+    evidence: 'first-observed' as const,
+    occurrence: args.occurrence,
+    causedBy: [pending.acknowledgementRecordIndex, args.connectivityRecord.index],
+  }
+  if (pending.connected === false) {
+    args.faultState.recoveringByClient.delete(args.clientId)
+    args.faultState.activeByClient.set(args.clientId, pending.faultId)
+    args.record({
+      ...input,
+      payload: { _tag: 'fault.injected', faultId: pending.faultId, fault: 'client-disconnected' },
+    })
+  } else {
+    args.faultState.activeByClient.delete(args.clientId)
+    const removal = args.record({
+      ...input,
+      payload: { _tag: 'fault.removed', faultId: pending.faultId, fault: 'client-disconnected' },
+    })
+    args.faultState.recoveringByClient.set(args.clientId, {
+      faultId: pending.faultId,
+      removalRecordIndex: removal.index,
+    })
+  }
+}
+
+const selectedRecoveryFaults = (
+  state: ScenarioFaultState,
+  participants: ReadonlyArray<ParticipantRef>,
+): ReadonlyArray<RecoveringFault> => {
+  const selectedClientIds = new Set(participants.map((participant) => participant.clientId))
+  return [...state.recoveringByClient.entries()].flatMap(([clientId, fault]) =>
+    selectedClientIds.has(clientId) === true ? [{ clientId, ...fault }] : [],
+  )
 }
 
 const operationOutcome = (error: HostError): 'definite-failure' | 'indefinite' =>

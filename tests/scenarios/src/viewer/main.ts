@@ -486,6 +486,33 @@ const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact
       return [
         { label: 'Connected', value: String(payload.connected), tone: payload.connected === true ? 'good' : 'warn' },
       ]
+    case 'fault.injected':
+    case 'fault.removed':
+      return [
+        { label: 'Fault', value: payload.fault },
+        { label: 'Fault ID', value: payload.faultId },
+        { label: 'Boundary', value: payload._tag === 'fault.injected' ? 'injected' : 'removed' },
+      ]
+    case 'quiescence.reached':
+      return [
+        { label: 'Quiescent', value: 'true', tone: 'good' },
+        { label: 'In-flight modifying operations', value: payload.inFlightOperationIds.join(', ') || 'none' },
+      ]
+    case 'recovery.observed':
+      return [
+        { label: 'Faults', value: payload.faultIds.join(', ') },
+        {
+          label: 'Convergence predicate',
+          value: String(payload.converged),
+          tone: payload.converged === true ? 'good' : 'warn',
+        },
+        { label: 'Observations', value: `${payload.observations.length} participants` },
+      ]
+    case 'recovery.completed':
+      return [
+        { label: 'Faults', value: payload.faultIds.join(', '), tone: 'good' },
+        { label: 'Observations', value: `${payload.observations.length} recovered participants`, tone: 'good' },
+      ]
     case 'settlement.requested':
       return [
         { label: 'Participants', value: payload.participants.join(', ') },

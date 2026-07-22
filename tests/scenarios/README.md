@@ -53,6 +53,12 @@ projection covers serial runner instructions and their retained control
 acknowledgements or failure outcomes; it is not yet a complete concurrent
 history.
 
+Disconnect faults are injected or removed only when a system observation
+confirms the state requested through the host. Settlement records quiescence
+from the runner's in-flight operation projection, then retains recovery samples
+separately from the stable convergence barrier. A reconnect acknowledgement is
+therefore not presented as proof of recovery.
+
 ## Test the profiles
 
 ```sh

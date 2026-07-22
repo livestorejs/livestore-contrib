@@ -457,6 +457,17 @@ export const deriveScenarioOperationHistory = (
   })
 }
 
+/** Returns operation IDs whose retained instruction has no outcome at this trace prefix. */
+export const deriveInFlightScenarioOperationIds = (
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+  excluding: ReadonlyArray<string> = [],
+): ReadonlyArray<string> => {
+  const excluded = new Set(excluding)
+  return deriveScenarioOperationHistory(trace)
+    .filter((operation) => operation.status === 'pending' && excluded.has(operation.operationId) === false)
+    .map((operation) => operation.operationId)
+}
+
 /**
  * Preserves short elapsed-time distances while capping the visual width of long gaps.
  * Every distortion remains available as an explicit gap annotation.
@@ -666,12 +677,16 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
       return 'topology'
     case 'connectivity.disconnected':
     case 'connectivity.reconnected':
+    case 'fault.injected':
+    case 'fault.removed':
       return 'connectivity'
     case 'lifecycle.session-stopped':
     case 'lifecycle.session-restarted':
     case 'lifecycle.client-restarted':
       return 'lifecycle'
     case 'settlement.completed':
+    case 'quiescence.reached':
+    case 'recovery.completed':
       return 'settlement'
     case 'oracle.verdict':
       return record.payload.status === 'failed' ? 'failure' : undefined
@@ -714,6 +729,16 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return scoped('disconnected')
     case 'connectivity.reconnected':
       return scoped('reconnected')
+    case 'fault.injected':
+      return scoped(`fault ${record.payload.faultId} injected`)
+    case 'fault.removed':
+      return scoped(`fault ${record.payload.faultId} removed`)
+    case 'quiescence.reached':
+      return `Quiescence reached · ${record.payload.inFlightOperationIds.length} modifying operations in flight`
+    case 'recovery.observed':
+      return `Recovery observed for ${record.payload.faultIds.length} faults · ${record.payload.converged === true ? 'convergence predicate reached' : 'progress pending'}`
+    case 'recovery.completed':
+      return `Recovery completed for ${record.payload.faultIds.length} faults`
     case 'lifecycle.session-stop.requested':
       return scoped('session stop requested')
     case 'lifecycle.session-stopped':

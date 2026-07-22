@@ -331,6 +331,26 @@ export const ScenarioTracePayload = Schema.Union([
   Schema.TaggedStruct('connectivity.reconnect.requested', { connected: Schema.Literal(true) }),
   Schema.TaggedStruct('connectivity.disconnected', { connected: Schema.Literal(false) }),
   Schema.TaggedStruct('connectivity.reconnected', { connected: Schema.Literal(true) }),
+  Schema.TaggedStruct('fault.injected', {
+    faultId: Schema.String,
+    fault: Schema.Literal('client-disconnected'),
+  }),
+  Schema.TaggedStruct('fault.removed', {
+    faultId: Schema.String,
+    fault: Schema.Literal('client-disconnected'),
+  }),
+  Schema.TaggedStruct('quiescence.reached', {
+    inFlightOperationIds: Schema.Array(Schema.String),
+  }),
+  Schema.TaggedStruct('recovery.observed', {
+    faultIds: Schema.Array(Schema.String),
+    converged: Schema.Boolean,
+    observations: Schema.Array(SyncObservationPayload),
+  }),
+  Schema.TaggedStruct('recovery.completed', {
+    faultIds: Schema.Array(Schema.String),
+    observations: Schema.Array(SyncObservationPayload),
+  }),
   Schema.TaggedStruct('lifecycle.session-stop.requested', {}),
   Schema.TaggedStruct('lifecycle.session-stopped', {}),
   Schema.TaggedStruct('lifecycle.session-restart.requested', {}),
