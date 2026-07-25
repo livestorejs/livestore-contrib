@@ -550,6 +550,7 @@ export const defineScenario = (input: unknown): ScenarioAst => {
 
   const stepIds = new Set<string>()
   const operationIds = new Set<string>()
+  const planSteps: ScenarioStep[] = []
   const validateOperation = (step: ParallelOperationStep) => {
     if (stepIds.has(step.id) === true) throw new ScenarioValidationError(`Duplicate step id: ${step.id}`)
     stepIds.add(step.id)
@@ -561,6 +562,7 @@ export const defineScenario = (input: unknown): ScenarioAst => {
   }
   for (const phase of scenario.phases) {
     for (const step of phase.steps) {
+      planSteps.push(step)
       if (stepIds.has(step.id) === true) throw new ScenarioValidationError(`Duplicate step id: ${step.id}`)
       stepIds.add(step.id)
       if (step._tag === 'parallel') {
@@ -583,6 +585,7 @@ export const defineScenario = (input: unknown): ScenarioAst => {
     }
   }
 
+  const snapshotOracleParticipants = new Set<string>()
   for (const oracle of scenario.oracles) {
     if (oracle._tag === 'operation-history') {
       if (oracle.operationIds.length === 0) {
@@ -599,9 +602,31 @@ export const defineScenario = (input: unknown): ScenarioAst => {
         }
       }
     } else {
-      oracle.participants.forEach(assertParticipant)
+      for (const participant of oracle.participants) {
+        assertParticipant(participant)
+        snapshotOracleParticipants.add(participantKey(participant))
+      }
     }
   }
+
+  if (snapshotOracleParticipants.size > 0) {
+    const terminalStep = planSteps.at(-1)
+    if (terminalStep?._tag !== 'settle') {
+      throw new ScenarioValidationError(
+        'Snapshot-based oracles require a terminal Settlement as the final Scenario step',
+      )
+    }
+    const settledParticipants = new Set(terminalStep.participants.map(participantKey))
+    const missingParticipants = [...snapshotOracleParticipants].filter(
+      (participant) => settledParticipants.has(participant) === false,
+    )
+    if (missingParticipants.length > 0) {
+      throw new ScenarioValidationError(
+        `Terminal Settlement is missing snapshot-oracle participants: ${missingParticipants.join(', ')}`,
+      )
+    }
+  }
+
   return scenario
 }
 

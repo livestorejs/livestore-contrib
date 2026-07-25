@@ -49,6 +49,84 @@ Vitest.describe('scenario model', () => {
     expect(defineScenario(encoded)).toEqual(offlineWriterRecovery)
   })
 
+  Vitest.it('requires a terminal Settlement for snapshot-based oracles', () => {
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'missing-terminal-settlement',
+        phases: offlineWriterRecovery.phases.map((phase) => ({
+          ...phase,
+          steps: phase.steps.filter((step) => step._tag !== 'settle'),
+        })),
+      }),
+    ).toThrow('Snapshot-based oracles require a terminal Settlement')
+  })
+
+  Vitest.it('rejects a modifying operation after the Settlement used by snapshot-based oracles', () => {
+    const lastPhaseIndex = offlineWriterRecovery.phases.length - 1
+
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'stale-terminal-settlement',
+        phases: offlineWriterRecovery.phases.map((phase, index) =>
+          index === lastPhaseIndex
+            ? {
+                ...phase,
+                steps: [
+                  ...phase.steps,
+                  {
+                    _tag: 'action' as const,
+                    id: 'write-after-settlement',
+                    target: { clientId: 'client-a', sessionId: 'session-a' },
+                    action: 'createTodo',
+                    input: { id: 'too-late', text: 'This invalidates the Settlement evidence' },
+                  },
+                ],
+              }
+            : phase,
+        ),
+      }),
+    ).toThrow('Snapshot-based oracles require a terminal Settlement')
+  })
+
+  Vitest.it('requires the terminal Settlement to cover every snapshot-oracle participant', () => {
+    const lastPhaseIndex = offlineWriterRecovery.phases.length - 1
+
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'incomplete-terminal-settlement',
+        phases: offlineWriterRecovery.phases.map((phase, index) =>
+          index === lastPhaseIndex
+            ? {
+                ...phase,
+                steps: phase.steps.map((step) =>
+                  step._tag === 'settle'
+                    ? { ...step, participants: [{ clientId: 'client-a', sessionId: 'session-a' }] }
+                    : step,
+                ),
+              }
+            : phase,
+        ),
+      }),
+    ).toThrow('Terminal Settlement is missing snapshot-oracle participants: client-b/session-b')
+  })
+
+  Vitest.it('allows operation-history-only scenarios without Settlement', () => {
+    const scenario = defineScenario({
+      ...offlineWriterRecovery,
+      id: 'history-without-settlement',
+      phases: offlineWriterRecovery.phases.map((phase) => ({
+        ...phase,
+        steps: phase.steps.filter((step) => step._tag !== 'settle'),
+      })),
+      oracles: offlineWriterRecovery.oracles.filter((oracle) => oracle._tag === 'operation-history'),
+    })
+
+    expect(scenario.phases.flatMap((phase) => phase.steps).every((step) => step._tag !== 'settle')).toBe(true)
+  })
+
   Vitest.it('expands the shared workday into exactly 100 mixed application actions', () => {
     const steps = sharedTodoWorkday.phases.flatMap((phase) => phase.steps)
     const actionSteps = steps.filter((step) => step._tag === 'action')
@@ -111,6 +189,44 @@ Vitest.describe('scenario model', () => {
       expect(artifact.descriptor.traceVersion).toBe(3)
     }
   })
+})
+
+Vitest.describe('scenario runner preflight', () => {
+  Vitest.live('rejects a typed AST that bypasses terminal Settlement construction validation', (test) =>
+    Effect.gen(function* () {
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      let createClientCalls = 0
+      const bypassedScenario = {
+        ...offlineWriterRecovery,
+        id: 'preflight-missing-terminal-settlement',
+        phases: offlineWriterRecovery.phases.map((phase) => ({
+          ...phase,
+          steps: phase.steps.filter((step) => step._tag !== 'settle'),
+        })),
+      }
+      const error = yield* runScenario({
+        scenario: bypassedScenario,
+        applicationId: todoApplication.id,
+        host: {
+          ...host,
+          createClient: (command) => {
+            createClientCalls += 1
+            return host.createClient(command)
+          },
+        },
+        options: { runId: 'preflight-missing-terminal-settlement-test', sourceRevision: 'test' },
+      }).pipe(Effect.flip)
+
+      expect(createClientCalls).toBe(0)
+      expect(error).toEqual(
+        expect.objectContaining({
+          code: 'invalid-scenario',
+          message: expect.stringContaining('Snapshot-based oracles require a terminal Settlement'),
+        }),
+      )
+    }).pipe(Vitest.withTestCtx(test)),
+  )
 })
 
 Vitest.describe('elapsed-time projection', () => {

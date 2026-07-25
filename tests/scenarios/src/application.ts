@@ -25,6 +25,7 @@ export class ScenarioOperationError extends Error {
       | 'invalid-action-input'
       | 'invalid-inspector-output'
       | 'invalid-observation-evidence'
+      | 'invalid-scenario'
       | 'missing-client'
       | 'missing-participant'
       | 'operations-in-flight'

@@ -28,6 +28,7 @@ import {
   type ParallelOperationStep,
   type ParticipantRef,
   type ParticipantSnapshot,
+  defineScenario,
   participantKey,
   type ScenarioAst,
   type ScenarioOracle,
@@ -1242,6 +1243,18 @@ const validateExecution = (args: {
   host: ParticipantHost
   execution: ExecutionConfiguration
 }): Effect.Effect<void, ScenarioOperationError> => {
+  try {
+    // A caller can construct a value typed as ScenarioAst without using the
+    // authoring constructor, so execution repeats its semantic validation.
+    defineScenario(args.scenario)
+  } catch (cause) {
+    return Effect.fail(
+      new ScenarioOperationError(
+        'invalid-scenario',
+        cause instanceof Error ? cause.message : `Invalid scenario: ${String(cause)}`,
+      ),
+    )
+  }
   if (args.scenario.applicationId !== args.applicationId) {
     return Effect.fail(
       new ScenarioOperationError(
