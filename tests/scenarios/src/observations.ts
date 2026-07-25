@@ -16,18 +16,18 @@ export interface EventRefRegistry {
   readonly reconcileObservedEvents: (events: ReadonlyArray<ObservedEvent>) => ReadonlyArray<ObservedEvent>
 }
 
-/** Assigns one runner-owned reference to each origin occurrence across every component. */
+/** Correlates sampled Event occurrences for debugging without claiming stable identity. */
 export const makeEventRefRegistry = (): EventRefRegistry => {
   const refs = new Map<string, string>()
   let nextRef = 1
 
   const resolveRef = (event: TraceableEvent, occurrence: number): string => {
-    const lineageKey = `${eventFingerprint(event)}\u0000${occurrence}`
-    const existing = refs.get(lineageKey)
+    const correlationKey = `${eventFingerprint(event)}\u0000${occurrence}`
+    const existing = refs.get(correlationKey)
     if (existing !== undefined) return existing
     const eventRef = `event-${String(nextRef).padStart(4, '0')}`
     nextRef += 1
-    refs.set(lineageKey, eventRef)
+    refs.set(correlationKey, eventRef)
     return eventRef
   }
 

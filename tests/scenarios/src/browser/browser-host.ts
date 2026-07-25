@@ -35,7 +35,6 @@ export const browserHostCapabilities: HostCapabilities = {
     'disconnect-reconnect',
     'sync-observation',
     'system-observation',
-    'event-lineage',
     'state-inspection',
     'opfs-state',
     'session-restart',

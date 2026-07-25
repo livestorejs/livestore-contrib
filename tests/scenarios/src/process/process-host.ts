@@ -39,7 +39,6 @@ export const processHostCapabilities: HostCapabilities = {
     'disconnect-reconnect',
     'sync-observation',
     'system-observation',
-    'event-lineage',
     'state-inspection',
     'sqlite-state',
     'process-isolation',

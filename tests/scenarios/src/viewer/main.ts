@@ -179,6 +179,7 @@ const loadArtifactJson = (input: string): void => {
   cursorIndex = artifact.trace.length - 1
   selectedDetailRecordIndex = undefined
   selectedEventRef = undefined
+  eventSelection.textContent = eventCorrelationSelectionLabel()
   timelineViewport = { start: 0, end: 1 }
   eventlogScrollStates.clear()
   playButton.disabled = false
@@ -741,7 +742,7 @@ const renderEventlog = (key: string, events: ReadonlyArray<ObservedEvent>, label
                       type="button"
                       class="event-chip ${event.disposition} ${event.eventRef === selectedEventRef ? 'selected' : ''}"
                       data-event-ref="${escapeMarkup(event.eventRef)}"
-                      title="${escapeMarkup(`${event.name} · ${event.eventRef} · ${event.disposition}`)}"
+                      title="${escapeMarkup(`${event.name} · inferred correlation ${event.eventRef} · ${event.disposition}`)}"
                     >${escapeMarkup(displayEventPosition(event))}</button>`,
                 )
                 .join('')
@@ -1298,7 +1299,7 @@ const bindEventSelection = (): void => {
   systemState.querySelectorAll<HTMLElement>('[data-event-ref]').forEach((element) => {
     element.addEventListener('click', () => {
       selectedEventRef = element.dataset.eventRef
-      eventSelection.textContent = selectedEventRef === undefined ? '' : `Highlighting ${selectedEventRef}`
+      eventSelection.textContent = eventCorrelationSelectionLabel(selectedEventRef)
       render()
     })
   })
@@ -1355,7 +1356,7 @@ const bindTimelineScrubber = (): void => {
       const eventRef = eventTarget?.dataset.eventRef
       if (eventRef !== undefined) {
         selectedEventRef = eventRef
-        eventSelection.textContent = `Highlighting ${eventRef}`
+        eventSelection.textContent = eventCorrelationSelectionLabel(eventRef)
         render()
         return
       }
@@ -1548,15 +1549,23 @@ const groupMarkersIntoBins = ({
 const markerGroupTitle = (group: ReadonlyArray<PositionedTimelineMarker>): string => {
   if (group.length === 1) {
     const marker = group[0]!.marker
-    return `${marker.event.name} · ${marker.event.eventRef} · ${displayEventPosition(marker.event)} · observed change in capture ${marker.captureIndex + 1}`
+    return `${marker.event.name} · inferred correlation ${marker.event.eventRef} · ${displayEventPosition(marker.event)} · observed change in capture ${marker.captureIndex + 1}`
   }
   const visibleItems = group
     .slice(0, 8)
-    .map(({ marker }) => `${displayEventPosition(marker.event)} · ${marker.event.name} · ${marker.event.eventRef}`)
+    .map(
+      ({ marker }) =>
+        `${displayEventPosition(marker.event)} · ${marker.event.name} · inferred correlation ${marker.event.eventRef}`,
+    )
     .join('\n')
   const remainder = group.length > 8 ? `\n… ${group.length - 8} more` : ''
   return `${group.length} observed event changes\n${visibleItems}${remainder}`
 }
+
+const eventCorrelationSelectionLabel = (eventRef?: string): string =>
+  eventRef === undefined
+    ? 'Select an event to highlight inferred matching observations.'
+    : `Highlighting inferred correlation ${eventRef}`
 
 const syncBadge = (sync: ComponentSyncObservation | null): readonly [string, string] => {
   if (sync === null) return ['unobserved', 'neutral']

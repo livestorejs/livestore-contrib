@@ -1553,7 +1553,7 @@ const firstEventlogMismatch = (
   return undefined
 }
 
-/** Eventlog equality uses portable Event facts; run-local lineage is separate evidence. */
+/** Eventlog equality uses portable Event facts; inferred eventRef correlation is non-authoritative. */
 const eventFact = (event: ObservedEvent): string =>
   canonicalJson({
     name: event.name,

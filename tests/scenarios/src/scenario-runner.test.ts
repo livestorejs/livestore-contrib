@@ -12,12 +12,14 @@ import {
   type ScenarioOperationFailureOutcome,
 } from './application.ts'
 import { makeMockScenarioBackend } from './backends.ts'
+import { browserHostCapabilities } from './browser/browser-host.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
-import { makeInProcessHost } from './host.ts'
+import { inProcessHostCapabilities, makeInProcessHost } from './host.ts'
 import { defineScenario, ScenarioRunArtifact, type ScenarioTraceRecord } from './model.ts'
+import { processHostCapabilities } from './process/process-host.ts'
 import {
   deriveAdaptiveTimeLayout,
   deriveConnectivityIntervals,
@@ -253,6 +255,12 @@ Vitest.describe('elapsed-time projection', () => {
 })
 
 Vitest.describe('participant-host failure conformance', () => {
+  Vitest.it('does not advertise exact Event lineage for sampled-correlation hosts', () => {
+    for (const capabilities of [inProcessHostCapabilities, processHostCapabilities, browserHostCapabilities]) {
+      expect(capabilities.capabilities).not.toContain('event-lineage')
+    }
+  })
+
   Vitest.it('keeps portable failure category independent from operation certainty', () => {
     const cases: ReadonlyArray<{
       code: ParticipantHostFailureCode
@@ -778,7 +786,7 @@ Vitest.describe('offline writer recovery', () => {
         expect(artifact.descriptor.traceVersion).toBe(3)
         expect(artifact.verdicts).toHaveLength(5)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
-        expectOfflineEventConfirmationLifecycle(artifact)
+        expectOfflineEventCorrelationLifecycle(artifact)
         expect(artifact.snapshots).toHaveLength(2)
         expect(artifact.trace.map((record) => record.payload._tag)).toEqual(
           expect.arrayContaining([
@@ -1080,7 +1088,7 @@ Vitest.describe('process profile', () => {
           stateProfile: 'sqlite',
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('process-isolation')
-        expectOfflineEventConfirmationLifecycle(artifact)
+        expectOfflineEventCorrelationLifecycle(artifact)
         expect(artifact.descriptor.componentVersions.node).toBe(process.version)
         expect(artifact.snapshots).toHaveLength(2)
         const participantRecords = artifact.trace.filter((record) => record.emitterId.startsWith('process-client:'))
@@ -1115,7 +1123,7 @@ Vitest.describe('browser profile', () => {
           stateProfile: 'opfs',
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('browser-shared-worker')
-        expectOfflineEventConfirmationLifecycle(artifact)
+        expectOfflineEventCorrelationLifecycle(artifact)
         expect(artifact.snapshots).toHaveLength(2)
         expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)
         expect(artifact.trace.at(-1)?.payload).toEqual(expect.objectContaining({ _tag: 'run.completed' }))
@@ -1156,8 +1164,8 @@ Vitest.describe('browser profile', () => {
   )
 })
 
-/** Ensures every participant profile preserves a pending event until backend confirmation. */
-const expectOfflineEventConfirmationLifecycle = (artifact: ScenarioRunArtifact): void => {
+/** Ensures sampled correlation remains useful for one unambiguous pending-to-confirmed Event. */
+const expectOfflineEventCorrelationLifecycle = (artifact: ScenarioRunArtifact): void => {
   const reconnectIndex = artifact.trace.find(
     (record) => record.clientId === 'client-a' && record.payload._tag === 'connectivity.reconnected',
   )?.index

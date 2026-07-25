@@ -69,7 +69,6 @@ export const inProcessHostCapabilities: HostCapabilities = {
     'disconnect-reconnect',
     'sync-observation',
     'system-observation',
-    'event-lineage',
     'state-inspection',
     'sqlite-state',
   ],
