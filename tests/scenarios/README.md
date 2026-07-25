@@ -82,4 +82,11 @@ pnpm --dir tests/scenarios exec tsc --noEmit -p tsconfig.json
 
 The scenario AST does not select execution placement. The same portable
 scenario can therefore run through the in-process, isolated Node process, or
-browser host when its declared capabilities are available.
+browser host when its required capabilities are available. The runner derives
+requirements implied by topology, operations, observations, and oracles;
+`requires` is only needed for additional platform-specific guarantees. Run the
+shared profile contract directly with:
+
+```sh
+pnpm --dir tests/scenarios exec vitest run src/host-conformance.test.ts
+```

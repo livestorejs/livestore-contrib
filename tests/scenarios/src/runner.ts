@@ -16,6 +16,7 @@ import { PlatformNode } from '@livestore/utils/node'
 import { type ApplicationDefinition, ScenarioOperationError } from './application.ts'
 import { makeLocalSyncCfScenarioBackend, makeMockScenarioBackend } from './backends.ts'
 import { makeBrowserHost } from './browser/browser-host.ts'
+import { deriveScenarioRequirements, sessionsBeyondHostLimit } from './capabilities.ts'
 import { makeInProcessHost, type HostError, type ParticipantHost } from './host.ts'
 import {
   type ComponentSyncObservation,
@@ -1289,7 +1290,19 @@ const validateExecution = (args: {
       ),
     )
   }
-  const missing = args.scenario.requires.filter((capability) => available.has(capability) === false)
+  const oversizedClients = sessionsBeyondHostLimit({
+    scenario: args.scenario,
+    maximumSessionsPerClient: args.host.capabilities.maximumSessionsPerClient,
+  })
+  if (oversizedClients.length > 0) {
+    return Effect.fail(
+      new ScenarioOperationError(
+        'capability-unavailable',
+        `Host ${args.host.capabilities.profile} supports at most ${args.host.capabilities.maximumSessionsPerClient} session(s) per Client; requested: ${oversizedClients.map(({ clientId, requested }) => `${clientId} (${requested})`).join(', ')}`,
+      ),
+    )
+  }
+  const missing = deriveScenarioRequirements(args.scenario).filter((capability) => available.has(capability) === false)
   if (missing.length > 0) {
     return Effect.fail(
       new ScenarioOperationError(

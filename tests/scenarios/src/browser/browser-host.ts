@@ -46,10 +46,15 @@ export const browserHostCapabilities: HostCapabilities = {
   settlement: 'stable-poll',
 }
 
+export interface BrowserParticipantHost extends ParticipantHost {
+  /** Test-only resource identities used to prove scope cleanup. */
+  readonly profileDirectories: () => ReadonlyArray<string>
+}
+
 export const makeBrowserHost = (args: {
   applicationId: string
   backend: Pick<ScenarioBackend, 'id' | 'observe' | 'serializedConfig' | 'componentVersions'>
-}): Effect.Effect<ParticipantHost, ScenarioOperationError, Scope.Scope> =>
+}): Effect.Effect<BrowserParticipantHost, ScenarioOperationError, Scope.Scope> =>
   Effect.gen(function* () {
     if (args.applicationId !== 'scenario-todo-app') {
       return yield* Effect.fail(
@@ -247,11 +252,13 @@ export const makeBrowserHost = (args: {
       drainRuntimeFailures,
       observeSync,
       inspectState,
+      profileDirectories: () => [...clients.values()].map((client) => client.userDataDir),
     }
   })
 
 interface BrowserClientController {
   readonly clientId: string
+  readonly userDataDir: string
   readonly connected: () => boolean
   readonly getSession: (sessionId: string) => Effect.Effect<Page, ScenarioOperationError>
   readonly setConnectivity: (connected: boolean) => Effect.Effect<void, ScenarioOperationError>
@@ -418,6 +425,7 @@ const makeBrowserClient = (args: {
 
       return {
         clientId: args.clientId,
+        userDataDir,
         connected: () => state.connected,
         getSession,
         setConnectivity,

@@ -13,6 +13,7 @@ import {
 } from './application.ts'
 import { makeMockScenarioBackend } from './backends.ts'
 import { browserHostCapabilities } from './browser/browser-host.ts'
+import { deriveScenarioRequirements } from './capabilities.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
@@ -49,6 +50,25 @@ Vitest.describe('scenario model', () => {
   Vitest.it('validates and round-trips the versioned serializable AST', () => {
     const encoded = JSON.parse(JSON.stringify(offlineWriterRecovery))
     expect(defineScenario(encoded)).toEqual(offlineWriterRecovery)
+  })
+
+  Vitest.it('derives host requirements from topology, operations, observations, and oracles', () => {
+    expect(
+      deriveScenarioRequirements(
+        defineScenario({
+          ...browserMultiSessionRecovery,
+          requires: [],
+        }),
+      ),
+    ).toEqual([
+      'system-observation',
+      'sync-observation',
+      'multiple-sessions',
+      'named-actions',
+      'session-restart',
+      'client-restart',
+      'state-inspection',
+    ])
   })
 
   Vitest.it('requires a terminal Settlement for snapshot-based oracles', () => {
@@ -475,21 +495,72 @@ Vitest.describe('scenario operation history', () => {
 
 /** Verifies: LS.SYS.VER.SCEN-R05, LS.SYS.VER.SCEN-R06, LS.SYS.VER.SCEN-R08 */
 Vitest.describe('in-process host conformance', () => {
-  Vitest.live('rejects topology beyond its advertised session capability', (test) =>
+  Vitest.live('rejects inferred incompatible behavior before creating any Client', (test) =>
     Effect.gen(function* () {
       const backend = yield* makeMockScenarioBackend
       const host = yield* makeInProcessHost({ application: todoApplication, backend })
-      expect(host.capabilities.maximumSessionsPerClient).toBe(1)
+      let createClientCalls = 0
+      const incompatibleScenario = defineScenario({
+        version: 1,
+        id: 'preflight-incompatible-lifecycle',
+        description: 'Requires a Client restart without declaring it manually.',
+        tags: ['preflight'],
+        seed: 1,
+        applicationId: todoApplication.id,
+        requires: [],
+        topology: {
+          storeId: 'preflight-incompatible-lifecycle',
+          clients: [{ id: 'client-a', sessions: ['session-a1'], initiallyConnected: true }],
+        },
+        phases: [
+          {
+            id: 'lifecycle',
+            description: 'Restart the Client.',
+            steps: [{ _tag: 'restart-client', id: 'restart-client-a', clientId: 'client-a' }],
+          },
+        ],
+        oracles: [],
+      })
 
-      const exit = yield* host
-        .createClient({
-          operationId: 'create-client-a',
-          storeId: 'host-conformance',
-          client: { id: 'client-a', sessions: ['session-a', 'session-b'], initiallyConnected: true },
-        })
-        .pipe(Effect.exit)
+      const exit = yield* runScenario({
+        scenario: incompatibleScenario,
+        applicationId: todoApplication.id,
+        host: {
+          ...host,
+          createClient: (command) =>
+            Effect.sync(() => {
+              createClientCalls += 1
+              return command
+            }).pipe(Effect.flatMap(host.createClient)),
+        },
+      }).pipe(Effect.exit)
 
       expect(Exit.isFailure(exit)).toBe(true)
+      expect(createClientCalls).toBe(0)
+
+      const oversizedExit = yield* runScenario({
+        scenario: defineScenario({
+          ...incompatibleScenario,
+          id: 'preflight-oversized-client',
+          topology: {
+            storeId: 'preflight-oversized-client',
+            clients: [{ id: 'client-a', sessions: ['session-a1', 'session-a2'], initiallyConnected: true }],
+          },
+          phases: [],
+        }),
+        applicationId: todoApplication.id,
+        host: {
+          ...host,
+          createClient: (command) =>
+            Effect.sync(() => {
+              createClientCalls += 1
+              return command
+            }).pipe(Effect.flatMap(host.createClient)),
+        },
+      }).pipe(Effect.exit)
+
+      expect(Exit.isFailure(oversizedExit)).toBe(true)
+      expect(createClientCalls).toBe(0)
     }).pipe(Vitest.withTestCtx(test)),
   )
 

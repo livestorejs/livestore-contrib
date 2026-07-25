@@ -12,6 +12,26 @@ export type SyncBackendRealization = typeof SyncBackendRealization.Type
 export const StateProfile = Schema.Literals(['sqlite', 'opfs'])
 export type StateProfile = typeof StateProfile.Type
 
+/** Behaviors that a Scenario may require from its participant host. */
+export const HostCapability = Schema.Literals([
+  'multiple-clients',
+  'multiple-sessions',
+  'named-actions',
+  'disconnect-reconnect',
+  'sync-observation',
+  'system-observation',
+  'state-inspection',
+  'sqlite-state',
+  'opfs-state',
+  'session-restart',
+  'client-restart',
+  'process-isolation',
+  'browser-shared-worker',
+  'browser-web-locks',
+  'event-lineage',
+])
+export type HostCapability = typeof HostCapability.Type
+
 export const ExecutionConfiguration = Schema.Struct({
   participantProfile: ParticipantProfile,
   syncBackend: SyncBackendRealization,
@@ -152,7 +172,7 @@ export const ScenarioAst = Schema.Struct({
   tags: Schema.Array(Schema.String),
   seed: Schema.Finite,
   applicationId: Schema.String,
-  requires: Schema.Array(Schema.String),
+  requires: Schema.Array(HostCapability),
   topology: Schema.Struct({
     storeId: Schema.String,
     clients: Schema.Array(ClientDefinition),
@@ -164,7 +184,7 @@ export type ScenarioAst = typeof ScenarioAst.Type
 
 export const HostCapabilities = Schema.Struct({
   profile: ParticipantProfile,
-  capabilities: Schema.Array(Schema.String),
+  capabilities: Schema.Array(HostCapability),
   maximumSessionsPerClient: Schema.Finite,
   settlement: Schema.Literal('stable-poll'),
 })
