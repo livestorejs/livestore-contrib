@@ -596,6 +596,57 @@ Vitest.describe('in-process host conformance', () => {
  * R16, and R18.
  */
 Vitest.describe('offline writer recovery', () => {
+  Vitest.live('rejects equal settled heads when a participant Eventlog diverges from the backend', (test) =>
+    Effect.gen(function* () {
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      const divergentHost = {
+        ...host,
+        observeSystem: host.observeSystem.pipe(
+          Effect.map((observation) => ({
+            ...observation,
+            clients: observation.clients.map((client) =>
+              client.clientId === 'client-b'
+                ? {
+                    ...client,
+                    sessions: client.sessions.map((session) => ({
+                      ...session,
+                      sync: {
+                        ...session.sync,
+                        events: session.sync.events.map((event, index) =>
+                          index === 0 && event.disposition === 'confirmed'
+                            ? { ...event, name: `${event.name}.divergent` }
+                            : event,
+                        ),
+                      },
+                    })),
+                  }
+                : client,
+            ),
+          })),
+        ),
+      }
+
+      const artifact = yield* runScenario({
+        scenario: offlineWriterRecovery,
+        applicationId: todoApplication.id,
+        host: divergentHost,
+        options: { runId: 'divergent-eventlog-test', sourceRevision: 'test' },
+      })
+      const verdict = artifact.verdicts.find((candidate) => candidate.oracleId === 'eventlogs-converged')
+
+      expect(artifact.status).toBe('failed')
+      expect(verdict).toEqual(
+        expect.objectContaining({
+          status: 'failed',
+          summary: expect.stringContaining('client-b/session-b'),
+        }),
+      )
+      expect(verdict?.summary).toContain('position e1')
+      expect(verdict?.evidence).toHaveLength(3)
+    }).pipe(Vitest.withTestCtx(test)),
+  )
+
   Vitest.live(
     'runs through real Stores and emits passing convergence evidence',
     (test) =>

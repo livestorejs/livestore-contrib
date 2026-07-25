@@ -18,10 +18,12 @@ import { makeLocalSyncCfScenarioBackend, makeMockScenarioBackend } from './backe
 import { makeBrowserHost } from './browser/browser-host.ts'
 import { makeInProcessHost, type HostError, type ParticipantHost } from './host.ts'
 import {
+  type ComponentSyncObservation,
   type OracleVerdict,
   type ExecutionConfiguration,
   type HostObservationOccurrence,
   type HostSystemObservation,
+  type ObservedEvent,
   type OperationHistoryOracle,
   type ParallelOperationStep,
   type ParticipantRef,
@@ -1049,15 +1051,17 @@ const evaluateOracles = (args: {
     const verdict =
       oracle._tag === 'operation-history'
         ? evaluateOperationHistoryOracle(oracle, args.trace)
-        : evaluateSnapshotOracle(
-            oracle,
-            oracle.participants.map((participant) =>
-              args.snapshots.find((snapshot) => participantKey(snapshot.participant) === participantKey(participant)),
-            ),
-            oracle.participants.flatMap(
-              (participant) => args.evidenceByParticipant.get(participantKey(participant)) ?? [],
-            ),
-          )
+        : oracle._tag === 'eventlog-convergence'
+          ? evaluateEventlogConvergenceOracle(oracle, args.trace)
+          : evaluateSnapshotOracle(
+              oracle,
+              oracle.participants.map((participant) =>
+                args.snapshots.find((snapshot) => participantKey(snapshot.participant) === participantKey(participant)),
+              ),
+              oracle.participants.flatMap(
+                (participant) => args.evidenceByParticipant.get(participantKey(participant)) ?? [],
+              ),
+            )
     args.record({
       origin: 'verdict',
       correlationId: oracle.id,
@@ -1074,7 +1078,7 @@ const evaluateOracles = (args: {
   })
 
 const evaluateSnapshotOracle = (
-  oracle: Exclude<ScenarioOracle, OperationHistoryOracle>,
+  oracle: Exclude<ScenarioOracle, OperationHistoryOracle | EventlogConvergenceOracle>,
   selected: ReadonlyArray<ParticipantSnapshot | undefined>,
   evidence: ReadonlyArray<number>,
 ): OracleVerdict => {
@@ -1089,19 +1093,6 @@ const evaluateSnapshotOracle = (
       return passed === true
         ? passedVerdict(oracle, evidence, 'All expected participants have resolved pending events')
         : failedVerdict(oracle, evidence, 'At least one expected participant still has pending events')
-    }
-    case 'eventlog-convergence': {
-      const heads = new Set(snapshots.map((snapshot) => globalPosition(snapshot.sync.upstreamHead)))
-      const passed =
-        heads.size === 1 &&
-        snapshots.every(
-          (snapshot) =>
-            snapshot.sync.pendingCount === 0 &&
-            globalPosition(snapshot.sync.localHead) === globalPosition(snapshot.sync.upstreamHead),
-        )
-      return passed === true
-        ? passedVerdict(oracle, evidence, 'All expected participants share one settled authoritative head')
-        : failedVerdict(oracle, evidence, 'Expected participants do not share one settled authoritative head')
     }
     case 'state-convergence': {
       const values = snapshots.map((snapshot) => canonicalJson(snapshot.state[oracle.inspector]))
@@ -1121,6 +1112,87 @@ const evaluateSnapshotOracle = (
         : failedVerdict(oracle, evidence, `Missing IDs (${missingByParticipant.join('; ')})`)
     }
   }
+}
+
+type EventlogConvergenceOracle = Extract<ScenarioOracle, { readonly _tag: 'eventlog-convergence' }>
+
+interface EventlogCaptureEvidence {
+  readonly backend: {
+    readonly recordIndex: number
+    readonly head: string
+    readonly events: ReadonlyArray<ObservedEvent>
+  }
+  readonly participants: ReadonlyMap<string, ParticipantEventlogEvidence>
+}
+
+interface ParticipantEventlogEvidence {
+  readonly recordIndex: number
+  readonly observation: ComponentSyncObservation
+}
+
+interface EventlogCaptureAccumulator {
+  backend?: EventlogCaptureEvidence['backend']
+  readonly participants: Map<string, ParticipantEventlogEvidence>
+}
+
+const evaluateEventlogConvergenceOracle = (
+  oracle: EventlogConvergenceOracle,
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): OracleVerdict => {
+  const evidence = latestCompleteEventlogCapture(trace, oracle.participants)
+  if (evidence === undefined) {
+    return failedVerdict(
+      oracle,
+      [],
+      'Eventlog convergence has insufficient evidence: no complete backend and participant observation capture',
+    )
+  }
+
+  const backendEvents = evidence.backend.events.filter((event) => event.disposition === 'confirmed')
+  const evidenceIndexes = [
+    evidence.backend.recordIndex,
+    ...oracle.participants.flatMap((participant) => {
+      const participantEvidence = evidence.participants.get(participantKey(participant))
+      return participantEvidence === undefined ? [] : [participantEvidence.recordIndex]
+    }),
+  ]
+
+  for (const participant of oracle.participants) {
+    const key = participantKey(participant)
+    const participantEvidence = evidence.participants.get(key)
+    if (participantEvidence === undefined) {
+      return failedVerdict(oracle, evidenceIndexes, `Eventlog convergence has insufficient evidence for ${key}`)
+    }
+
+    const observation = participantEvidence.observation
+    const settledAtBackendHead =
+      observation.pendingCount === 0 &&
+      globalPosition(observation.localHead) === globalPosition(evidence.backend.head) &&
+      globalPosition(observation.upstreamHead) === globalPosition(evidence.backend.head)
+    if (settledAtBackendHead === false) {
+      return failedVerdict(
+        oracle,
+        evidenceIndexes,
+        `${key} is not settled at authoritative backend head ${evidence.backend.head}`,
+      )
+    }
+
+    const participantEvents = observation.events.filter((event) => event.disposition === 'confirmed')
+    const mismatch = firstEventlogMismatch(backendEvents, participantEvents)
+    if (mismatch !== undefined) {
+      return failedVerdict(
+        oracle,
+        evidenceIndexes,
+        `${key} diverged from the authoritative Eventlog at position ${mismatch.position}: expected ${mismatch.expected}, observed ${mismatch.observed}`,
+      )
+    }
+  }
+
+  return passedVerdict(
+    oracle,
+    evidenceIndexes,
+    `All expected participants match the authoritative Eventlog through ${evidence.backend.head}`,
+  )
 }
 
 const evaluateOperationHistoryOracle = (
@@ -1395,6 +1467,91 @@ const observationsAreSettled = (observations: ReadonlyArray<SyncObservation>): b
 }
 
 const globalPosition = (head: string): number => EventSequenceNumber.Client.fromString(head).global
+
+/** Selects one non-atomic capture only when it contains every fact the oracle compares. */
+const latestCompleteEventlogCapture = (
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+  participants: ReadonlyArray<ParticipantRef>,
+): EventlogCaptureEvidence | undefined => {
+  const participantKeys = new Set(participants.map(participantKey))
+  const captures = new Map<string, EventlogCaptureAccumulator>()
+
+  for (const record of trace) {
+    if (record.captureId === null) continue
+    const capture =
+      captures.get(record.captureId) ??
+      ({ participants: new Map<string, ParticipantEventlogEvidence>() } satisfies EventlogCaptureAccumulator)
+    captures.set(record.captureId, capture)
+
+    if (record.payload._tag === 'backend.observed') {
+      capture.backend = {
+        recordIndex: record.index,
+        head: record.payload.observation.head,
+        events: record.payload.observation.events,
+      }
+    } else if (
+      record.payload._tag === 'session.sync.observed' &&
+      record.clientId !== null &&
+      record.sessionId !== null
+    ) {
+      const key = participantKey({ clientId: record.clientId, sessionId: record.sessionId })
+      if (participantKeys.has(key) === true) {
+        capture.participants.set(key, {
+          recordIndex: record.index,
+          observation: record.payload.observation,
+        })
+      }
+    }
+  }
+
+  for (const capture of [...captures.values()].toReversed()) {
+    if (
+      capture.backend !== undefined &&
+      participants.every((participant) => capture.participants.has(participantKey(participant))) === true
+    ) {
+      return { backend: capture.backend, participants: capture.participants }
+    }
+  }
+  return undefined
+}
+
+const firstEventlogMismatch = (
+  expectedEvents: ReadonlyArray<ObservedEvent>,
+  observedEvents: ReadonlyArray<ObservedEvent>,
+):
+  | {
+      readonly position: string
+      readonly expected: string
+      readonly observed: string
+    }
+  | undefined => {
+  const eventCount = Math.max(expectedEvents.length, observedEvents.length)
+  for (let index = 0; index < eventCount; index += 1) {
+    const expected = expectedEvents[index]
+    const observed = observedEvents[index]
+    if (expected === undefined || observed === undefined || eventFact(expected) !== eventFact(observed)) {
+      return {
+        position: expected?.position ?? observed?.position ?? `index ${index}`,
+        expected: describeEventFact(expected),
+        observed: describeEventFact(observed),
+      }
+    }
+  }
+  return undefined
+}
+
+/** Eventlog equality uses portable Event facts; run-local lineage is separate evidence. */
+const eventFact = (event: ObservedEvent): string =>
+  canonicalJson({
+    name: event.name,
+    args: event.args,
+    origin: event.origin,
+    position: globalPosition(event.position),
+    parentPosition: globalPosition(event.parentPosition),
+  })!
+
+const describeEventFact = (event: ObservedEvent | undefined): string =>
+  event === undefined ? 'no Event' : `${event.name} from ${participantKey(event.origin)} at ${event.position}`
 
 const syncObservationPayload = (observation: SyncObservation): SyncObservationPayload => ({
   participant: participantKey(observation.participant),
