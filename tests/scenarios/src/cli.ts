@@ -8,7 +8,9 @@ import { PlatformNode } from '@livestore/utils/node'
 
 import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
+import { lateClientCatchUp } from './corpus/late-client-catch-up.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
+import { seededTodoWorkload } from './corpus/seeded-todo-workload.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
@@ -33,7 +35,9 @@ interface CliOptions {
 const scenarios: Readonly<Record<string, ScenarioAst>> = {
   [backendOutageRecovery.id]: backendOutageRecovery,
   [offlineWriterRecovery.id]: offlineWriterRecovery,
+  [seededTodoWorkload.id]: seededTodoWorkload,
   [browserMultiSessionRecovery.id]: browserMultiSessionRecovery,
+  [lateClientCatchUp.id]: lateClientCatchUp,
   [sharedTodoWorkday.id]: sharedTodoWorkday,
 }
 
@@ -51,12 +55,14 @@ const runSelectedScenario = (options: CliOptions, runOptions: RunScenarioOptions
       return runProcessLocalSyncCfScenario({
         scenario: options.scenario,
         applicationId: todoApplication.id,
+        workloads: todoApplication.workloads,
         options: runOptions,
       })
     case 'browser':
       return runBrowserLocalSyncCfScenario({
         scenario: options.scenario,
         applicationId: todoApplication.id,
+        workloads: todoApplication.workloads,
         options: runOptions,
       })
   }

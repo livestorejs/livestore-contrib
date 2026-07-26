@@ -2,6 +2,7 @@ import { Schema } from '@livestore/utils/effect'
 
 import {
   type ComponentSyncObservation,
+  deriveScenarioTopology,
   type ObservedEvent,
   ScenarioRunArtifact,
   type ScenarioTraceRecord,
@@ -470,6 +471,10 @@ const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact
       ]
     case 'client.created':
       return [{ label: 'Status', value: payload.status, tone: 'good' }]
+    case 'lifecycle.session-add.requested':
+      return [{ label: 'Lifecycle operation', value: 'add session' }]
+    case 'lifecycle.session-added':
+      return [{ label: 'Status', value: 'added', tone: 'good' }]
     case 'action.completed':
       return [
         { label: 'Action', value: payload.action },
@@ -479,6 +484,20 @@ const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact
       return [
         { label: 'Action', value: payload.action },
         { label: 'Input', value: jsonValueSummary(payload.input) },
+      ]
+    case 'workload.requested':
+      return [
+        { label: 'Workload', value: payload.workload },
+        { label: 'Count', value: String(payload.count) },
+        { label: 'Derived seed', value: String(payload.seed) },
+        { label: 'Targets', value: payload.targets.join(', ') },
+        { label: 'Input', value: jsonValueSummary(payload.input) },
+      ]
+    case 'workload.completed':
+      return [
+        { label: 'Workload', value: payload.workload },
+        { label: 'Generated actions', value: String(payload.actionIds.length), tone: 'good' },
+        { label: 'Status', value: payload.status, tone: 'good' },
       ]
     case 'connectivity.disconnect.requested':
     case 'connectivity.reconnect.requested':
@@ -782,13 +801,14 @@ const renderTimeline = (): void => {
   const connectivityIntervals = deriveConnectivityIntervals(trace)
   const laneActivityIntervals = deriveLaneActivityIntervals({ scenario: artifact.scenario, trace })
   const runtimeFailureIntervals = deriveRuntimeFailureIntervals(trace)
-  const clientsById = new Map(artifact.scenario.topology.clients.map((client) => [client.id, client]))
+  const declaredTopology = deriveScenarioTopology(artifact.scenario)
+  const clientsById = new Map(declaredTopology.map((client) => [client.id, client]))
   const systemCaptureIds = new Set(
     playbackMoments.flatMap((moment) => (moment.captureId === null ? [] : [moment.captureId])),
   )
   const lanes: ReadonlyArray<TimelineLane> = [
     { key: backendComponentKey, label: 'Backend', color: '#4169e1', role: 'backend' },
-    ...artifact.scenario.topology.clients.flatMap((client, index) => [
+    ...declaredTopology.flatMap((client, index) => [
       {
         key: leaderComponentKey(client.id),
         label: `${client.id} · Leader`,
@@ -1040,10 +1060,11 @@ const renderTimeline = (): void => {
                 <circle cx="${x}" cy="${leaderY}" r="3.5" />
               </g>`
         case 'lifecycle.session-stopped':
-        case 'lifecycle.session-restarted': {
+        case 'lifecycle.session-restarted':
+        case 'lifecycle.session-added': {
           if (record.clientId === null || record.sessionId === null) return ''
           const y = yAt(sessionComponentKey(record.clientId, record.sessionId))
-          const restarted = record.payload._tag === 'lifecycle.session-restarted'
+          const restarted = record.payload._tag !== 'lifecycle.session-stopped'
           return `<g class="participant-milestone lifecycle ${restarted === true ? 'restarted' : 'stopped'}" data-record-index="${record.index}">
               <title>${title}</title>
               <line x1="${x}" x2="${x}" y1="${y - 8}" y2="${y + 8}" />
@@ -1143,7 +1164,7 @@ const renderTimeline = (): void => {
           })
           .join('')
 
-  const hierarchySvg = artifact.scenario.topology.clients
+  const hierarchySvg = declaredTopology
     .map((client) => {
       if (client.sessions.length === 0) return ''
       const leaderY = yAt(leaderComponentKey(client.id))

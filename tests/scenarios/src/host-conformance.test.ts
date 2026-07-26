@@ -107,6 +107,7 @@ const exerciseHostConformance = (profile: HostConformanceProfile) =>
           scenario: makeConformanceScenario(profile.capabilities),
           applicationId: todoApplication.id,
           host: fixture.host,
+          workloads: todoApplication.workloads,
           options: {
             runId: `host-conformance:${profile.capabilities.profile}`,
             sourceRevision: 'test',
@@ -186,7 +187,7 @@ const exerciseHostConformance = (profile: HostConformanceProfile) =>
   })
 
 const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst => {
-  const supportsMultipleSessions = capabilities.capabilities.includes('multiple-sessions')
+  const supportsDynamicSessionAddition = capabilities.capabilities.includes('dynamic-session-addition')
   const supportsSessionRestart = capabilities.capabilities.includes('session-restart')
   const supportsClientRestart = capabilities.capabilities.includes('client-restart')
   const supportsBackendAvailability = capabilities.capabilities.includes('backend-availability')
@@ -207,11 +208,9 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
       clients: [
         {
           id: sessionA.clientId,
-          sessions:
-            supportsMultipleSessions === true ? [sessionA.sessionId, sessionA2.sessionId] : [sessionA.sessionId],
+          sessions: [sessionA.sessionId],
           initiallyConnected: true,
         },
-        { id: sessionB.clientId, sessions: [sessionB.sessionId], initiallyConnected: true },
       ],
     },
     phases: [
@@ -226,6 +225,31 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
             action: 'createTodo',
             input: { id: 'conformance-a', text: 'Written by Client A' },
           },
+          {
+            _tag: 'create-client',
+            id: 'create-b',
+            client: { id: sessionB.clientId, sessions: [sessionB.sessionId], initiallyConnected: true },
+          },
+          {
+            _tag: 'workload',
+            id: 'seeded-workload',
+            workload: 'createTodoBurst',
+            input: { idPrefix: 'conformance-workload', textPrefix: 'Generated conformance task' },
+            targets: [sessionA, sessionB],
+            count: 2,
+          },
+          ...(supportsDynamicSessionAddition === true
+            ? [
+                { _tag: 'add-session' as const, id: 'add-a2', target: sessionA2 },
+                {
+                  _tag: 'action' as const,
+                  id: 'write-from-a2',
+                  target: sessionA2,
+                  action: 'createTodo',
+                  input: { id: 'conformance-a2', text: 'Written by a dynamically added session' },
+                },
+              ]
+            : []),
           { _tag: 'disconnect', id: 'disconnect-b', clientId: sessionB.clientId },
           {
             _tag: 'action',
@@ -267,7 +291,8 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
           {
             _tag: 'settle',
             id: 'settle-conformance',
-            participants: supportsMultipleSessions === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
+            participants:
+              supportsDynamicSessionAddition === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
             healDisconnectedClients: [],
             timeoutMs: 15_000,
           },
@@ -278,12 +303,12 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
       {
         _tag: 'pending-resolution',
         id: 'all-pending-resolved',
-        participants: supportsMultipleSessions === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
+        participants: supportsDynamicSessionAddition === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
       },
       {
         _tag: 'state-convergence',
         id: 'state-converged',
-        participants: supportsMultipleSessions === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
+        participants: supportsDynamicSessionAddition === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
         inspector: 'todos',
       },
     ],
@@ -366,6 +391,8 @@ const expectPassingHostContract = (artifact: ScenarioRunArtifact): void => {
     expect.arrayContaining([
       'client.created',
       'action.completed',
+      'workload.requested',
+      'workload.completed',
       'connectivity.disconnected',
       'connectivity.reconnected',
       'backend.observed',
@@ -384,6 +411,9 @@ const expectPassingHostContract = (artifact: ScenarioRunArtifact): void => {
     const restarted = artifact.trace.find((record) => record.payload._tag === 'lifecycle.session-restarted')!
     expect(stopped.index).toBeLessThan(isolatedWrite.index)
     expect(isolatedWrite.index).toBeLessThan(restarted.index)
+  }
+  if (artifact.descriptor.capabilities.capabilities.includes('dynamic-session-addition') === true) {
+    expect(tags).toContain('lifecycle.session-added')
   }
   if (artifact.descriptor.capabilities.capabilities.includes('client-restart') === true) {
     expect(tags).toContain('lifecycle.client-restarted')

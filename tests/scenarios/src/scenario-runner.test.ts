@@ -16,11 +16,13 @@ import { browserHostCapabilities } from './browser/browser-host.ts'
 import { deriveScenarioRequirements } from './capabilities.ts'
 import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
+import { lateClientCatchUp } from './corpus/late-client-catch-up.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
+import { seededTodoWorkload } from './corpus/seeded-todo-workload.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
 import { inProcessHostCapabilities, makeInProcessHost } from './host.ts'
-import { defineScenario, ScenarioRunArtifact, type ScenarioTraceRecord } from './model.ts'
+import { defineScenario, deriveScenarioTopology, ScenarioRunArtifact, type ScenarioTraceRecord } from './model.ts'
 import { processHostCapabilities } from './process/process-host.ts'
 import {
   deriveAdaptiveTimeLayout,
@@ -53,6 +55,128 @@ Vitest.describe('scenario model', () => {
     expect(defineScenario(encoded)).toEqual(offlineWriterRecovery)
   })
 
+  Vitest.it('retains a seeded workload as one compact serializable step', () => {
+    const encoded = JSON.parse(JSON.stringify(seededTodoWorkload))
+    const decoded = defineScenario(encoded)
+    const workloadSteps = decoded.phases.flatMap((phase) => phase.steps).filter((step) => step._tag === 'workload')
+
+    expect(decoded).toEqual(seededTodoWorkload)
+    expect(workloadSteps).toEqual([
+      expect.objectContaining({ id: 'create-seeded-todos', workload: 'createTodoBurst', count: 12 }),
+    ])
+    expect(decoded.phases.flatMap((phase) => phase.steps).some((step) => step._tag === 'action')).toBe(false)
+    expect(deriveScenarioRequirements(decoded)).toContain('named-actions')
+  })
+
+  Vitest.it('rejects empty or unbounded workload counts', () => {
+    const workloadStep = seededTodoWorkload.phases[0]!.steps[0]!
+    for (const count of [0, 10_001]) {
+      expect(() =>
+        defineScenario({
+          ...seededTodoWorkload,
+          id: `invalid-workload-count-${count}`,
+          phases: [
+            {
+              ...seededTodoWorkload.phases[0]!,
+              steps: [{ ...workloadStep, count }, seededTodoWorkload.phases[0]!.steps[1]!],
+            },
+          ],
+        }),
+      ).toThrow('Workload count must be between 1 and 10000')
+    }
+  })
+
+  Vitest.it('validates dynamic participant additions in plan order', () => {
+    const scenario = defineScenario({
+      version: 1,
+      id: 'dynamic-topology-model',
+      description: 'Adds a Client and a session after startup.',
+      tags: ['topology'],
+      seed: 1,
+      applicationId: todoApplication.id,
+      requires: [],
+      topology: {
+        storeId: 'dynamic-topology-model',
+        clients: [{ id: 'client-a', sessions: ['session-a'], initiallyConnected: true }],
+      },
+      phases: [
+        {
+          id: 'join',
+          description: 'Create the late participants.',
+          steps: [
+            {
+              _tag: 'create-client',
+              id: 'create-b',
+              client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
+            },
+            {
+              _tag: 'add-session',
+              id: 'add-a2',
+              target: { clientId: 'client-a', sessionId: 'session-a2' },
+            },
+            {
+              _tag: 'action',
+              id: 'write-b',
+              target: { clientId: 'client-b', sessionId: 'session-b' },
+              action: 'createTodo',
+              input: { id: 'late', text: 'Late participant write' },
+            },
+          ],
+        },
+      ],
+      oracles: [],
+    })
+
+    expect(deriveScenarioTopology(scenario)).toEqual([
+      { id: 'client-a', sessions: ['session-a', 'session-a2'], initiallyConnected: true },
+      { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
+    ])
+    expect(deriveScenarioRequirements(scenario)).toEqual(
+      expect.arrayContaining([
+        'multiple-clients',
+        'multiple-sessions',
+        'dynamic-client-creation',
+        'dynamic-session-addition',
+      ]),
+    )
+  })
+
+  Vitest.it('rejects participant use before its creation step', () => {
+    expect(() =>
+      defineScenario({
+        version: 1,
+        id: 'dynamic-topology-use-before-create',
+        description: 'Invalid ordering.',
+        tags: ['topology'],
+        seed: 1,
+        applicationId: todoApplication.id,
+        requires: [],
+        topology: { storeId: 'dynamic-topology-invalid', clients: [] },
+        phases: [
+          {
+            id: 'join',
+            description: 'Uses the Client too early.',
+            steps: [
+              {
+                _tag: 'action',
+                id: 'write-b-too-early',
+                target: { clientId: 'client-b', sessionId: 'session-b' },
+                action: 'createTodo',
+                input: { id: 'late', text: 'Too early' },
+              },
+              {
+                _tag: 'create-client',
+                id: 'create-b',
+                client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
+              },
+            ],
+          },
+        ],
+        oracles: [],
+      }),
+    ).toThrow('Unknown participant reference: client-b/session-b')
+  })
+
   Vitest.it('derives host requirements from topology, operations, observations, and oracles', () => {
     expect(
       deriveScenarioRequirements(
@@ -66,6 +190,7 @@ Vitest.describe('scenario model', () => {
       'sync-observation',
       'multiple-sessions',
       'named-actions',
+      'dynamic-session-addition',
       'session-restart',
       'client-restart',
       'state-inspection',
@@ -248,6 +373,153 @@ Vitest.describe('scenario runner preflight', () => {
           message: expect.stringContaining('Snapshot-based oracles require a terminal Settlement'),
         }),
       )
+    }).pipe(Vitest.withTestCtx(test)),
+  )
+
+  Vitest.live('resolves workload libraries before creating any Client', (test) =>
+    Effect.gen(function* () {
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      let createClientCalls = 0
+      const countingHost = {
+        ...host,
+        createClient: (command: Parameters<typeof host.createClient>[0]) => {
+          createClientCalls += 1
+          return host.createClient(command)
+        },
+      }
+      const error = yield* runScenario({
+        scenario: seededTodoWorkload,
+        applicationId: todoApplication.id,
+        host: countingHost,
+        workloads: {},
+        options: { runId: 'missing-workload-library-test', sourceRevision: 'test' },
+      }).pipe(Effect.flip)
+
+      expect(createClientCalls).toBe(0)
+      expect(error).toEqual(
+        expect.objectContaining({
+          code: 'unknown-workload',
+          message: expect.stringContaining('createTodoBurst'),
+        }),
+      )
+
+      const invalidInputScenario = defineScenario({
+        ...seededTodoWorkload,
+        id: 'invalid-workload-input',
+        phases: seededTodoWorkload.phases.map((phase) => ({
+          ...phase,
+          steps: phase.steps.map((step) =>
+            step._tag === 'workload' ? { ...step, input: { idPrefix: 'missing-text-prefix' } } : step,
+          ),
+        })),
+      })
+      const invalidInputError = yield* runScenario({
+        scenario: invalidInputScenario,
+        applicationId: todoApplication.id,
+        host: countingHost,
+        workloads: todoApplication.workloads,
+        options: { runId: 'invalid-workload-input-test', sourceRevision: 'test' },
+      }).pipe(Effect.flip)
+      expect(createClientCalls).toBe(0)
+      expect(invalidInputError).toEqual(expect.objectContaining({ code: 'invalid-workload-input' }))
+    }).pipe(Vitest.withTestCtx(test)),
+  )
+})
+
+Vitest.describe('seeded workloads', () => {
+  Vitest.live(
+    'repeats the same generated actions for the same seed and retains every action as trace evidence',
+    (test) =>
+      Effect.gen(function* () {
+        const first = yield* runInProcessScenario({
+          scenario: seededTodoWorkload,
+          application: todoApplication,
+          options: { runId: 'seeded-workload-first', sourceRevision: 'test' },
+        })
+        const second = yield* runInProcessScenario({
+          scenario: seededTodoWorkload,
+          application: todoApplication,
+          options: { runId: 'seeded-workload-second', sourceRevision: 'test' },
+        })
+        const differentSeed = yield* runInProcessScenario({
+          scenario: defineScenario({
+            ...seededTodoWorkload,
+            id: 'seeded-todo-workload-different-seed',
+            seed: seededTodoWorkload.seed + 1,
+          }),
+          application: todoApplication,
+          options: { runId: 'seeded-workload-different-seed', sourceRevision: 'test' },
+        })
+
+        expect(first.status).toBe('passed')
+        expect(second.status).toBe('passed')
+        expect(differentSeed.status).toBe('passed')
+        expect(workloadActionSignature(first)).toEqual(workloadActionSignature(second))
+        expect(workloadActionSignature(first)).not.toEqual(workloadActionSignature(differentSeed))
+
+        const requested = first.trace.find((record) => record.payload._tag === 'workload.requested')
+        const completed = first.trace.find((record) => record.payload._tag === 'workload.completed')
+        expect(requested?.payload).toEqual(
+          expect.objectContaining({ _tag: 'workload.requested', workload: 'createTodoBurst', count: 12 }),
+        )
+        expect(completed?.payload).toEqual(
+          expect.objectContaining({
+            _tag: 'workload.completed',
+            actionIds: Array.from(
+              { length: 12 },
+              (_, index) => `create-seeded-todos:${String(index + 1).padStart(4, '0')}`,
+            ),
+          }),
+        )
+        expect(
+          first.trace.filter(
+            (record) => record.payload._tag === 'action.requested' && record.causationId === 'create-seeded-todos',
+          ),
+        ).toHaveLength(12)
+        expect(
+          deriveScenarioOperationHistory(first.trace).find(
+            (operation) => operation.operationId === 'create-seeded-todos',
+          ),
+        ).toEqual(expect.objectContaining({ family: 'workload', status: 'succeeded' }))
+      }).pipe(Vitest.withTestCtx(test)),
+    20_000,
+  )
+})
+
+Vitest.describe('dynamic participant addition', () => {
+  Vitest.live('creates a late Client after confirmed history and converges from empty local state', (test) =>
+    Effect.gen(function* () {
+      const artifact = yield* runInProcessScenario({
+        scenario: lateClientCatchUp,
+        application: todoApplication,
+        options: { runId: 'late-client-catch-up-test', sourceRevision: 'test' },
+      })
+
+      expect(artifact.status).toBe('passed')
+      expect(artifact.snapshots).toHaveLength(2)
+      const initialSettlement = artifact.trace.find(
+        (record) => record.correlationId === 'settle-initial-history' && record.payload._tag === 'settlement.completed',
+      )
+      const lateCreation = artifact.trace.find(
+        (record) => record.correlationId === 'create-client-b' && record.payload._tag === 'client.created',
+      )
+      expect(initialSettlement?.index).toBeLessThan(lateCreation?.index ?? -1)
+      expect(
+        projectTraceAt({
+          scenario: artifact.scenario,
+          trace: artifact.trace,
+          cursorIndex: initialSettlement?.index ?? -1,
+        }).clients.find((client) => client.clientId === 'client-b')?.lifecycle,
+      ).toBe('declared')
+      expect(
+        projectTraceAt({
+          scenario: artifact.scenario,
+          trace: artifact.trace,
+          cursorIndex: lateCreation?.index ?? -1,
+        }).clients.find((client) => client.clientId === 'client-b')?.lifecycle,
+      ).toBe('created')
+      expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
     }).pipe(Vitest.withTestCtx(test)),
   )
 })
@@ -1238,10 +1510,46 @@ Vitest.describe('browser profile', () => {
 
         expect(artifact.status).toBe('passed')
         expect(artifact.snapshots).toHaveLength(2)
+        const sessionAdded = artifact.trace.find((record) => record.payload._tag === 'lifecycle.session-added')
+        const beforeAddition = projectTraceAt({
+          scenario: artifact.scenario,
+          trace: artifact.trace,
+          cursorIndex: (sessionAdded?.index ?? 0) - 1,
+        })
+        const afterAddition = projectTraceAt({
+          scenario: artifact.scenario,
+          trace: artifact.trace,
+          cursorIndex: sessionAdded?.index ?? -1,
+        })
+        expect(
+          beforeAddition.clients
+            .find((client) => client.clientId === 'client-a')
+            ?.sessions.find((session) => session.sessionId === 'session-a2')?.lifecycle,
+        ).toBe('declared')
+        expect(
+          afterAddition.clients
+            .find((client) => client.clientId === 'client-a')
+            ?.sessions.find((session) => session.sessionId === 'session-a2')?.lifecycle,
+        ).toBe('created')
+        const initialLeaderStopped = artifact.trace.find(
+          (record) => record.correlationId === 'stop-session-a1' && record.payload._tag === 'lifecycle.session-stopped',
+        )
+        const successorWrite = artifact.trace.find(
+          (record) =>
+            record.correlationId === 'session-a2-write-after-leader-turnover' &&
+            record.payload._tag === 'action.completed',
+        )
+        const initialLeaderRestarted = artifact.trace.find(
+          (record) =>
+            record.correlationId === 'restart-session-a1' && record.payload._tag === 'lifecycle.session-restarted',
+        )
+        expect(initialLeaderStopped?.index).toBeLessThan(successorWrite?.index ?? -1)
+        expect(successorWrite?.index).toBeLessThan(initialLeaderRestarted?.index ?? -1)
         expect(artifact.trace.map((record) => record.payload._tag)).toEqual(
           expect.arrayContaining([
             'lifecycle.session-stopped',
             'lifecycle.session-restarted',
+            'lifecycle.session-added',
             'lifecycle.client-restarted',
           ]),
         )
@@ -1325,3 +1633,17 @@ const expectBackendOutageRecovery = (artifact: ScenarioRunArtifact): void => {
   expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)
   expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
 }
+
+const workloadActionSignature = (artifact: ScenarioRunArtifact): ReadonlyArray<unknown> =>
+  artifact.trace.flatMap((record) =>
+    record.payload._tag === 'action.requested' && record.causationId === 'create-seeded-todos'
+      ? [
+          {
+            operationId: record.correlationId,
+            participant: `${record.clientId}/${record.sessionId}`,
+            action: record.payload.action,
+            input: record.payload.input,
+          },
+        ]
+      : [],
+  )

@@ -3,11 +3,14 @@ import { defineScenario } from '../model.ts'
 const sessionA1 = { clientId: 'client-a', sessionId: 'session-a1' } as const
 const sessionA2 = { clientId: 'client-a', sessionId: 'session-a2' } as const
 
-/** Exercises the persisted web topology rather than merely running a Store inside a page. */
+/**
+ * Exercises the persisted web topology rather than merely running a Store inside a page.
+ * The fixture starts A1 before adding A2, so blocking Web Lock election makes A1 the initial Leader holder.
+ */
 export const browserMultiSessionRecovery = defineScenario({
   version: 1,
   id: 'browser-multi-session-recovery',
-  description: 'Two browser sessions share one Client leader and recover through session and Client restarts.',
+  description: 'A later browser session joins one Client leader and both recover through session and Client restarts.',
   tags: ['sync', 'browser', 'multi-session', 'opfs', 'lifecycle'],
   seed: 1443,
   applicationId: 'scenario-todo-app',
@@ -19,12 +22,13 @@ export const browserMultiSessionRecovery = defineScenario({
     'opfs-state',
     'session-restart',
     'client-restart',
+    'dynamic-session-addition',
     'browser-shared-worker',
     'browser-web-locks',
   ],
   topology: {
     storeId: 'scenario-browser-multi-session-recovery',
-    clients: [{ id: 'client-a', sessions: ['session-a1', 'session-a2'], initiallyConnected: true }],
+    clients: [{ id: 'client-a', sessions: ['session-a1'], initiallyConnected: true }],
   },
   phases: [
     {
@@ -38,6 +42,7 @@ export const browserMultiSessionRecovery = defineScenario({
           action: 'createTodo',
           input: { id: 'todo-session-a1', text: 'Written by the first browser session' },
         },
+        { _tag: 'add-session', id: 'add-session-a2', target: sessionA2 },
         {
           _tag: 'action',
           id: 'session-a2-write',
@@ -56,17 +61,18 @@ export const browserMultiSessionRecovery = defineScenario({
     },
     {
       id: 'session-lifecycle',
-      description: 'One page closes while the Client leader remains live, then restores from the shared Client state.',
+      description:
+        'The initial lock-holding page closes, its sibling continues through Leader turnover, then it returns.',
       steps: [
-        { _tag: 'stop-session', id: 'stop-session-a2', target: sessionA2 },
+        { _tag: 'stop-session', id: 'stop-session-a1', target: sessionA1 },
         {
           _tag: 'action',
-          id: 'session-a1-write-while-a2-stopped',
-          target: sessionA1,
+          id: 'session-a2-write-after-leader-turnover',
+          target: sessionA2,
           action: 'createTodo',
-          input: { id: 'todo-while-a2-stopped', text: 'Written while the second session is stopped' },
+          input: { id: 'todo-after-leader-turnover', text: 'Written after the initial Leader session closes' },
         },
-        { _tag: 'restart-session', id: 'restart-session-a2', target: sessionA2 },
+        { _tag: 'restart-session', id: 'restart-session-a1', target: sessionA1 },
         {
           _tag: 'settle',
           id: 'settle-session-restart',
@@ -105,7 +111,7 @@ export const browserMultiSessionRecovery = defineScenario({
       id: 'no-todos-lost',
       participants: [sessionA1, sessionA2],
       inspector: 'todos',
-      expectedIds: ['todo-session-a1', 'todo-session-a2', 'todo-while-a2-stopped'],
+      expectedIds: ['todo-session-a1', 'todo-session-a2', 'todo-after-leader-turnover'],
     },
   ],
 })

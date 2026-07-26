@@ -40,6 +40,8 @@ export const browserHostCapabilities: HostCapabilities = {
     'opfs-state',
     'session-restart',
     'client-restart',
+    'dynamic-client-creation',
+    'dynamic-session-addition',
     'browser-shared-worker',
     'browser-web-locks',
   ],
@@ -120,6 +122,13 @@ export const makeBrowserHost = (args: {
           action: command.action,
           input: command.input,
         })
+        return acknowledge(command.operationId)
+      })
+
+    const addSession: ParticipantHost['addSession'] = (command) =>
+      Effect.gen(function* () {
+        const client = yield* getClient(clients, command.target.clientId)
+        yield* client.addSession(command.target.sessionId)
         return acknowledge(command.operationId)
       })
 
@@ -247,6 +256,7 @@ export const makeBrowserHost = (args: {
         chromium: chromium.name(),
       },
       createClient,
+      addSession,
       dispatchAction,
       setConnectivity,
       setBackendAvailability,
@@ -266,6 +276,7 @@ interface BrowserClientController {
   readonly userDataDir: string
   readonly connected: () => boolean
   readonly getSession: (sessionId: string) => Effect.Effect<Page, ScenarioOperationError>
+  readonly addSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
   readonly setConnectivity: (connected: boolean) => Effect.Effect<void, ScenarioOperationError>
   readonly stopSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
   readonly restartSession: (sessionId: string) => Effect.Effect<void, ScenarioOperationError>
@@ -301,6 +312,7 @@ const makeBrowserClient = (args: {
         pages: new Map<string, Page>(),
         runtimeFailures: [] as RuntimeFailureObservation[],
       }
+      const knownSessionIds = new Set(args.sessionIds)
       let shutdownComplete = false
 
       for (const sessionId of args.sessionIds) {
@@ -328,9 +340,32 @@ const makeBrowserClient = (args: {
           state.pages.delete(sessionId)
         })
 
+      const addSession = (sessionId: string) =>
+        Effect.gen(function* () {
+          if (knownSessionIds.has(sessionId) === true) {
+            return yield* Effect.fail(browserRequestRejected(`Session ${args.clientId}/${sessionId} already exists`))
+          }
+          if (knownSessionIds.size >= browserHostCapabilities.maximumSessionsPerClient) {
+            return yield* Effect.fail(
+              browserRequestRejected(
+                `Client ${args.clientId} already has the maximum ${browserHostCapabilities.maximumSessionsPerClient} sessions`,
+              ),
+            )
+          }
+          const page = yield* startSessionPage({
+            ...args,
+            context: state.context,
+            sessionId,
+            onRuntimeFailure: (failure) => state.runtimeFailures.push(failure),
+          })
+          if (state.connected === false) yield* setClientSyncConnectivity(new Map([[sessionId, page]]), false)
+          knownSessionIds.add(sessionId)
+          state.pages.set(sessionId, page)
+        })
+
       const restartSession = (sessionId: string) =>
         Effect.gen(function* () {
-          if (args.sessionIds.includes(sessionId) === false) {
+          if (knownSessionIds.has(sessionId) === false) {
             return yield* Effect.fail(browserRequestRejected(`Unknown session ${args.clientId}/${sessionId}`))
           }
           if (state.pages.has(sessionId) === true) {
@@ -372,7 +407,7 @@ const makeBrowserClient = (args: {
         yield* closePages(state.pages)
         yield* closeContext(state.context)
         state.context = yield* launchBrowserContext(userDataDir)
-        for (const sessionId of args.sessionIds) {
+        for (const sessionId of knownSessionIds) {
           const page = yield* startSessionPage({
             ...args,
             context: state.context,
@@ -433,6 +468,7 @@ const makeBrowserClient = (args: {
         userDataDir,
         connected: () => state.connected,
         getSession,
+        addSession,
         setConnectivity,
         stopSession,
         restartSession,

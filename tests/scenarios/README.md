@@ -13,6 +13,8 @@ pnpm --dir tests/scenarios scenario:run --profile in-process --backend local-syn
 pnpm --dir tests/scenarios scenario:run --profile process
 pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile process --scenario backend-outage-recovery
+pnpm --dir tests/scenarios scenario:run --profile process --scenario seeded-todo-workload
+pnpm --dir tests/scenarios scenario:run --profile process --scenario late-client-catch-up
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario browser-multi-session-recovery
 pnpm --dir tests/scenarios scenario:run --profile process --scenario shared-todo-workday --output artifacts/shared-todo-workday-process.json
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario shared-todo-workday --output artifacts/shared-todo-workday-browser.json
@@ -60,6 +62,34 @@ records every child invocation before releasing the host requests, preserves
 each child outcome, and joins the group before the next step. The
 `operation-history` oracle can require named operations to have terminal,
 non-indefinite outcomes and overlapping intervals.
+
+A `workload` step keeps a repeated application pattern compact by naming an
+application-owned workload, its serializable input, allowed targets, and a
+bounded action count. The runner resolves and expands the workload before it
+creates any Client, using a workload-specific seed derived from the Scenario
+seed and stable phase/step identity. The callback remains in the application
+definition rather than the AST. Every generated action receives a stable child
+operation ID and ordinary action instruction/acknowledgement records; the
+workload retains its own enclosing instruction/outcome boundary. Workload v1
+dispatches generated actions sequentially and allows between 1 and 10,000
+actions.
+
+The initial topology contains only participants that exist before the first
+phase. A sequential `create-client` step can create a new Client with its first
+sessions after history already exists; all profiles support that operation. A
+sequential `add-session` step attaches a new session to an existing Client;
+the browser profile realizes it by opening another page in the Client's
+persistent context. Creation acknowledgements prove only that the Store or
+page started. Settlement and oracles separately prove catch-up and convergence.
+Participant additions are rejected in `parallel` groups, and removal is not
+part of the current surface.
+
+`browser-multi-session-recovery` also covers behavioral Leader turnover using
+ordinary session lifecycle: the fixture starts the first page through blocking
+Web Lock election, adds a sibling, closes the initial lock holder, writes
+through the sibling, and then converges after restart. The artifact proves that
+recovery path, but does not claim portable trace evidence naming the old and new
+Leader sessions.
 
 Participant-host failures carry a portable category for host infrastructure,
 request rejection, invalid response, response timeout, or transport failure.

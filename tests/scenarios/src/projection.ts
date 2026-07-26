@@ -3,6 +3,7 @@ import { Schema } from '@livestore/utils/effect'
 import {
   BackendObservation,
   ComponentSyncObservation,
+  deriveScenarioTopology,
   type ObservedEvent,
   OracleVerdict,
   type ScenarioAst,
@@ -118,6 +119,7 @@ export interface ScenarioOperationHistoryEntry {
 export type ScenarioOperationHistoryFamily =
   | 'client-create'
   | 'application-action'
+  | 'workload'
   | 'connectivity'
   | 'backend-availability'
   | 'session-lifecycle'
@@ -144,6 +146,7 @@ export const scenarioOperationHistoryCoverage: ScenarioOperationHistoryCoverage 
   includedFamilies: [
     'client-create',
     'application-action',
+    'workload',
     'connectivity',
     'backend-availability',
     'session-lifecycle',
@@ -182,7 +185,7 @@ export const projectTraceAt = (args: {
   let state = initialObservedSystemState(args.scenario, cursorIndex)
 
   for (const record of args.trace.slice(0, cursorIndex + 1)) {
-    state = applyTraceRecord(state, record)
+    state = applyTraceRecord(state, record, args.scenario)
   }
 
   return Schema.decodeUnknownSync(ObservedSystemState)(state)
@@ -201,7 +204,7 @@ export const derivePlaybackMoments = (args: {
   let materialSignature = materialSystemSignature(state)
 
   for (const record of args.trace) {
-    state = applyTraceRecord({ ...state, cursorIndex: record.index }, record)
+    state = applyTraceRecord({ ...state, cursorIndex: record.index }, record, args.scenario)
     const kind = semanticMomentKind(record)
     if (kind !== undefined) {
       moments.push({
@@ -343,7 +346,7 @@ export const deriveLaneActivityIntervals = (args: {
 }): ReadonlyArray<LaneActivityInterval> => {
   const intervals: LaneActivityInterval[] = []
   const openByComponent = new Map<string, number>()
-  const clientsById = new Map(args.scenario.topology.clients.map((client) => [client.id, client]))
+  const clientsById = new Map(scenarioClientCreationDefinitions(args.scenario).map((client) => [client.id, client]))
 
   const open = (componentKey: string, recordIndex: number): void => {
     if (openByComponent.has(componentKey) === false) openByComponent.set(componentKey, recordIndex)
@@ -374,6 +377,7 @@ export const deriveLaneActivityIntervals = (args: {
         }
         break
       case 'lifecycle.session-restarted':
+      case 'lifecycle.session-added':
         if (record.clientId !== null && record.sessionId !== null) {
           open(sessionComponentKey(record.clientId, record.sessionId), record.index)
         }
@@ -598,12 +602,20 @@ export const backendComponentKey = 'backend'
 export const leaderComponentKey = (clientId: string): string => `leader:${clientId}`
 export const sessionComponentKey = (clientId: string, sessionId: string): string => `session:${clientId}/${sessionId}`
 
+/** Keeps Client creation sessions distinct from sessions attached by later plan steps. */
+const scenarioClientCreationDefinitions = (scenario: ScenarioAst) => [
+  ...scenario.topology.clients,
+  ...scenario.phases.flatMap((phase) =>
+    phase.steps.flatMap((step) => (step._tag === 'create-client' ? [step.client] : [])),
+  ),
+]
+
 const initialObservedSystemState = (scenario: ScenarioAst, cursorIndex: number): ObservedSystemState => ({
   cursorIndex,
   runStatus: 'not-started',
   activePhaseId: null,
   backend: null,
-  clients: scenario.topology.clients.map((client) => ({
+  clients: deriveScenarioTopology(scenario).map((client) => ({
     clientId: client.id,
     lifecycle: 'declared',
     health: 'unknown',
@@ -619,7 +631,11 @@ const initialObservedSystemState = (scenario: ScenarioAst, cursorIndex: number):
   verdicts: [],
 })
 
-const applyTraceRecord = (state: ObservedSystemState, record: ScenarioTraceRecord): ObservedSystemState => {
+const applyTraceRecord = (
+  state: ObservedSystemState,
+  record: ScenarioTraceRecord,
+  scenario: ScenarioAst,
+): ObservedSystemState => {
   const payload = record.payload
   switch (payload._tag) {
     case 'run.started':
@@ -633,14 +649,34 @@ const applyTraceRecord = (state: ObservedSystemState, record: ScenarioTraceRecor
     case 'phase.completed':
       return { ...state, activePhaseId: null }
     case 'client.created':
-      return record.clientId === null
+      if (record.clientId === null) return state
+      return updateClient(state, record.clientId, (client) => {
+        const createdSessions = new Set(
+          scenarioClientCreationDefinitions(scenario).find((definition) => definition.id === record.clientId)
+            ?.sessions ?? [],
+        )
+        return {
+          ...client,
+          lifecycle: 'created',
+          health: 'healthy',
+          sessions: client.sessions.map((session) =>
+            createdSessions.has(session.sessionId) === true
+              ? { ...session, lifecycle: 'created' as const, health: 'healthy' as const }
+              : session,
+          ),
+        }
+      })
+    case 'lifecycle.session-added':
+      return record.clientId === null || record.sessionId === null
         ? state
-        : updateClient(state, record.clientId, (client) => ({
-            ...client,
-            lifecycle: 'created',
-            health: 'healthy',
-            sessions: client.sessions.map((session) => ({ ...session, lifecycle: 'created', health: 'healthy' })),
-          }))
+        : updateClient(state, record.clientId, (client) => {
+            const sessions = client.sessions.map((session) =>
+              session.sessionId === record.sessionId
+                ? { ...session, lifecycle: 'created' as const, health: 'healthy' as const }
+                : session,
+            )
+            return { ...client, health: deriveClientHealth(client, sessions), sessions }
+          })
     case 'lifecycle.session-stopped':
       return record.clientId === null || record.sessionId === null
         ? state
@@ -674,11 +710,11 @@ const applyTraceRecord = (state: ObservedSystemState, record: ScenarioTraceRecor
             ...client,
             lifecycle: 'created',
             health: 'healthy',
-            sessions: client.sessions.map((session) => ({
-              ...session,
-              lifecycle: 'created',
-              health: 'healthy',
-            })),
+            sessions: client.sessions.map((session) =>
+              session.lifecycle === 'declared'
+                ? session
+                : { ...session, lifecycle: 'created' as const, health: 'healthy' as const },
+            ),
           }))
     case 'runtime.failure.observed':
       return record.clientId === null
@@ -743,6 +779,7 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
     case 'runtime.failure.observed':
       return 'failure'
     case 'action.requested':
+    case 'workload.requested':
       return 'action'
     case 'client.created':
       return 'topology'
@@ -754,6 +791,7 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
       return 'connectivity'
     case 'lifecycle.session-stopped':
     case 'lifecycle.session-restarted':
+    case 'lifecycle.session-added':
     case 'lifecycle.client-restarted':
       return 'lifecycle'
     case 'settlement.completed':
@@ -791,6 +829,10 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return scoped(`requested ${record.payload.action}`)
     case 'action.completed':
       return scoped(`${record.payload.action} control acknowledged`)
+    case 'workload.requested':
+      return `Requested workload ${record.payload.workload} · ${record.payload.count} actions · seed ${record.payload.seed}`
+    case 'workload.completed':
+      return `Workload ${record.payload.workload} completed · ${record.payload.actionIds.length} actions`
     case 'client.created':
       return scoped('created')
     case 'connectivity.disconnect.requested':
@@ -823,6 +865,10 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return scoped('session restart requested')
     case 'lifecycle.session-restarted':
       return scoped('restarted')
+    case 'lifecycle.session-add.requested':
+      return scoped('session addition requested')
+    case 'lifecycle.session-added':
+      return scoped('added')
     case 'lifecycle.client-restart.requested':
       return scoped('Client restart requested')
     case 'lifecycle.client-restarted':
@@ -1029,6 +1075,8 @@ const operationFamily = (payload: ScenarioTracePayload): ScenarioOperationHistor
       return 'client-create'
     case 'action.requested':
       return 'application-action'
+    case 'workload.requested':
+      return 'workload'
     case 'connectivity.disconnect.requested':
     case 'connectivity.reconnect.requested':
       return 'connectivity'
@@ -1036,6 +1084,7 @@ const operationFamily = (payload: ScenarioTracePayload): ScenarioOperationHistor
       return 'backend-availability'
     case 'lifecycle.session-stop.requested':
     case 'lifecycle.session-restart.requested':
+    case 'lifecycle.session-add.requested':
       return 'session-lifecycle'
     case 'lifecycle.client-restart.requested':
       return 'client-lifecycle'

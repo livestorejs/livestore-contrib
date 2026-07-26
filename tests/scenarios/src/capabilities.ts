@@ -1,10 +1,11 @@
-import type { HostCapability, ScenarioAst, ScenarioStep } from './model.ts'
+import { deriveScenarioTopology, type HostCapability, type ScenarioAst, type ScenarioStep } from './model.ts'
 
 /**
  * Derives host behavior from the executable Scenario shape so capability
  * validation cannot depend on authors repeating structural facts by hand.
  */
 export const deriveScenarioRequirements = (scenario: ScenarioAst): ReadonlyArray<HostCapability> => {
+  const declaredTopology = deriveScenarioTopology(scenario)
   const requirements = new Set<HostCapability>([
     ...scenario.requires,
     // The runner records this view before any participant exists.
@@ -12,16 +13,21 @@ export const deriveScenarioRequirements = (scenario: ScenarioAst): ReadonlyArray
   ])
 
   // Final snapshot capture records this view for every declared participant.
-  if (scenario.topology.clients.length > 0) requirements.add('sync-observation')
-  if (scenario.topology.clients.length > 1) requirements.add('multiple-clients')
-  if (scenario.topology.clients.some((client) => client.sessions.length > 1) === true)
-    requirements.add('multiple-sessions')
+  if (declaredTopology.length > 0) requirements.add('sync-observation')
+  if (declaredTopology.length > 1) requirements.add('multiple-clients')
+  if (declaredTopology.some((client) => client.sessions.length > 1) === true) requirements.add('multiple-sessions')
 
   for (const step of scenario.phases.flatMap((phase) => phase.steps)) {
     if (step._tag === 'parallel') {
       for (const operation of step.operations) addOperationRequirements(requirements, operation)
     } else if (step._tag === 'settle') {
       if (step.healDisconnectedClients.length > 0) requirements.add('disconnect-reconnect')
+    } else if (step._tag === 'workload') {
+      requirements.add('named-actions')
+    } else if (step._tag === 'create-client') {
+      requirements.add('dynamic-client-creation')
+    } else if (step._tag === 'add-session') {
+      requirements.add('dynamic-session-addition')
     } else {
       addOperationRequirements(requirements, step)
     }
@@ -41,7 +47,7 @@ export const sessionsBeyondHostLimit = (args: {
   scenario: ScenarioAst
   maximumSessionsPerClient: number
 }): ReadonlyArray<{ readonly clientId: string; readonly requested: number }> =>
-  args.scenario.topology.clients.flatMap((client) =>
+  deriveScenarioTopology(args.scenario).flatMap((client) =>
     client.sessions.length > args.maximumSessionsPerClient
       ? [{ clientId: client.id, requested: client.sessions.length }]
       : [],
@@ -49,7 +55,10 @@ export const sessionsBeyondHostLimit = (args: {
 
 const addOperationRequirements = (
   requirements: Set<HostCapability>,
-  operation: Exclude<ScenarioStep, { readonly _tag: 'parallel' | 'settle' }>,
+  operation: Exclude<
+    ScenarioStep,
+    { readonly _tag: 'parallel' | 'settle' | 'workload' | 'create-client' | 'add-session' }
+  >,
 ): void => {
   switch (operation._tag) {
     case 'action':

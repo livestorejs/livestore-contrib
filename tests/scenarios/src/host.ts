@@ -14,6 +14,7 @@ import {
 import { makeConnectivityControlledBackend, type ScenarioBackend } from './backends.ts'
 import { makeParticipantClock, readControllerOccurrence } from './clock.ts'
 import type {
+  AddSessionCommand,
   CreateClientCommand,
   ClientLifecycleCommand,
   DispatchActionCommand,
@@ -41,6 +42,7 @@ export interface ParticipantHost {
   readonly backendId: SyncBackendRealization
   readonly componentVersions: Readonly<Record<string, string>>
   readonly createClient: (command: CreateClientCommand) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
+  readonly addSession: (command: AddSessionCommand) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
   readonly dispatchAction: (
     command: DispatchActionCommand,
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
@@ -76,6 +78,7 @@ export const inProcessHostCapabilities: HostCapabilities = {
     'system-observation',
     'state-inspection',
     'sqlite-state',
+    'dynamic-client-creation',
   ],
   maximumSessionsPerClient: 1,
   settlement: 'stable-poll',
@@ -266,6 +269,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
         ...args.backend.componentVersions,
       },
       createClient,
+      addSession: unsupportedLifecycle('session addition'),
       dispatchAction,
       setConnectivity,
       setBackendAvailability,

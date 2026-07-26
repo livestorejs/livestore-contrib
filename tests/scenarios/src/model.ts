@@ -26,6 +26,8 @@ export const HostCapability = Schema.Literals([
   'opfs-state',
   'session-restart',
   'client-restart',
+  'dynamic-client-creation',
+  'dynamic-session-addition',
   'process-isolation',
   'browser-shared-worker',
   'browser-web-locks',
@@ -85,6 +87,18 @@ export const RestartClientStep = Schema.TaggedStruct('restart-client', {
   clientId: Schema.String,
 })
 
+/** Creates a new Client after the initial Scenario topology has started. */
+export const CreateClientStep = Schema.TaggedStruct('create-client', {
+  id: Schema.String,
+  client: ClientDefinition,
+})
+
+/** Adds a new session to an already-created Client. */
+export const AddSessionStep = Schema.TaggedStruct('add-session', {
+  id: Schema.String,
+  target: ParticipantRef,
+})
+
 export const BackendUnavailableStep = Schema.TaggedStruct('backend-unavailable', {
   id: Schema.String,
 })
@@ -92,6 +106,16 @@ export const BackendUnavailableStep = Schema.TaggedStruct('backend-unavailable',
 export const BackendAvailableStep = Schema.TaggedStruct('backend-available', {
   id: Schema.String,
 })
+
+/** Invokes a named deterministic application workload through a compact plan node. */
+export const WorkloadStep = Schema.TaggedStruct('workload', {
+  id: Schema.String,
+  workload: Schema.String,
+  input: Schema.Json,
+  targets: Schema.Array(ParticipantRef),
+  count: Schema.Int,
+})
+export type WorkloadStep = typeof WorkloadStep.Type
 
 export const ParallelOperationStep = Schema.Union([
   ActionStep,
@@ -126,6 +150,9 @@ export const ScenarioStep = Schema.Union([
   RestartClientStep,
   BackendUnavailableStep,
   BackendAvailableStep,
+  WorkloadStep,
+  CreateClientStep,
+  AddSessionStep,
   ParallelStep,
   SettleStep,
 ])
@@ -209,6 +236,12 @@ export const CreateClientCommand = Schema.Struct({
   client: ClientDefinition,
 })
 export type CreateClientCommand = typeof CreateClientCommand.Type
+
+export const AddSessionCommand = Schema.Struct({
+  operationId: Schema.String,
+  target: ParticipantRef,
+})
+export type AddSessionCommand = typeof AddSessionCommand.Type
 
 export const DispatchActionCommand = Schema.Struct({
   operationId: Schema.String,
@@ -391,6 +424,18 @@ export const ScenarioTracePayload = Schema.Union([
     action: Schema.String,
     status: Schema.Literal('acknowledged'),
   }),
+  Schema.TaggedStruct('workload.requested', {
+    workload: Schema.String,
+    input: Schema.Json,
+    targets: Schema.Array(Schema.String),
+    count: Schema.Int,
+    seed: Schema.Finite,
+  }),
+  Schema.TaggedStruct('workload.completed', {
+    workload: Schema.String,
+    actionIds: Schema.Array(Schema.String),
+    status: Schema.Literal('acknowledged'),
+  }),
   Schema.TaggedStruct('connectivity.disconnect.requested', { connected: Schema.Literal(false) }),
   Schema.TaggedStruct('connectivity.reconnect.requested', { connected: Schema.Literal(true) }),
   Schema.TaggedStruct('connectivity.disconnected', { connected: Schema.Literal(false) }),
@@ -421,6 +466,8 @@ export const ScenarioTracePayload = Schema.Union([
   Schema.TaggedStruct('lifecycle.session-stopped', {}),
   Schema.TaggedStruct('lifecycle.session-restart.requested', {}),
   Schema.TaggedStruct('lifecycle.session-restarted', {}),
+  Schema.TaggedStruct('lifecycle.session-add.requested', {}),
+  Schema.TaggedStruct('lifecycle.session-added', {}),
   Schema.TaggedStruct('lifecycle.client-restart.requested', {}),
   Schema.TaggedStruct('lifecycle.client-restarted', {}),
   Schema.TaggedStruct('settlement.requested', {
@@ -613,10 +660,55 @@ export const defineScenario = (input: unknown): ScenarioAst => {
         step.operations.forEach(validateOperation)
       } else {
         operationIds.add(step.id)
-        if (step._tag === 'action') assertParticipant(step.target)
-        if (step._tag === 'stop-session' || step._tag === 'restart-session') assertParticipant(step.target)
-        if (step._tag === 'restart-client') assertClient(step.clientId)
-        if (step._tag === 'disconnect' || step._tag === 'reconnect') assertClient(step.clientId)
+        switch (step._tag) {
+          case 'create-client': {
+            if (clientIds.has(step.client.id) === true) {
+              throw new ScenarioValidationError(`Duplicate Client id: ${step.client.id}`)
+            }
+            if (step.client.sessions.length === 0) {
+              throw new ScenarioValidationError(`Client ${step.client.id} must declare at least one session`)
+            }
+            clientIds.add(step.client.id)
+            for (const sessionId of step.client.sessions) {
+              const key = participantKey({ clientId: step.client.id, sessionId })
+              if (participants.has(key) === true) throw new ScenarioValidationError(`Duplicate participant: ${key}`)
+              participants.add(key)
+            }
+            break
+          }
+          case 'add-session': {
+            assertClient(step.target.clientId)
+            const key = participantKey(step.target)
+            if (participants.has(key) === true) throw new ScenarioValidationError(`Duplicate participant: ${key}`)
+            participants.add(key)
+            break
+          }
+          case 'action':
+            assertParticipant(step.target)
+            break
+          case 'workload':
+            if (step.targets.length === 0) {
+              throw new ScenarioValidationError(`Workload must select at least one target: ${step.id}`)
+            }
+            if (step.count <= 0 || step.count > 10_000) {
+              throw new ScenarioValidationError(`Workload count must be between 1 and 10000: ${step.id}`)
+            }
+            step.targets.forEach(assertParticipant)
+            break
+          case 'stop-session':
+          case 'restart-session':
+            assertParticipant(step.target)
+            break
+          case 'restart-client':
+          case 'disconnect':
+          case 'reconnect':
+            assertClient(step.clientId)
+            break
+          case 'backend-unavailable':
+          case 'backend-available':
+          case 'settle':
+            break
+        }
       }
       if (step._tag === 'settle') {
         if (step.timeoutMs <= 0) throw new ScenarioValidationError(`Settle timeout must be positive: ${step.id}`)
@@ -669,6 +761,24 @@ export const defineScenario = (input: unknown): ScenarioAst => {
   }
 
   return scenario
+}
+
+/** Returns the complete topology declared by startup definitions and ordered addition steps. */
+export const deriveScenarioTopology = (scenario: ScenarioAst): ReadonlyArray<ClientDefinition> => {
+  const clients = new Map(
+    scenario.topology.clients.map((client) => [client.id, { ...client, sessions: [...client.sessions] }]),
+  )
+  for (const step of scenario.phases.flatMap((phase) => phase.steps)) {
+    if (step._tag === 'create-client') {
+      clients.set(step.client.id, { ...step.client, sessions: [...step.client.sessions] })
+    } else if (step._tag === 'add-session') {
+      const client = clients.get(step.target.clientId)
+      if (client !== undefined) {
+        clients.set(client.id, { ...client, sessions: [...client.sessions, step.target.sessionId] })
+      }
+    }
+  }
+  return [...clients.values()]
 }
 
 export const participantKey = ({ clientId, sessionId }: ParticipantRef): string => `${clientId}/${sessionId}`
