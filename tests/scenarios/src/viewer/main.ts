@@ -1,10 +1,8 @@
-import { Schema } from '@livestore/utils/effect'
-
 import {
   type ComponentSyncObservation,
   deriveScenarioTopology,
   type ObservedEvent,
-  ScenarioRunArtifact,
+  type ScenarioRunArtifact,
   type ScenarioTraceRecord,
 } from '../model.ts'
 import {
@@ -23,6 +21,9 @@ import {
   summarizeTraceRecord,
 } from '../projection.ts'
 import './style.css'
+import { decodeArtifactJson, fetchArtifactCatalog, fetchArtifactJson, readArtifactFile } from './artifact-io.ts'
+import { renderTimelineSceneMarkup } from './timeline-scene-markup.ts'
+import { deriveTimelineScene } from './timeline-scene.ts'
 
 const requireElement = <T extends Element>(id: string, constructor: { new (): T }): T => {
   const element = document.getElementById(id)
@@ -98,40 +99,21 @@ playbackRecordsButton.addEventListener('click', () => setPlaybackMode('records')
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0]
   if (file === undefined) return
-  void file.text().then(loadArtifactJson).catch(showLoadError)
+  void readArtifactFile(file).then(loadArtifactJson).catch(showLoadError)
 })
 
 loadExampleButton.addEventListener('click', () => {
   const file = exampleArtifactSelect.value
   if (file.length === 0) return
-  void fetch(`/${encodeURIComponent(file)}`)
-    .then(async (response) => {
-      if (response.ok === false) throw new Error(`Could not load saved artifact ${file}.`)
-      return response.text()
-    })
-    .then(loadArtifactJson)
-    .catch(showLoadError)
+  void fetchArtifactJson(file).then(loadArtifactJson).catch(showLoadError)
 })
 
 exampleArtifactSelect.addEventListener('change', () => {
   loadExampleButton.disabled = exampleArtifactSelect.value.length === 0
 })
 
-interface ArtifactCatalog {
-  readonly version: 1
-  readonly entries: ReadonlyArray<{
-    readonly file: string
-    readonly label: string
-    readonly applicationEventCount: number
-    readonly traceRecordCount: number
-    readonly status?: 'passed' | 'failed'
-  }>
-}
-
 const loadArtifactCatalog = async (): Promise<void> => {
-  const response = await fetch('/catalog.json')
-  if (response.ok === false) throw new Error('Run a scenario to generate the saved-run catalog.')
-  const catalog = (await response.json()) as ArtifactCatalog
+  const catalog = await fetchArtifactCatalog()
   exampleArtifactSelect.replaceChildren(
     new Option('select saved run', ''),
     ...catalog.entries.map(
@@ -175,7 +157,7 @@ playButton.addEventListener('click', () => {
 
 const loadArtifactJson = (input: string): void => {
   stopPlayback()
-  artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(input)
+  artifact = decodeArtifactJson(input)
   playbackMoments = derivePlaybackMoments({ scenario: artifact.scenario, trace: artifact.trace })
   cursorIndex = artifact.trace.length - 1
   selectedDetailRecordIndex = undefined
@@ -289,7 +271,8 @@ const render = (): void => {
   systemState.className = 'topology'
   systemState.innerHTML = renderTopology(projected)
   restoreEventlogScrollState()
-  renderTimeline()
+  if (new URLSearchParams(window.location.search).has('original-timeline') === true) renderTimelineOriginalReference()
+  else renderTimeline()
   bindEventSelection()
   bindTraceInspector()
   bindTimelineScrubber()
@@ -793,7 +776,7 @@ const renderRole = (
     }${health === 'failed' ? ' · <em class="runtime-health">runtime failed</em>' : ''}</span>
   </div>`
 
-const renderTimeline = (): void => {
+const renderTimelineOriginalReference = (): void => {
   if (artifact === undefined) return
   const trace = artifact.trace
   const markers = deriveEventTimeline(trace)
@@ -1325,6 +1308,31 @@ const renderTimeline = (): void => {
     </svg>`
 }
 
+/** The executable legacy renderer now consumes the same DOM-free geometry as React. */
+const renderTimeline = (): void => {
+  if (artifact === undefined) return
+  const scene = deriveTimelineScene({
+    artifact,
+    cursorIndex,
+    selectedEventRef,
+    timelineMode,
+    timeScaleMode,
+    traceVisibility,
+    viewport: timelineViewport,
+  })
+  timelineRecordPositions = scene.scrubPositions
+  timeline.className = 'timeline'
+  timeline.innerHTML = renderTimelineSceneMarkup(
+    scene,
+    recordLabel.textContent ?? '',
+    artifact.trace.length,
+    cursorIndex,
+  )
+}
+
+// Kept temporarily as an in-file audit reference while parity screenshots are reviewed.
+void renderTimelineOriginalReference
+
 const bindEventSelection = (): void => {
   systemState.querySelectorAll<HTMLElement>('[data-event-ref]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -1484,7 +1492,7 @@ const bindRangeNavigator = (): void => {
   navigator.addEventListener('keydown', (event) => {
     const span = timelineViewport.end - timelineViewport.start
     const midpoint = (timelineViewport.start + timelineViewport.end) / 2
-    if (event.key === 'Home') {
+    if (event.key === 'Home' || event.key === 'Escape') {
       timelineViewport = { start: 0, end: 1 }
     } else if (event.key === '+' || event.key === '=') {
       const nextSpan = span * 0.75

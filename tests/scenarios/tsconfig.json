@@ -38,6 +38,7 @@
       }
     ],
     "composite": true,
+    "jsx": "react-jsx",
     "rootDir": "./src",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "types": ["vitest/globals", "node"]

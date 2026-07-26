@@ -5,6 +5,7 @@ export default tsconfigJson({
     ...baseTsconfigCompilerOptions,
     composite: true,
     exactOptionalPropertyTypes: false,
+    jsx: 'react-jsx',
     lib: [...domLib],
     outDir: './dist',
     rootDir: './src',

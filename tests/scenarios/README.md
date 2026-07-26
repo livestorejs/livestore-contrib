@@ -34,19 +34,68 @@ Set `SCENARIO_BROWSER_DB_SNAPSHOT_DIR=<directory>` to export the first session,
 leader, and eventlog databases immediately before each browser Client
 reconnects.
 
-## View the artifact
+## Compare the legacy and React viewers
+
+The imperative viewer remains the default comparison reference:
 
 ```sh
 pnpm --dir tests/scenarios viewer
 ```
 
-Open the printed URL and choose a generated artifact from **saved runs**. The
+Open the printed URL (normally `http://localhost:5173`) and choose a generated
+artifact from **saved runs**. The
 scenario CLI refreshes this local catalog whenever it writes into `artifacts/`;
-the file picker can still open an artifact from elsewhere.
+the file picker can still open a `.json` or `.json.gz` artifact from elsewhere.
+
+Run the React parity candidate independently with:
+
+```sh
+pnpm --dir tests/scenarios viewer:react
+```
+
+For side-by-side manual verification, use fixed ports in two terminals:
+
+```sh
+pnpm --dir tests/scenarios viewer --host 127.0.0.1 --port 4173 --strictPort
+pnpm --dir tests/scenarios viewer:react --host 127.0.0.1 --port 4174 --strictPort
+```
+
+Then open the legacy viewer at `http://127.0.0.1:4173` and the React viewer at
+`http://127.0.0.1:4174`. The legacy URL
+`http://127.0.0.1:4173/?original-timeline` additionally runs the retained
+pre-scene timeline renderer for geometry audits; the ordinary legacy URL uses
+the same pure timeline scene as React.
+
+Storybook is the component and state workbench:
+
+```sh
+pnpm --dir tests/scenarios storybook
+pnpm --dir tests/scenarios storybook:build
+```
+
+It opens at `http://localhost:6006` and includes primitive, topology,
+inspector, sparse/dense timeline, lifecycle, failure, range, and complete-app
+stories backed by the tracked reference artifacts.
+
+The automated parity gate starts both viewers, validates interactions, and
+compares React screenshots with deterministic legacy baselines in desktop
+light, desktop dark, and narrow light projects:
+
+```sh
+pnpm --dir tests/scenarios viewer:parity
+```
+
+The React controller owns durable projection, playback, cursor, selection,
+viewport, and inspector state. Event-log scroll and pointer-drag bookkeeping
+remain local to the relevant components. `deriveTimelineScene()` is DOM-free;
+the legacy serializer and layered React SVG renderer consume its same semantic
+layers and preserve the two-SVG main-timeline/range-navigator organization.
 
 Tracked `.json.gz` reference artifacts are also included in the saved-run
 catalog. They preserve diagnostically useful failures without adding the full
-uncompressed traces to the repository.
+uncompressed traces to the repository. The set includes a passed
+`browser-multi-session-recovery` lifecycle run, an `offline-writer-recovery`
+failure, and the dense `shared-todo-workday` failure.
 
 Host acknowledgements mean only that the participant host completed handling
 the controller request at its advertised boundary. They do not confirm backend
