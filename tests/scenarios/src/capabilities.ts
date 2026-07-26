@@ -59,6 +59,10 @@ const addOperationRequirements = (
     case 'reconnect':
       requirements.add('disconnect-reconnect')
       return
+    case 'backend-unavailable':
+    case 'backend-available':
+      requirements.add('backend-availability')
+      return
     case 'stop-session':
     case 'restart-session':
       requirements.add('session-restart')

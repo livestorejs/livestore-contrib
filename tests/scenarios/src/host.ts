@@ -24,6 +24,7 @@ import type {
   ObservedEvent,
   ParticipantRef,
   RuntimeFailureObservation,
+  SetBackendAvailabilityCommand,
   SessionLifecycleCommand,
   SetConnectivityCommand,
   SyncObservation,
@@ -46,6 +47,9 @@ export interface ParticipantHost {
   readonly setConnectivity: (
     command: SetConnectivityCommand,
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
+  readonly setBackendAvailability: (
+    command: SetBackendAvailabilityCommand,
+  ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
   readonly stopSession: (
     command: SessionLifecycleCommand,
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
@@ -67,6 +71,7 @@ export const inProcessHostCapabilities: HostCapabilities = {
     'multiple-clients',
     'named-actions',
     'disconnect-reconnect',
+    'backend-availability',
     'sync-observation',
     'system-observation',
     'state-inspection',
@@ -170,6 +175,9 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
         return acknowledge(command.operationId)
       })
 
+    const setBackendAvailability: ParticipantHost['setBackendAvailability'] = (command) =>
+      args.backend.setAvailability(command.available).pipe(Effect.as(acknowledge(command.operationId)))
+
     const observeSync: ParticipantHost['observeSync'] = (participant) =>
       Effect.gen(function* () {
         const store = yield* getStore(stores, participant)
@@ -260,6 +268,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
       createClient,
       dispatchAction,
       setConnectivity,
+      setBackendAvailability,
       stopSession: unsupportedLifecycle('session stop'),
       restartSession: unsupportedLifecycle('session restart'),
       restartClient: unsupportedLifecycle('Client restart'),

@@ -14,6 +14,7 @@ import {
 import { makeMockScenarioBackend } from './backends.ts'
 import { browserHostCapabilities } from './browser/browser-host.ts'
 import { deriveScenarioRequirements } from './capabilities.ts'
+import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
@@ -1118,6 +1119,21 @@ Vitest.describe('offline writer recovery', () => {
 /** Verifies the local-concrete backend realization independently of participant placement. */
 Vitest.describe('local sync-cf backend', () => {
   Vitest.live(
+    'drops the participant route during a backend outage and recovers through the real WebSocket backend',
+    (test) =>
+      Effect.gen(function* () {
+        const artifact = yield* runInProcessLocalSyncCfScenario({
+          scenario: backendOutageRecovery,
+          application: todoApplication,
+          options: { runId: 'backend-outage-recovery-local-sync-cf', sourceRevision: 'test' },
+        })
+
+        expectBackendOutageRecovery(artifact)
+      }).pipe(Vitest.withTestCtx(test, { timeout: 60_000 })),
+    60_000,
+  )
+
+  Vitest.live(
     'runs the portable scenario through the real WebSocket and SQLite Durable Object backend',
     (test) =>
       Effect.gen(function* () {
@@ -1273,4 +1289,39 @@ const expectOfflineEventCorrelationLifecycle = (artifact: ScenarioRunArtifact): 
   expect(recoveredObservation.payload.observation.events).toContainEqual(
     expect.objectContaining({ eventRef: pendingEvent.eventRef, disposition: 'confirmed' }),
   )
+}
+
+const expectBackendOutageRecovery = (artifact: ScenarioRunArtifact): void => {
+  expect(artifact.status).toBe('passed')
+  const injected = artifact.trace.find(
+    (record) => record.payload._tag === 'fault.injected' && record.payload.fault === 'backend-unavailable',
+  )
+  const removed = artifact.trace.find(
+    (record) => record.payload._tag === 'fault.removed' && record.payload.fault === 'backend-unavailable',
+  )
+  const recovered = artifact.trace.find(
+    (record) =>
+      record.payload._tag === 'recovery.completed' && record.payload.faultIds.includes('backend-outage-started'),
+  )
+  expect(injected).toBeDefined()
+  expect(removed?.index).toBeGreaterThan(injected?.index ?? Number.POSITIVE_INFINITY)
+  expect(recovered?.index).toBeGreaterThan(removed?.index ?? Number.POSITIVE_INFINITY)
+  const observedOutage = artifact.trace.find(
+    (record) =>
+      record.index > (injected?.index ?? Number.POSITIVE_INFINITY) &&
+      record.index < (removed?.index ?? Number.NEGATIVE_INFINITY) &&
+      record.payload._tag === 'backend.observed' &&
+      record.payload.observation.connected === false,
+  )
+  const pendingDuringOutage = artifact.trace.find(
+    (record) =>
+      record.index > (injected?.index ?? Number.POSITIVE_INFINITY) &&
+      record.index < (removed?.index ?? Number.NEGATIVE_INFINITY) &&
+      record.payload._tag === 'leader.sync.observed' &&
+      record.payload.observation.pendingCount > 0,
+  )
+  expect(observedOutage).toBeDefined()
+  expect(pendingDuringOutage).toBeDefined()
+  expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)
+  expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
 }

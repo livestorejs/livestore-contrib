@@ -33,6 +33,7 @@ export const browserHostCapabilities: HostCapabilities = {
     'multiple-sessions',
     'named-actions',
     'disconnect-reconnect',
+    'backend-availability',
     'sync-observation',
     'system-observation',
     'state-inspection',
@@ -53,7 +54,7 @@ export interface BrowserParticipantHost extends ParticipantHost {
 
 export const makeBrowserHost = (args: {
   applicationId: string
-  backend: Pick<ScenarioBackend, 'id' | 'observe' | 'serializedConfig' | 'componentVersions'>
+  backend: Pick<ScenarioBackend, 'id' | 'observe' | 'setAvailability' | 'serializedConfig' | 'componentVersions'>
 }): Effect.Effect<BrowserParticipantHost, ScenarioOperationError, Scope.Scope> =>
   Effect.gen(function* () {
     if (args.applicationId !== 'scenario-todo-app') {
@@ -128,6 +129,9 @@ export const makeBrowserHost = (args: {
         yield* client.setConnectivity(command.connected)
         return acknowledge(command.operationId)
       })
+
+    const setBackendAvailability: ParticipantHost['setBackendAvailability'] = (command) =>
+      args.backend.setAvailability(command.available).pipe(Effect.as(acknowledge(command.operationId)))
 
     const stopSession: ParticipantHost['stopSession'] = (command) =>
       Effect.gen(function* () {
@@ -245,6 +249,7 @@ export const makeBrowserHost = (args: {
       createClient,
       dispatchAction,
       setConnectivity,
+      setBackendAvailability,
       stopSession,
       restartSession,
       restartClient,

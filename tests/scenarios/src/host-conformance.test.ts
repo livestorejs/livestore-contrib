@@ -82,12 +82,16 @@ const profiles: ReadonlyArray<HostConformanceProfile> = [
   },
 ]
 
+const hostConformanceTimeout = (profile: HostCapabilities['profile']): number =>
+  profile === 'browser' ? 180_000 : profile === 'process' ? 90_000 : 20_000
+
 /** Verifies: LS.SYS.VER.SCEN-R04, LS.SYS.VER.SCEN-R05, LS.SYS.VER.SCEN-R08 */
 Vitest.describe.each(profiles)('$capabilities.profile host contract', (profile) => {
+  const timeout = hostConformanceTimeout(profile.capabilities.profile)
   Vitest.live(
     'passes the shared capability-driven conformance suite',
-    (test) => exerciseHostConformance(profile).pipe(Vitest.withTestCtx(test)),
-    profile.capabilities.profile === 'browser' ? 180_000 : profile.capabilities.profile === 'process' ? 90_000 : 20_000,
+    (test) => exerciseHostConformance(profile).pipe(Vitest.withTestCtx(test, { timeout })),
+    timeout,
   )
 })
 
@@ -185,6 +189,7 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
   const supportsMultipleSessions = capabilities.capabilities.includes('multiple-sessions')
   const supportsSessionRestart = capabilities.capabilities.includes('session-restart')
   const supportsClientRestart = capabilities.capabilities.includes('client-restart')
+  const supportsBackendAvailability = capabilities.capabilities.includes('backend-availability')
   const sessionA = { clientId: 'conformance-a', sessionId: 'session-a' } as const
   const sessionA2 = { clientId: 'conformance-a', sessionId: 'session-a2' } as const
   const sessionB = { clientId: 'conformance-b', sessionId: 'session-b' } as const
@@ -230,6 +235,19 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
             input: { id: 'conformance-b', text: 'Written by Client B while offline' },
           },
           { _tag: 'reconnect', id: 'reconnect-b', clientId: sessionB.clientId },
+          ...(supportsBackendAvailability === true
+            ? [
+                { _tag: 'backend-unavailable' as const, id: 'backend-unavailable' },
+                {
+                  _tag: 'action' as const,
+                  id: 'write-during-backend-outage',
+                  target: sessionA,
+                  action: 'createTodo',
+                  input: { id: 'conformance-backend-outage', text: 'Retained while the backend is unavailable' },
+                },
+                { _tag: 'backend-available' as const, id: 'backend-available' },
+              ]
+            : []),
           ...(supportsSessionRestart === true
             ? [
                 { _tag: 'stop-session' as const, id: 'stop-a2', target: sessionA2 },
@@ -369,6 +387,19 @@ const expectPassingHostContract = (artifact: ScenarioRunArtifact): void => {
   }
   if (artifact.descriptor.capabilities.capabilities.includes('client-restart') === true) {
     expect(tags).toContain('lifecycle.client-restarted')
+  }
+  if (artifact.descriptor.capabilities.capabilities.includes('backend-availability') === true) {
+    expect(tags).toContain('backend.availability.changed')
+    expect(artifact.trace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          payload: { _tag: 'fault.injected', faultId: 'backend-unavailable', fault: 'backend-unavailable' },
+        }),
+        expect.objectContaining({
+          payload: { _tag: 'fault.removed', faultId: 'backend-unavailable', fault: 'backend-unavailable' },
+        }),
+      ]),
+    )
   }
 }
 

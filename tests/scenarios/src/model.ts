@@ -18,6 +18,7 @@ export const HostCapability = Schema.Literals([
   'multiple-sessions',
   'named-actions',
   'disconnect-reconnect',
+  'backend-availability',
   'sync-observation',
   'system-observation',
   'state-inspection',
@@ -84,6 +85,14 @@ export const RestartClientStep = Schema.TaggedStruct('restart-client', {
   clientId: Schema.String,
 })
 
+export const BackendUnavailableStep = Schema.TaggedStruct('backend-unavailable', {
+  id: Schema.String,
+})
+
+export const BackendAvailableStep = Schema.TaggedStruct('backend-available', {
+  id: Schema.String,
+})
+
 export const ParallelOperationStep = Schema.Union([
   ActionStep,
   DisconnectStep,
@@ -91,6 +100,8 @@ export const ParallelOperationStep = Schema.Union([
   StopSessionStep,
   RestartSessionStep,
   RestartClientStep,
+  BackendUnavailableStep,
+  BackendAvailableStep,
 ])
 export type ParallelOperationStep = typeof ParallelOperationStep.Type
 
@@ -113,6 +124,8 @@ export const ScenarioStep = Schema.Union([
   StopSessionStep,
   RestartSessionStep,
   RestartClientStep,
+  BackendUnavailableStep,
+  BackendAvailableStep,
   ParallelStep,
   SettleStep,
 ])
@@ -211,6 +224,12 @@ export const SetConnectivityCommand = Schema.Struct({
   connected: Schema.Boolean,
 })
 export type SetConnectivityCommand = typeof SetConnectivityCommand.Type
+
+export const SetBackendAvailabilityCommand = Schema.Struct({
+  operationId: Schema.String,
+  available: Schema.Boolean,
+})
+export type SetBackendAvailabilityCommand = typeof SetBackendAvailabilityCommand.Type
 
 export const SessionLifecycleCommand = Schema.Struct({
   operationId: Schema.String,
@@ -376,13 +395,15 @@ export const ScenarioTracePayload = Schema.Union([
   Schema.TaggedStruct('connectivity.reconnect.requested', { connected: Schema.Literal(true) }),
   Schema.TaggedStruct('connectivity.disconnected', { connected: Schema.Literal(false) }),
   Schema.TaggedStruct('connectivity.reconnected', { connected: Schema.Literal(true) }),
+  Schema.TaggedStruct('backend.availability.requested', { available: Schema.Boolean }),
+  Schema.TaggedStruct('backend.availability.changed', { available: Schema.Boolean }),
   Schema.TaggedStruct('fault.injected', {
     faultId: Schema.String,
-    fault: Schema.Literal('client-disconnected'),
+    fault: Schema.Literals(['client-disconnected', 'backend-unavailable']),
   }),
   Schema.TaggedStruct('fault.removed', {
     faultId: Schema.String,
-    fault: Schema.Literal('client-disconnected'),
+    fault: Schema.Literals(['client-disconnected', 'backend-unavailable']),
   }),
   Schema.TaggedStruct('quiescence.reached', {
     inFlightOperationIds: Schema.Array(Schema.String),

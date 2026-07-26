@@ -19,6 +19,8 @@ import {
   SubscriptionRef,
 } from '@livestore/utils/effect'
 
+import { makeAvailabilityProxy } from './availability-proxy.ts'
+
 export interface BackendSnapshot {
   readonly connected: boolean
   readonly events: ReadonlyArray<LiveStoreEvent.Global.Encoded>
@@ -33,6 +35,7 @@ export interface ScenarioBackend<TSyncMetadata = Schema.Json> {
     args: SyncBackend.MakeBackendArgs,
   ) => Effect.Effect<SyncBackend.SyncBackend<TSyncMetadata>, UnknownError, Scope.Scope>
   readonly observe: (storeId: string) => Effect.Effect<BackendSnapshot, UnknownError, Scope.Scope>
+  readonly setAvailability: (available: boolean) => Effect.Effect<void, UnknownError>
   readonly serializedConfig:
     | { readonly _tag: 'mock' }
     | { readonly _tag: 'sync-cf-ws'; readonly url: string; readonly storeIdSuffix: string }
@@ -68,6 +71,7 @@ export const makeMockScenarioBackend: Effect.Effect<ScenarioBackend, UnknownErro
           connected: SubscriptionRef.get(backend.isConnected),
           events: backend.events,
         }),
+      setAvailability: (available) => (available === true ? backend.connect : backend.disconnect),
       serializedConfig: { _tag: 'mock' },
       componentVersions: { '@livestore/common/mock-sync-backend': 'workspace' },
     } satisfies ScenarioBackend
@@ -84,9 +88,11 @@ export const makeLocalSyncCfScenarioBackend: Effect.Effect<
     cwd: path.join(import.meta.dirname, 'backends', 'sync-cf'),
     showLogs: process.env.SCENARIO_BACKEND_LOGS === '1',
   })
+  const availabilityProxy = yield* makeAvailabilityProxy(server.url)
   const storeIdSuffix = `scenario-${process.pid}-${Date.now()}`
   const physicalStoreId = (storeId: string) => `${storeId}-${storeIdSuffix}`
-  const makeWsBackend = makeWsSync({ url: server.url })
+  const makeWsBackend = makeWsSync({ url: availabilityProxy.url })
+  const makeObserverBackend = makeWsSync({ url: server.url })
   const makeBackend = (args: SyncBackend.MakeBackendArgs) =>
     makeWsBackend({ ...args, storeId: physicalStoreId(args.storeId) }).pipe(
       Effect.provide(Layer.mergeAll(FetchHttpClient.layer, KeyValueStore.layerMemory)),
@@ -97,7 +103,11 @@ export const makeLocalSyncCfScenarioBackend: Effect.Effect<
     Effect.gen(function* () {
       const existing = observers.get(storeId)
       if (existing !== undefined) return existing
-      const observer = yield* makeBackend({ storeId, clientId: 'scenario-backend-observer', payload: undefined })
+      const observer = yield* makeObserverBackend({
+        storeId: physicalStoreId(storeId),
+        clientId: 'scenario-backend-observer',
+        payload: undefined,
+      }).pipe(Effect.provide(Layer.mergeAll(FetchHttpClient.layer, KeyValueStore.layerMemory)))
       yield* observer.connect
       observers.set(storeId, observer)
       return observer
@@ -112,13 +122,14 @@ export const makeLocalSyncCfScenarioBackend: Effect.Effect<
         const pages = yield* observer
           .pull(Option.none(), { live: false })
           .pipe(Stream.runCollectReadonlyArray, UnknownError.mapToUnknownError)
-        const connected = yield* SubscriptionRef.get(observer.isConnected)
+        const connected = yield* availabilityProxy.isAvailable
         return {
           connected,
           events: pages.flatMap((page) => page.batch.map(({ eventEncoded }) => eventEncoded)),
         }
       }).pipe(UnknownError.mapToUnknownError),
-    serializedConfig: { _tag: 'sync-cf-ws', url: server.url, storeIdSuffix },
+    setAvailability: (available) => availabilityProxy.setAvailable(available),
+    serializedConfig: { _tag: 'sync-cf-ws', url: availabilityProxy.url, storeIdSuffix },
     componentVersions: {
       '@livestore/sync-cf': 'workspace',
       'cloudflare-runtime': 'wrangler-local',

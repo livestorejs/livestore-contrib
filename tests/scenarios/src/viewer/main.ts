@@ -487,6 +487,15 @@ const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<RecordFact
       return [
         { label: 'Connected', value: String(payload.connected), tone: payload.connected === true ? 'good' : 'warn' },
       ]
+    case 'backend.availability.requested':
+    case 'backend.availability.changed':
+      return [
+        {
+          label: 'Backend available',
+          value: String(payload.available),
+          tone: payload.available === true ? 'good' : 'warn',
+        },
+      ]
     case 'fault.injected':
     case 'fault.removed':
       return [

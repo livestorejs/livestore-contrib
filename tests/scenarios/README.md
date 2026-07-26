@@ -12,6 +12,7 @@ pnpm --dir tests/scenarios scenario:run
 pnpm --dir tests/scenarios scenario:run --profile in-process --backend local-sync-cf
 pnpm --dir tests/scenarios scenario:run --profile process
 pnpm --dir tests/scenarios scenario:run --profile browser
+pnpm --dir tests/scenarios scenario:run --profile process --scenario backend-outage-recovery
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario browser-multi-session-recovery
 pnpm --dir tests/scenarios scenario:run --profile process --scenario shared-todo-workday --output artifacts/shared-todo-workday-process.json
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario shared-todo-workday --output artifacts/shared-todo-workday-browser.json
@@ -66,11 +67,19 @@ That category is independent from outcome certainty: a timeout or transport
 loss after dispatch remains indefinite, while a known rejection or transport
 failure before send is definite. Adapter-native details remain in the message.
 
-Disconnect faults are injected or removed only when a system observation
-confirms the state requested through the host. Settlement records quiescence
-from the runner's in-flight operation projection, then retains recovery samples
-separately from the stable convergence barrier. A reconnect acknowledgement is
-therefore not presented as proof of recovery.
+Disconnect and backend-availability faults are injected or removed only when a
+system observation confirms the state requested through the host. For local
+`sync-cf`, a Scenario-owned TCP proxy temporarily withholds traffic on existing
+participant sockets and rejects new connections; Wrangler, the Worker, and its
+Durable Object state remain running. The authoritative backend observer uses a
+direct route, so evidence remains readable during the participant-route outage.
+This models a transient network blackhole, not a Wrangler/DO restart or recovery
+after an established WebSocket is destroyed.
+
+Settlement records quiescence from the runner's in-flight operation projection,
+then retains recovery samples separately from the stable convergence barrier. A
+reconnect or backend-availability acknowledgement is therefore not presented as
+proof of recovery.
 
 ## Test the profiles
 

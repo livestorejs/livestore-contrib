@@ -6,6 +6,7 @@ import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
+import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
@@ -30,6 +31,7 @@ interface CliOptions {
 }
 
 const scenarios: Readonly<Record<string, ScenarioAst>> = {
+  [backendOutageRecovery.id]: backendOutageRecovery,
   [offlineWriterRecovery.id]: offlineWriterRecovery,
   [browserMultiSessionRecovery.id]: browserMultiSessionRecovery,
   [sharedTodoWorkday.id]: sharedTodoWorkday,

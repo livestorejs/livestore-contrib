@@ -119,6 +119,7 @@ export type ScenarioOperationHistoryFamily =
   | 'client-create'
   | 'application-action'
   | 'connectivity'
+  | 'backend-availability'
   | 'session-lifecycle'
   | 'client-lifecycle'
   | 'settlement'
@@ -144,6 +145,7 @@ export const scenarioOperationHistoryCoverage: ScenarioOperationHistoryCoverage 
     'client-create',
     'application-action',
     'connectivity',
+    'backend-availability',
     'session-lifecycle',
     'client-lifecycle',
     'settlement',
@@ -746,6 +748,7 @@ const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentKind | u
       return 'topology'
     case 'connectivity.disconnected':
     case 'connectivity.reconnected':
+    case 'backend.availability.changed':
     case 'fault.injected':
     case 'fault.removed':
       return 'connectivity'
@@ -798,6 +801,10 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return scoped('disconnected')
     case 'connectivity.reconnected':
       return scoped('reconnected')
+    case 'backend.availability.requested':
+      return `Backend ${record.payload.available === true ? 'availability' : 'unavailability'} requested`
+    case 'backend.availability.changed':
+      return `Backend availability control acknowledged: ${record.payload.available === true ? 'available' : 'unavailable'}`
     case 'fault.injected':
       return scoped(`fault ${record.payload.faultId} injected`)
     case 'fault.removed':
@@ -1025,6 +1032,8 @@ const operationFamily = (payload: ScenarioTracePayload): ScenarioOperationHistor
     case 'connectivity.disconnect.requested':
     case 'connectivity.reconnect.requested':
       return 'connectivity'
+    case 'backend.availability.requested':
+      return 'backend-availability'
     case 'lifecycle.session-stop.requested':
     case 'lifecycle.session-restart.requested':
       return 'session-lifecycle'

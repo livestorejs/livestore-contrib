@@ -536,6 +536,17 @@ const executeStep = (args: {
         onInvoked: args.onInvoked,
       })
     }
+    case 'backend-unavailable':
+    case 'backend-available':
+      return setBackendAvailability({
+        host: args.host,
+        phaseId: args.phaseId,
+        record: args.record,
+        operationId: args.step.id,
+        available: args.step._tag === 'backend-available',
+        faultState: args.faultState,
+        onInvoked: args.onInvoked,
+      })
     case 'stop-session':
     case 'restart-session': {
       const step = args.step
@@ -703,6 +714,41 @@ const setConnectivity = (args: {
     }
   })
 
+const setBackendAvailability = (args: {
+  host: ParticipantHost
+  phaseId: string
+  record: TraceRecorder
+  operationId: string
+  available: boolean
+  faultState: ScenarioFaultState
+  onInvoked?: () => Effect.Effect<void>
+}): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
+  Effect.gen(function* () {
+    args.record({
+      origin: 'instruction',
+      correlationId: args.operationId,
+      phaseId: args.phaseId,
+      payload: { _tag: 'backend.availability.requested', available: args.available },
+    })
+    if (args.onInvoked !== undefined) yield* args.onInvoked()
+    yield* args.host.setBackendAvailability({ operationId: args.operationId, available: args.available })
+    const acknowledgement = args.record({
+      origin: 'acknowledgement',
+      correlationId: args.operationId,
+      phaseId: args.phaseId,
+      payload: { _tag: 'backend.availability.changed', available: args.available },
+    })
+    const faultId = args.available === false ? args.operationId : args.faultState.backend.active
+    if (faultId !== undefined) {
+      args.faultState.backend.pending = {
+        operationId: args.operationId,
+        available: args.available,
+        faultId,
+        acknowledgementRecordIndex: acknowledgement.index,
+      }
+    }
+  })
+
 /** Records component-scoped facts so every cursor advances one observed component at a time. */
 const recordSystemObservation = (args: {
   host: ParticipantHost
@@ -716,7 +762,7 @@ const recordSystemObservation = (args: {
   Effect.gen(function* () {
     const captureId = args.record.nextCaptureId(args.reason)
     const observation = args.observation === undefined ? yield* args.host.observeSystem : args.observation
-    args.record({
+    const backendRecord = args.record({
       origin: 'observation',
       correlationId: args.correlationId,
       phaseId: args.phaseId,
@@ -724,6 +770,15 @@ const recordSystemObservation = (args: {
       evidence: 'first-observed',
       occurrence: observation.occurrences.backend,
       payload: { _tag: 'backend.observed', reason: args.reason, observation: observation.backend },
+    })
+    recordObservedBackendFaultTransition({
+      available: observation.backend.connected,
+      backendRecord,
+      faultState: args.faultState,
+      record: args.record,
+      phaseId: args.phaseId,
+      captureId,
+      occurrence: observation.occurrences.backend,
     })
     for (const client of observation.clients) {
       const clientOccurrences = observation.occurrences.clients.find((item) => item.clientId === client.clientId)
@@ -926,7 +981,10 @@ const awaitSettlement = (args: {
               observations: lastObservations,
             },
           })
-          for (const fault of recoveryFaults) args.faultState.recoveringByClient.delete(fault.clientId)
+          for (const fault of recoveryFaults) {
+            if (fault.scope === 'client') args.faultState.recoveringByClient.delete(fault.clientId)
+            else args.faultState.backend.recovering = undefined
+          }
         }
         return observations
       }
@@ -973,15 +1031,30 @@ const deriveSyncObservation = (args: {
     )
   }
 
-  const localHead = EventSequenceNumber.Client.fromString(session.sync.upstreamHead)
-  const upstreamHead = EventSequenceNumber.Client.fromString(args.observation.backend.head)
-  const pendingCount = Math.max(session.sync.pendingCount, localHead.client)
+  const backendHead = EventSequenceNumber.Client.fromString(args.observation.backend.head)
+  const leaderLocalHead = EventSequenceNumber.Client.fromString(client.leader.localHead)
+  const leaderUpstreamHead = EventSequenceNumber.Client.fromString(client.leader.upstreamHead)
+  const sessionLocalHead = EventSequenceNumber.Client.fromString(session.sync.localHead)
+  const sessionUpstreamHead = EventSequenceNumber.Client.fromString(session.sync.upstreamHead)
+  const pendingCount = Math.max(
+    client.leader.pendingCount,
+    session.sync.pendingCount,
+    leaderLocalHead.client,
+    leaderUpstreamHead.client,
+    sessionLocalHead.client,
+    sessionUpstreamHead.client,
+  )
+  const componentHeads = [leaderLocalHead, leaderUpstreamHead, sessionLocalHead, sessionUpstreamHead]
   return Effect.succeed({
     participant: args.participant,
-    localHead: session.sync.upstreamHead,
+    localHead: session.sync.localHead,
     upstreamHead: args.observation.backend.head,
     pendingCount,
-    isSynced: client.connected === true && pendingCount === 0 && localHead.global === upstreamHead.global,
+    isSynced:
+      args.observation.backend.connected === true &&
+      client.connected === true &&
+      pendingCount === 0 &&
+      componentHeads.every((head) => head.global === backendHead.global),
   })
 }
 
@@ -1358,16 +1431,28 @@ const describeHostError = (error: HostError): { readonly code: string; readonly 
   }
 }
 
-interface RecoveringFault {
-  readonly clientId: string
-  readonly faultId: string
-  readonly removalRecordIndex: number
-}
+type RecoveringFault =
+  | {
+      readonly scope: 'client'
+      readonly clientId: string
+      readonly faultId: string
+      readonly removalRecordIndex: number
+    }
+  | {
+      readonly scope: 'backend'
+      readonly faultId: string
+      readonly removalRecordIndex: number
+    }
 
 interface ScenarioFaultState {
   readonly activeByClient: Map<string, string>
-  readonly recoveringByClient: Map<string, Omit<RecoveringFault, 'clientId'>>
+  readonly recoveringByClient: Map<string, Omit<Extract<RecoveringFault, { readonly scope: 'client' }>, 'clientId'>>
   readonly pendingByClient: Map<string, PendingFaultTransition>
+  readonly backend: {
+    active?: string
+    recovering?: Extract<RecoveringFault, { readonly scope: 'backend' }>
+    pending?: PendingBackendFaultTransition
+  }
 }
 
 interface PendingFaultTransition {
@@ -1377,10 +1462,18 @@ interface PendingFaultTransition {
   readonly acknowledgementRecordIndex: number
 }
 
+interface PendingBackendFaultTransition {
+  readonly operationId: string
+  readonly available: boolean
+  readonly faultId: string
+  readonly acknowledgementRecordIndex: number
+}
+
 const makeFaultState = (): ScenarioFaultState => ({
   activeByClient: new Map(),
   recoveringByClient: new Map(),
   pendingByClient: new Map(),
+  backend: {},
 })
 
 const recordObservedFaultTransition = (args: {
@@ -1421,9 +1514,53 @@ const recordObservedFaultTransition = (args: {
       payload: { _tag: 'fault.removed', faultId: pending.faultId, fault: 'client-disconnected' },
     })
     args.faultState.recoveringByClient.set(args.clientId, {
+      scope: 'client',
       faultId: pending.faultId,
       removalRecordIndex: removal.index,
     })
+  }
+}
+
+const recordObservedBackendFaultTransition = (args: {
+  available: boolean
+  backendRecord: ScenarioTraceRecord
+  faultState: ScenarioFaultState
+  record: TraceRecorder
+  phaseId?: string
+  captureId: string
+  occurrence: HostObservationOccurrence
+}): void => {
+  const pending = args.faultState.backend.pending
+  if (pending === undefined || pending.available !== args.available) return
+  args.faultState.backend.pending = undefined
+
+  const input = {
+    origin: 'observation' as const,
+    correlationId: pending.operationId,
+    phaseId: args.phaseId,
+    captureId: args.captureId,
+    evidence: 'first-observed' as const,
+    occurrence: args.occurrence,
+    causedBy: [pending.acknowledgementRecordIndex, args.backendRecord.index],
+  }
+  if (pending.available === false) {
+    args.faultState.backend.recovering = undefined
+    args.faultState.backend.active = pending.faultId
+    args.record({
+      ...input,
+      payload: { _tag: 'fault.injected', faultId: pending.faultId, fault: 'backend-unavailable' },
+    })
+  } else {
+    args.faultState.backend.active = undefined
+    const removal = args.record({
+      ...input,
+      payload: { _tag: 'fault.removed', faultId: pending.faultId, fault: 'backend-unavailable' },
+    })
+    args.faultState.backend.recovering = {
+      scope: 'backend',
+      faultId: pending.faultId,
+      removalRecordIndex: removal.index,
+    }
   }
 }
 
@@ -1432,9 +1569,12 @@ const selectedRecoveryFaults = (
   participants: ReadonlyArray<ParticipantRef>,
 ): ReadonlyArray<RecoveringFault> => {
   const selectedClientIds = new Set(participants.map((participant) => participant.clientId))
-  return [...state.recoveringByClient.entries()].flatMap(([clientId, fault]) =>
-    selectedClientIds.has(clientId) === true ? [{ clientId, ...fault }] : [],
-  )
+  return [
+    ...[...state.recoveringByClient.entries()].flatMap(([clientId, fault]) =>
+      selectedClientIds.has(clientId) === true ? [{ clientId, ...fault }] : [],
+    ),
+    ...(state.backend.recovering === undefined ? [] : [state.backend.recovering]),
+  ]
 }
 
 const recordOperationFailure = (args: {

@@ -37,6 +37,7 @@ export const processHostCapabilities: HostCapabilities = {
     'multiple-clients',
     'named-actions',
     'disconnect-reconnect',
+    'backend-availability',
     'sync-observation',
     'system-observation',
     'state-inspection',
@@ -53,7 +54,7 @@ export interface ProcessParticipantHost extends ParticipantHost {
 
 export const makeProcessHost = (args: {
   applicationId: string
-  backend: Pick<ScenarioBackend, 'id' | 'observe' | 'serializedConfig' | 'componentVersions'>
+  backend: Pick<ScenarioBackend, 'id' | 'observe' | 'setAvailability' | 'serializedConfig' | 'componentVersions'>
 }): Effect.Effect<ProcessParticipantHost, ScenarioOperationError, Scope.Scope> =>
   Effect.gen(function* () {
     if (args.backend.serializedConfig._tag !== 'sync-cf-ws') {
@@ -121,6 +122,9 @@ export const makeProcessHost = (args: {
         yield* client.request({ _tag: 'set-connectivity', connected: command.connected })
         return acknowledge(command.operationId)
       })
+
+    const setBackendAvailability: ParticipantHost['setBackendAvailability'] = (command) =>
+      args.backend.setAvailability(command.available).pipe(Effect.as(acknowledge(command.operationId)))
 
     const observeSystem: ParticipantHost['observeSystem'] = Effect.gen(function* () {
       const backend =
@@ -191,6 +195,7 @@ export const makeProcessHost = (args: {
       createClient,
       dispatchAction,
       setConnectivity,
+      setBackendAvailability,
       stopSession: unsupportedLifecycle('session stop'),
       restartSession: unsupportedLifecycle('session restart'),
       restartClient: unsupportedLifecycle('Client restart'),
