@@ -4,91 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LiveStore scenario replay</title>
-    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="toolbar">
-        <div class="toolbar-copy">
-          <h1 id="run-title">scenario</h1>
-          <p id="run-summary" class="summary">Load a completed run artifact to begin.</p>
-        </div>
-        <div class="controls">
-          <label class="file-button">
-            open
-            <input id="artifact-file" type="file" accept="application/json,application/gzip,.json,.json.gz" />
-          </label>
-          <div class="select-control">
-            <select id="example-artifact" aria-label="Saved scenario run" disabled>
-              <option>saved runs</option>
-            </select>
-          </div>
-          <button id="load-example" type="button" disabled>load</button>
-        </div>
-      </header>
-
-      <section aria-labelledby="system-state-heading">
-        <div class="section-heading">
-          <h2 id="system-state-heading">System</h2>
-          <div id="run-status" class="badge neutral">Not loaded</div>
-        </div>
-        <div id="system-state" class="empty-state">Choose an artifact above.</div>
-      </section>
-
-      <nav class="timeline-actions" aria-label="Timeline playback and display controls">
-        <button id="play" class="timeline-play" type="button" disabled>play</button>
-        <div class="timeline-action-settings">
-          <div class="mode-control">
-            <span class="mode-label">play</span>
-            <div class="mode-switch" aria-label="Playback stepping">
-              <button id="playback-moments" type="button" aria-pressed="true">moments</button>
-              <button id="playback-records" type="button" aria-pressed="false">records</button>
-            </div>
-          </div>
-          <div class="mode-control">
-            <span class="mode-label">show</span>
-            <div class="mode-switch" aria-label="Trace visibility">
-              <button id="visibility-system" type="button" aria-pressed="true">system</button>
-              <button id="visibility-all" type="button" aria-pressed="false">all</button>
-            </div>
-          </div>
-          <div class="mode-control">
-            <span class="mode-label">layout</span>
-            <div class="mode-switch" aria-label="Timeline projection">
-              <button id="mode-flow" type="button" aria-pressed="true">flow</button>
-              <button id="mode-time" type="button" aria-pressed="false">time</button>
-            </div>
-            <div id="time-scale-switch" class="mode-switch time-scale-switch" aria-label="Time scale" hidden>
-              <button id="time-fit" type="button" aria-pressed="true">fit</button>
-              <button id="time-raw" type="button" aria-pressed="false">raw</button>
-            </div>
-          </div>
-        </div>
-        <span id="cursor-label">0 / 0</span>
-      </nav>
-
-      <section aria-labelledby="timeline-heading">
-        <div class="section-heading timeline-heading">
-          <div class="timeline-heading-copy">
-            <h2 id="timeline-heading">Timeline</h2>
-            <p id="trace-name" class="trace-name">No trace loaded</p>
-          </div>
-          <span id="record-label">No observation selected</span>
-        </div>
-        <p id="timeline-mode-note" class="selection-copy">
-          Observation captures are aligned; no causal arrows are inferred.
-        </p>
-        <p id="event-selection" class="selection-copy">Select an event to highlight inferred matching observations.</p>
-        <div id="timeline" class="timeline empty-state">No trace loaded.</div>
-      </section>
-
-      <section class="details" aria-labelledby="details-heading">
-        <div class="section-heading">
-          <h2 id="details-heading">Trace</h2>
-        </div>
-        <div id="record-details" class="trace-inspector-empty">No trace record selected.</div>
-      </section>
-    </main>
-    <script type="module" src="./main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
   </body>
 </html>

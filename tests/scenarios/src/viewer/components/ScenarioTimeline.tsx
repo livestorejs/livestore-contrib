@@ -11,7 +11,7 @@ import {
   type TimelineViewport,
   type TimeScaleMode,
   type TraceVisibility,
-} from '../../viewer/timeline-scene.ts'
+} from '../timeline-scene.ts'
 
 interface TimelineLayerProps {
   readonly nodes: ReadonlyArray<SvgSceneNode>

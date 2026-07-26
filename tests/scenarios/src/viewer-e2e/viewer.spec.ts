@@ -7,71 +7,27 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const offlineArtifact = path.join(packageRoot, 'artifacts/reference-offline-writer-recovery-browser-failure.json.gz')
 const lifecycleArtifact = path.join(packageRoot, 'artifacts/reference-browser-multi-session-recovery-browser.json.gz')
 const denseArtifact = path.join(packageRoot, 'artifacts/reference-shared-todo-workday-browser-failure.json.gz')
+const viewerUrl = 'http://127.0.0.1:4173'
 
-test('legacy baseline: loaded failure and meaningful interaction state', async ({ page }) => {
-  await openArtifact(page, 'http://127.0.0.1:4173', offlineArtifact, 'offline-writer-recovery')
-  await expect(page).toHaveScreenshot('legacy-loaded-failure.png', { fullPage: true })
+test('canonical viewer matches the approved failure and interaction baselines', async ({ page }) => {
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
+  await expect(page).toHaveScreenshot('loaded-failure.png', { fullPage: true })
 
   await applyComparisonState(page)
-  await expect(page).toHaveScreenshot('legacy-interaction-state.png', { fullPage: true })
+  await expect(page).toHaveScreenshot('interaction-state.png', { fullPage: true })
+  await expect(page.getByText(/Highlighting inferred correlation/)).toBeVisible()
+  await expect(page.getByText('Logical time')).toBeVisible()
+  await expect(page.locator('svg.timeline-main')).toHaveAttribute('aria-valuenow', /\d+/)
 })
 
-test('legacy baseline: passed browser lifecycle final state', async ({ page }) => {
-  await openArtifact(page, 'http://127.0.0.1:4173', lifecycleArtifact, 'browser-multi-session-recovery')
-  await expect(page).toHaveScreenshot('legacy-loaded-success.png', { fullPage: true })
+test('canonical viewer matches the approved passed lifecycle baseline', async ({ page }) => {
+  await openArtifact(page, viewerUrl, lifecycleArtifact, 'browser-multi-session-recovery')
+  await expect(page.getByLabel('System').locator('.section-heading .badge')).toHaveText('passed')
+  await expect(page).toHaveScreenshot('loaded-success.png', { fullPage: true })
 })
 
-test('React matches legacy visuals and interaction semantics', async ({ browser }) => {
-  const legacy = await browser.newPage()
-  const react = await browser.newPage()
-  await Promise.all([
-    openArtifact(legacy, 'http://127.0.0.1:4173', offlineArtifact, 'offline-writer-recovery'),
-    openArtifact(react, 'http://127.0.0.1:4174', offlineArtifact, 'offline-writer-recovery'),
-  ])
-
-  await expectEquivalentScreenshots(legacy, react, 'legacy-loaded-failure.png')
-  await Promise.all([applyComparisonState(legacy), applyComparisonState(react)])
-  await expectEquivalentScreenshots(legacy, react, 'legacy-interaction-state.png')
-
-  await expect(react.getByText(/Highlighting inferred correlation/)).toBeVisible()
-  await expect(react.getByText('Logical time')).toBeVisible()
-  await expect(react.locator('svg.timeline-main')).toHaveAttribute('aria-valuenow', /\d+/)
-  await legacy.close()
-  await react.close()
-})
-
-test('shared scene preserves the retained pre-extraction timeline renderer', async ({ browser }) => {
-  const original = await browser.newPage()
-  const sharedScene = await browser.newPage()
-  await Promise.all([
-    openArtifact(original, 'http://127.0.0.1:4173?original-timeline', offlineArtifact, 'offline-writer-recovery'),
-    openArtifact(sharedScene, 'http://127.0.0.1:4173', offlineArtifact, 'offline-writer-recovery'),
-  ])
-  const [originalTimeline, sharedTimeline] = await Promise.all([
-    original.locator('.timeline').screenshot({ animations: 'disabled' }),
-    sharedScene.locator('.timeline').screenshot({ animations: 'disabled' }),
-  ])
-  expect(originalTimeline).toMatchSnapshot('legacy-original-timeline.png', { maxDiffPixelRatio: 0.001 })
-  expect(sharedTimeline).toMatchSnapshot('legacy-original-timeline.png', { maxDiffPixelRatio: 0.001 })
-  await original.close()
-  await sharedScene.close()
-})
-
-test('passed browser lifecycle artifact matches at its final state', async ({ browser }) => {
-  const legacy = await browser.newPage()
-  const react = await browser.newPage()
-  await Promise.all([
-    openArtifact(legacy, 'http://127.0.0.1:4173', lifecycleArtifact, 'browser-multi-session-recovery'),
-    openArtifact(react, 'http://127.0.0.1:4174', lifecycleArtifact, 'browser-multi-session-recovery'),
-  ])
-  await expect(react.getByLabel('System').locator('.section-heading .badge')).toHaveText('passed')
-  await expectEquivalentScreenshots(legacy, react, 'legacy-loaded-success.png')
-  await legacy.close()
-  await react.close()
-})
-
-test('React application playback, cursor, and range keyboard controls remain independent', async ({ page }) => {
-  await openArtifact(page, 'http://127.0.0.1:4174', offlineArtifact, 'offline-writer-recovery')
+test('playback, cursor, and range keyboard controls remain independent', async ({ page }) => {
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
   const cursor = page.locator('svg.timeline-main')
   const initialCursor = await cursor.getAttribute('aria-valuenow')
   await cursor.scrollIntoViewIfNeeded()
@@ -96,8 +52,8 @@ test('React application playback, cursor, and range keyboard controls remain ind
   await expect(page.getByRole('button', { name: 'play', exact: true })).toBeVisible()
 })
 
-test('React pointer scrubbing, range dragging, moment selection, and inspector persistence', async ({ page }) => {
-  await openArtifact(page, 'http://127.0.0.1:4174', offlineArtifact, 'offline-writer-recovery')
+test('pointer scrubbing, range dragging, moment selection, and inspector persistence', async ({ page }) => {
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
   const cursor = page.locator('svg.timeline-main')
   const initialCursor = await cursor.getAttribute('aria-valuenow')
   const timelineBounds = await cursor.boundingBox()
@@ -132,8 +88,8 @@ test('React pointer scrubbing, range dragging, moment selection, and inspector p
   await expect(page.getByText('Logical time')).toBeVisible()
 })
 
-test('React reports malformed artifact loads without losing the runnable shell', async ({ page }) => {
-  await page.goto('http://127.0.0.1:4174')
+test('malformed artifact loads do not lose the runnable shell', async ({ page }) => {
+  await page.goto(viewerUrl)
   await page.locator('input[type=file]').setInputFiles({
     name: 'malformed.json',
     mimeType: 'application/json',
@@ -143,8 +99,8 @@ test('React reports malformed artifact loads without losing the runnable shell',
   await expect(page.getByRole('heading', { name: 'scenario' })).toBeVisible()
 })
 
-test('React event logs preserve manual scroll and follow new tail evidence', async ({ page }) => {
-  await openArtifact(page, 'http://127.0.0.1:4174', denseArtifact, 'shared-todo-workday')
+test('event logs preserve manual scroll and follow new tail evidence', async ({ page }) => {
+  await openArtifact(page, viewerUrl, denseArtifact, 'shared-todo-workday')
   const overflowIndex = await page
     .locator('.eventlog')
     .evaluateAll((elements) => elements.findIndex((element) => element.scrollWidth > element.clientWidth))
@@ -198,14 +154,4 @@ const applyComparisonState = async (page: Page): Promise<void> => {
   await page.getByText('Trace metadata').click()
   await page.getByText('Raw JSON').click()
   await expect(page.getByText('Logical time')).toBeVisible()
-}
-
-const expectEquivalentScreenshots = async (legacy: Page, react: Page, baselineName: string): Promise<void> => {
-  const [legacyScreenshot, reactScreenshot] = await Promise.all([
-    legacy.screenshot({ fullPage: true, animations: 'disabled' }),
-    react.screenshot({ fullPage: true, animations: 'disabled' }),
-  ])
-  // Guard against a stale baseline independently, then use Playwright's image comparator for diagnostic diffs.
-  expect(legacyScreenshot).toMatchSnapshot(baselineName, { maxDiffPixelRatio: 0.001 })
-  expect(reactScreenshot).toMatchSnapshot(baselineName, { maxDiffPixelRatio: 0.001 })
 }

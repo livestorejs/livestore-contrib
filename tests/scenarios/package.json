@@ -9,8 +9,6 @@
     "test:watch": "vitest",
     "viewer": "pnpm exec vite --config scenario-viewer.vite.config.ts",
     "viewer:build": "pnpm exec vite build --config scenario-viewer.vite.config.ts",
-    "viewer:react": "pnpm exec vite --config scenario-viewer-react.vite.config.ts",
-    "viewer:react:build": "pnpm exec vite build --config scenario-viewer-react.vite.config.ts",
     "storybook": "pnpm exec storybook dev -p 6006",
     "storybook:build": "pnpm exec storybook build",
     "viewer:parity": "pnpm exec playwright test --config viewer-playwright.config.ts"

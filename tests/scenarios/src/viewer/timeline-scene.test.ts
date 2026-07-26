@@ -16,7 +16,7 @@ const denseArtifact = decodeReference('reference-shared-todo-workday-browser-fai
 const lifecycleArtifact = decodeReference('reference-browser-multi-session-recovery-browser.json.gz')
 
 describe('deriveTimelineScene', () => {
-  test('keeps the legacy viewBox, lane hierarchy, and two-SVG geometry', () => {
+  test('keeps the established viewBox, lane hierarchy, and two-SVG geometry', () => {
     const scene = deriveTimelineScene({
       artifact: offlineArtifact,
       cursorIndex: offlineArtifact.trace.length - 1,

@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import type { ScenarioRunArtifact } from '../../model.ts'
-import { decodeArtifactJson, fetchArtifactJson } from '../../viewer/artifact-io.ts'
+import { decodeArtifactJson, fetchArtifactJson } from '../artifact-io.ts'
 
 export type ReferenceArtifactName =
   | 'reference-browser-multi-session-recovery-browser.json.gz'

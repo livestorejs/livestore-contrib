@@ -103,7 +103,7 @@ const titled = (title: string, child: SvgSceneNode): SvgSceneNode => ({
 
 /**
  * Derives every timeline coordinate and semantic layer without reading or mutating the DOM.
- * Keeping the geometry here lets the legacy string renderer and React SVG renderer share one parity source.
+ * Keeping geometry separate from rendering makes semantic thresholds directly testable.
  */
 export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScene => {
   const { artifact, cursorIndex, selectedEventRef, timelineMode, timeScaleMode, traceVisibility } = args

@@ -1,6 +1,6 @@
 # React scenario viewer parity checklist
 
-This checklist is the durable issue record for the scenario-viewer parity migration. The legacy viewer remains the executable reference until a maintainer accepts the React viewer.
+This checklist is the durable issue record for the completed scenario-viewer parity migration. After manual acceptance, React became the canonical viewer and the imperative implementation was removed.
 
 ## Reference artifacts and states
 
@@ -29,7 +29,7 @@ This checklist is the durable issue record for the scenario-viewer parity migrat
 
 ## Implementation
 
-- [x] React/Vite entry is independently runnable from the untouched legacy entry.
+- [x] React/Vite entry was independently validated against the legacy entry before cutover.
 - [x] Storybook is local to `tests/scenarios/` and builds successfully.
 - [x] Reusable primitives, topology, controls, inspector, and full-app stories exist.
 - [x] Timeline geometry is derived by a pure DOM-free scene function.
@@ -47,4 +47,4 @@ This checklist is the durable issue record for the scenario-viewer parity migrat
 - [x] `README.md` documents exact commands and URLs for both viewers and parity tests.
 - [x] Known differences are recorded and explained; baseline updates are reviewed rather than automatic.
 
-No material visual or behavioral differences are known. The parity suite permits at most a 0.1% pixel mismatch to accommodate browser rasterization; all reviewed comparisons are below that threshold. The retained `?original-timeline` renderer additionally proves that extracting the shared scene did not alter the legacy timeline.
+No material visual or behavioral differences are known. The migration suite permitted at most a 0.1% pixel mismatch to accommodate browser rasterization, and all reviewed comparisons were below that threshold. The approved legacy screenshots remain as regression baselines; no legacy runtime implementation remains.

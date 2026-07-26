@@ -9,7 +9,7 @@ import {
   readArtifactFile,
   decodeArtifactJson,
   type ArtifactCatalog,
-} from '../viewer/artifact-io.ts'
+} from './artifact-io.ts'
 import { PlaybackToolbar } from './components/PlaybackToolbar.tsx'
 import { StatusBadge, type StatusTone } from './components/Primitives.tsx'
 import { ScenarioTimeline } from './components/ScenarioTimeline.tsx'

@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef } from 'react'
 
 import type { ComponentSyncObservation, ObservedEvent } from '../../model.ts'
 import type { ObservedSystemState, ProjectedClient } from '../../projection.ts'
-import { clientColor, displayEventPosition } from '../../viewer/timeline-scene.ts'
+import { clientColor, displayEventPosition } from '../timeline-scene.ts'
 import { StatusBadge, type StatusTone } from './Primitives.tsx'
 
 export interface EventLogScrollState {

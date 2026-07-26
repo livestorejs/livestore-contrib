@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-function-as-prop -- File and select handlers are local leaf interactions. */
 import type { ChangeEvent, ReactNode } from 'react'
 
-import type { ArtifactCatalog } from '../../viewer/artifact-io.ts'
+import type { ArtifactCatalog } from '../artifact-io.ts'
 
 export const ArtifactPicker = ({
   catalog,

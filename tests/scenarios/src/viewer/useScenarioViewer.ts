@@ -2,15 +2,15 @@ import { useEffect, useMemo, useReducer, useRef } from 'react'
 
 import type { ScenarioRunArtifact, ScenarioTraceRecord } from '../model.ts'
 import { derivePlaybackMoments } from '../projection.ts'
+import type { EventLogScrollState } from './components/SystemTopology.tsx'
+import type { InspectorExpansionState } from './components/TraceInspector.tsx'
 import {
   clampTimelineViewport,
   type TimelineMode,
   type TimelineViewport,
   type TimeScaleMode,
   type TraceVisibility,
-} from '../viewer/timeline-scene.ts'
-import type { EventLogScrollState } from './components/SystemTopology.tsx'
-import type { InspectorExpansionState } from './components/TraceInspector.tsx'
+} from './timeline-scene.ts'
 
 export type PlaybackMode = 'moments' | 'records'
 

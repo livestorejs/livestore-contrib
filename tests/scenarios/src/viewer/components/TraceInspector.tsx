@@ -2,7 +2,7 @@
 import type { ScenarioTraceRecord } from '../../model.ts'
 import type { PlaybackMoment } from '../../projection.ts'
 import { summarizeTraceRecord } from '../../projection.ts'
-import { detailRecordScope, groupDetailRecords, traceRecordFacts } from '../../viewer/trace-inspector-model.ts'
+import { detailRecordScope, groupDetailRecords, traceRecordFacts } from '../trace-inspector-model.ts'
 
 export interface InspectorExpansionState {
   readonly traceMetadataOpen: boolean

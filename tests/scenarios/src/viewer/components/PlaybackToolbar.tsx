@@ -1,4 +1,4 @@
-import type { TimelineMode, TimeScaleMode, TraceVisibility } from '../../viewer/timeline-scene.ts'
+import type { TimelineMode, TimeScaleMode, TraceVisibility } from '../timeline-scene.ts'
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- Small static control option lists are clearer inline. */
 import type { PlaybackMode } from '../useScenarioViewer.ts'
 import { ModeControl, SegmentedControl } from './Primitives.tsx'

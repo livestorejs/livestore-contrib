@@ -20,18 +20,10 @@ export default defineConfig({
     { name: 'desktop-dark', use: { viewport: { width: 1440, height: 1000 }, colorScheme: 'dark' } },
     { name: 'narrow-light', use: { viewport: { width: 700, height: 900 }, colorScheme: 'light' } },
   ],
-  webServer: [
-    {
-      command: 'pnpm viewer --host 127.0.0.1 --port 4173 --strictPort',
-      cwd: path.resolve(import.meta.dirname),
-      url: 'http://127.0.0.1:4173',
-      reuseExistingServer: false,
-    },
-    {
-      command: 'pnpm viewer:react --host 127.0.0.1 --port 4174 --strictPort',
-      cwd: path.resolve(import.meta.dirname),
-      url: 'http://127.0.0.1:4174',
-      reuseExistingServer: false,
-    },
-  ],
+  webServer: {
+    command: 'pnpm viewer --host 127.0.0.1 --port 4173 --strictPort',
+    cwd: path.resolve(import.meta.dirname),
+    url: 'http://127.0.0.1:4173',
+    reuseExistingServer: false,
+  },
 })

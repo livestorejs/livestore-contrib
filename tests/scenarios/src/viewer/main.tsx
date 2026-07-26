@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
-import '../viewer/style.css'
+import './style.css'
 import { ScenarioViewerApp } from './ScenarioViewerApp.tsx'
 
 const root = document.getElementById('root')

@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react'
 
 import type { ScenarioRunArtifact } from '../../model.ts'
 import { derivePlaybackMoments } from '../../projection.ts'
-import type { TimelineMode, TimelineViewport, TimeScaleMode, TraceVisibility } from '../../viewer/timeline-scene.ts'
 import { ReferenceFixture, type ReferenceArtifactName } from '../stories/fixtures.tsx'
+import type { TimelineMode, TimelineViewport, TimeScaleMode, TraceVisibility } from '../timeline-scene.ts'
 import { ScenarioTimeline } from './ScenarioTimeline.tsx'
 
 const meta = {
