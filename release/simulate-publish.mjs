@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
+/** Contrib publishes only under the snapshot dist-tag; verification checks this same tag. */
+const SNAPSHOT_TAG = 'snapshot'
 
 const readJson = (path) => JSON.parse(readFileSync(join(rootDir, path), 'utf8'))
 const writeJson = (path, value) => writeFileSync(join(rootDir, path), `${JSON.stringify(value, null, 2)}\n`)
@@ -201,20 +204,106 @@ const npmViewExists = (name, version) => {
 
 const sleep = (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
 
-const waitForNpmView = (name, version) => {
+/** `npm view --json`, with any failure (unpublished version, network) reported as absent. */
+const npmViewJson = (args) => {
+  try {
+    const raw = execFileSync('npm', ['view', ...args, '--json'], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    return JSON.parse(raw.trim())
+  } catch {
+    return undefined
+  }
+}
+
+/** What the registry currently serves for one package version. */
+const readRegistryState = (name, version, tag) => {
+  const manifest = npmViewJson([`${name}@${version}`])
+  const distTags = npmViewJson([name, 'dist-tags'])
+  const integrity = manifest?.dist?.integrity
+  return {
+    version: typeof manifest?.version === 'string' ? manifest.version : undefined,
+    integrity: typeof integrity === 'string' ? integrity : undefined,
+    distTag: typeof distTags?.[tag] === 'string' ? distTags[tag] : undefined,
+  }
+}
+
+/** npm's `dist.integrity` format: base64 SHA-512 of the tarball, algorithm-prefixed. */
+const tarballIntegrity = (tarballPath) =>
+  `sha512-${createHash('sha512').update(readFileSync(tarballPath)).digest('base64')}`
+
+/**
+ * Compare what the registry serves against what was published.
+ *
+ * `pending` and `mismatch` need opposite handling: propagation is eventually
+ * consistent and worth retrying, whereas a tarball digest that disagrees with what
+ * we packed can never become correct, because a published npm version is immutable.
+ *
+ * Mirrors `registryVerification` in `@overeng/npm-release`; this copy exists until
+ * contrib can consume that package (see effect-utils DELTA-001).
+ */
+const registryVerification = ({ name, version, tag, localIntegrity, remote }) => {
+  if (remote.version === undefined) {
+    return { status: 'pending', reason: `${name}@${version} is not visible on the registry yet` }
+  }
+  if (remote.version !== version) {
+    return { status: 'mismatch', reason: `${name}: registry serves version ${remote.version}, expected ${version}` }
+  }
+  if (localIntegrity !== undefined && remote.integrity !== undefined && remote.integrity !== localIntegrity) {
+    return {
+      status: 'mismatch',
+      reason: `${name}@${version}: registry tarball digest ${remote.integrity} does not match the locally packed ${localIntegrity}`,
+    }
+  }
+  if (remote.distTag === undefined) {
+    return {
+      status: 'pending',
+      reason: `${name}: dist-tag "${tag}" is absent, so ${version} published but nothing resolves to it`,
+    }
+  }
+  if (remote.distTag !== version) {
+    return {
+      status: 'pending',
+      reason: `${name}: dist-tag "${tag}" points at ${remote.distTag}, expected ${version}`,
+    }
+  }
+  return { status: 'ok' }
+}
+
+/**
+ * Wait for the registry to agree that the release is live.
+ *
+ * `localIntegrity` is only supplied for packages this run actually published — a
+ * repack of an already-published package need not be byte-identical, so comparing
+ * its digest would report a mismatch that isn't one.
+ */
+const verifyPublished = ({ name, version, tag, localIntegrity }) => {
   const attempts = 24
   const delayMs = 5_000
+  let lastReason
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    if (npmViewExists(name, version) === true) return
+    const result = registryVerification({
+      name,
+      version,
+      tag,
+      localIntegrity,
+      remote: readRegistryState(name, version, tag),
+    })
 
+    if (result.status === 'ok') return
+    if (result.status === 'mismatch') throw new Error(result.reason)
+
+    lastReason = result.reason
     if (attempt !== attempts) {
-      console.log(`${name}@${version} is not visible on npm yet; retrying in ${delayMs / 1_000}s`)
+      console.log(`${result.reason}; retrying in ${delayMs / 1_000}s`)
       sleep(delayMs)
     }
   }
 
-  throw new Error(`${name}@${version} is not visible on npm after publish`)
+  throw new Error(`${lastReason} — registry did not converge within the verification window`)
 }
 
 const packPackage = (pkg) => {
@@ -327,6 +416,9 @@ if (dryRun === true || publish === true) {
 
     smokeInstallPackedTarballs(packed)
 
+    /** Digest of each tarball this run uploaded, so verification can prove the registry serves it. */
+    const publishedIntegrity = new Map()
+
     for (const { pkg, tarballPath } of packed) {
       const existing = npmViewExists(pkg.name, pkg.version)
       if (existing === true && publish === true) {
@@ -334,15 +426,27 @@ if (dryRun === true || publish === true) {
         continue
       }
 
-      const publishArgs = ['publish', tarballPath, '--tag=snapshot', '--access=public', '--ignore-scripts']
-      if (dryRun === true) publishArgs.push('--dry-run')
+      const publishArgs = ['publish', tarballPath, `--tag=${SNAPSHOT_TAG}`, '--access=public', '--ignore-scripts']
+      if (dryRun === true) {
+        publishArgs.push('--dry-run')
+      } else if (process.env.GITHUB_ACTIONS === 'true') {
+        // SLSA provenance from the job's OIDC identity, matching how core publishes.
+        publishArgs.push('--provenance')
+      }
       run('npm', publishArgs)
+      if (publish === true) publishedIntegrity.set(pkg.name, tarballIntegrity(tarballPath))
       console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
     }
 
     if (publish === true) {
       for (const pkg of plan.packages) {
-        waitForNpmView(pkg.name, pkg.version)
+        verifyPublished({
+          name: pkg.name,
+          version: pkg.version,
+          tag: SNAPSHOT_TAG,
+          localIntegrity: publishedIntegrity.get(pkg.name),
+        })
+        console.log(`Verified ${pkg.name}@${pkg.version} (dist-tag ${SNAPSHOT_TAG} -> ${pkg.version})`)
       }
     }
   } finally {
