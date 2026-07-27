@@ -1,0 +1,50 @@
+{
+  "name": "@livestore/devtools-common",
+  "version": "0.4.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/livestorejs/livestore-contrib.git"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "echo No tests yet"
+  },
+  "dependencies": {
+    "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils"
+  },
+  "peerDependencies": {
+    "@effect/opentelemetry": "^4.0.0-beta.97",
+    "@effect/platform-browser": "^4.0.0-beta.97",
+    "@effect/platform-bun": "^4.0.0-beta.97",
+    "@effect/platform-node": "^4.0.0-beta.97",
+    "@effect/platform-node-shared": "^4.0.0-beta.97",
+    "@effect/vitest": "^4.0.0-beta.97",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@standard-schema/spec": "^1.1.0",
+    "effect": "^4.0.0-beta.97"
+  },
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "workspaceClosureDirs": [
+      "packages/@livestore/devtools-common",
+      "repos/livestore/packages/@livestore/utils"
+    ]
+  }
+}

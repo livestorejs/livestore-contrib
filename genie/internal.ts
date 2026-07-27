@@ -10,6 +10,7 @@ export const contribPackageNames = [
   'adapter-expo',
   'adapter-node',
   'cli',
+  'devtools-common',
   'devtools-expo',
   'graphql',
   'solid',

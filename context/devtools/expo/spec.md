@@ -77,6 +77,24 @@ whose inline script redirects the browser to
 (`webui/index.html:9`) (LSC.DT.EXPO-R05). `port` is taken from the page's own
 URL, and the host is again pinned to `localhost`.
 
+## Distribution Class: Pinned
+
+This surface is **pinned**: its running version is determined mechanically by the
+app's dependency resolution (npm + lockfile). It therefore ships in lockstep with
+core and takes on **no** protocol-version tolerance — no accepted-version window,
+no negotiation, no capability degradation.
+
+The distinction is the *install path*, not the topology. Expo devtools is
+out-of-process, frequently on another device, and reaches the app over a
+hop-routed webmesh `proxy` channel — and is still pinned, because a LiveStore
+release changes which build the developer runs without any action outside
+dependency install. Only an **unpinned** surface (one installed and updated
+independently of the app, e.g. a browser extension) needs negotiated
+compatibility.
+
+Recorded explicitly so that tolerance is not added here by analogy with the
+browser extension.
+
 ## Not Owned Here
 
 Everything the protocol contract covers — message schemas, versioning/handshake,
