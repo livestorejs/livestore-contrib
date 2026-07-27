@@ -101,6 +101,11 @@ export const browserMultiSessionRecovery = defineScenario({
     { _tag: 'pending-resolution', id: 'pending-resolved', participants: [sessionA1, sessionA2] },
     { _tag: 'eventlog-convergence', id: 'eventlogs-converged', participants: [sessionA1, sessionA2] },
     {
+      _tag: 'confirmed-eventlog-prefix',
+      id: 'confirmed-eventlogs-append-only',
+      participants: [sessionA1, sessionA2],
+    },
+    {
       _tag: 'state-convergence',
       id: 'todo-state-converged',
       participants: [sessionA1, sessionA2],

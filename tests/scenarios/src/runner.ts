@@ -24,6 +24,7 @@ import { makeBrowserHost } from './browser/browser-host.ts'
 import { deriveScenarioRequirements, sessionsBeyondHostLimit } from './capabilities.ts'
 import { makeInProcessHost, type HostError, type ParticipantHost } from './host.ts'
 import {
+  type ConfirmedEventlogPrefixOracle,
   type ComponentSyncObservation,
   type ClientDefinition,
   type OracleVerdict,
@@ -51,7 +52,13 @@ import {
   type WorkloadStep,
 } from './model.ts'
 import { makeProcessHost } from './process/process-host.ts'
-import { deriveOverlappingScenarioOperationPairs, deriveScenarioOperationHistoryProjection } from './projection.ts'
+import {
+  backendComponentKey,
+  deriveOverlappingScenarioOperationPairs,
+  deriveScenarioOperationHistoryProjection,
+  leaderComponentKey,
+  sessionComponentKey,
+} from './projection.ts'
 
 export interface RunScenarioOptions {
   readonly runId?: string
@@ -1300,17 +1307,21 @@ const evaluateOracles = (args: {
     const verdict =
       oracle._tag === 'operation-history'
         ? evaluateOperationHistoryOracle(oracle, args.trace)
-        : oracle._tag === 'eventlog-convergence'
-          ? evaluateEventlogConvergenceOracle(oracle, args.trace)
-          : evaluateSnapshotOracle(
-              oracle,
-              oracle.participants.map((participant) =>
-                args.snapshots.find((snapshot) => participantKey(snapshot.participant) === participantKey(participant)),
-              ),
-              oracle.participants.flatMap(
-                (participant) => args.evidenceByParticipant.get(participantKey(participant)) ?? [],
-              ),
-            )
+        : oracle._tag === 'confirmed-eventlog-prefix'
+          ? evaluateConfirmedEventlogPrefixOracle(oracle, args.trace)
+          : oracle._tag === 'eventlog-convergence'
+            ? evaluateEventlogConvergenceOracle(oracle, args.trace)
+            : evaluateSnapshotOracle(
+                oracle,
+                oracle.participants.map((participant) =>
+                  args.snapshots.find(
+                    (snapshot) => participantKey(snapshot.participant) === participantKey(participant),
+                  ),
+                ),
+                oracle.participants.flatMap(
+                  (participant) => args.evidenceByParticipant.get(participantKey(participant)) ?? [],
+                ),
+              )
     args.record({
       origin: 'verdict',
       correlationId: oracle.id,
@@ -1327,7 +1338,7 @@ const evaluateOracles = (args: {
   })
 
 const evaluateSnapshotOracle = (
-  oracle: Exclude<ScenarioOracle, OperationHistoryOracle | EventlogConvergenceOracle>,
+  oracle: Exclude<ScenarioOracle, OperationHistoryOracle | EventlogConvergenceOracle | ConfirmedEventlogPrefixOracle>,
   selected: ReadonlyArray<ParticipantSnapshot | undefined>,
   evidence: ReadonlyArray<number>,
 ): OracleVerdict => {
@@ -1361,6 +1372,88 @@ const evaluateSnapshotOracle = (
         : failedVerdict(oracle, evidence, `Missing IDs (${missingByParticipant.join('; ')})`)
     }
   }
+}
+
+interface CanonicalObservedEvent {
+  readonly fact: string
+  readonly position: string
+  readonly description: string
+}
+
+interface ObservedConfirmedPrefix {
+  readonly events: ReadonlyArray<CanonicalObservedEvent>
+  readonly recordIndex: number
+}
+
+/** Checks retained complete observations without claiming continuous visibility between samples. */
+const evaluateConfirmedEventlogPrefixOracle = (
+  oracle: ConfirmedEventlogPrefixOracle,
+  trace: ReadonlyArray<ScenarioTraceRecord>,
+): OracleVerdict => {
+  const selectedComponents = new Map<string, string>([[backendComponentKey, 'backend']])
+  for (const participant of oracle.participants) {
+    selectedComponents.set(leaderComponentKey(participant.clientId), `Client ${participant.clientId} Leader`)
+    selectedComponents.set(
+      sessionComponentKey(participant.clientId, participant.sessionId),
+      participantKey(participant),
+    )
+  }
+
+  const previousByComponent = new Map<string, ObservedConfirmedPrefix>()
+  const observationCountByComponent = new Map<string, number>()
+  const evidence: number[] = []
+  let comparisonCount = 0
+  let repeatedEncodingCount = 0
+
+  for (const record of trace) {
+    if (record.captureId === null) continue
+    const observation = observedComponentEventlog(record)
+    if (observation === undefined || selectedComponents.has(observation.key) === false) continue
+
+    const canonical = canonicalConfirmedEvents(observation.events)
+    if (canonical._tag === 'conflict') {
+      return failedVerdict(
+        oracle,
+        [...evidence, record.index],
+        `${selectedComponents.get(observation.key)} has conflicting confirmed Event facts at global position ${canonical.position} in observation #${record.index + 1}`,
+      )
+    }
+    const confirmed = canonical.events
+    repeatedEncodingCount += canonical.repeatedEncodingCount
+    evidence.push(record.index)
+    observationCountByComponent.set(observation.key, (observationCountByComponent.get(observation.key) ?? 0) + 1)
+    const previous = previousByComponent.get(observation.key)
+    if (previous !== undefined) {
+      comparisonCount += 1
+      const mismatch = firstEventlogPrefixMismatch(previous.events, confirmed)
+      if (mismatch !== undefined) {
+        return failedVerdict(
+          oracle,
+          [previous.recordIndex, record.index],
+          `${selectedComponents.get(observation.key)} did not preserve its confirmed Eventlog prefix at position ${mismatch.position}: previous ${mismatch.expected}, observed ${mismatch.observed}`,
+        )
+      }
+    }
+    previousByComponent.set(observation.key, { events: confirmed, recordIndex: record.index })
+  }
+
+  const insufficient = [...selectedComponents].flatMap(([key, label]) => {
+    const count = observationCountByComponent.get(key) ?? 0
+    return count < 2 ? [`${label} (${count})`] : []
+  })
+  if (insufficient.length > 0) {
+    return failedVerdict(
+      oracle,
+      evidence,
+      `Confirmed Eventlog prefix has insufficient evidence; expected at least two complete observations for: ${insufficient.join(', ')}`,
+    )
+  }
+
+  return passedVerdict(
+    oracle,
+    evidence,
+    `${comparisonCount} retained confirmed Eventlog transitions preserved their prefixes across ${selectedComponents.size} components${repeatedEncodingCount === 0 ? '' : `; coalesced ${repeatedEncodingCount} repeated same-position encodings`}`,
+  )
 }
 
 type EventlogConvergenceOracle = Extract<ScenarioOracle, { readonly _tag: 'eventlog-convergence' }>
@@ -1881,6 +1974,34 @@ const observationsAreSettled = (observations: ReadonlyArray<SyncObservation>): b
 
 const globalPosition = (head: string): number => EventSequenceNumber.Client.fromString(head).global
 
+const observedComponentEventlog = (
+  record: ScenarioTraceRecord,
+): { readonly key: string; readonly events: ReadonlyArray<ObservedEvent> } | undefined => {
+  switch (record.payload._tag) {
+    case 'backend.observed':
+      return {
+        key: backendComponentKey,
+        events: record.payload.observation.events,
+      }
+    case 'leader.sync.observed':
+      return record.clientId === null
+        ? undefined
+        : {
+            key: leaderComponentKey(record.clientId),
+            events: record.payload.observation.events,
+          }
+    case 'session.sync.observed':
+      return record.clientId === null || record.sessionId === null
+        ? undefined
+        : {
+            key: sessionComponentKey(record.clientId, record.sessionId),
+            events: record.payload.observation.events,
+          }
+    default:
+      return undefined
+  }
+}
+
 /** Selects one non-atomic capture only when it contains every fact the oracle compares. */
 const latestCompleteEventlogCapture = (
   trace: ReadonlyArray<ScenarioTraceRecord>,
@@ -1951,6 +2072,65 @@ const firstEventlogMismatch = (
     }
   }
   return undefined
+}
+
+const firstEventlogPrefixMismatch = (
+  previousEvents: ReadonlyArray<CanonicalObservedEvent>,
+  observedEvents: ReadonlyArray<CanonicalObservedEvent>,
+):
+  | {
+      readonly position: string
+      readonly expected: string
+      readonly observed: string
+    }
+  | undefined => {
+  for (let index = 0; index < previousEvents.length; index += 1) {
+    const expected = previousEvents[index]!
+    const observed = observedEvents[index]
+    if (observed === undefined || expected.fact !== observed.fact) {
+      return {
+        position: expected.position,
+        expected: expected.description,
+        observed: observed?.description ?? 'no Event',
+      }
+    }
+  }
+  return undefined
+}
+
+const canonicalObservedEvent = (event: ObservedEvent): CanonicalObservedEvent => ({
+  fact: eventFact(event),
+  position: event.position,
+  description: describeEventFact(event),
+})
+
+/** A concurrent paged pull may repeat one encoding; a global position cannot name two different Event facts. */
+const canonicalConfirmedEvents = (
+  observedEvents: ReadonlyArray<ObservedEvent>,
+):
+  | {
+      readonly _tag: 'events'
+      readonly events: ReadonlyArray<CanonicalObservedEvent>
+      readonly repeatedEncodingCount: number
+    }
+  | { readonly _tag: 'conflict'; readonly position: number } => {
+  const events: CanonicalObservedEvent[] = []
+  const factByPosition = new Map<number, string>()
+  let repeatedEncodingCount = 0
+  for (const event of observedEvents) {
+    if (event.disposition !== 'confirmed') continue
+    const canonical = canonicalObservedEvent(event)
+    const position = globalPosition(event.position)
+    const previous = factByPosition.get(position)
+    if (previous === canonical.fact) {
+      repeatedEncodingCount += 1
+      continue
+    }
+    if (previous !== undefined) return { _tag: 'conflict', position }
+    factByPosition.set(position, canonical.fact)
+    events.push(canonical)
+  }
+  return { _tag: 'events', events, repeatedEncodingCount }
 }
 
 /** Eventlog equality uses portable Event facts; inferred eventRef correlation is non-authoritative. */

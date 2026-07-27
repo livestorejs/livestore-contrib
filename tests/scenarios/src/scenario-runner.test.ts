@@ -21,8 +21,15 @@ import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { seededTodoWorkload } from './corpus/seeded-todo-workload.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
 import { todoApplication } from './fixtures/todo-application.ts'
-import { inProcessHostCapabilities, makeInProcessHost } from './host.ts'
-import { defineScenario, deriveScenarioTopology, ScenarioRunArtifact, type ScenarioTraceRecord } from './model.ts'
+import { inProcessHostCapabilities, makeInProcessHost, type ParticipantHost } from './host.ts'
+import {
+  defineScenario,
+  deriveScenarioTopology,
+  type HostSystemObservation,
+  type ObservedEvent,
+  ScenarioRunArtifact,
+  type ScenarioTraceRecord,
+} from './model.ts'
 import { processHostCapabilities } from './process/process-host.ts'
 import {
   deriveAdaptiveTimeLayout,
@@ -273,6 +280,38 @@ Vitest.describe('scenario model', () => {
     })
 
     expect(scenario.phases.flatMap((phase) => phase.steps).every((step) => step._tag !== 'settle')).toBe(true)
+  })
+
+  Vitest.it('allows a confirmed Eventlog prefix oracle without Settlement', () => {
+    const scenario = defineScenario({
+      ...offlineWriterRecovery,
+      id: 'prefix-history-without-settlement',
+      phases: offlineWriterRecovery.phases.map((phase) => ({
+        ...phase,
+        steps: phase.steps.filter((step) => step._tag !== 'settle'),
+      })),
+      oracles: offlineWriterRecovery.oracles.filter((oracle) => oracle._tag === 'confirmed-eventlog-prefix'),
+    })
+
+    expect(scenario.phases.flatMap((phase) => phase.steps).every((step) => step._tag !== 'settle')).toBe(true)
+  })
+
+  Vitest.it('requires a non-empty, unique participant selection for confirmed Eventlog prefix evidence', () => {
+    const prefixOracle = offlineWriterRecovery.oracles.find((oracle) => oracle._tag === 'confirmed-eventlog-prefix')!
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'empty-prefix-selection',
+        oracles: [{ ...prefixOracle, participants: [] }],
+      }),
+    ).toThrow('must select at least one participant')
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'duplicate-prefix-selection',
+        oracles: [{ ...prefixOracle, participants: [prefixOracle.participants[0]!, prefixOracle.participants[0]!] }],
+      }),
+    ).toThrow('selects participant more than once')
   })
 
   Vitest.it('expands the shared workday into exactly 100 mixed application actions', () => {
@@ -1064,6 +1103,96 @@ Vitest.describe('in-process host conformance', () => {
  * R16, and R18.
  */
 Vitest.describe('offline writer recovery', () => {
+  for (const mutation of ['conflict', 'delete', 'rewrite', 'reorder'] as const) {
+    Vitest.live(`rejects a transient confirmed Eventlog ${mutation} repaired before terminal capture`, (test) =>
+      Effect.gen(function* () {
+        const backend = yield* makeMockScenarioBackend
+        const host = yield* makeInProcessHost({ application: todoApplication, backend })
+        const artifact = yield* runScenario({
+          scenario: offlineWriterRecovery,
+          applicationId: todoApplication.id,
+          host: withTransientSessionEventlogMutation(host, mutation),
+          options: { runId: `transient-prefix-${mutation}-test`, sourceRevision: 'test' },
+        })
+        const prefixVerdict = artifact.verdicts.find(
+          (candidate) => candidate.oracleId === 'confirmed-eventlogs-append-only',
+        )
+
+        expect(artifact.status).toBe('failed')
+        expect(prefixVerdict).toEqual(expect.objectContaining({ status: 'failed' }))
+        expect(prefixVerdict?.evidence.length).toBeGreaterThan(0)
+        if (mutation === 'rewrite' || mutation === 'reorder') expect(prefixVerdict?.evidence).toHaveLength(2)
+        expect(artifact.verdicts.find((candidate) => candidate.oracleId === 'eventlogs-converged')?.status).toBe(
+          'passed',
+        )
+      }).pipe(Vitest.withTestCtx(test)),
+    )
+  }
+
+  Vitest.live('coalesces one repeated encoding of the same confirmed global Event fact', (test) =>
+    Effect.gen(function* () {
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      const artifact = yield* runScenario({
+        scenario: offlineWriterRecovery,
+        applicationId: todoApplication.id,
+        host: withTransientSessionEventlogMutation(host, 'duplicate'),
+        options: { runId: 'repeated-prefix-encoding-test', sourceRevision: 'test' },
+      })
+      const prefixVerdict = artifact.verdicts.find(
+        (candidate) => candidate.oracleId === 'confirmed-eventlogs-append-only',
+      )
+
+      expect(artifact.status).toBe('passed')
+      expect(prefixVerdict).toEqual(
+        expect.objectContaining({
+          status: 'passed',
+          summary: expect.stringContaining('coalesced 1 repeated same-position encodings'),
+        }),
+      )
+    }).pipe(Vitest.withTestCtx(test)),
+  )
+
+  Vitest.live('fails rather than passing a component with only one retained observation', (test) =>
+    Effect.gen(function* () {
+      const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
+      const scenario = defineScenario({
+        version: 1,
+        id: 'insufficient-prefix-evidence',
+        description: 'Creates a participant but retains no later component observation.',
+        tags: ['safety'],
+        seed: 1,
+        applicationId: todoApplication.id,
+        requires: [],
+        topology: {
+          storeId: 'insufficient-prefix-evidence',
+          clients: [{ id: participant.clientId, sessions: [participant.sessionId], initiallyConnected: true }],
+        },
+        phases: [],
+        oracles: [
+          { _tag: 'confirmed-eventlog-prefix', id: 'confirmed-eventlogs-append-only', participants: [participant] },
+        ],
+      })
+      const backend = yield* makeMockScenarioBackend
+      const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      const artifact = yield* runScenario({
+        scenario,
+        applicationId: todoApplication.id,
+        host,
+        options: { runId: 'insufficient-prefix-evidence-test', sourceRevision: 'test' },
+      })
+      const verdict = artifact.verdicts[0]
+
+      expect(artifact.status).toBe('failed')
+      expect(verdict).toEqual(
+        expect.objectContaining({
+          status: 'failed',
+          summary: expect.stringContaining('expected at least two complete observations'),
+        }),
+      )
+    }).pipe(Vitest.withTestCtx(test)),
+  )
+
   Vitest.live('rejects equal settled heads when a participant Eventlog diverges from the backend', (test) =>
     Effect.gen(function* () {
       const backend = yield* makeMockScenarioBackend
@@ -1128,8 +1257,15 @@ Vitest.describe('offline writer recovery', () => {
         expect(artifact.status).toBe('passed')
         expect(artifact.artifactVersion).toBe(4)
         expect(artifact.descriptor.traceVersion).toBe(3)
-        expect(artifact.verdicts).toHaveLength(5)
+        expect(artifact.verdicts).toHaveLength(6)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
+        expect(artifact.verdicts).toContainEqual(
+          expect.objectContaining({
+            oracleId: 'confirmed-eventlogs-append-only',
+            status: 'passed',
+            summary: expect.stringContaining('retained confirmed Eventlog transitions'),
+          }),
+        )
         expectOfflineEventCorrelationLifecycle(artifact)
         expect(artifact.snapshots).toHaveLength(2)
         expect(artifact.trace.map((record) => record.payload._tag)).toEqual(
@@ -1545,6 +1681,27 @@ Vitest.describe('browser profile', () => {
         )
         expect(initialLeaderStopped?.index).toBeLessThan(successorWrite?.index ?? -1)
         expect(successorWrite?.index).toBeLessThan(initialLeaderRestarted?.index ?? -1)
+        const prefixVerdict = artifact.verdicts.find(
+          (verdict) => verdict.oracleId === 'confirmed-eventlogs-append-only',
+        )
+        const beforeStopObservation = artifact.trace.find(
+          (record) =>
+            record.index < (initialLeaderStopped?.index ?? -1) &&
+            record.clientId === 'client-a' &&
+            record.sessionId === 'session-a1' &&
+            record.payload._tag === 'session.sync.observed',
+        )
+        const afterRestartObservation = artifact.trace.find(
+          (record) =>
+            record.index > (initialLeaderRestarted?.index ?? Number.POSITIVE_INFINITY) &&
+            record.clientId === 'client-a' &&
+            record.sessionId === 'session-a1' &&
+            record.payload._tag === 'session.sync.observed',
+        )
+        expect(prefixVerdict).toEqual(expect.objectContaining({ status: 'passed' }))
+        expect(prefixVerdict?.evidence).toEqual(
+          expect.arrayContaining([beforeStopObservation?.index, afterRestartObservation?.index]),
+        )
         expect(artifact.trace.map((record) => record.payload._tag)).toEqual(
           expect.arrayContaining([
             'lifecycle.session-stopped',
@@ -1558,6 +1715,80 @@ Vitest.describe('browser profile', () => {
     180_000,
   )
 })
+
+type TransientPrefixMutation = 'conflict' | 'delete' | 'duplicate' | 'rewrite' | 'reorder'
+
+/** Produces one bad retained sample, then resumes the host's unmodified complete observations. */
+const withTransientSessionEventlogMutation = (
+  host: ParticipantHost,
+  mutation: TransientPrefixMutation,
+): ParticipantHost => {
+  let eligibleObservations = 0
+  let injected = false
+  return {
+    ...host,
+    observeSystem: host.observeSystem.pipe(
+      Effect.map((observation) => {
+        if (injected === true) return observation
+        const target = observation.clients
+          .find((client) => client.clientId === 'client-b')
+          ?.sessions.find((session) => session.sessionId === 'session-b')
+        const confirmedCount = target?.sync.events.filter((event) => event.disposition === 'confirmed').length ?? 0
+        const requiredCount = mutation === 'reorder' ? 2 : 1
+        if (confirmedCount < requiredCount) return observation
+        eligibleObservations += 1
+        if (eligibleObservations < 2) return observation
+        injected = true
+        return mutateSessionObservation(observation, mutation)
+      }),
+    ),
+  }
+}
+
+const mutateSessionObservation = (
+  observation: HostSystemObservation,
+  mutation: TransientPrefixMutation,
+): HostSystemObservation => ({
+  ...observation,
+  clients: observation.clients.map((client) =>
+    client.clientId !== 'client-b'
+      ? client
+      : {
+          ...client,
+          sessions: client.sessions.map((session) =>
+            session.sessionId !== 'session-b'
+              ? session
+              : {
+                  ...session,
+                  sync: {
+                    ...session.sync,
+                    events: mutateConfirmedEvents(session.sync.events, mutation),
+                  },
+                },
+          ),
+        },
+  ),
+})
+
+const mutateConfirmedEvents = (
+  events: ReadonlyArray<ObservedEvent>,
+  mutation: TransientPrefixMutation,
+): ReadonlyArray<ObservedEvent> => {
+  const confirmedIndexes = events.flatMap((event, index) => (event.disposition === 'confirmed' ? [index] : []))
+  const first = confirmedIndexes[0]!
+  if (mutation === 'conflict') {
+    return events.toSpliced(first, 0, { ...events[first]!, name: `${events[first]!.name}.conflicting` })
+  }
+  if (mutation === 'delete') return events.filter((_event, index) => index !== first)
+  if (mutation === 'duplicate') return events.toSpliced(first, 0, events[first]!)
+  if (mutation === 'rewrite') {
+    return events.map((event, index) => (index === first ? { ...event, name: `${event.name}.rewritten` } : event))
+  }
+  const second = confirmedIndexes[1]!
+  const reordered = [...events]
+  ;[reordered[first], reordered[second]] = [reordered[second]!, reordered[first]!]
+  return reordered
+}
 
 /** Ensures sampled correlation remains useful for one unambiguous pending-to-confirmed Event. */
 const expectOfflineEventCorrelationLifecycle = (artifact: ScenarioRunArtifact): void => {

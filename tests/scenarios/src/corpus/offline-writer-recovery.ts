@@ -78,6 +78,11 @@ export const offlineWriterRecovery = defineScenario({
     { _tag: 'pending-resolution', id: 'pending-resolved', participants: [clientA, clientB] },
     { _tag: 'eventlog-convergence', id: 'eventlogs-converged', participants: [clientA, clientB] },
     {
+      _tag: 'confirmed-eventlog-prefix',
+      id: 'confirmed-eventlogs-append-only',
+      participants: [clientA, clientB],
+    },
+    {
       _tag: 'state-convergence',
       id: 'todo-state-converged',
       participants: [clientA, clientB],

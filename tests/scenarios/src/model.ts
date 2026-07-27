@@ -175,6 +175,12 @@ export const EventlogConvergenceOracle = Schema.TaggedStruct('eventlog-convergen
   participants: Schema.Array(ParticipantRef),
 })
 
+export const ConfirmedEventlogPrefixOracle = Schema.TaggedStruct('confirmed-eventlog-prefix', {
+  id: Schema.String,
+  participants: Schema.Array(ParticipantRef),
+})
+export type ConfirmedEventlogPrefixOracle = typeof ConfirmedEventlogPrefixOracle.Type
+
 export const StateConvergenceOracle = Schema.TaggedStruct('state-convergence', {
   id: Schema.String,
   participants: Schema.Array(ParticipantRef),
@@ -199,6 +205,7 @@ export type OperationHistoryOracle = typeof OperationHistoryOracle.Type
 export const ScenarioOracle = Schema.Union([
   PendingResolutionOracle,
   EventlogConvergenceOracle,
+  ConfirmedEventlogPrefixOracle,
   StateConvergenceOracle,
   StateContainsIdsOracle,
   OperationHistoryOracle,
@@ -733,6 +740,23 @@ export const defineScenario = (input: unknown): ScenarioAst => {
         if (operationIds.has(operationId) === false) {
           throw new ScenarioValidationError(`Unknown operation reference: ${operationId}`)
         }
+      }
+    } else if (oracle._tag === 'confirmed-eventlog-prefix') {
+      if (oracle.participants.length === 0) {
+        throw new ScenarioValidationError(
+          `Confirmed-eventlog-prefix oracle must select at least one participant: ${oracle.id}`,
+        )
+      }
+      const selectedParticipants = new Set<string>()
+      for (const participant of oracle.participants) {
+        assertParticipant(participant)
+        const key = participantKey(participant)
+        if (selectedParticipants.has(key) === true) {
+          throw new ScenarioValidationError(
+            `Confirmed-eventlog-prefix oracle selects participant more than once: ${key}`,
+          )
+        }
+        selectedParticipants.add(key)
       }
     } else {
       for (const participant of oracle.participants) {
