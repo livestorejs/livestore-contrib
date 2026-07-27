@@ -239,7 +239,7 @@ export const TraceInspector = ({
   readonly onSectionToggle: (section: 'traceMetadataOpen' | 'rawJsonOpen', open: boolean) => void
   readonly onJsonToggle: (record: ScenarioTraceRecord, path: string, open: boolean) => void
 }) => {
-  const records = recordIndexes.flatMap((index) => (trace[index] === undefined ? [] : [trace[index]!]))
+  const records = recordIndexes.flatMap((index) => (trace[index] === undefined ? [] : [trace[index]]))
   const selectedRecord = trace[selectedRecordIndex] ?? records.at(-1)
   if (selectedRecord === undefined) return <div className="trace-inspector-empty">No trace record selected.</div>
   const momentTitle =
