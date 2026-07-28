@@ -1,8 +1,8 @@
 # LiveStore Contrib — Intent Layer
 
-*For: contributors to livestore-contrib · Assumes: familiarity with
+_For: contributors to livestore-contrib · Assumes: familiarity with
 [LiveStore's intent layer](https://github.com/livestorejs/livestore/tree/main/context)
-· Covers: how this repo's realization intent relates to the core contracts*
+· Covers: how this repo's realization intent relates to the core contracts_
 
 This repository hosts realization intent for contrib-owned packages. The
 product intent layer — vision, requirements, subsystem contracts, ontology —

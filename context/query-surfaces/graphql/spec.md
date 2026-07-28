@@ -35,7 +35,7 @@ holds two thunks in the store's reactivity graph
 - **`variableValues$`** (`makeThunk` at `:155`, stored `:163`) — created only
   when `genVariableValues` is a function (`:154-163`); static variables are passed
   through without a thunk (`:164-166`, with a `// TODO don't even create a thunk
-  if variables are static` at `:149`).
+if variables are static` at `:149`).
 - **`results$`** (`:169`) — the result thunk. It resolves the current variables
   (`:172-175`), runs the query once (`:176-183`), registers table dependencies
   (`:186-190`), records debug info including the printed document and duration

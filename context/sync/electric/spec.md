@@ -39,7 +39,7 @@ and no `ServerAheadError`: the ordering authority is the Postgres eventlog
 table, whose `seqNum` is the PRIMARY KEY (`src/make-electric-url.ts:123`), so
 concurrent writers are linearized at the DB. A rejected push (`success: false`
 or non-2xx) is mapped to `UnknownError` (`src/index.ts:374`, `:377`) — the
-core defect family, which is *surfaced, not rebased*. This does **not** realize
+core defect family, which is _surfaced, not rebased_. This does **not** realize
 the rebase-and-retry recovery the core taxonomy assigns to push rejection
 (LSC.SYNC.ELECTRIC-R02, [.delta/DELTA-001](./.delta/DELTA-001-no-rebase-signal.md)).
 The batch is POSTed whole — no per-message event cap or payload chunking, unlike

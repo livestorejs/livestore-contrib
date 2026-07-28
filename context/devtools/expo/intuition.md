@@ -1,14 +1,14 @@
 # Expo Devtools — Intuition
 
-*For: contributors to `devtools-expo` · Assumes: the core devtools mental model
+_For: contributors to `devtools-expo` · Assumes: the core devtools mental model
 (surfaces as protocol peers over webmesh) · Covers: why the Expo surface is glue,
-not an implementation*
+not an implementation_
 
 The mental unlock is that `devtools-expo` implements almost nothing. The devtools
 protocol, the server that speaks it, and the UI that renders it already exist —
 the Node adapter's devtools server and the shared devtools UI. What was missing
-for Expo was not a new devtools; it was a way to *stand up the existing one next
-to a Metro dev server and hand a developer a door into it*. That is all this
+for Expo was not a new devtools; it was a way to _stand up the existing one next
+to a Metro dev server and hand a developer a door into it_. That is all this
 package is: a Metro config patch, an env var, an HTTP redirect, and a plugin menu
 entry.
 
@@ -27,7 +27,7 @@ lives entirely inside one browser: it bridges the page and the extension with
 `window.postMessage` and never leaves the process. Expo can't do that — the app
 is a separate JS runtime on another device, and there is no browser to host an
 extension. So the topology inverts: instead of bridging within a process, you
-run a server *outside* the app and have the app dial out to it over a hop-routed
+run a server _outside_ the app and have the app dial out to it over a hop-routed
 webmesh `proxy` channel (mode `proxy` vs. the extension's `direct`). That
 out-of-process reach is exactly why the surface is split across two packages —
 this one advertises and hosts the endpoint, `adapter-expo` opens the client

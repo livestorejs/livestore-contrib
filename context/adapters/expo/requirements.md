@@ -47,13 +47,13 @@ LS.SYS.VER.CONF-R03).
   `ClientSessionLeaderThreadProxy` surface; because the leader runs in-process
   every method holds a direct reference to the `syncProcessor` / state db /
   eventlog db — no serialization boundary and no RPC. `refines: LS.SYS.RT-R02,
-  LS.SYS.RT-R05`
+LS.SYS.RT-R05`
 - **LSC.ADAPT.EXPO-R05 Boot progress and migration report:** The adapter offers
   `{ stage: 'loading' }` to the session boot-status queue on start, forwards the
   leader-thread boot-status stream into it, and surfaces the leader's migrations
   report on the proxy's initial state. `refines: LS.SYS.RT-R03, LS.SYS.RT-R11`
 - **LSC.ADAPT.EXPO-R06 Outbound devtools connection:** When devtools are enabled
-  the adapter connects *outward* over a Webmesh WebSocket to an external devtools
+  the adapter connects _outward_ over a Webmesh WebSocket to an external devtools
   server (URL resolved from the React Native dev server, or
   `EXPO_PUBLIC_LIVESTORE_DEVTOOLS_URL`); it does not host a server as Node does.
   The devtools protocol and surfaces are owned by core `07-devtools/`.

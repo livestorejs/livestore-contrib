@@ -26,7 +26,7 @@ LIVESTORE_CORE_CONTEXT_DIR=/path/to/livestore/context bun tests/intent-layer/che
 
 `src/checks.ts` (`runChecks`) returns check-name → violations for: LSC ID
 uniqueness, namespace↔directory mapping (parsed from the `context/spec.md` ID
-Scheme table), `refines:` resolution (LSC.* locally, LS.* cross-repo, guarded),
+Scheme table), `refines:` resolution (LSC._ locally, LS._ cross-repo, guarded),
 relative-link integrity, spec `Status` headers, empty companion dirs,
 decision-record shape, and the maturity vocabulary.
 

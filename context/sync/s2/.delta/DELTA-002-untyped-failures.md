@@ -15,8 +15,8 @@ offline (core LS.SYS.SYNC-R03). This provider realizes only the offline half.
   (`src/sync-provider.ts:159-161`, `:264-288`). The core `IsOfflineError`,
   `ServerAheadError`, and the `RejectedPushError` family are never produced.
 
-Where DELTA-001 concerns the *mechanism* (no fast-forward arbitration), this
-delta concerns the *shape of what surfaces*: even a backend that did reject or
+Where DELTA-001 concerns the _mechanism_ (no fast-forward arbitration), this
+delta concerns the _shape of what surfaces_: even a backend that did reject or
 signal "you're behind" would reach the engine as an opaque `UnknownError` — a
 defect the recovery loop is told not to retry — rather than an expected sync
 condition. The two deltas overlap on the missing `ServerAheadError` path but are
