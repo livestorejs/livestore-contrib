@@ -16,10 +16,11 @@ to support multiple sessions eventually. Today, concurrent sessions on one
 (`src/client-session/adapter.ts:53`); the only cross-instance coordination is a
 shutdown `BroadcastChannel` (`src/shutdown-channel.ts:9`).
 
-Single-leader (core LS.SYS.RT-R01) *is* satisfied — by construction, since there
+Single-leader (core LS.SYS.RT-R01) _is_ satisfied — by construction, since there
 is only ever one session.
 
 Close condition: either multi-session leadership is implemented on Node (handover
-+ real lock status), or the core contract is refined to make handover
-optional for single-context adapters and LSC.ADAPT.NODE-R03 is restated as a
-conformant realization of that optional contract.
+
+- real lock status), or the core contract is refined to make handover
+  optional for single-context adapters and LSC.ADAPT.NODE-R03 is restated as a
+  conformant realization of that optional contract.

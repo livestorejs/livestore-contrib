@@ -121,7 +121,7 @@ leader is in-process, the `ClientSessionLeaderThreadProxy`
 ## Devtools
 
 Enabled only when `devtoolsEnabled` is true (`src/index.ts:164`, `:195`,
-`:414`). Unlike Node, Expo hosts **no** devtools server; it connects *outward*
+`:414`). Unlike Node, Expo hosts **no** devtools server; it connects _outward_
 over a Webmesh WebSocket to an external server. The target URL is resolved by
 `getDevtoolsUrl` (`src/index.ts:460`): it reads
 `EXPO_PUBLIC_LIVESTORE_DEVTOOLS_URL` (default `ws://0.0.0.0:4242`) for the port

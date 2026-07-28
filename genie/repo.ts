@@ -8,6 +8,8 @@
  * `../../../genie/repo.ts`.
  */
 
+/** Core consumes this step but does not re-export it, so source it from effect-utils directly. */
+import { prepareCiScriptsStep } from '../repos/effect-utils/genie/ci-workflow.ts'
 import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import {
   applyMegarepoLockStep,
@@ -87,6 +89,12 @@ export const refs = {
 } as const
 
 export const livestoreContribSetupStepsAfterCheckout = [
+  /**
+   * Must precede any retry-wrapped command: the helpers are copied out of the
+   * checkout into `runner.temp`, so a later alternate checkout cannot replace
+   * them mid-job. Genie enforces the ordering.
+   */
+  prepareCiScriptsStep,
   installNixStep({
     extraConf:
       'extra-substituters = https://cache.nixos.org\nextra-trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=',

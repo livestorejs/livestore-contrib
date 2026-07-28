@@ -1,12 +1,12 @@
 # CLI — Intuition
 
-*For: contributors to `@livestore/cli` · Assumes: the core store/sync/adapter
+_For: contributors to `@livestore/cli` · Assumes: the core store/sync/adapter
 mental model · Covers: why the CLI is a standalone tool, not a dimension
-realization, and how its three commands relate*
+realization, and how its three commands relate_
 
 Every other contrib package plugs into a hole the core left open — an adapter, a
 sync provider, a devtools surface. The CLI plugs into none of them. It is a
-*consumer* that stands beside the library and reaches into it from the outside:
+_consumer_ that stands beside the library and reaches into it from the outside:
 it scaffolds projects that use LiveStore, moves a store's events across a sync
 backend, and hands LiveStore to an AI agent. That is why it lives at the top
 level of the contrib tree and refines no core requirement — reading it as "the
@@ -16,7 +16,7 @@ The three commands answer three different developer moments. **`create`** is the
 "day zero" tool: it has nothing to do with the runtime — it just pulls an example
 straight out of the public monorepo at a git ref and drops it on disk, so it is
 really a thin, package-manager-aware GitHub fetcher. **`sync`** is the operational
-tool: export/import talk to a sync backend *directly*, without ever booting a
+tool: export/import talk to a sync backend _directly_, without ever booting a
 store, which is why they need only the backend half of your config module and why
 import insists the backend be empty — they move an eventlog wholesale, they do
 not reconcile one. **`mcp`** is the agent tool: a stdio MCP server that is partly

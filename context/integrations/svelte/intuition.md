@@ -1,18 +1,18 @@
 # Svelte Integration — Intuition
 
-*For: contributors to `@livestore/svelte` · Assumes: the core integration mental
+_For: contributors to `@livestore/svelte` · Assumes: the core integration mental
 model (thin bindings over the Store) and Svelte 5 runes · Covers: why Svelte is
-one enhanced store instead of a set of hooks*
+one enhanced store instead of a set of hooks_
 
 React has to build its own reactivity to meet the contract: a hook per primitive
 (`useStore`, `useQuery`, …), a context-scoped registry to resolve stores, and
 reference-counting to survive StrictMode double-invoke and Fast Refresh. Svelte 5
-already *has* a reactive graph — `$effect` tracks its own dependencies and tears
+already _has_ a reactive graph — `$effect` tracks its own dependencies and tears
 itself down — so the Svelte binding does almost nothing. It boots the store and
 then makes one change: it swaps `store.query` for a version that, when you call
 it inside a reactive scope, registers a hidden reactive token and subscribes for
 you. The store itself becomes the reactive surface; there is no `useQuery`
-because `store.query` *is* the query hook.
+because `store.query` _is_ the query hook.
 
 The two structural deviations from React both fall out of "lean on Svelte":
 
@@ -30,7 +30,7 @@ The two structural deviations from React both fall out of "lean on Svelte":
 The trap to avoid: because `store.query` looks like it "just works", it is easy
 to assume every query type is reactive. It is not — reactivity is wired only for
 `def`-tagged query definitions today (`// TODO support other query types`). A
-signal-def or a live-query *instance* used inside `$effect` will render once with
+signal-def or a live-query _instance_ used inside `$effect` will render once with
 the correct value and then never update. That is the def-only bound (see
 LSC.INT.SVELTE-R02 and LSC.INT.SVELTE-DQ1), and it exists because the binding
 skips the shared `framework-toolkit` normalization that React relies on.
