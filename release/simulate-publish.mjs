@@ -107,6 +107,35 @@ const plan = {
   packages: [],
 }
 
+const DEFAULT_RELEASE_BUILD = {
+  command: ['pnpm', 'exec', 'tsc', '--build', 'tsconfig.json', '--noCheck'],
+  outputs: ['dist'],
+}
+
+// Only pnpm may be invoked: the build runs with the repo's toolchain on PATH, so an
+// arbitrary binary here would be an unreviewed execution surface in the release path.
+const ALLOWED_BUILD_BINARIES = new Set(['pnpm'])
+
+/**
+ * Resolve a package's release build. Absence means "the tsc default" so existing
+ * packages need no change, but a malformed spec is an error rather than a silent
+ * fallback — a package that declares a build must get the build it declared.
+ */
+const releaseBuildFor = ({ name, manifest }) => {
+  const spec = manifest.$genie?.releaseBuild
+  if (spec === undefined) return DEFAULT_RELEASE_BUILD
+  if (Array.isArray(spec.command) === false || Array.isArray(spec.outputs) === false) {
+    addError(`${name} $genie.releaseBuild must be { command: string[], outputs: string[] }`)
+    return DEFAULT_RELEASE_BUILD
+  }
+  if (spec.command.length > 0 && ALLOWED_BUILD_BINARIES.has(spec.command[0]) === false) {
+    addError(
+      `${name} $genie.releaseBuild.command must start with one of: ${[...ALLOWED_BUILD_BINARIES].join(', ')}`,
+    )
+  }
+  return spec
+}
+
 for (const { path, manifest } of publishablePackages) {
   if (typeof manifest.name !== 'string' || manifest.name.length === 0) {
     addError(`${path} must have a package name`)
@@ -150,11 +179,25 @@ for (const { path, manifest } of publishablePackages) {
     }
   }
 
+  const releaseBuild = releaseBuildFor({ name: manifest.name, manifest })
+
+  // Static honesty check: whatever the build emits must actually be shipped.
+  // Runs on the no-build `release:surface:check` path too, so a package that builds
+  // into a directory it does not publish fails at PR time rather than at publish.
+  const shippedPaths = simulatedManifest.publishConfig?.files ?? simulatedManifest.files ?? []
+  for (const output of releaseBuild.outputs ?? []) {
+    const root = output.split('/')[0]
+    if (shippedPaths.includes(root) === false) {
+      addError(`${manifest.name} $genie.releaseBuild emits "${output}" but "${root}" is not in files`)
+    }
+  }
+
   plan.packages.push({
     name: manifest.name,
     path,
     version: simulatedManifest.version,
     rewrites,
+    releaseBuild,
     manifest: simulatedManifest,
   })
 }
@@ -230,8 +273,23 @@ const packPackage = (pkg) => {
 
 const buildPackages = () => {
   for (const pkg of plan.packages) {
+    const build = pkg.releaseBuild ?? DEFAULT_RELEASE_BUILD
+    if (build.command.length === 0) {
+      console.log(`- ${pkg.name}: no release build declared, skipping`)
+      continue
+    }
+
     const packageDir = dirname(join(rootDir, pkg.path))
-    run('pnpm', ['--dir', packageDir, 'exec', 'tsc', '--build', 'tsconfig.json', '--noCheck'])
+    const [binary, ...rest] = build.command
+    run(binary, ['--dir', packageDir, ...rest])
+
+    // Post-condition: without this a build that writes to the wrong directory
+    // produces an empty tarball and the failure surfaces at install time.
+    for (const output of build.outputs) {
+      if (existsSync(join(packageDir, output)) === false) {
+        throw new Error(`${pkg.name} release build did not produce "${output}"`)
+      }
+    }
   }
 }
 
