@@ -1,3 +1,20 @@
+import {
+  type BackendObservation,
+  type ComponentSyncObservation,
+  deriveScenarioTopology,
+  type ObservedEvent,
+  type ScenarioAst,
+  type ScenarioTracePayload,
+  type ScenarioTraceRecord,
+} from '../model.ts'
+import type {
+  ObservedSystemState,
+  PlaybackMomentKind,
+  ProjectedClient,
+  ProjectedSession,
+  ScenarioOperationHistoryFamily,
+} from './types.ts'
+
 export const backendComponentKey = 'backend'
 export const leaderComponentKey = (clientId: string): string => `leader:${clientId}`
 export const sessionComponentKey = (clientId: string, sessionId: string): string => `session:${clientId}/${sessionId}`
@@ -494,19 +511,3 @@ export const operationFamily = (payload: ScenarioTracePayload): ScenarioOperatio
       return undefined
   }
 }
-import {
-  type BackendObservation,
-  type ComponentSyncObservation,
-  deriveScenarioTopology,
-  type ObservedEvent,
-  type ScenarioAst,
-  type ScenarioTracePayload,
-  type ScenarioTraceRecord,
-} from '../model.ts'
-import type {
-  ObservedSystemState,
-  PlaybackMomentKind,
-  ProjectedClient,
-  ProjectedSession,
-  ScenarioOperationHistoryFamily,
-} from './types.ts'

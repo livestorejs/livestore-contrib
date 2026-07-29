@@ -1,3 +1,20 @@
+import { Schema } from '@livestore/utils/effect'
+
+import { HostCapabilities } from './host-protocol.ts'
+import {
+  BackendObservation,
+  ComponentSyncObservation,
+  SyncObservation,
+  SyncObservationPayload,
+} from './observations.ts'
+import {
+  ExecutionConfiguration,
+  ParticipantRef,
+  ScenarioAst,
+  scenarioArtifactVersion,
+  scenarioTraceVersion,
+} from './scenario.ts'
+
 export const ScenarioTracePayload = Schema.Union([
   Schema.TaggedStruct('run.started', {
     scenarioId: Schema.String,
@@ -198,15 +215,3 @@ export const ScenarioRunArtifact = Schema.Struct({
   status: Schema.Literals(['passed', 'failed']),
 })
 export type ScenarioRunArtifact = typeof ScenarioRunArtifact.Type
-import { Schema } from '@livestore/utils/effect'
-
-import { HostCapabilities } from './host-protocol.ts'
-import { BackendObservation, ComponentSyncObservation, SyncObservation, SyncObservationPayload } from './observations.ts'
-import {
-  ExecutionConfiguration,
-  ParticipantRef,
-  ScenarioAst,
-  scenarioArtifactVersion,
-  scenarioTraceVersion,
-} from './scenario.ts'
-

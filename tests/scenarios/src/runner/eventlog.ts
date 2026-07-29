@@ -1,3 +1,24 @@
+import { EventSequenceNumber } from '@livestore/common/schema'
+import { Schema } from '@livestore/utils/effect'
+
+import {
+  type ObservedEvent,
+  type OracleVerdict,
+  type ParticipantRef,
+  participantKey,
+  type ScenarioOracle,
+  type ScenarioTraceRecord,
+  type SyncObservation,
+  type SyncObservationPayload,
+} from '../model.ts'
+import { backendComponentKey, leaderComponentKey, sessionComponentKey } from '../projection.ts'
+import type {
+  CanonicalObservedEvent,
+  EventlogCaptureAccumulator,
+  EventlogCaptureEvidence,
+  ParticipantEventlogEvidence,
+} from './oracles.ts'
+
 export const globalPosition = (head: string): number => EventSequenceNumber.Client.fromString(head).global
 
 export const observedComponentEventlog = (
@@ -206,7 +227,11 @@ export const readIds = (value: Schema.Json | undefined): ReadonlySet<string> => 
   )
 }
 
-export const passedVerdict = (oracle: ScenarioOracle, evidence: ReadonlyArray<number>, summary: string): OracleVerdict => ({
+export const passedVerdict = (
+  oracle: ScenarioOracle,
+  evidence: ReadonlyArray<number>,
+  summary: string,
+): OracleVerdict => ({
   oracleId: oracle.id,
   oracle: oracle._tag,
   status: 'passed',
@@ -214,30 +239,14 @@ export const passedVerdict = (oracle: ScenarioOracle, evidence: ReadonlyArray<nu
   evidence,
 })
 
-export const failedVerdict = (oracle: ScenarioOracle, evidence: ReadonlyArray<number>, summary: string): OracleVerdict => ({
+export const failedVerdict = (
+  oracle: ScenarioOracle,
+  evidence: ReadonlyArray<number>,
+  summary: string,
+): OracleVerdict => ({
   oracleId: oracle.id,
   oracle: oracle._tag,
   status: 'failed',
   summary,
   evidence,
 })
-import { EventSequenceNumber } from '@livestore/common/schema'
-import { Schema } from '@livestore/utils/effect'
-
-import {
-  type ObservedEvent,
-  type OracleVerdict,
-  type ParticipantRef,
-  participantKey,
-  type ScenarioOracle,
-  type ScenarioTraceRecord,
-  type SyncObservation,
-  type SyncObservationPayload,
-} from '../model.ts'
-import { backendComponentKey, leaderComponentKey, sessionComponentKey } from '../projection.ts'
-import type {
-  CanonicalObservedEvent,
-  EventlogCaptureAccumulator,
-  EventlogCaptureEvidence,
-  ParticipantEventlogEvidence,
-} from './oracles.ts'

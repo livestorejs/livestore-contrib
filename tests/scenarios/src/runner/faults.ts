@@ -1,3 +1,16 @@
+import { ScenarioOperationError } from '../application.ts'
+import type { HostError } from '../host.ts'
+import type {
+  HostObservationOccurrence,
+  ParticipantRef,
+  ScenarioTraceRecord,
+  SyncObservation,
+  SyncObservationPayload,
+} from '../model.ts'
+import { canonicalJson, globalPosition } from './eventlog.ts'
+import { describeHostError } from './support.ts'
+import type { TraceRecorder } from './trace-recorder.ts'
+
 type RecoveringFault =
   | {
       readonly scope: 'client'
@@ -188,15 +201,3 @@ export const observationsAreSettled = (observations: ReadonlyArray<SyncObservati
     )
   )
 }
-import { ScenarioOperationError } from '../application.ts'
-import type { HostError } from '../host.ts'
-import type {
-  HostObservationOccurrence,
-  ParticipantRef,
-  ScenarioTraceRecord,
-  SyncObservation,
-  SyncObservationPayload,
-} from '../model.ts'
-import { canonicalJson, globalPosition } from './eventlog.ts'
-import { describeHostError } from './support.ts'
-import type { TraceRecorder } from './trace-recorder.ts'

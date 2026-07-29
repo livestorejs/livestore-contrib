@@ -1,3 +1,34 @@
+import {
+  expectOfflineEventCorrelationLifecycle,
+  withTransientSessionEventlogMutation,
+} from './test-support/runner-assertions.ts'
+/** Verifies the local-concrete backend realization independently of participant placement. */
+import {
+  Effect,
+  ScenarioRunArtifact,
+  type ScenarioTraceRecord,
+  Schema,
+  Vitest,
+  defineScenario,
+  deriveConnectivityIntervals,
+  deriveEventTimeline,
+  deriveExplicitCausalEdges,
+  deriveInFlightScenarioOperationIds,
+  deriveLaneActivityIntervals,
+  derivePlaybackMoments,
+  deriveRuntimeFailureIntervals,
+  deriveScenarioOperationHistory,
+  deriveTraceCaptures,
+  expect,
+  makeInProcessHost,
+  makeMockScenarioBackend,
+  offlineWriterRecovery,
+  projectTraceAt,
+  runInProcessScenario,
+  runScenario,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('offline writer recovery', () => {
   for (const mutation of ['conflict', 'delete', 'rewrite', 'reorder'] as const) {
     Vitest.live(`rejects a transient confirmed Eventlog ${mutation} repaired before terminal capture`, (test) =>
@@ -419,34 +450,3 @@ Vitest.describe('offline writer recovery', () => {
     15_000,
   )
 })
-
-/** Verifies the local-concrete backend realization independently of participant placement. */
-import {
-  Effect,
-  ScenarioRunArtifact,
-  type ScenarioTraceRecord,
-  Schema,
-  Vitest,
-  defineScenario,
-  deriveConnectivityIntervals,
-  deriveEventTimeline,
-  deriveExplicitCausalEdges,
-  deriveInFlightScenarioOperationIds,
-  deriveLaneActivityIntervals,
-  derivePlaybackMoments,
-  deriveRuntimeFailureIntervals,
-  deriveScenarioOperationHistory,
-  deriveTraceCaptures,
-  expect,
-  makeInProcessHost,
-  makeMockScenarioBackend,
-  offlineWriterRecovery,
-  projectTraceAt,
-  runInProcessScenario,
-  runScenario,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-import {
-  expectOfflineEventCorrelationLifecycle,
-  withTransientSessionEventlogMutation,
-} from './test-support/runner-assertions.ts'

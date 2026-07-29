@@ -1,3 +1,10 @@
+import {
+  type HostObservationOccurrence,
+  type ScenarioTracePayload,
+  type ScenarioTraceRecord,
+  scenarioTraceVersion,
+} from '../model.ts'
+
 type TraceInput = {
   readonly origin: ScenarioTraceRecord['origin']
   readonly payload: ScenarioTracePayload
@@ -109,9 +116,3 @@ const evidenceForOrigin = (origin: ScenarioTraceRecord['origin']): ScenarioTrace
       return 'controller-event'
   }
 }
-import {
-  type HostObservationOccurrence,
-  type ScenarioTracePayload,
-  type ScenarioTraceRecord,
-  scenarioTraceVersion,
-} from '../model.ts'

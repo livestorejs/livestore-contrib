@@ -1,3 +1,15 @@
+import { expectOfflineEventCorrelationLifecycle } from './test-support/runner-assertions.ts'
+import {
+  Effect,
+  Vitest,
+  browserMultiSessionRecovery,
+  expect,
+  offlineWriterRecovery,
+  projectTraceAt,
+  runBrowserLocalSyncCfScenario,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('browser profile', () => {
   Vitest.live(
     'runs the offline writer recovery through the browser SharedWorker topology',
@@ -113,15 +125,3 @@ Vitest.describe('browser profile', () => {
     180_000,
   )
 })
-import {
-  Effect,
-  Vitest,
-  browserMultiSessionRecovery,
-  expect,
-  offlineWriterRecovery,
-  projectTraceAt,
-  runBrowserLocalSyncCfScenario,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-import { expectOfflineEventCorrelationLifecycle } from './test-support/runner-assertions.ts'
-

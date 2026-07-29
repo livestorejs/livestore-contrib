@@ -1,3 +1,15 @@
+import { workloadActionSignature } from './test-support/runner-assertions.ts'
+import {
+  Effect,
+  Vitest,
+  defineScenario,
+  deriveScenarioOperationHistory,
+  expect,
+  runInProcessScenario,
+  seededTodoWorkload,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('seeded workloads', () => {
   Vitest.live(
     'repeats the same generated actions for the same seed and retains every action as trace evidence',
@@ -57,15 +69,3 @@ Vitest.describe('seeded workloads', () => {
     20_000,
   )
 })
-import {
-  Effect,
-  Vitest,
-  defineScenario,
-  deriveScenarioOperationHistory,
-  expect,
-  runInProcessScenario,
-  seededTodoWorkload,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-import { workloadActionSignature } from './test-support/runner-assertions.ts'
-

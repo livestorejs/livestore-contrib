@@ -1,3 +1,30 @@
+import { EventSequenceNumber } from '@livestore/common/schema'
+import { Effect, type Schema, type Scope } from '@livestore/utils/effect'
+
+import { ScenarioOperationError } from '../application.ts'
+import type { HostError, ParticipantHost } from '../host.ts'
+import {
+  deriveScenarioTopology,
+  type HostSystemObservation,
+  type ParticipantRef,
+  type ParticipantSnapshot,
+  participantKey,
+  type ScenarioAst,
+  type SyncObservation,
+  type SyncObservationPayload,
+} from '../model.ts'
+import { canonicalJson, syncObservationPayload } from './eventlog.ts'
+import {
+  observationsAreSettled,
+  recordObservedBackendFaultTransition,
+  recordObservedFaultTransition,
+  type ScenarioFaultState,
+  selectedRecoveryFaults,
+  settlementTimeoutError,
+} from './faults.ts'
+import { describeHostError } from './support.ts'
+import type { TraceRecorder } from './trace-recorder.ts'
+
 export const recordSystemObservation = (args: {
   host: ParticipantHost
   record: TraceRecorder
@@ -362,29 +389,3 @@ export const captureSnapshots = (args: {
     return { snapshots, evidenceByParticipant }
   })
 }
-import { EventSequenceNumber } from '@livestore/common/schema'
-import { Effect, Schema, type Scope } from '@livestore/utils/effect'
-
-import { ScenarioOperationError } from '../application.ts'
-import type { HostError, ParticipantHost } from '../host.ts'
-import {
-  deriveScenarioTopology,
-  type HostSystemObservation,
-  type ParticipantRef,
-  type ParticipantSnapshot,
-  participantKey,
-  type ScenarioAst,
-  type SyncObservation,
-  type SyncObservationPayload,
-} from '../model.ts'
-import { canonicalJson, syncObservationPayload } from './eventlog.ts'
-import {
-  observationsAreSettled,
-  recordObservedBackendFaultTransition,
-  recordObservedFaultTransition,
-  type ScenarioFaultState,
-  selectedRecoveryFaults,
-  settlementTimeoutError,
-} from './faults.ts'
-import { describeHostError } from './support.ts'
-import type { TraceRecorder } from './trace-recorder.ts'

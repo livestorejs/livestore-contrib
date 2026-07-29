@@ -1,3 +1,16 @@
+import {
+  Effect,
+  Vitest,
+  defineScenario,
+  expect,
+  makeInProcessHost,
+  makeMockScenarioBackend,
+  offlineWriterRecovery,
+  runScenario,
+  seededTodoWorkload,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('scenario runner preflight', () => {
   Vitest.live('rejects a typed AST that bypasses terminal Settlement construction validation', (test) =>
     Effect.gen(function* () {
@@ -85,16 +98,3 @@ Vitest.describe('scenario runner preflight', () => {
     }).pipe(Vitest.withTestCtx(test)),
   )
 })
-import {
-  Effect,
-  Vitest,
-  defineScenario,
-  expect,
-  makeInProcessHost,
-  makeMockScenarioBackend,
-  offlineWriterRecovery,
-  runScenario,
-  seededTodoWorkload,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-

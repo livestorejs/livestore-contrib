@@ -1,3 +1,35 @@
+import {
+  type ComponentSyncObservation,
+  type ConfirmedEventlogPrefixOracle,
+  type ObservedEvent,
+  type OperationHistoryOracle,
+  type OracleVerdict,
+  type ParticipantSnapshot,
+  participantKey,
+  type ScenarioOracle,
+  type ScenarioTraceRecord,
+} from '../model.ts'
+import {
+  backendComponentKey,
+  deriveOverlappingScenarioOperationPairs,
+  deriveScenarioOperationHistoryProjection,
+  leaderComponentKey,
+  sessionComponentKey,
+} from '../projection.ts'
+import {
+  canonicalConfirmedEvents,
+  canonicalJson,
+  failedVerdict,
+  firstEventlogMismatch,
+  firstEventlogPrefixMismatch,
+  globalPosition,
+  latestCompleteEventlogCapture,
+  observedComponentEventlog,
+  passedVerdict,
+  readIds,
+} from './eventlog.ts'
+import type { TraceRecorder } from './trace-recorder.ts'
+
 export const evaluateOracles = (args: {
   oracles: ReadonlyArray<ScenarioOracle>
   snapshots: ReadonlyArray<ParticipantSnapshot>
@@ -281,34 +313,3 @@ const evaluateOperationHistoryOracle = (
 }
 
 /** Resolves every named workload before creating participants and retains its deterministic expansion for the run. */
-import {
-  type ComponentSyncObservation,
-  type ConfirmedEventlogPrefixOracle,
-  type ObservedEvent,
-  type OperationHistoryOracle,
-  type OracleVerdict,
-  type ParticipantSnapshot,
-  participantKey,
-  type ScenarioOracle,
-  type ScenarioTraceRecord,
-} from '../model.ts'
-import {
-  backendComponentKey,
-  deriveOverlappingScenarioOperationPairs,
-  deriveScenarioOperationHistoryProjection,
-  leaderComponentKey,
-  sessionComponentKey,
-} from '../projection.ts'
-import {
-  canonicalConfirmedEvents,
-  canonicalJson,
-  failedVerdict,
-  firstEventlogMismatch,
-  firstEventlogPrefixMismatch,
-  globalPosition,
-  latestCompleteEventlogCapture,
-  observedComponentEventlog,
-  passedVerdict,
-  readIds,
-} from './eventlog.ts'
-import type { TraceRecorder } from './trace-recorder.ts'

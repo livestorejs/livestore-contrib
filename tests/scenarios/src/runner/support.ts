@@ -1,3 +1,21 @@
+import { Effect, Schema } from '@livestore/utils/effect'
+
+import { ScenarioOperationError } from '../application.ts'
+import { deriveScenarioRequirements, sessionsBeyondHostLimit } from '../capabilities.ts'
+import type { HostError, ParticipantHost } from '../host.ts'
+import {
+  defineScenario,
+  type ExecutionConfiguration,
+  type OracleVerdict,
+  type ParticipantSnapshot,
+  type ScenarioAst,
+  scenarioArtifactVersion,
+  ScenarioRunArtifact,
+  type ScenarioTraceRecord,
+  scenarioTraceVersion,
+} from '../model.ts'
+import type { RunScenarioOptions } from '../runner.ts'
+
 export const validateExecution = (args: {
   scenario: ScenarioAst
   applicationId: string
@@ -127,20 +145,3 @@ const formatUnknownFailure = (cause: unknown): string => {
     return String(cause)
   }
 }
-import { Effect, Schema } from '@livestore/utils/effect'
-
-import { ScenarioOperationError } from '../application.ts'
-import { deriveScenarioRequirements, sessionsBeyondHostLimit } from '../capabilities.ts'
-import type { HostError, ParticipantHost } from '../host.ts'
-import {
-  defineScenario,
-  type ExecutionConfiguration,
-  type OracleVerdict,
-  type ParticipantSnapshot,
-  type ScenarioAst,
-  scenarioArtifactVersion,
-  ScenarioRunArtifact,
-  type ScenarioTraceRecord,
-  scenarioTraceVersion,
-} from '../model.ts'
-import type { RunScenarioOptions } from '../runner.ts'

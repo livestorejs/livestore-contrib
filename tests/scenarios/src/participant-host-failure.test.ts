@@ -1,3 +1,14 @@
+import {
+  type ParticipantHostFailureCode,
+  type ScenarioOperationFailureOutcome,
+  Vitest,
+  browserHostCapabilities,
+  expect,
+  inProcessHostCapabilities,
+  participantHostFailure,
+  processHostCapabilities,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('participant-host failure conformance', () => {
   Vitest.it('does not advertise exact Event lineage for sampled-correlation hosts', () => {
     for (const capabilities of [inProcessHostCapabilities, processHostCapabilities, browserHostCapabilities]) {
@@ -26,14 +37,3 @@ Vitest.describe('participant-host failure conformance', () => {
     ).toEqual(cases)
   })
 })
-import {
-  type ParticipantHostFailureCode,
-  type ScenarioOperationFailureOutcome,
-  Vitest,
-  browserHostCapabilities,
-  expect,
-  inProcessHostCapabilities,
-  participantHostFailure,
-  processHostCapabilities,
-} from './test-support/scenario-test-kit.ts'
-

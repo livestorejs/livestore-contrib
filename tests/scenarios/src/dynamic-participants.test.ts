@@ -1,3 +1,13 @@
+import {
+  Effect,
+  Vitest,
+  expect,
+  lateClientCatchUp,
+  projectTraceAt,
+  runInProcessScenario,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('dynamic participant addition', () => {
   Vitest.live('creates a late Client after confirmed history and converges from empty local state', (test) =>
     Effect.gen(function* () {
@@ -34,13 +44,3 @@ Vitest.describe('dynamic participant addition', () => {
     }).pipe(Vitest.withTestCtx(test)),
   )
 })
-import {
-  Effect,
-  Vitest,
-  expect,
-  lateClientCatchUp,
-  projectTraceAt,
-  runInProcessScenario,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-

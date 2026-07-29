@@ -1,3 +1,9 @@
+import { Effect } from '@livestore/utils/effect'
+
+import { type ApplicationWorkloadLibrary, ScenarioOperationError } from '../application.ts'
+import { participantKey, type ScenarioAst, type WorkloadStep } from '../model.ts'
+import type { PreparedWorkloadAction, PreparedWorkloadExpansion, PreparedWorkloadExpansions } from './execution.ts'
+
 export const prepareWorkloadExpansions = (args: {
   scenario: ScenarioAst
   workloads: ApplicationWorkloadLibrary
@@ -69,12 +75,3 @@ const deriveWorkloadSeed = (args: { scenarioSeed: number; phaseId: string; step:
   for (const character of input) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619)
   return hash >>> 0
 }
-import { Effect } from '@livestore/utils/effect'
-
-import { type ApplicationWorkloadLibrary, ScenarioOperationError } from '../application.ts'
-import { participantKey, type ScenarioAst, type WorkloadStep } from '../model.ts'
-import type {
-  PreparedWorkloadAction,
-  PreparedWorkloadExpansion,
-  PreparedWorkloadExpansions,
-} from './execution.ts'

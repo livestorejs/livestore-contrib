@@ -1,3 +1,5 @@
+import { Vitest, deriveAdaptiveTimeLayout, expect, projectAdaptiveTime } from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('elapsed-time projection', () => {
   Vitest.it('compresses long gaps while preserving and exposing their real duration', () => {
     const layout = deriveAdaptiveTimeLayout([0, 50, 100, 3_100, 3_150], {
@@ -20,10 +22,3 @@ Vitest.describe('elapsed-time projection', () => {
     expect(projectAdaptiveTime(layout, 50)).toBe(0.5)
   })
 })
-import {
-  Vitest,
-  deriveAdaptiveTimeLayout,
-  expect,
-  projectAdaptiveTime,
-} from './test-support/scenario-test-kit.ts'
-

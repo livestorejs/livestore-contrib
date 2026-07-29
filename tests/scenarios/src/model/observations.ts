@@ -1,3 +1,7 @@
+import { Schema } from '@livestore/utils/effect'
+
+import { ParticipantRef } from './scenario.ts'
+
 export const SyncObservation = Schema.Struct({
   participant: ParticipantRef,
   localHead: Schema.String,
@@ -101,7 +105,3 @@ export const SyncObservationPayload = Schema.Struct({
   isSynced: Schema.Boolean,
 })
 export type SyncObservationPayload = typeof SyncObservationPayload.Type
-import { Schema } from '@livestore/utils/effect'
-
-import { ParticipantRef } from './scenario.ts'
-

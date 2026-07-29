@@ -1,3 +1,23 @@
+import {
+  Effect,
+  Exit,
+  ScenarioRunArtifact,
+  Schema,
+  Vitest,
+  defineScenario,
+  deriveInFlightScenarioOperationIds,
+  derivePlaybackMoments,
+  deriveScenarioOperationHistory,
+  expect,
+  makeInProcessHost,
+  makeMockScenarioBackend,
+  offlineWriterRecovery,
+  participantHostFailure,
+  projectTraceAt,
+  runScenario,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('in-process host conformance', () => {
   Vitest.live('rejects inferred incompatible behavior before creating any Client', (test) =>
     Effect.gen(function* () {
@@ -71,6 +91,7 @@ Vitest.describe('in-process host conformance', () => {
   Vitest.live('captures a non-convergent settlement as an inspectable failed artifact', (test) =>
     Effect.gen(function* () {
       const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
+      const timeoutMs = 250
       const scenario = defineScenario({
         version: 1,
         id: 'captured-settlement-failure',
@@ -101,7 +122,7 @@ Vitest.describe('in-process host conformance', () => {
                 id: 'must-time-out',
                 participants: [participant],
                 healDisconnectedClients: [participant.clientId],
-                timeoutMs: 10,
+                timeoutMs,
               },
             ],
           },
@@ -147,7 +168,7 @@ Vitest.describe('in-process host conformance', () => {
         expect.objectContaining({
           _tag: 'settlement.failed',
           code: 'settlement-timeout',
-          timeoutMs: 10,
+          timeoutMs,
           observations: [
             expect.objectContaining({ participant: 'client-a/session-a', pendingCount: 1, isSynced: false }),
           ],
@@ -294,22 +315,3 @@ Vitest.describe('in-process host conformance', () => {
  * Verifies the first vertical slice of LS.SYS.VER.SCEN-R02, R04, R07, R11 to
  * R16, and R18.
  */
-import {
-  Effect,
-  Exit,
-  ScenarioRunArtifact,
-  Schema,
-  Vitest,
-  defineScenario,
-  deriveInFlightScenarioOperationIds,
-  derivePlaybackMoments,
-  deriveScenarioOperationHistory,
-  expect,
-  makeInProcessHost,
-  makeMockScenarioBackend,
-  offlineWriterRecovery,
-  participantHostFailure,
-  projectTraceAt,
-  runScenario,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'

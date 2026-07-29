@@ -228,4 +228,3 @@ export const ScenarioAst = Schema.Struct({
   oracles: Schema.Array(ScenarioOracle),
 })
 export type ScenarioAst = typeof ScenarioAst.Type
-

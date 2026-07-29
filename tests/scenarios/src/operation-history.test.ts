@@ -1,3 +1,19 @@
+import {
+  Deferred,
+  Effect,
+  Vitest,
+  defineScenario,
+  deriveOverlappingScenarioOperationPairs,
+  deriveScenarioOperationHistory,
+  deriveScenarioOperationHistoryProjection,
+  expect,
+  makeInProcessHost,
+  makeMockScenarioBackend,
+  participantHostFailure,
+  runScenario,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('scenario operation history', () => {
   Vitest.live(
     'retains overlapping operation intervals and evaluates a history property',
@@ -189,18 +205,3 @@ Vitest.describe('scenario operation history', () => {
 })
 
 /** Verifies: LS.SYS.VER.SCEN-R05, LS.SYS.VER.SCEN-R06, LS.SYS.VER.SCEN-R08 */
-import {
-  Deferred,
-  Effect,
-  Vitest,
-  defineScenario,
-  deriveOverlappingScenarioOperationPairs,
-  deriveScenarioOperationHistory,
-  deriveScenarioOperationHistoryProjection,
-  expect,
-  makeInProcessHost,
-  makeMockScenarioBackend,
-  participantHostFailure,
-  runScenario,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'

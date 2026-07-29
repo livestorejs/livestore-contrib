@@ -1,3 +1,14 @@
+import { expectOfflineEventCorrelationLifecycle } from './test-support/runner-assertions.ts'
+/** Verifies the persisted web topology, browser network boundary, and lifecycle controls. */
+import {
+  Effect,
+  Vitest,
+  expect,
+  offlineWriterRecovery,
+  runProcessLocalSyncCfScenario,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('process profile', () => {
   Vitest.live(
     'runs one isolated Node process per Client against local sync-cf',
@@ -31,14 +42,3 @@ Vitest.describe('process profile', () => {
     90_000,
   )
 })
-
-/** Verifies the persisted web topology, browser network boundary, and lifecycle controls. */
-import {
-  Effect,
-  Vitest,
-  expect,
-  offlineWriterRecovery,
-  runProcessLocalSyncCfScenario,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-import { expectOfflineEventCorrelationLifecycle } from './test-support/runner-assertions.ts'

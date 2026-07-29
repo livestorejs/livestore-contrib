@@ -1,3 +1,20 @@
+import {
+  ScenarioRunArtifact,
+  Schema,
+  Vitest,
+  browserMultiSessionRecovery,
+  defineScenario,
+  deriveScenarioRequirements,
+  deriveScenarioTopology,
+  expect,
+  gunzipSync,
+  offlineWriterRecovery,
+  readFileSync,
+  seededTodoWorkload,
+  sharedTodoWorkday,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('scenario model', () => {
   Vitest.it('validates and round-trips the versioned serializable AST', () => {
     const encoded = JSON.parse(JSON.stringify(offlineWriterRecovery))
@@ -319,20 +336,3 @@ Vitest.describe('scenario model', () => {
     }
   })
 })
-import {
-  ScenarioRunArtifact,
-  Schema,
-  Vitest,
-  browserMultiSessionRecovery,
-  defineScenario,
-  deriveScenarioRequirements,
-  deriveScenarioTopology,
-  expect,
-  gunzipSync,
-  offlineWriterRecovery,
-  readFileSync,
-  seededTodoWorkload,
-  sharedTodoWorkday,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-

@@ -1,3 +1,7 @@
+import { Schema } from '@livestore/utils/effect'
+
+import { ClientDefinition, HostCapability, ParticipantProfile, ParticipantRef } from './scenario.ts'
+
 export const HostCapabilities = Schema.Struct({
   profile: ParticipantProfile,
   capabilities: Schema.Array(HostCapability),
@@ -65,7 +69,3 @@ export const HostAcknowledgement = Schema.Struct({
   status: Schema.Literal('acknowledged'),
 })
 export type HostAcknowledgement = typeof HostAcknowledgement.Type
-import { Schema } from '@livestore/utils/effect'
-
-import { ClientDefinition, HostCapability, ParticipantProfile, ParticipantRef } from './scenario.ts'
-

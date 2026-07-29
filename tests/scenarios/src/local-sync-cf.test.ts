@@ -1,3 +1,15 @@
+import { expectBackendOutageRecovery } from './test-support/runner-assertions.ts'
+/** Verifies the worker/process participant profile against the same portable scenario. */
+import {
+  Effect,
+  Vitest,
+  backendOutageRecovery,
+  expect,
+  offlineWriterRecovery,
+  runInProcessLocalSyncCfScenario,
+  todoApplication,
+} from './test-support/scenario-test-kit.ts'
+
 Vitest.describe('local sync-cf backend', () => {
   Vitest.live(
     'drops the participant route during a backend outage and recovers through the real WebSocket backend',
@@ -36,15 +48,3 @@ Vitest.describe('local sync-cf backend', () => {
     60_000,
   )
 })
-
-/** Verifies the worker/process participant profile against the same portable scenario. */
-import {
-  Effect,
-  Vitest,
-  backendOutageRecovery,
-  expect,
-  offlineWriterRecovery,
-  runInProcessLocalSyncCfScenario,
-  todoApplication,
-} from './test-support/scenario-test-kit.ts'
-import { expectBackendOutageRecovery } from './test-support/runner-assertions.ts'

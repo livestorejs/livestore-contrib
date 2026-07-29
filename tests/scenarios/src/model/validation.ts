@@ -1,3 +1,13 @@
+import { Schema } from '@livestore/utils/effect'
+
+import {
+  type ClientDefinition,
+  type ParallelOperationStep,
+  type ParticipantRef,
+  ScenarioAst,
+  type ScenarioStep,
+} from './scenario.ts'
+
 export class ScenarioValidationError extends Error {
   readonly _tag = 'ScenarioValidationError'
 
@@ -202,12 +212,3 @@ export const deriveScenarioTopology = (scenario: ScenarioAst): ReadonlyArray<Cli
 }
 
 export const participantKey = ({ clientId, sessionId }: ParticipantRef): string => `${clientId}/${sessionId}`
-import { Schema } from '@livestore/utils/effect'
-
-import {
-  ClientDefinition,
-  ParallelOperationStep,
-  ParticipantRef,
-  ScenarioAst,
-  ScenarioStep,
-} from './scenario.ts'
