@@ -124,6 +124,13 @@ export default packageJson(
           import: '#vendor/react-inspector',
           entry: './src/index.tsx',
           files: ['src', 'LICENSE', 'UPSTREAM.md', 'package.json'],
+          textReplacements: [
+            {
+              path: 'UPSTREAM.md',
+              from: 'See `FORK_CHANGELOG.md` for detailed documentation of all changes made in this fork.',
+              to: 'The main changes made in this fork are summarized below.',
+            },
+          ],
         },
       ],
     },

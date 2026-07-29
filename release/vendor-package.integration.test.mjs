@@ -30,7 +30,10 @@ const makeFixture = ({ effectPeer = '^4.0.0-beta.99', includeLicense = true } = 
   })
   writeFileSync(join(sourcePackageDir, 'src/index.tsx'), 'export const Inspector = true\n')
   writeFileSync(join(sourcePackageDir, 'README.md'), '# Inspector\n')
-  writeFileSync(join(sourcePackageDir, 'UPSTREAM.md'), 'Upstream: storybookjs/react-inspector\n')
+  writeFileSync(
+    join(sourcePackageDir, 'UPSTREAM.md'),
+    'Upstream: storybookjs/react-inspector\nSee `FORK_CHANGELOG.md` for detailed changes.\n',
+  )
   writeFileSync(join(sourcePackageDir, 'FORK_CHANGELOG.md'), '# Fork changes\n')
   if (includeLicense === true) {
     writeFileSync(
@@ -72,6 +75,13 @@ const makeFixture = ({ effectPeer = '^4.0.0-beta.99', includeLicense = true } = 
           import: '#vendor/react-inspector',
           entry: './src/index.tsx',
           files: ['src', 'LICENSE', 'UPSTREAM.md', 'package.json'],
+          textReplacements: [
+            {
+              path: 'UPSTREAM.md',
+              from: 'See `FORK_CHANGELOG.md` for detailed changes.',
+              to: 'Fork-specific changes are summarized below.',
+            },
+          ],
         },
       ],
     },
@@ -112,9 +122,10 @@ describe('release vendoring', () => {
     expect(readFileSync(join(fixture.targetPackageDir, 'src/vendor/react-inspector/LICENSE'), 'utf8')).toContain(
       'Copyright (c) 2017 Xiaoyi Chen',
     )
-    expect(readFileSync(join(fixture.targetPackageDir, 'src/vendor/react-inspector/UPSTREAM.md'), 'utf8')).toContain(
-      'storybookjs/react-inspector',
-    )
+    const upstream = readFileSync(join(fixture.targetPackageDir, 'src/vendor/react-inspector/UPSTREAM.md'), 'utf8')
+    expect(upstream).toContain('storybookjs/react-inspector')
+    expect(upstream).toContain('Fork-specific changes are summarized below.')
+    expect(upstream).not.toContain('FORK_CHANGELOG.md')
 
     cleanupVendorPlan(plan)
     expect(existsSync(join(fixture.targetPackageDir, 'src/vendor/react-inspector'))).toBe(false)

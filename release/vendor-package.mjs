@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, posix, relative, resolve, sep } from 'node:path'
 
 const cloneJson = (value) => JSON.parse(JSON.stringify(value))
@@ -68,6 +68,9 @@ const planOneVendor = ({ rootDir, targetPackageDir, manifest, spec }) => {
   }
   if (Array.isArray(spec.files) === false || spec.files.length === 0) {
     throw new Error(`${manifest.name} $genie.releaseVendors.files must be a non-empty string array`)
+  }
+  if (spec.textReplacements !== undefined && Array.isArray(spec.textReplacements) === false) {
+    throw new Error(`${manifest.name} $genie.releaseVendors.textReplacements must be an array`)
   }
 
   assertRelativePath('release vendor sourceRepo', spec.sourceRepo)
@@ -143,6 +146,37 @@ const planOneVendor = ({ rootDir, targetPackageDir, manifest, spec }) => {
     throw new Error(`${manifest.name} release vendor target already exists: ${relative(rootDir, targetDir)}`)
   }
 
+  const textReplacements = (spec.textReplacements ?? []).map((replacement) => {
+    for (const key of ['path', 'from', 'to']) {
+      if (typeof replacement?.[key] !== 'string' || replacement[key].length === 0) {
+        throw new Error(`${manifest.name} $genie.releaseVendors.textReplacements.${key} must be a non-empty string`)
+      }
+    }
+    assertRelativePath('release vendor text replacement path', replacement.path)
+    if (
+      spec.files.some(
+        (selectedPath) => replacement.path === selectedPath || replacement.path.startsWith(`${selectedPath}${sep}`),
+      ) === false
+    ) {
+      throw new Error(`${spec.dependency} text replacement path is not selected for vendoring: ${replacement.path}`)
+    }
+
+    const source = join(sourcePackageDir, replacement.path)
+    const target = join(targetDir, replacement.path)
+    assertInside(sourcePackageDir, source, 'release vendor text replacement source')
+    assertInside(targetDir, target, 'release vendor text replacement target')
+    if (existsSync(source) === false || lstatSync(source).isFile() === false) {
+      throw new Error(`${spec.dependency} text replacement source is not a file: ${replacement.path}`)
+    }
+    const occurrences = readFileSync(source, 'utf8').split(replacement.from).length - 1
+    if (occurrences !== 1) {
+      throw new Error(
+        `${spec.dependency} text replacement must match exactly once in ${replacement.path}; matched ${occurrences}`,
+      )
+    }
+    return { target, from: replacement.from, to: replacement.to }
+  })
+
   const copyEntries = spec.files.map((path) => {
     const source = join(sourcePackageDir, path)
     if (existsSync(source) === false) {
@@ -163,6 +197,7 @@ const planOneVendor = ({ rootDir, targetPackageDir, manifest, spec }) => {
     target: spec.target,
     targetDir,
     copyEntries,
+    textReplacements,
     fileCount: copyEntries.reduce((count, entry) => count + entry.fileCount, 0),
     provenance: {
       source,
@@ -234,6 +269,10 @@ export const applyVendorPlan = (plan) => {
           errorOnExist: true,
           force: false,
         })
+      }
+      for (const replacement of vendor.textReplacements) {
+        const source = readFileSync(replacement.target, 'utf8')
+        writeFileSync(replacement.target, source.replace(replacement.from, replacement.to))
       }
     }
   } catch (error) {
