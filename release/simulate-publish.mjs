@@ -1,7 +1,17 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 
@@ -293,21 +303,51 @@ const buildPackages = () => {
   }
 }
 
-const originalManifestContents = new Map(
-  plan.packages.map((pkg) => [pkg.path, readFileSync(join(rootDir, pkg.path), 'utf8')]),
+const originalManifests = new Map(
+  plan.packages.map((pkg) => {
+    const path = join(rootDir, pkg.path)
+    return [
+      pkg.path,
+      {
+        content: readFileSync(path, 'utf8'),
+        mode: statSync(path).mode,
+      },
+    ]
+  }),
 )
+let manifestRewritesApplied = false
 
 const applyManifestRewrites = () => {
+  manifestRewritesApplied = true
   for (const pkg of plan.packages) {
+    const path = join(rootDir, pkg.path)
+    chmodSync(path, originalManifests.get(pkg.path).mode | 0o200)
     writeJson(pkg.path, pkg.manifest)
   }
 }
 
 const restoreManifestRewrites = () => {
-  for (const [path, content] of originalManifestContents) {
-    writeFileSync(join(rootDir, path), content)
+  if (manifestRewritesApplied === false) return
+  manifestRewritesApplied = false
+  for (const [path, original] of originalManifests) {
+    const absolutePath = join(rootDir, path)
+    chmodSync(absolutePath, original.mode | 0o200)
+    writeFileSync(absolutePath, original.content)
+    chmodSync(absolutePath, original.mode)
   }
 }
+
+const restoreManifestsOnSignal = (signal) => {
+  const handler = () => {
+    restoreManifestRewrites()
+    process.removeListener(signal, handler)
+    process.kill(process.pid, signal)
+  }
+  process.once(signal, handler)
+}
+
+restoreManifestsOnSignal('SIGINT')
+restoreManifestsOnSignal('SIGTERM')
 
 const restoreGeneratedFiles = () => {
   const env = { ...process.env, DEVENV_TASK_PASSTHROUGH: '1' }
