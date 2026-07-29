@@ -6,15 +6,10 @@
  * `getDebug`. Values default to `0` when missing.
  *
  * @example
- *   declare module '@overeng/meters/debug-bag' {
- *     interface DebugBag {
- *       RpcInFlight: number
- *       ReactRender1: number
- *     }
- *   }
+ *   import { getDebugRuntime, incrDebugRuntime } from './debug-bag.js'
  *
- *   incrDebug('RpcInFlight')
- *   const v = getDebug('RpcInFlight')
+ *   incrDebugRuntime('rpc-in-flight')
+ *   const v = getDebugRuntime('rpc-in-flight')
  */
 
 export interface DebugBag {

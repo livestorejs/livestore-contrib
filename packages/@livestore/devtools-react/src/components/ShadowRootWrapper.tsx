@@ -84,7 +84,7 @@ export const ShadowRootWrapper: React.FC<{
       hostInner.remove()
       // TODO calling this right now might still result in a error message like:
       // "Attempted to synchronously unmount a root while React was already rendering. React cannot finish unmounting the root until the current render has completed, which may lead to a race condition."
-      // More context for possible solution approaches: https://chat.openai.com/share/c3184b7b-b44c-44a0-8a6f-10a25756b0b0
+      // The unmount must happen after any active React render has committed.
       reactRoot.unmount()
       styleGdg.remove()
     }

@@ -91,7 +91,7 @@ export default packageJson(
      * `dist` only, which would publish a broken package — it is never exercised
      * there because the package is private.
      */
-    files: ['dist', 'package.json', 'src'],
+    files: ['dist', 'LICENSE.chromium', 'package.json', 'src'],
     publishConfig: {
       access: 'public',
     },

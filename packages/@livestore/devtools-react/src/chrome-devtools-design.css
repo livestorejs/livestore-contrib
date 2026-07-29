@@ -1,7 +1,9 @@
 /*
- * Copyright 2020 The Chromium Authors. All rights reserved.
+ * Copyright 2020 The Chromium Authors
  * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
+ * found in the LICENSE.chromium file.
+ *
+ * Source: https://chromium.googlesource.com/devtools/devtools-frontend/+/184a74dd67da736152ad3296b7ebb15a9a3d579c/front_end/design_system_tokens.css
  */
 
 /**
@@ -19,6 +21,8 @@
   --sys-color-on-surface-subtle: var(--ref-palette-neutral30);
   --sys-color-on-surface-secondary: var(--ref-palette-neutral30);
   --sys-color-on-surface-primary: var(--ref-palette-primary10);
+  --sys-color-on-surface-light: var(--ref-palette-neutral50);
+  --sys-color-on-surface-light-graphics: var(--ref-palette-neutral60);
 
   /* Universal surfaces */
 
@@ -222,20 +226,40 @@
   --sys-color-token-deleted: var(--ref-palette-error50);
   --sys-color-token-inserted: var(--ref-palette-green60);
   --sys-color-token-pseudo-element: var(--ref-palette-blue40);
-  --sys-color-token-subtle: var(--ref-palette-neutral60);
+  --sys-color-token-subtle: var(--ref-palette-neutral50);
 
   /**
-   * Gradients
-   */
+  * Gradients
+  */
   --sys-color-gradient-primary: var(--ref-palette-primary90);
   --sys-color-gradient-tertiary: var(--ref-palette-tertiary95);
 
   &.baseline-default {
-    --sys-color-surface5: color-mix(in sRGB, #6991d6 14%, var(--ref-palette-neutral100));
-    --sys-color-surface4: color-mix(in sRGB, #6991d6 12%, var(--ref-palette-neutral100));
-    --sys-color-surface3: color-mix(in sRGB, #6991d6 11%, var(--ref-palette-neutral100));
-    --sys-color-surface2: color-mix(in sRGB, #6991d6 8%, var(--ref-palette-neutral100));
-    --sys-color-surface1: color-mix(in sRGB, #6991d6 5%, var(--ref-palette-neutral100));
+    --sys-color-surface5: color-mix(
+      in sRGB,
+      #6991d6 14%,
+      var(--ref-palette-neutral100)
+    );
+    --sys-color-surface4: color-mix(
+      in sRGB,
+      #6991d6 12%,
+      var(--ref-palette-neutral100)
+    );
+    --sys-color-surface3: color-mix(
+      in sRGB,
+      #6991d6 11%,
+      var(--ref-palette-neutral100)
+    );
+    --sys-color-surface2: color-mix(
+      in sRGB,
+      #6991d6 8%,
+      var(--ref-palette-neutral100)
+    );
+    --sys-color-surface1: color-mix(
+      in sRGB,
+      #6991d6 5%,
+      var(--ref-palette-neutral100)
+    );
   }
 
   &.baseline-grayscale {
@@ -267,6 +291,45 @@
     );
   }
 
+  &.baseline-default,
+  &.baseline-grayscale {
+    --sys-color-base: var(--ref-palette-neutral100);
+    --sys-color-surface: var(--ref-palette-neutral100);
+    --sys-color-cdt-base-container: var(--ref-palette-neutral100);
+
+    &.theme-with-dark-background {
+      --sys-color-surface5: color-mix(
+        in sRGB,
+        #d1e1ff 14%,
+        var(--ref-palette-neutral10)
+      );
+      --sys-color-surface4: color-mix(
+        in sRGB,
+        #d1e1ff 12%,
+        var(--ref-palette-neutral10)
+      );
+      --sys-color-surface3: color-mix(
+        in sRGB,
+        #d1e1ff 11%,
+        var(--ref-palette-neutral10)
+      );
+      --sys-color-surface2: color-mix(
+        in sRGB,
+        #d1e1ff 8%,
+        var(--ref-palette-neutral10)
+      );
+      --sys-color-surface1: color-mix(
+        in sRGB,
+        #d1e1ff 5%,
+        var(--ref-palette-neutral10)
+      );
+      --sys-color-divider: var(--ref-palette-neutral40);
+      --sys-color-base: var(--ref-palette-neutral25);
+      --sys-color-surface: var(--ref-palette-neutral10);
+      --sys-color-cdt-base-container: var(--ref-palette-neutral15);
+    }
+  }
+
   &.theme-with-dark-background {
     /* Chrome Desktop Design System */
 
@@ -276,6 +339,8 @@
     --sys-color-on-surface-subtle: var(--ref-palette-neutral80);
     --sys-color-on-surface-secondary: var(--ref-palette-neutral80);
     --sys-color-on-surface-primary: var(--ref-palette-primary90);
+    --sys-color-on-surface-light: var(--ref-palette-neutral60);
+    --sys-color-on-surface-light-graphics: var(--ref-palette-neutral50);
 
     /* Universal surfaces */
 
@@ -464,7 +529,7 @@
     --sys-color-token-property-special: var(--ref-palette-cyan80);
     --sys-color-token-type: var(--ref-palette-blue70);
     --sys-color-token-definition: var(--ref-palette-blue70);
-    --sys-color-token-variable-special: var(--ref-palette-blue40);
+    --sys-color-token-variable-special: var(--ref-palette-tertiary80);
     --sys-color-token-builtin: var(--ref-palette-blue80);
     --sys-color-token-keyword: var(--ref-palette-purple60);
     --sys-color-token-number: var(--ref-palette-green90);
@@ -482,29 +547,10 @@
     --sys-color-token-subtle: var(--ref-palette-neutral60);
 
     /**
-     * Gradients
-     */
+    * Gradients
+    */
     --sys-color-gradient-primary: var(--ref-palette-primary30);
     --sys-color-gradient-tertiary: var(--ref-palette-tertiary30);
-  }
-
-  &.baseline-default,
-  &.baseline-grayscale {
-    --sys-color-base: var(--ref-palette-neutral100);
-    --sys-color-surface: var(--ref-palette-neutral100);
-    --sys-color-cdt-base-container: var(--ref-palette-neutral100);
-
-    &.theme-with-dark-background {
-      --sys-color-surface5: color-mix(in sRGB, #d1e1ff 14%, var(--ref-palette-neutral10));
-      --sys-color-surface4: color-mix(in sRGB, #d1e1ff 12%, var(--ref-palette-neutral10));
-      --sys-color-surface3: color-mix(in sRGB, #d1e1ff 11%, var(--ref-palette-neutral10));
-      --sys-color-surface2: color-mix(in sRGB, #d1e1ff 8%, var(--ref-palette-neutral10));
-      --sys-color-surface1: color-mix(in sRGB, #d1e1ff 5%, var(--ref-palette-neutral10));
-      --sys-color-divider: var(--ref-palette-neutral40);
-      --sys-color-base: var(--ref-palette-neutral25);
-      --sys-color-surface: var(--ref-palette-neutral10);
-      --sys-color-cdt-base-container: var(--ref-palette-neutral15);
-    }
   }
 
   /* Colors end */
@@ -561,7 +607,8 @@
    * added to the html tag on load, but is here as a safe
    * fallback
    */
-  --default-font-family: '.SFNSDisplay-Regular', 'Helvetica Neue', 'Lucida Grande', sans-serif;
+  --default-font-family:
+    '.SFNSDisplay-Regular', 'Helvetica Neue', 'Lucida Grande', sans-serif;
   --monospace-font-size: 10px;
   --monospace-font-family: monospace;
   --source-code-font-size: 11px;
@@ -569,7 +616,8 @@
 
   /* Default fonts */
   &.platform-linux {
-    --default-font-family: 'Google Sans Text', 'Google Sans', system-ui, sans-serif;
+    --default-font-family:
+      'Google Sans Text', 'Google Sans', system-ui, sans-serif;
     --monospace-font-size: 11px;
     --monospace-font-family: 'Noto Sans Mono', 'DejaVu Sans Mono', monospace;
     --source-code-font-size: 11px;
@@ -593,23 +641,29 @@
   }
 
   &.platform-screenshot-test {
-    --default-font-family: roboto;
-    --monospace-font-family: roboto;
-    --source-code-font-family: roboto;
+    --default-font-family: ahem;
+    --monospace-font-family: ahem;
+    --source-code-font-family: ahem;
   }
+
 
   --ref-typeface-weight-regular: 400;
   --ref-typeface-weight-medium: 500;
   --ref-typeface-weight-bold: 700;
-  --sys-typescale-headline1: var(--ref-typeface-weight-medium) var(--sys-typescale-headline1-size) /
+  --sys-typescale-headline1: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-headline1-size) /
     var(--sys-typescale-headline1-line-height) var(--default-font-family);
-  --sys-typescale-headline2: var(--ref-typeface-weight-medium) var(--sys-typescale-headline2-size) /
+  --sys-typescale-headline2: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-headline2-size) /
     var(--sys-typescale-headline2-line-height) var(--default-font-family);
-  --sys-typescale-headline3: var(--ref-typeface-weight-medium) var(--sys-typescale-headline3-size) /
+  --sys-typescale-headline3: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-headline3-size) /
     var(--sys-typescale-headline3-line-height) var(--default-font-family);
-  --sys-typescale-headline4: var(--ref-typeface-weight-medium) var(--sys-typescale-headline4-size) /
+  --sys-typescale-headline4: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-headline4-size) /
     var(--sys-typescale-headline4-line-height) var(--default-font-family);
-  --sys-typescale-headline5: var(--ref-typeface-weight-medium) var(--sys-typescale-headline5-size) /
+  --sys-typescale-headline5: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-headline5-size) /
     var(--sys-typescale-headline5-line-height) var(--default-font-family);
   --sys-typescale-body1-regular: var(--ref-typeface-weight-regular)
     var(--sys-typescale-body1-size) / var(--sys-typescale-body1-line-height)
@@ -626,32 +680,42 @@
   --sys-typescale-body5-regular: var(--ref-typeface-weight-regular)
     var(--sys-typescale-body5-size) / var(--sys-typescale-body5-line-height)
     var(--default-font-family);
-  --sys-typescale-body1-medium: var(--ref-typeface-weight-medium) var(--sys-typescale-body1-size) /
-    var(--sys-typescale-body1-line-height) var(--default-font-family);
-  --sys-typescale-body2-medium: var(--ref-typeface-weight-medium) var(--sys-typescale-body2-size) /
-    var(--sys-typescale-body2-line-height) var(--default-font-family);
-  --sys-typescale-body3-medium: var(--ref-typeface-weight-medium) var(--sys-typescale-body3-size) /
-    var(--sys-typescale-body3-line-height) var(--default-font-family);
-  --sys-typescale-body4-medium: var(--ref-typeface-weight-medium) var(--sys-typescale-body4-size) /
-    var(--sys-typescale-body4-line-height) var(--default-font-family);
-  --sys-typescale-body5-medium: var(--ref-typeface-weight-medium) var(--sys-typescale-body5-size) /
-    var(--sys-typescale-body5-line-height) var(--default-font-family);
-  --sys-typescale-body1-bold: var(--ref-typeface-weight-bold) var(--sys-typescale-body1-size) /
-    var(--sys-typescale-body1-line-height) var(--default-font-family);
-  --sys-typescale-body2-bold: var(--ref-typeface-weight-bold) var(--sys-typescale-body2-size) /
-    var(--sys-typescale-body2-line-height) var(--default-font-family);
-  --sys-typescale-body3-bold: var(--ref-typeface-weight-bold) var(--sys-typescale-body3-size) /
-    var(--sys-typescale-body3-line-height) var(--default-font-family);
-  --sys-typescale-body4-bold: var(--ref-typeface-weight-bold) var(--sys-typescale-body4-size) /
-    var(--sys-typescale-body4-line-height) var(--default-font-family);
-  --sys-typescale-body5-bold: var(--ref-typeface-weight-bold) var(--sys-typescale-body5-size) /
-    var(--sys-typescale-body5-line-height) var(--default-font-family);
+  --sys-typescale-body1-medium: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-body1-size) / var(--sys-typescale-body1-line-height)
+    var(--default-font-family);
+  --sys-typescale-body2-medium: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-body2-size) / var(--sys-typescale-body2-line-height)
+    var(--default-font-family);
+  --sys-typescale-body3-medium: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-body3-size) / var(--sys-typescale-body3-line-height)
+    var(--default-font-family);
+  --sys-typescale-body4-medium: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-body4-size) / var(--sys-typescale-body4-line-height)
+    var(--default-font-family);
+  --sys-typescale-body5-medium: var(--ref-typeface-weight-medium)
+    var(--sys-typescale-body5-size) / var(--sys-typescale-body5-line-height)
+    var(--default-font-family);
+  --sys-typescale-body1-bold: var(--ref-typeface-weight-bold)
+    var(--sys-typescale-body1-size) / var(--sys-typescale-body1-line-height)
+    var(--default-font-family);
+  --sys-typescale-body2-bold: var(--ref-typeface-weight-bold)
+    var(--sys-typescale-body2-size) / var(--sys-typescale-body2-line-height)
+    var(--default-font-family);
+  --sys-typescale-body3-bold: var(--ref-typeface-weight-bold)
+    var(--sys-typescale-body3-size) / var(--sys-typescale-body3-line-height)
+    var(--default-font-family);
+  --sys-typescale-body4-bold: var(--ref-typeface-weight-bold)
+    var(--sys-typescale-body4-size) / var(--sys-typescale-body4-line-height)
+    var(--default-font-family);
+  --sys-typescale-body5-bold: var(--ref-typeface-weight-bold)
+    var(--sys-typescale-body5-size) / var(--sys-typescale-body5-line-height)
+    var(--default-font-family);
   --sys-typescale-monospace-regular: var(--ref-typeface-weight-regular)
-    var(--sys-typescale-monospace-size) / var(--sys-typescale-monospace-line-height)
-    var(--monospace-font-family);
+    var(--sys-typescale-monospace-size) /
+    var(--sys-typescale-monospace-line-height) var(--monospace-font-family);
   --sys-typescale-monospace-bold: var(--ref-typeface-weight-bold)
-    var(--sys-typescale-monospace-size) / var(--sys-typescale-monospace-line-height)
-    var(--monospace-font-family);
+    var(--sys-typescale-monospace-size) /
+    var(--sys-typescale-monospace-line-height) var(--monospace-font-family);
   --sys-typescale-headline1-size: 24px;
   --sys-typescale-headline2-size: 20px;
   --sys-typescale-headline3-size: 18px;
@@ -679,11 +743,16 @@
 
   /* Elevation begin */
 
-  --sys-elevation-level1: 0 1px 2px 0 rgb(0 0 0 / 30%), 0 1px 3px 1px rgb(0 0 0 / 15%);
-  --sys-elevation-level2: 0 1px 2px 0 rgb(0 0 0 / 30%), 0 2px 6px 2px rgb(0 0 0 / 15%);
-  --sys-elevation-level3: 0 4px 8px 3px rgb(0 0 0 / 15%), 0 1px 3px 0 rgb(0 0 0 / 30%);
-  --sys-elevation-level4: 0 6px 10px 4px rgb(0 0 0 / 15%), 0 2px 3px 0 rgb(0 0 0 / 30%);
-  --sys-elevation-level5: 0 8px 12px 6px rgb(0 0 0 / 15%), 0 4px 4px 0 rgb(0 0 0 / 30%);
+  --sys-elevation-level1:
+    0 1px 2px 0 rgb(0 0 0 / 30%), 0 1px 3px 1px rgb(0 0 0 / 15%);
+  --sys-elevation-level2:
+    0 1px 2px 0 rgb(0 0 0 / 30%), 0 2px 6px 2px rgb(0 0 0 / 15%);
+  --sys-elevation-level3:
+    0 4px 8px 3px rgb(0 0 0 / 15%), 0 1px 3px 0 rgb(0 0 0 / 30%);
+  --sys-elevation-level4:
+    0 6px 10px 4px rgb(0 0 0 / 15%), 0 2px 3px 0 rgb(0 0 0 / 30%);
+  --sys-elevation-level5:
+    0 8px 12px 6px rgb(0 0 0 / 15%), 0 4px 4px 0 rgb(0 0 0 / 30%);
 
   /* Elevation end */
 
@@ -709,12 +778,12 @@
   /* Motion end */
 
   /**
-   * Reference colors. Reference colors are a set of base colors that get updated on Chrome
-   * color theme changes and should not be directly used (except when defining system or
-   * application colors).
-   *
-   * DON'T CHANGE AND DON'T USE THEM DIRECTLY IN CODE.
-   * More info: https://chromium.googlesource.com/devtools/devtools-frontend/+/main/docs/styleguide/ux/styles.md#colors
+    * Reference colors. Reference colors are a set of base colors that get updated on Chrome
+    * color theme changes and should not be directly used (except when defining system or
+    * application colors).
+    *
+    * DON'T CHANGE AND DON'T USE THEM DIRECTLY IN CODE.
+    * More info: https://chromium.googlesource.com/devtools/devtools-frontend/+/main/docs/styleguide/ux/styles.md#colors
    **/
   --ref-palette-primary0: var(--color-ref-primary0, rgb(0 0 0 / 100%));
   --ref-palette-primary10: var(--color-ref-primary10, rgb(4 30 73 / 100%));
@@ -728,7 +797,10 @@
   --ref-palette-primary90: var(--color-ref-primary90, rgb(211 227 253 / 100%));
   --ref-palette-primary95: var(--color-ref-primary95, rgb(236 243 254 / 100%));
   --ref-palette-primary99: var(--color-ref-primary99, rgb(250 251 255 / 100%));
-  --ref-palette-primary100: var(--color-ref-primary100, rgb(255 255 255 / 100%));
+  --ref-palette-primary100: var(
+    --color-ref-primary100,
+    rgb(255 255 255 / 100%)
+  );
   --ref-palette-secondary0: var(--color-ref-secondary0, rgb(0 0 0 / 100%));
   --ref-palette-secondary10: var(--color-ref-secondary10, rgb(0 29 53 / 100%));
   --ref-palette-secondary15: var(--color-ref-secondary15, rgb(0 40 69 / 100%));
@@ -737,14 +809,38 @@
   --ref-palette-secondary30: var(--color-ref-secondary30, rgb(0 74 119 / 100%));
   --ref-palette-secondary35: var(--color-ref-secondary35, rgb(0 87 137 / 100%));
   --ref-palette-secondary40: var(--color-ref-secondary40, rgb(0 99 155 / 100%));
-  --ref-palette-secondary50: var(--color-ref-secondary50, rgb(4 125 183 / 100%));
-  --ref-palette-secondary60: var(--color-ref-secondary60, rgb(57 152 211 / 100%));
-  --ref-palette-secondary70: var(--color-ref-secondary70, rgb(90 179 240 / 100%));
-  --ref-palette-secondary80: var(--color-ref-secondary80, rgb(127 207 255 / 100%));
-  --ref-palette-secondary90: var(--color-ref-secondary90, rgb(223 243 255 / 100%));
-  --ref-palette-secondary95: var(--color-ref-secondary95, rgb(223 243 255 / 100%));
-  --ref-palette-secondary99: var(--color-ref-secondary99, rgb(247 252 255 / 100%));
-  --ref-palette-secondary100: var(--color-ref-secondary100, rgb(255 255 255 / 100%));
+  --ref-palette-secondary50: var(
+    --color-ref-secondary50,
+    rgb(4 125 183 / 100%)
+  );
+  --ref-palette-secondary60: var(
+    --color-ref-secondary60,
+    rgb(57 152 211 / 100%)
+  );
+  --ref-palette-secondary70: var(
+    --color-ref-secondary70,
+    rgb(90 179 240 / 100%)
+  );
+  --ref-palette-secondary80: var(
+    --color-ref-secondary80,
+    rgb(127 207 255 / 100%)
+  );
+  --ref-palette-secondary90: var(
+    --color-ref-secondary90,
+    rgb(223 243 255 / 100%)
+  );
+  --ref-palette-secondary95: var(
+    --color-ref-secondary95,
+    rgb(223 243 255 / 100%)
+  );
+  --ref-palette-secondary99: var(
+    --color-ref-secondary99,
+    rgb(247 252 255 / 100%)
+  );
+  --ref-palette-secondary100: var(
+    --color-ref-secondary100,
+    rgb(255 255 255 / 100%)
+  );
   --ref-palette-tertiary0: var(--color-ref-tertiary0, rgb(0 0 0 / 100%));
   --ref-palette-tertiary10: var(--color-ref-tertiary10, rgb(7 39 17 / 100%));
   --ref-palette-tertiary20: var(--color-ref-tertiary20, rgb(10 56 24 / 100%));
@@ -753,11 +849,26 @@
   --ref-palette-tertiary50: var(--color-ref-tertiary50, rgb(25 134 57 / 100%));
   --ref-palette-tertiary60: var(--color-ref-tertiary60, rgb(30 164 70 / 100%));
   --ref-palette-tertiary70: var(--color-ref-tertiary70, rgb(55 190 95 / 100%));
-  --ref-palette-tertiary80: var(--color-ref-tertiary80, rgb(109 213 140 / 100%));
-  --ref-palette-tertiary90: var(--color-ref-tertiary90, rgb(196 238 208 / 100%));
-  --ref-palette-tertiary95: var(--color-ref-tertiary95, rgb(231 248 237 / 100%));
-  --ref-palette-tertiary99: var(--color-ref-tertiary99, rgb(242 255 238 / 100%));
-  --ref-palette-tertiary100: var(--color-ref-tertiary100, rgb(255 255 255 / 100%));
+  --ref-palette-tertiary80: var(
+    --color-ref-tertiary80,
+    rgb(109 213 140 / 100%)
+  );
+  --ref-palette-tertiary90: var(
+    --color-ref-tertiary90,
+    rgb(196 238 208 / 100%)
+  );
+  --ref-palette-tertiary95: var(
+    --color-ref-tertiary95,
+    rgb(231 248 237 / 100%)
+  );
+  --ref-palette-tertiary99: var(
+    --color-ref-tertiary99,
+    rgb(242 255 238 / 100%)
+  );
+  --ref-palette-tertiary100: var(
+    --color-ref-tertiary100,
+    rgb(255 255 255 / 100%)
+  );
   --ref-palette-error0: var(--color-ref-error0, rgb(0 0 0 / 100%));
   --ref-palette-error10: var(--color-ref-error10, rgb(65 14 11 / 100%));
   --ref-palette-error20: var(--color-ref-error20, rgb(96 20 16 / 100%));
@@ -787,20 +898,62 @@
   --ref-palette-neutral95: var(--color-ref-neutral95, rgb(242 242 242 / 100%));
   --ref-palette-neutral98: var(--color-ref-neutral98, rgb(250 249 248 / 100%));
   --ref-palette-neutral99: var(--color-ref-neutral99, rgb(253 252 251 / 100%));
-  --ref-palette-neutral100: var(--color-ref-neutral100, rgb(255 255 255 / 100%));
-  --ref-palette-neutral-variant0: var(--color-ref-neutral-variant0, rgb(0 0 0 / 100%));
-  --ref-palette-neutral-variant10: var(--color-ref-neutral-variant10, rgb(25 29 28 / 100%));
-  --ref-palette-neutral-variant20: var(--color-ref-neutral-variant20, rgb(45 49 47 / 100%));
-  --ref-palette-neutral-variant30: var(--color-ref-neutral-variant30, rgb(68 71 70 / 100%));
-  --ref-palette-neutral-variant40: var(--color-ref-neutral-variant40, rgb(92 95 94 / 100%));
-  --ref-palette-neutral-variant50: var(--color-ref-neutral-variant50, rgb(116 119 117 / 100%));
-  --ref-palette-neutral-variant60: var(--color-ref-neutral-variant60, rgb(142 145 143 / 100%));
-  --ref-palette-neutral-variant70: var(--color-ref-neutral-variant70, rgb(169 172 170 / 100%));
-  --ref-palette-neutral-variant80: var(--color-ref-neutral-variant80, rgb(196 199 197 / 100%));
-  --ref-palette-neutral-variant90: var(--color-ref-neutral-variant90, rgb(225 227 225 / 100%));
-  --ref-palette-neutral-variant95: var(--color-ref-neutral-variant95, rgb(239 242 239 / 100%));
-  --ref-palette-neutral-variant99: var(--color-ref-neutral-variant99, rgb(250 253 251 / 100%));
-  --ref-palette-neutral-variant100: var(--color-ref-neutral-variant100, rgb(255 255 255 / 100%));
+  --ref-palette-neutral100: var(
+    --color-ref-neutral100,
+    rgb(255 255 255 / 100%)
+  );
+  --ref-palette-neutral-variant0: var(
+    --color-ref-neutral-variant0,
+    rgb(0 0 0 / 100%)
+  );
+  --ref-palette-neutral-variant10: var(
+    --color-ref-neutral-variant10,
+    rgb(25 29 28 / 100%)
+  );
+  --ref-palette-neutral-variant20: var(
+    --color-ref-neutral-variant20,
+    rgb(45 49 47 / 100%)
+  );
+  --ref-palette-neutral-variant30: var(
+    --color-ref-neutral-variant30,
+    rgb(68 71 70 / 100%)
+  );
+  --ref-palette-neutral-variant40: var(
+    --color-ref-neutral-variant40,
+    rgb(92 95 94 / 100%)
+  );
+  --ref-palette-neutral-variant50: var(
+    --color-ref-neutral-variant50,
+    rgb(116 119 117 / 100%)
+  );
+  --ref-palette-neutral-variant60: var(
+    --color-ref-neutral-variant60,
+    rgb(142 145 143 / 100%)
+  );
+  --ref-palette-neutral-variant70: var(
+    --color-ref-neutral-variant70,
+    rgb(169 172 170 / 100%)
+  );
+  --ref-palette-neutral-variant80: var(
+    --color-ref-neutral-variant80,
+    rgb(196 199 197 / 100%)
+  );
+  --ref-palette-neutral-variant90: var(
+    --color-ref-neutral-variant90,
+    rgb(225 227 225 / 100%)
+  );
+  --ref-palette-neutral-variant95: var(
+    --color-ref-neutral-variant95,
+    rgb(239 242 239 / 100%)
+  );
+  --ref-palette-neutral-variant99: var(
+    --color-ref-neutral-variant99,
+    rgb(250 253 251 / 100%)
+  );
+  --ref-palette-neutral-variant100: var(
+    --color-ref-neutral-variant100,
+    rgb(255 255 255 / 100%)
+  );
 
   /* Additional fixed colors */
   --ref-palette-blue0: rgb(0 0 0 / 100%);

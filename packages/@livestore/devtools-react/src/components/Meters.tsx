@@ -107,7 +107,7 @@ export const Meters: React.FC<{
     [],
   )
 
-  // TODO add "in flight tasks" (e.g. for diffstream, images, etc.)
+  // TODO add a meter for in-flight background work such as sync pulls and image decoding.
 
   return (
     <div

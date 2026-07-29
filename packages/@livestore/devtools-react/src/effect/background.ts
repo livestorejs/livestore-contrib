@@ -38,9 +38,8 @@ export const backgroundWork = ({
             {
               status: networkStatus,
             },
-            // TODO seems like there are some unique constraints on the id field
-            // maybe if the timestamp overlaps or some concurrency issues?
-            // https://share.cleanshot.com/Qm4DSRV0
+            // TODO use a stable tie-breaker if distinct status updates can share
+            // the same timestamp; the table id must remain unique.
             networkStatus.timestampMs.toString(),
           ),
         )
