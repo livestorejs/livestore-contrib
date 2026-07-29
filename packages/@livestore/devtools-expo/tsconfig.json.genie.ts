@@ -16,5 +16,5 @@ export default tsconfigJson({
   },
   include: ['./src', 'src/types.d.ts'],
   exclude: [...packageTsconfigExclude],
-  references: [refs.adapterWeb, refs.adapterNode, refs.utils],
+  references: [{ path: '../devtools-vite' }, refs.adapterWeb, refs.adapterNode, refs.utils],
 })

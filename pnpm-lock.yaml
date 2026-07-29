@@ -2564,6 +2564,12 @@ importers:
       '@livestore/utils-dev':
         specifier: link:../../repos/livestore/packages/@livestore/utils-dev
         version: link:../../repos/livestore/packages/@livestore/utils-dev
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      react-dom:
+        specifier: 19.2.3
+        version: 19.2.3(react@19.2.3)
     devDependencies:
       '@effect/opentelemetry':
         specifier: 4.0.0-beta.98

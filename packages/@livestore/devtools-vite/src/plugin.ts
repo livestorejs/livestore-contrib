@@ -5,7 +5,11 @@ import { Effect, Logger, Schema } from '@livestore/utils/effect'
 import type { InlineConfig, ViteDevServer } from 'vite'
 import { createIdResolver, normalizePath, type Plugin, runnerImport } from 'vite'
 
-import { getMountPath, shouldPassThroughViteRequest } from './vite-path.ts'
+import {
+  getMountPath,
+  normalizeClientImport,
+  shouldPassThroughViteRequest,
+} from './vite-path.ts'
 
 export const PluginOptions = Schema.Struct({
   /**
@@ -465,24 +469,6 @@ const mergeOptimizeDepsEntries = ({
     }
   }
   return mergedEntries.length > 0 ? mergedEntries : current
-}
-
-/**
- * Normalize a Vite-resolved module id for browser consumption.
- * - file:// and absolute paths become /@fs/... to avoid bare specifiers.
- * - Already normalized ids are returned as-is.
- */
-const normalizeClientImport = (resolved: string | null | undefined): string | undefined => {
-  if (!resolved) return undefined
-  // Vite resolves to file:// or absolute paths; convert to /@fs for client imports.
-  if (resolved.startsWith('file://')) {
-    const url = new URL(resolved)
-    return `/@fs/${normalizePath(url.pathname)}`
-  }
-  if (path.isAbsolute(resolved) && !resolved.startsWith('/@fs/')) {
-    return `/@fs/${normalizePath(resolved)}`
-  }
-  return resolved
 }
 
 /**

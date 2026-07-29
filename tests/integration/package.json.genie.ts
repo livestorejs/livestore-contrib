@@ -21,6 +21,7 @@ const runtimeDeps = catalog.compose({
       utilsPkg,
       utilsDevPkg,
     ],
+    external: catalog.pick('react', 'react-dom'),
   },
   devDependencies: {
     external: effectDevDeps('@playwright/test', '@types/node', 'vite', 'vitest', 'wrangler'),

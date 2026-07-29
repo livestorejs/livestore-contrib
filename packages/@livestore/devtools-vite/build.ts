@@ -67,7 +67,7 @@ export declare const livestoreDevtoolsPlugin: (options: PluginOptions) => Plugin
 export const build = Cli.Command.make(
   'run',
   {
-    devBuild: Cli.Options.boolean('devBuild').pipe(Cli.Options.withDefault(false)),
+    devBuild: Cli.Flag.boolean('devBuild').pipe(Cli.Flag.withDefault(false)),
   },
   Effect.fn('@livestore/devtools-vite/build')(function* ({ devBuild: isDevBuild }) {
     const packageDir = `${workspaceRoot}/packages/@livestore/devtools-vite`
@@ -114,10 +114,9 @@ export const build = Cli.Command.make(
 
 if (import.meta.main) {
   Cli.Command.run(build, {
-    name: 'Build @livestore/devtools-vite',
     version: '0.0.0',
-  })(process.argv).pipe(
-    Effect.provide(Layer.mergeAll(PlatformNode.NodeContext.layer)),
+  }).pipe(
+    Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer)),
     PlatformNode.NodeRuntime.runMain,
   )
 }

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getMountPath,
   getPathnameFromRequestUrl,
+  normalizeClientImport,
   shouldPassThroughViteRequest,
 } from './vite-path.js'
 
@@ -73,5 +74,25 @@ describe('shouldPassThroughViteRequest', () => {
         mountPath: '/_livestore',
       }),
     ).toEqual(false)
+  })
+})
+
+describe('normalizeClientImport', () => {
+  it('normalizes absolute paths without a double slash after /@fs', () => {
+    expect(normalizeClientImport('/workspace/example/module.ts')).toEqual(
+      '/@fs/workspace/example/module.ts',
+    )
+  })
+
+  it('normalizes file URLs without a double slash after /@fs', () => {
+    expect(normalizeClientImport('file:///workspace/example/module.ts')).toEqual(
+      '/@fs/workspace/example/module.ts',
+    )
+  })
+
+  it('preserves Vite ids that are already browser-consumable', () => {
+    expect(normalizeClientImport('/@fs/workspace/example/module.ts')).toEqual(
+      '/@fs/workspace/example/module.ts',
+    )
   })
 })

@@ -1,5 +1,7 @@
 import path from 'node:path'
 
+import { normalizePath } from 'vite'
+
 /**
  * Computes the mount path for the devtools, combining the Vite base path with the devtools pathname.
  *
@@ -102,4 +104,23 @@ export const shouldPassThroughViteRequest = ({
     viteResourceExtensions.some((extension) => relativePathname.endsWith(extension)) ||
     hasViteResourceQuery(rawUrl)
   )
+}
+
+/**
+ * Normalizes a Vite-resolved module id for use as a browser import.
+ *
+ * Vite's `/@fs` prefix is concatenated directly with the absolute pathname:
+ * `/@fs/home/example/module.ts`, never `/@fs//home/example/module.ts`.
+ */
+export const normalizeClientImport = (
+  resolved: string | null | undefined,
+): string | undefined => {
+  if (!resolved) return undefined
+  if (resolved.startsWith('file://')) {
+    return `/@fs${normalizePath(new URL(resolved).pathname)}`
+  }
+  if (path.isAbsolute(resolved) && !resolved.startsWith('/@fs/')) {
+    return `/@fs${normalizePath(resolved)}`
+  }
+  return resolved
 }

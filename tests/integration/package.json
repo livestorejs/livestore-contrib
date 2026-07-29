@@ -14,7 +14,9 @@
     "@livestore/livestore": "link:../../repos/livestore/packages/@livestore/livestore",
     "@livestore/sync-cf": "link:../../repos/livestore/packages/@livestore/sync-cf",
     "@livestore/utils": "link:../../repos/livestore/packages/@livestore/utils",
-    "@livestore/utils-dev": "link:../../repos/livestore/packages/@livestore/utils-dev"
+    "@livestore/utils-dev": "link:../../repos/livestore/packages/@livestore/utils-dev",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@effect/opentelemetry": "4.0.0-beta.98",
