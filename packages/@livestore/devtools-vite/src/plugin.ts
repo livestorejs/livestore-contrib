@@ -13,6 +13,8 @@ import {
   shouldPassThroughViteRequest,
 } from './vite-path.ts'
 
+export { devtoolsReactSourceFilter } from './vite-path.ts'
+
 export const PluginOptions = Schema.Struct({
   /**
    * The path to the schema file. The schema file needs to export the schema as `export const schema`.

@@ -1,7 +1,7 @@
 import process from 'node:process'
 
 import { cloudflare } from '@cloudflare/vite-plugin'
-import { livestoreDevtoolsPlugin } from '@livestore/devtools-vite'
+import { devtoolsReactSourceFilter, livestoreDevtoolsPlugin } from '@livestore/devtools-vite'
 import { defineConfig } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
 
@@ -25,7 +25,7 @@ export default defineConfig({
     For more info see https://github.com/thetarnav/solid-devtools/tree/main/packages/extension#readme
     */
     // devtools(),
-    solidPlugin({ exclude: ['@livestore/**devtools**', 'react-dom/**'] }),
+    solidPlugin({ exclude: [devtoolsReactSourceFilter, 'react-dom/**'] }),
     livestoreDevtoolsPlugin({ schemaPath: './src/livestore/schema.ts' }),
   ],
 })

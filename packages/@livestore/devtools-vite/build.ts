@@ -61,6 +61,7 @@ export interface PluginOptions {
 }
 
 export declare const PluginOptions: Schema.Schema<PluginOptions>
+export declare const devtoolsReactSourceFilter: RegExp
 export declare const livestoreDevtoolsPlugin: (options: PluginOptions) => Plugin
 `
 

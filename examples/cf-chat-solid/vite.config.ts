@@ -1,7 +1,7 @@
 import process from 'node:process'
 
 import { cloudflare } from '@cloudflare/vite-plugin'
-import { livestoreDevtoolsPlugin } from '@livestore/devtools-vite'
+import { devtoolsReactSourceFilter, livestoreDevtoolsPlugin } from '@livestore/devtools-vite'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
@@ -17,7 +17,7 @@ export default defineConfig({
   worker: { format: 'es' },
   plugins: [
     cloudflare(),
-    solidPlugin({ exclude: ['@livestore/**devtools**', 'react-dom/**'] }),
+    solidPlugin({ exclude: [devtoolsReactSourceFilter, 'react-dom/**'] }),
     tailwindcss(),
     livestoreDevtoolsPlugin({ schemaPath: './src/livestore/schema.ts' }),
   ],

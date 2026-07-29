@@ -1,11 +1,36 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  devtoolsReactSourceFilter,
   getMountPath,
   getPathnameFromRequestUrl,
   normalizeClientImport,
   shouldPassThroughViteRequest,
 } from './vite-path.js'
+
+describe('devtoolsReactSourceFilter', () => {
+  it('matches Vite absolute source ids', () => {
+    expect(
+      devtoolsReactSourceFilter.test(
+        '/@fs/workspace/packages/@livestore/devtools-react/src/mount-devtools.tsx',
+      ),
+    ).toEqual(true)
+  })
+
+  it('matches package-manager source ids on Windows', () => {
+    expect(
+      devtoolsReactSourceFilter.test(
+        String.raw`C:\workspace\node_modules\@livestore\devtools-react\src\mod.ts`,
+      ),
+    ).toEqual(true)
+  })
+
+  it('does not match host application source', () => {
+    expect(
+      devtoolsReactSourceFilter.test('/workspace/examples/solid/src/App.tsx'),
+    ).toEqual(false)
+  })
+})
 
 describe('getMountPath', () => {
   it('default vite / node adapter case', () => {

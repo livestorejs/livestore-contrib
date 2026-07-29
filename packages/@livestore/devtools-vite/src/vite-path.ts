@@ -3,6 +3,14 @@ import path from 'node:path'
 import { normalizePath } from 'vite'
 
 /**
+ * Excludes the React DevTools source from competing host JSX transforms.
+ *
+ * Matches both package-manager paths and Vite's absolute `/@fs` source IDs.
+ */
+export const devtoolsReactSourceFilter =
+  /[/\\]@livestore[/\\]devtools-react[/\\]src[/\\]/
+
+/**
  * Computes the mount path for the devtools, combining the Vite base path with the devtools pathname.
  *
  * The result is used both for server-side middleware mounting and for the client-side
