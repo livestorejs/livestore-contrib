@@ -1,0 +1,91 @@
+{
+  "name": "@livestore/devtools-react",
+  "version": "0.4.0",
+  "license": "LicenseRef-LiveStore-Community-1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/livestorejs/livestore-contrib.git"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/mod.ts",
+    "./components": "./src/components/mod.ts",
+    "./components/Tabs": "./src/components/Tabs/mod.ts",
+    "./index.css": "./dist/index.css"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tailwindcss -i ./src/index.css -o ./dist/index.css",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "1.1.4",
+    "@dprint/formatter": "0.4.1",
+    "@dprint/sql": "0.2.0",
+    "@glideapps/glide-data-grid": "6.0.4-alpha24",
+    "@glideapps/glide-data-grid-cells": "6.0.4-alpha24",
+    "@livestore/adapter-web": "link:../../../repos/livestore/packages/@livestore/adapter-web",
+    "@livestore/common": "link:../../../repos/livestore/packages/@livestore/common",
+    "@livestore/devtools-common": "workspace:^",
+    "@livestore/livestore": "link:../../../repos/livestore/packages/@livestore/livestore",
+    "@livestore/react": "link:../../../repos/livestore/packages/@livestore/react",
+    "@livestore/sqlite-wasm": "link:../../../repos/livestore/packages/@livestore/sqlite-wasm",
+    "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils",
+    "@livestore/webmesh": "link:../../../repos/livestore/packages/@livestore/webmesh",
+    "@overeng/react-inspector": "link:../../../repos/effect-utils/packages/@overeng/react-inspector",
+    "@tanstack/react-router": "1.145.7",
+    "clsx": "2.1.1",
+    "lucide-react": "0.488.0",
+    "react-aria": "3.50.0",
+    "react-aria-components": "1.19.0",
+    "react-error-boundary": "6.0.0",
+    "react-icons": "5.5.0",
+    "reactflow": "11.11.4",
+    "tailwind-merge": "2.6.0"
+  },
+  "devDependencies": {
+    "@storybook/react": "10.4.6",
+    "@storybook/react-vite": "10.4.6",
+    "tailwindcss": "4.1.18",
+    "vite": "7.3.1",
+    "vitest": "4.1.9"
+  },
+  "peerDependencies": {
+    "@effect/opentelemetry": "^4.0.0-beta.99",
+    "@effect/platform-browser": "^4.0.0-beta.99",
+    "@effect/platform-bun": "^4.0.0-beta.99",
+    "@effect/platform-node": "^4.0.0-beta.99",
+    "@effect/platform-node-shared": "^4.0.0-beta.99",
+    "@effect/vitest": "^4.0.0-beta.99",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@standard-schema/spec": "^1.1.0",
+    "effect": "^4.0.0-beta.99",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "$genie": {
+    "releaseBuild": {
+      "command": [
+        "pnpm",
+        "exec",
+        "tailwindcss",
+        "-i",
+        "./src/index.css",
+        "-o",
+        "./dist/index.css"
+      ],
+      "outputs": [
+        "dist"
+      ]
+    }
+  }
+}

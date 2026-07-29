@@ -6,6 +6,7 @@ import adapterExpoPkg from './packages/@livestore/adapter-expo/package.json.geni
 import adapterNodePkg from './packages/@livestore/adapter-node/package.json.genie.ts'
 import cliPkg from './packages/@livestore/cli/package.json.genie.ts'
 import devtoolsCommonPkg from './packages/@livestore/devtools-common/package.json.genie.ts'
+import devtoolsReactPkg from './packages/@livestore/devtools-react/package.json.genie.ts'
 import devtoolsExpoPkg from './packages/@livestore/devtools-expo/package.json.genie.ts'
 import graphqlPkg from './packages/@livestore/graphql/package.json.genie.ts'
 import solidPkg from './packages/@livestore/solid/package.json.genie.ts'
@@ -20,6 +21,7 @@ export const rootWorkspacePackages = [
   adapterNodePkg,
   cliPkg,
   devtoolsCommonPkg,
+  devtoolsReactPkg,
   devtoolsExpoPkg,
   graphqlPkg,
   solidPkg,

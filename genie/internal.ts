@@ -12,6 +12,7 @@ export const contribPackageNames = [
   'cli',
   'devtools-common',
   'devtools-expo',
+  'devtools-react',
   'graphql',
   'solid',
   'svelte',

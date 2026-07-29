@@ -1,0 +1,166 @@
+LiveStore Community License 1.0
+
+SPDX-License-Identifier: LicenseRef-LiveStore-Community-1.0
+
+Licensor: Johannes Schickling
+
+## Purpose
+
+This license lets you use, modify, and share this software for free if you are
+below the size thresholds in **Free Use**, or if one of the **Always-Free Uses**
+applies to you. Organizations above those thresholds need a commercial license.
+
+Every released version of the software converts to the Apache License, Version
+2.0 two years after that version was first published, so nothing licensed under
+these terms stays restricted permanently.
+
+## Acceptance
+
+To receive this license, you must agree to its rules. The rules of this license
+are both obligations under your agreement with the licensor and conditions to
+your license. You must not do anything under this license that breaks any of its
+rules.
+
+## Free Use
+
+You may use the software free of charge if, at all times while you use it, **all
+three** of the following are true of you and your affiliates taken together:
+
+1. fewer than 10 individuals work for you, counting employees, officers, and
+   individual contractors;
+
+2. your revenue in your most recently completed fiscal year was less than
+   US $1,000,000; and
+
+3. the total external investment you have ever received is less than
+   US $1,000,000, counted cumulatively across all rounds and instruments.
+
+These figures are fixed. They are not indexed to inflation and do not change
+over time. If you exceed any one of the three, Free Use ends and you need a
+commercial license, unless an Always-Free Use applies to you.
+
+## Always-Free Uses
+
+Whether or not you meet the thresholds above, this license is free for:
+
+1. **Individuals**, for personal, hobby, learning, or portfolio use.
+
+2. **Nonprofit organizations, educational institutions, government bodies, and
+   public research organizations**, for their own activities.
+
+3. **Evaluation** by any organization, for up to 30 consecutive days, to decide
+   whether to obtain a commercial license.
+
+## Copyright License
+
+The licensor grants you a copyright license to use, modify, and share the
+software, for uses permitted by this license.
+
+## Distribution License
+
+The licensor grants you an additional copyright license to share the software,
+including modified copies, with anyone, provided that they receive it under this
+license and you comply with **Notices**.
+
+## Changes and New Works License
+
+The licensor grants you an additional copyright license to make changes to the
+software, and to create new works based on the software, for uses permitted by
+this license.
+
+## Patent License
+
+The licensor grants you a patent license for the software that covers patent
+claims the licensor can license, or becomes able to license, that you would
+infringe by using the software as permitted by this license.
+
+## Conversion to Apache License 2.0
+
+Two years after the date a given version of the software was first published,
+that version is additionally available to you under the Apache License, Version
+2.0, at your option, with no further action required by the licensor.
+
+Conversion applies per version, measured from that version's own publication
+date. Later versions remain under this license until their own two years elapse.
+Once a version has converted, the conversion is irrevocable for that version.
+
+## Enforcement
+
+Compliance with this license is a contractual matter between you and the
+licensor. The software contains no license keys, activation, telemetry, or other
+technical measure that verifies or restricts your use, and the licensor does not
+intend to add one.
+
+## Notices
+
+You must ensure that anyone who gets a copy of any part of the software from you
+also gets a copy of these terms, along with the above copyright notice.
+
+If you modify the software, you must include in any modified copies a prominent
+notice stating that you modified it.
+
+## No Other Rights
+
+These terms do not imply any licenses other than those expressly granted in
+these terms.
+
+## Patent Defense
+
+If you make any written claim that the software infringes or contributes to
+infringement of any patent, your patent license for the software granted under
+these terms ends immediately.
+
+If your company makes such a claim, your patent license ends immediately for
+work on behalf of your company.
+
+## Violations
+
+The first time you are notified in writing that you have violated any of these
+rules, or done anything with the software not covered by your licenses, your
+licenses can nonetheless continue if you come into full compliance with these
+terms, and take practical steps to correct past violations, within 32 days of
+receiving notice.
+
+Otherwise, all your licenses end immediately.
+
+## No Liability
+
+**As far as the law allows, the software comes as is, without any warranty or
+condition, and the licensor will not be liable to you for any damages arising
+out of these terms or the use or nature of the software, under any kind of legal
+claim.**
+
+## Definitions
+
+**Affiliate** means any organization that controls, is controlled by, or is
+under common control with you, where control means ownership of more than 50% of
+the voting interests or the power to direct management.
+
+**External investment** means capital received from third parties in exchange
+for equity, convertible instruments, or debt, including venture capital, private
+equity, and crowdfunding, but excluding revenue from customers and grants from
+the organizations described in Always-Free Use 2.
+
+**Individual** means a natural person.
+
+**Licensor** means the individual or entity offering these terms, and the
+software.
+
+**Software** means the software the licensor makes available under these terms,
+including any portion of it.
+
+**You** means the individual or entity agreeing to these terms.
+
+**Your company** means any legal entity, sole proprietorship, or other kind of
+organization that you work for, plus all its affiliates.
+
+**Your licenses** means all the licenses granted to you for the software under
+these terms.
+
+**Use** means anything you do with the software requiring one of your licenses.
+
+## Attribution
+
+Portions of these terms are adapted from the PolyForm project's license templates
+(https://polyformproject.org), which are made available under the Creative
+Commons Attribution 4.0 International license (CC BY 4.0).

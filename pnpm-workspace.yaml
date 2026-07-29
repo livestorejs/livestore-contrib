@@ -21,6 +21,7 @@ packages:
   - packages/@livestore/cli
   - packages/@livestore/devtools-common
   - packages/@livestore/devtools-expo
+  - packages/@livestore/devtools-react
   - packages/@livestore/graphql
   - packages/@livestore/solid
   - packages/@livestore/svelte

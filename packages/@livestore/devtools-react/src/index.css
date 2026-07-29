@@ -1,0 +1,34 @@
+/* import "@glideapps/glide-data-grid/dist/index.css"; */
+/* NOTE: Using relative path due to Tailwind v4 CSS import resolution issues with package.json exports */
+@import '../node_modules/@glideapps/glide-data-grid/dist/index.css';
+@import 'reactflow/dist/style.css';
+@import './chrome-devtools-design.css';
+
+@import 'tailwindcss';
+
+@config "../tailwind.config.cjs";
+
+@layer base {
+  [data-reach-tabs] {
+    @apply h-full flex flex-col;
+  }
+
+  html,
+  body {
+    @apply bg-devtools-background text-devtools-text;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    width: 100%;
+  }
+
+  #loading {
+    font-size: 14px;
+    padding: 12px;
+  }
+}
