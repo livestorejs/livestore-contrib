@@ -21,6 +21,13 @@
       "commit": "e5998a45f69960b38eb2b8cb67cbb07b9e6962c7",
       "pinned": false,
       "lockedAt": "2026-06-03T09:20:09.577Z"
+    },
+    "react-inspector": {
+      "url": "https://github.com/overengineeringstudio/react-inspector",
+      "ref": "01bb584f6c9683f0fa37ec53aadcff189ae642ef",
+      "commit": "01bb584f6c9683f0fa37ec53aadcff189ae642ef",
+      "pinned": true,
+      "lockedAt": "2026-07-29T13:49:58.608Z"
     }
   }
 }

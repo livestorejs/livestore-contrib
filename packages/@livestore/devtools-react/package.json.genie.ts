@@ -35,6 +35,7 @@ const runtimeDeps = catalog.compose({
       '@dprint/sql',
       '@glideapps/glide-data-grid',
       '@glideapps/glide-data-grid-cells',
+      'is-dom',
       'clsx',
       'lucide-react',
       'react-aria',
@@ -93,6 +94,9 @@ export default packageJson(
       './components/Tabs': './src/components/Tabs/mod.ts',
       './index.css': './dist/index.css',
     },
+    imports: {
+      '#vendor/react-inspector': '@overeng/react-inspector',
+    },
     /**
      * `src` is required because the exports above resolve into it. Upstream ships
      * `dist` only, which would publish a broken package — it is never exercised
@@ -111,6 +115,17 @@ export default packageJson(
         command: ['pnpm', 'exec', 'tailwindcss', '-i', './src/index.css', '-o', './dist/index.css'],
         outputs: ['dist'],
       },
+      releaseVendors: [
+        {
+          dependency: '@overeng/react-inspector',
+          sourceRepo: 'repos/effect-utils',
+          sourcePackage: 'packages/@overeng/react-inspector',
+          target: 'src/vendor/react-inspector',
+          import: '#vendor/react-inspector',
+          entry: './src/index.tsx',
+          files: ['src', 'LICENSE', 'UPSTREAM.md', 'package.json'],
+        },
+      ],
     },
   },
   runtimeDeps,

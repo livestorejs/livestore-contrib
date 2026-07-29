@@ -11,7 +11,7 @@ import {
   ObjectValue,
   SchemaProvider,
   useSchemaContext,
-} from '@overeng/react-inspector'
+} from '#vendor/react-inspector'
 
 import { JsonTreeViewerContextMenu } from './JsonTreeViewerContextMenu.js'
 

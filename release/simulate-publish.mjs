@@ -15,6 +15,8 @@ import {
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 
+import { applyVendorPlan, cleanupVendorPlan, planVendorPackage } from './vendor-package.mjs'
+
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
 
@@ -116,6 +118,7 @@ const plan = {
   packageCount: publishablePackages.length,
   packages: [],
 }
+const vendorPlans = new Map()
 
 const DEFAULT_RELEASE_BUILD = {
   command: ['pnpm', 'exec', 'tsc', '--build', 'tsconfig.json', '--noCheck'],
@@ -156,7 +159,19 @@ for (const { path, manifest } of publishablePackages) {
     addError(`${manifest.name} version ${manifest.version} does not match release version ${expectedVersion}`)
   }
 
-  const simulatedManifest = cloneJson(manifest)
+  let simulatedManifest = cloneJson(manifest)
+  let vendorPlan = { manifest: simulatedManifest, vendors: [] }
+  try {
+    vendorPlan = planVendorPackage({
+      rootDir,
+      targetPackageDir: dirname(join(rootDir, path)),
+      manifest: simulatedManifest,
+    })
+    simulatedManifest = vendorPlan.manifest
+    vendorPlans.set(manifest.name, vendorPlan)
+  } catch (error) {
+    addError(`${manifest.name} release vendor: ${error instanceof Error ? error.message : String(error)}`)
+  }
   const rewrites = []
 
   for (const section of dependencySections) {
@@ -208,6 +223,11 @@ for (const { path, manifest } of publishablePackages) {
     version: simulatedManifest.version,
     rewrites,
     releaseBuild,
+    vendors: vendorPlan.vendors.map((vendor) => ({
+      dependency: vendor.dependency,
+      fileCount: vendor.fileCount,
+      provenance: vendor.provenance,
+    })),
     manifest: simulatedManifest,
   })
 }
@@ -279,6 +299,81 @@ const packPackage = (pkg) => {
     throw new Error(`Expected one tarball for ${pkg.name}, found ${tarballs.length}`)
   }
   return { packDir, tarballPath: join(packDir, tarballs[0]) }
+}
+
+const walkFiles = (path) =>
+  readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = join(path, entry.name)
+    return entry.isDirectory() ? walkFiles(entryPath) : [entryPath]
+  })
+
+const localProtocolPaths = (value, path = []) => {
+  if (typeof value === 'string') return isLocalProtocol(value) ? [path.join('.')] : []
+  if (value === null || typeof value !== 'object') return []
+  return Object.entries(value).flatMap(([key, entry]) => localProtocolPaths(entry, [...path, key]))
+}
+
+const bareOverengSpecifier = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"](@overeng\/[^'"]+)['"]/g
+const moduleFileExtension = /\.(?:[cm]?[jt]sx?)$/
+
+const verifyPackedTarball = ({ pkg, tarballPath, vendorPlan }) => {
+  const extractDir = mkdtempSync(join(tmpdir(), 'livestore-contrib-pack-verify-'))
+  try {
+    execFileSync('tar', ['-xzf', tarballPath, '-C', extractDir], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    })
+
+    const packageDir = join(extractDir, 'package')
+    const packedManifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'))
+    const protocolPaths = localProtocolPaths(packedManifest)
+    if (protocolPaths.length > 0) {
+      throw new Error(`${pkg.name} packed manifest contains local protocols at: ${protocolPaths.join(', ')}`)
+    }
+
+    for (const section of dependencySections) {
+      const overengDependencies = Object.keys(packedManifest[section] ?? {}).filter((name) =>
+        name.startsWith('@overeng/'),
+      )
+      if (overengDependencies.length > 0) {
+        throw new Error(`${pkg.name} packed manifest contains @overeng dependencies: ${overengDependencies.join(', ')}`)
+      }
+    }
+    for (const [specifier, target] of Object.entries(packedManifest.imports ?? {})) {
+      if (typeof target === 'string' && target.startsWith('@overeng/')) {
+        throw new Error(`${pkg.name} packed imports.${specifier} contains bare specifier ${target}`)
+      }
+    }
+
+    for (const path of walkFiles(packageDir).filter((path) => moduleFileExtension.test(path))) {
+      const source = readFileSync(path, 'utf8')
+      const match = bareOverengSpecifier.exec(source)
+      bareOverengSpecifier.lastIndex = 0
+      if (match !== null) {
+        throw new Error(`${pkg.name} packed file ${relative(packageDir, path)} contains bare specifier ${match[1]}`)
+      }
+    }
+
+    for (const vendor of vendorPlan?.vendors ?? []) {
+      const vendorDir = join(packageDir, vendor.target)
+      if (existsSync(vendorDir) === false || statSync(vendorDir).isDirectory() === false) {
+        throw new Error(`${pkg.name} packed tarball is missing vendored directory ${vendor.target}`)
+      }
+      const license = readFileSync(join(vendorDir, 'LICENSE'), 'utf8')
+      if (
+        license.includes('Copyright (c) 2017 Xiaoyi Chen') === false ||
+        license.includes('Johannes Schickling') === false
+      ) {
+        throw new Error(`${pkg.name} packed vendor LICENSE is missing required notices`)
+      }
+      const upstream = readFileSync(join(vendorDir, 'UPSTREAM.md'), 'utf8')
+      if (upstream.includes('storybookjs/react-inspector') === false) {
+        throw new Error(`${pkg.name} packed vendor UPSTREAM.md is missing provenance`)
+      }
+    }
+  } finally {
+    rmSync(extractDir, { recursive: true, force: true })
+  }
 }
 
 const buildPackages = () => {
@@ -407,20 +502,31 @@ console.log(
 )
 for (const pkg of plan.packages) {
   const packagePath = relative(rootDir, join(rootDir, pkg.path))
-  console.log(`- ${pkg.name}: ${pkg.rewrites.length} rewrites (${packagePath})`)
+  const vendorCount = pkg.vendors.reduce((count, vendor) => count + vendor.fileCount, 0)
+  console.log(`- ${pkg.name}: ${pkg.rewrites.length} rewrites, ${vendorCount} vendored files (${packagePath})`)
 }
 
 if (dryRun === true || publish === true) {
   verifyRequiredCorePackages()
 
   const packed = []
+  const appliedVendorPlans = []
   try {
     applyManifestRewrites()
+
+    for (const pkg of plan.packages) {
+      const vendorPlan = vendorPlans.get(pkg.name)
+      if (vendorPlan === undefined || vendorPlan.vendors.length === 0) continue
+      applyVendorPlan(vendorPlan)
+      appliedVendorPlans.push(vendorPlan)
+    }
+
     buildPackages()
 
     for (const pkg of plan.packages) {
       const { packDir, tarballPath } = packPackage(pkg)
       packed.push({ pkg, packDir, tarballPath })
+      verifyPackedTarball({ pkg, tarballPath, vendorPlan: vendorPlans.get(pkg.name) })
     }
 
     smokeInstallPackedTarballs(packed)
@@ -445,6 +551,7 @@ if (dryRun === true || publish === true) {
     }
   } finally {
     restoreManifestRewrites()
+    for (const vendorPlan of appliedVendorPlans.reverse()) cleanupVendorPlan(vendorPlan)
     restoreGeneratedFiles()
     for (const { packDir } of packed) {
       rmSync(packDir, { recursive: true, force: true })

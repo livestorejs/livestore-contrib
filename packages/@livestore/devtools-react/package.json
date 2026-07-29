@@ -13,6 +13,9 @@
   ],
   "type": "module",
   "sideEffects": false,
+  "imports": {
+    "#vendor/react-inspector": "@overeng/react-inspector"
+  },
   "exports": {
     ".": "./src/mod.ts",
     "./components": "./src/components/mod.ts",
@@ -43,6 +46,7 @@
     "@overeng/react-inspector": "link:../../../repos/effect-utils/packages/@overeng/react-inspector",
     "@tanstack/react-router": "1.145.7",
     "clsx": "2.1.1",
+    "is-dom": "1.1.0",
     "lucide-react": "0.488.0",
     "react-aria": "3.50.0",
     "react-aria-components": "1.19.0",
@@ -87,6 +91,22 @@
       "outputs": [
         "dist"
       ]
-    }
+    },
+    "releaseVendors": [
+      {
+        "dependency": "@overeng/react-inspector",
+        "sourceRepo": "repos/effect-utils",
+        "sourcePackage": "packages/@overeng/react-inspector",
+        "target": "src/vendor/react-inspector",
+        "import": "#vendor/react-inspector",
+        "entry": "./src/index.tsx",
+        "files": [
+          "src",
+          "LICENSE",
+          "UPSTREAM.md",
+          "package.json"
+        ]
+      }
+    ]
   }
 }
