@@ -85,6 +85,22 @@ export const build = Cli.Command.make(
       Effect.provide(devtoolsReactCwd),
     )
 
+    // devtools-react consumes devtools-common at runtime. Build only its
+    // remaining public entries; the retired licensing entry stays deleted.
+    yield* cmd(
+      [
+        'bun build',
+        '--tsconfig-override ./tsconfig.bun-runtime.json',
+        '../devtools-common/src/index.ts',
+        '../devtools-common/src/chrome-extension.ts',
+        '--outdir ../devtools-common/dist',
+        '--target browser',
+        '--format esm',
+        '--splitting',
+        '--sourcemap=none',
+      ].join(' '),
+    ).pipe(Effect.provide(packageCwd), Effect.withSpan('bun.build.devtools-common'))
+
     fs.rmSync(distDir, { recursive: true, force: true })
     yield* cmd(
       [

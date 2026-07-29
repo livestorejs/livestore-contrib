@@ -1,4 +1,6 @@
+import { createRequire } from 'node:module'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { Devtools } from '@livestore/common'
 import { Effect, Logger, Result, Schema } from '@livestore/utils/effect'
@@ -51,9 +53,30 @@ export const PluginOptions = Schema.Struct({
 export type PluginOptions = typeof PluginOptions.Type
 
 const pluginName = '@livestore/devtools-vite'
+const pluginImporter = fileURLToPath(import.meta.url)
 const emptyModuleId = 'virtual:@livestore/devtools-vite/empty-module'
 const resolvedEmptyModuleId = `\0${emptyModuleId}`
 const emptyDevtoolsReactDependencies = new Set(['marked', 'react-responsive-carousel'])
+
+const getWorkspaceReactInspectorIsDomEntry = () => {
+  try {
+    const devtoolsReactEntry = createRequire(import.meta.url).resolve(
+      '@livestore/devtools-react',
+    )
+    const reactInspectorEntry =
+      createRequire(devtoolsReactEntry).resolve('@overeng/react-inspector')
+    if (
+      normalizePath(reactInspectorEntry).includes(
+        '/packages/@overeng/react-inspector/',
+      ) === false
+    ) {
+      return undefined
+    }
+    return createRequire(devtoolsReactEntry).resolve('is-dom')
+  } catch {
+    return undefined
+  }
+}
 
 type ViteDevServerWithOptimizeDeps = ViteDevServer & {
   optimizeDeps?: {
@@ -106,10 +129,18 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
           Effect.gen(function* () {
             const resolveId = createIdResolver(server.config)
             const devtoolsReactResolved = yield* Effect.promise(() =>
-              resolveId(server.environments.client, '@livestore/devtools-react'),
+              resolveId(
+                server.environments.client,
+                '@livestore/devtools-react',
+                pluginImporter,
+              ),
             )
             const devtoolsReactCssResolved = yield* Effect.promise(() =>
-              resolveId(server.environments.client, '@livestore/devtools-react/index.css'),
+              resolveId(
+                server.environments.client,
+                '@livestore/devtools-react/index.css',
+                pluginImporter,
+              ),
             )
             const devtoolsReactImport = normalizeClientImport(devtoolsReactResolved)
             const devtoolsReactCssImport = normalizeClientImport(devtoolsReactCssResolved)
@@ -127,6 +158,7 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
               resolveId(
                 server.environments.client,
                 '@livestore/adapter-web/shared-worker?sharedworker',
+                pluginImporter,
               ),
             ).pipe(
               Effect.map((resolved: string | null | undefined) =>
@@ -152,7 +184,11 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
         // Prewarm optimizeDeps once on startup; later requests reuse this outcome to decide whether to serve devtools.
         const resolveId = createIdResolver(server.config)
         const devtoolsReactEntry = yield* Effect.promise(() =>
-          resolveId(server.environments.client, '@livestore/devtools-react'),
+          resolveId(
+            server.environments.client,
+            '@livestore/devtools-react',
+            pluginImporter,
+          ),
         )
         const optimizeDepsOutcome = yield* prewarmOptimizeDeps({
           server: serverWithOptimizeDeps,
@@ -269,6 +305,41 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
       })
       if (mergedOptimizeDepsEntries !== undefined) {
         config.optimizeDeps.entries = mergedOptimizeDepsEntries
+      }
+
+      // Linked dependencies are not prebundled by default. The workspace import
+      // map points Inspector at an external checkout, whose CommonJS dependency
+      // cannot otherwise resolve back through devtools-react. Published packages
+      // vendor Inspector locally, so this conditional path stays disabled there.
+      const workspaceReactInspectorIsDomEntry =
+        getWorkspaceReactInspectorIsDomEntry()
+      if (workspaceReactInspectorIsDomEntry !== undefined) {
+        if (config.resolve === undefined) {
+          config.resolve = {}
+        }
+        if (Array.isArray(config.resolve.alias)) {
+          if (
+            config.resolve.alias.some(
+              (entry) => entry.find === 'is-dom',
+            ) === false
+          ) {
+            config.resolve.alias.push({
+              find: 'is-dom',
+              replacement: workspaceReactInspectorIsDomEntry,
+            })
+          }
+        } else {
+          config.resolve.alias = {
+            'is-dom': workspaceReactInspectorIsDomEntry,
+            ...config.resolve.alias,
+          }
+        }
+        if (config.optimizeDeps.include === undefined) {
+          config.optimizeDeps.include = []
+        }
+        if (config.optimizeDeps.include.includes('is-dom') === false) {
+          config.optimizeDeps.include.push('is-dom')
+        }
       }
 
       // Avoid adding transitive dependencies here because Vite may prebundle
