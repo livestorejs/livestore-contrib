@@ -1,9 +1,9 @@
 import { makeInMemoryAdapter } from '@livestore/adapter-web'
 import { SyncBackend, type UnknownError } from '@livestore/common'
 import type { LiveStoreSchema } from '@livestore/common/schema'
-import { createStore, type Store } from '@livestore/livestore'
+import { createStore, makeShutdownDeferred, type ShutdownDeferred, type Store } from '@livestore/livestore'
 import type { Schema } from '@livestore/utils/effect'
-import { Effect, type OtelTracer, type Scope, SubscriptionRef } from '@livestore/utils/effect'
+import { Cause, Deferred, Effect, Exit, type OtelTracer, type Scope, SubscriptionRef } from '@livestore/utils/effect'
 
 import {
   dispatchApplicationAction,
@@ -101,6 +101,8 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
       {
         readonly connectivity: SubscriptionRef.SubscriptionRef<boolean>
         readonly sessionId: string
+        readonly shutdownDeferred: ShutdownDeferred
+        shutdownReported: boolean
       }
     >()
     const stores = new Map<string, Store<TSchema>>()
@@ -128,6 +130,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
           payload: undefined,
         })
         const connectivity = yield* SubscriptionRef.make(command.client.initiallyConnected)
+        const shutdownDeferred = yield* makeShutdownDeferred
         const controlledBackend = makeConnectivityControlledBackend({
           clientId: command.client.id,
           connectivity,
@@ -145,9 +148,10 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
               onSyncError: 'ignore',
             },
           }),
+          shutdownDeferred,
         })
 
-        clients.set(command.client.id, { connectivity, sessionId })
+        clients.set(command.client.id, { connectivity, sessionId, shutdownDeferred, shutdownReported: false })
         stores.set(participantKey({ clientId: command.client.id, sessionId }), store)
         observedStoreId ??= command.storeId
         return acknowledge(command.operationId)
@@ -261,6 +265,25 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
         })
       })
 
+    const drainRuntimeFailures: ParticipantHost['drainRuntimeFailures'] = Effect.gen(function* () {
+      const failures: RuntimeFailureObservation[] = []
+      for (const [clientId, client] of clients) {
+        if (client.shutdownReported === true || (yield* Deferred.isDone(client.shutdownDeferred)) === false) continue
+        client.shutdownReported = true
+        const exit = yield* Deferred.await(client.shutdownDeferred).pipe(Effect.exit)
+        if (Exit.isFailure(exit) === false) continue
+        const failure = Cause.squash(exit.cause)
+        failures.push({
+          clientId,
+          sessionId: client.sessionId,
+          source: 'store-shutdown',
+          code: runtimeFailureCode(failure),
+          message: Cause.pretty(exit.cause),
+        })
+      }
+      return failures
+    })
+
     return {
       capabilities: inProcessHostCapabilities,
       backendId: args.backend.id,
@@ -277,7 +300,7 @@ export const makeInProcessHost = <TSchema extends LiveStoreSchema, TSyncMetadata
       restartSession: unsupportedLifecycle('session restart'),
       restartClient: unsupportedLifecycle('Client restart'),
       observeSystem,
-      drainRuntimeFailures: Effect.succeed([]),
+      drainRuntimeFailures,
       observeSync,
       inspectState,
     }
@@ -299,6 +322,14 @@ const getStore = <TSchema extends LiveStoreSchema>(
 }
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
+
+const runtimeFailureCode = (failure: unknown): string => {
+  if (typeof failure === 'object' && failure !== null && '_tag' in failure && typeof failure._tag === 'string') {
+    return failure._tag
+  }
+  if (failure instanceof Error) return failure.name
+  return 'UnknownRuntimeFailure'
+}
 
 const unsupportedLifecycle = (operation: string) => (_command: { operationId: string }) =>
   Effect.fail(new ScenarioOperationError('capability-unavailable', `In-process host does not support ${operation}`))

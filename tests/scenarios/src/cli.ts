@@ -8,6 +8,7 @@ import { PlatformNode } from '@livestore/utils/node'
 
 import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
+import { concurrentDecrementRebase } from './corpus/concurrent-decrement-rebase.ts'
 import { lateClientCatchUp } from './corpus/late-client-catch-up.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
 import { seededTodoWorkload } from './corpus/seeded-todo-workload.ts'
@@ -37,6 +38,7 @@ const scenarios: Readonly<Record<string, ScenarioAst>> = {
   [offlineWriterRecovery.id]: offlineWriterRecovery,
   [seededTodoWorkload.id]: seededTodoWorkload,
   [browserMultiSessionRecovery.id]: browserMultiSessionRecovery,
+  [concurrentDecrementRebase.id]: concurrentDecrementRebase,
   [lateClientCatchUp.id]: lateClientCatchUp,
   [sharedTodoWorkday.id]: sharedTodoWorkday,
 }

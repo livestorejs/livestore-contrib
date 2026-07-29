@@ -21,11 +21,11 @@ published Scenario product package (LSC.VER.SCEN-R01).
 
 The same normalized Scenario and host contract are composed through:
 
-| Profile      | Placement and state                                                                     | Backend baseline                   | Evidence boundary                                 |
-| ------------ | --------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------- |
-| `in-process` | Store and host in the runner process; SQLite                                            | controlled mock or local `sync-cf` | direct host boundary, sampled product state       |
-| `process`    | isolated Node child process; SQLite                                                     | local `sync-cf`                    | serialized process protocol                       |
-| `browser`    | persistent Chromium context per Client, page per session; OPFS, SharedWorker, Web Locks | local `sync-cf`                    | serialized page protocol and browser observations |
+| Profile      | Placement and state                                                                     | Backend baseline                   | Evidence boundary                                                       |
+| ------------ | --------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| `in-process` | Store and host in the runner process; SQLite                                            | controlled mock or local `sync-cf` | direct host boundary, sampled product state and Store shutdown failures |
+| `process`    | isolated Node child process; SQLite                                                     | local `sync-cf`                    | serialized process protocol                                             |
+| `browser`    | persistent Chromium context per Client, page per session; OPFS, SharedWorker, Web Locks | local `sync-cf`                    | serialized page protocol and browser observations                       |
 
 The improved core `makeMockSyncBackend` gives each connection an independent
 live Event broadcast, cursor-seeded/filtered pulls, a shared connection signal,
@@ -45,7 +45,11 @@ advertised from sampled correlation (LSC.VER.SCEN-R03, R04).
 The baseline corpus covers offline-writer recovery, backend outage/recovery,
 late catch-up, seeded mixed todo work, dynamic Client/session addition,
 multi-session browser recovery and Leader turnover, and a shared workday
-topology. Workload v1 expands application-owned named workloads sequentially
+topology. It also includes the intentional `concurrent-decrement-rebase`
+failure, which preserves a SQLite-enforced non-negative invariant violation
+during pending-Event reconciliation. The associated
+[red-team plan](../../../tests/scenarios/RED_TEAMING.md) defines the wider search,
+promotion, failure-signature, and reduction campaign. Workload v1 expands application-owned named workloads sequentially
 from a derived seed and retains the enclosing and child operation identities.
 
 The oracle catalogue checks terminal Eventlog equality, sampled confirmed

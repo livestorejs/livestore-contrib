@@ -15,6 +15,7 @@ pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile process --scenario backend-outage-recovery
 pnpm --dir tests/scenarios scenario:run --profile process --scenario seeded-todo-workload
 pnpm --dir tests/scenarios scenario:run --profile process --scenario late-client-catch-up
+pnpm --dir tests/scenarios scenario:run --scenario concurrent-decrement-rebase
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario browser-multi-session-recovery
 pnpm --dir tests/scenarios scenario:run --profile process --scenario shared-todo-workday --output artifacts/shared-todo-workday-process.json
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario shared-todo-workday --output artifacts/shared-todo-workday-browser.json
@@ -33,6 +34,11 @@ run.
 Set `SCENARIO_BROWSER_DB_SNAPSHOT_DIR=<directory>` to export the first session,
 leader, and eventlog databases immediately before each browser Client
 reconnects.
+
+`concurrent-decrement-rebase` is an intentional failure reproducer for the
+command-replay RFC's invalid-rebase class. Its CLI process exits non-zero after
+writing an inspectable artifact. See [RED_TEAMING.md](./RED_TEAMING.md) for the
+broader campaign and failure-reduction plan.
 
 ## Inspect a scenario run
 

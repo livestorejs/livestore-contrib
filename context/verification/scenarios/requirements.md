@@ -65,7 +65,9 @@ realization choices and gaps, as registered by core
 
 - **LSC.VER.SCEN-DQ1 Failure minimization realization.** Core
   LS.SYS.VER.SCEN-DQ1 remains open; the current CLI preserves failures but does
-  not shrink a generated workload or fault schedule.
+  not shrink a generated workload or fault schedule. The dependency-aware
+  reduction approach and first campaign are specified in
+  [`tests/scenarios/RED_TEAMING.md`](../../../tests/scenarios/RED_TEAMING.md).
 - **LSC.VER.SCEN-DQ2 Trace retention realization.** Core
   LS.SYS.VER.SCEN-DQ2 remains open; tracked references use compressed complete
   artifacts, with no sampling or external artifact-store policy yet.
