@@ -47,7 +47,14 @@ const runtimeDeps = catalog.compose({
     ),
   },
   devDependencies: {
-    external: catalog.pick('@storybook/react', '@storybook/react-vite', 'tailwindcss', 'vite', 'vitest'),
+    external: catalog.pick(
+      '@storybook/react',
+      '@storybook/react-vite',
+      '@tailwindcss/cli',
+      'tailwindcss',
+      'vite',
+      'vitest',
+    ),
   },
   peerDependencies: {
     external: {

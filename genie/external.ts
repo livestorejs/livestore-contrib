@@ -71,7 +71,9 @@ export const livestoreContribWorkspaceCatalog = Object.fromEntries(
   contribPackageNames.map((name) => [`@livestore/${name}`, 'workspace:*']),
 ) as Record<`@livestore/${(typeof contribPackageNames)[number]}`, 'workspace:*'>
 
-export const livestoreContribOnlyCatalog = {} as const
+export const livestoreContribOnlyCatalog = {
+  '@tailwindcss/cli': '4.1.18',
+} as const
 
 export const catalog = defineCatalog({
   ...effectUtilsCatalogWithoutEffectV3,

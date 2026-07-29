@@ -54,6 +54,7 @@
   "devDependencies": {
     "@storybook/react": "10.4.6",
     "@storybook/react-vite": "10.4.6",
+    "@tailwindcss/cli": "4.1.18",
     "tailwindcss": "4.1.18",
     "vite": "7.3.1",
     "vitest": "4.1.9"
