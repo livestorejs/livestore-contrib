@@ -1,5 +1,4 @@
 import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core'
-import { getDurationMsFromSpan } from '@livestore/common'
 import type { RefreshReason, SqliteDbWrapper, Store } from '@livestore/livestore'
 import { StoreInternalsSymbol } from '@livestore/livestore'
 import { LiveQueries, ReactiveGraph } from '@livestore/livestore/internal'
@@ -220,6 +219,13 @@ export class LiveStoreGraphQLQuery<
     const operationName = graphql.getOperationAST(document)?.name?.value
 
     return otelTracer.startActiveSpan(`executeGraphQLQuery: ${operationName}`, {}, otelContext, (span) => {
+      /**
+       * Timed independently of the span. Core dropped `getDurationMsFromSpan` in
+       * livestorejs/livestore#1449 to decouple query timing from span internals —
+       * a no-op tracer records no timings, so span-derived durations were 0.
+       */
+      const startMs = performance.now()
+
       span.setAttribute('graphql.variables', JSON.stringify(variableValues))
       span.setAttribute('graphql.query', graphql.print(document))
 
@@ -253,7 +259,7 @@ export class LiveStoreGraphQLQuery<
 
       const result = this.mapResult(res.data as unknown as TResult, get)
 
-      const durationMs = getDurationMsFromSpan(span)
+      const durationMs = performance.now() - startMs
 
       this.executionTimes.push(durationMs)
 
