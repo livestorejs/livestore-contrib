@@ -15,6 +15,7 @@ export default tsconfigJson({
   exclude: [...packageTsconfigExclude],
   references: [
     { path: '../../packages/@livestore/adapter-node' },
+    { path: '../../packages/@livestore/devtools-vite' },
     { path: '../../repos/livestore/packages/@livestore/common' },
     { path: '../../repos/livestore/packages/@livestore/effect-playwright' },
     { path: '../../repos/livestore/packages/@livestore/livestore' },

@@ -7,6 +7,7 @@ import {
 } from '../../../genie/repo.ts'
 import utilsPkg from '../../../repos/livestore/packages/@livestore/utils/package.json.genie.ts'
 import adapterNodePkg from '../adapter-node/package.json.genie.ts'
+import devtoolsVitePkg from '../devtools-vite/package.json.genie.ts'
 
 const runtimeDeps = catalog.compose({
   workspace: workspaceMember('packages/@livestore/devtools-expo'),
@@ -14,12 +15,13 @@ const runtimeDeps = catalog.compose({
     workspace: [adapterNodePkg, utilsPkg],
   },
   devDependencies: {
+    workspace: [devtoolsVitePkg],
     external: catalog.pick('@types/node', 'expo', 'vite'),
   },
   peerDependencies: {
     external: {
       ...getUtilsPeerDeps(),
-      ...catalog.peers('@livestore/devtools-vite'),
+      '@livestore/devtools-vite': devtoolsVitePkg.data.version,
       expo: '^54.0.12',
     },
   },

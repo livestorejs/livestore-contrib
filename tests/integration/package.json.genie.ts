@@ -1,5 +1,6 @@
 import { catalog, effectDevDeps, localPackageDefaults, packageJson, workspaceMember } from '../../genie/repo.ts'
 import adapterNodePkg from '../../packages/@livestore/adapter-node/package.json.genie.ts'
+import devtoolsVitePkg from '../../packages/@livestore/devtools-vite/package.json.genie.ts'
 import commonPkg from '../../repos/livestore/packages/@livestore/common/package.json.genie.ts'
 import effectPlaywrightPkg from '../../repos/livestore/packages/@livestore/effect-playwright/package.json.genie.ts'
 import livestorePkg from '../../repos/livestore/packages/@livestore/livestore/package.json.genie.ts'
@@ -10,8 +11,16 @@ import utilsPkg from '../../repos/livestore/packages/@livestore/utils/package.js
 const runtimeDeps = catalog.compose({
   workspace: workspaceMember('tests/integration'),
   dependencies: {
-    workspace: [adapterNodePkg, commonPkg, effectPlaywrightPkg, livestorePkg, syncCfPkg, utilsPkg, utilsDevPkg],
-    external: catalog.pick('@livestore/devtools-vite'),
+    workspace: [
+      adapterNodePkg,
+      commonPkg,
+      devtoolsVitePkg,
+      effectPlaywrightPkg,
+      livestorePkg,
+      syncCfPkg,
+      utilsPkg,
+      utilsDevPkg,
+    ],
   },
   devDependencies: {
     external: effectDevDeps('@playwright/test', '@types/node', 'vite', 'vitest', 'wrangler'),

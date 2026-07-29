@@ -9,6 +9,7 @@ import commonPkg from '../../../repos/livestore/packages/@livestore/common/packa
 import sqliteWasmPkg from '../../../repos/livestore/packages/@livestore/sqlite-wasm/package.json.genie.ts'
 import utilsPkg from '../../../repos/livestore/packages/@livestore/utils/package.json.genie.ts'
 import webmeshPkg from '../../../repos/livestore/packages/@livestore/webmesh/package.json.genie.ts'
+import devtoolsVitePkg from '../devtools-vite/package.json.genie.ts'
 
 const runtimeDeps = catalog.compose({
   workspace: workspaceMember('packages/@livestore/adapter-node'),
@@ -17,8 +18,8 @@ const runtimeDeps = catalog.compose({
     external: catalog.pick('@opentelemetry/api'),
   },
   devDependencies: {
+    workspace: [devtoolsVitePkg],
     external: catalog.pick(
-      '@livestore/devtools-vite',
       '@rollup/plugin-commonjs',
       '@rollup/plugin-node-resolve',
       '@rollup/plugin-terser',

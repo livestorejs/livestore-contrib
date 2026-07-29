@@ -61,6 +61,9 @@
       "path": "../../packages/@livestore/adapter-node"
     },
     {
+      "path": "../../packages/@livestore/devtools-vite"
+    },
+    {
       "path": "../../packages/@livestore/sync-electric"
     },
     {

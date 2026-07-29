@@ -73,6 +73,11 @@ export const livestoreContribWorkspaceCatalog = Object.fromEntries(
 
 export const livestoreContribOnlyCatalog = {
   '@tailwindcss/cli': '4.1.18',
+  // Source-built devtools-vite owns both of these entries. Keep them after the
+  // inherited LiveStore catalog spread so the old npm artifact pin and
+  // package-extension-only watcher declaration cannot win.
+  '@livestore/devtools-vite': 'workspace:*',
+  '@parcel/watcher': '2.5.6',
 } as const
 
 export const catalog = defineCatalog({

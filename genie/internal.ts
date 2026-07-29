@@ -13,6 +13,7 @@ export const contribPackageNames = [
   'devtools-common',
   'devtools-expo',
   'devtools-react',
+  'devtools-vite',
   'graphql',
   'solid',
   'svelte',

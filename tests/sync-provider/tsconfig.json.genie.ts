@@ -19,6 +19,7 @@ export default tsconfigJson({
     { path: '../../repos/livestore/packages/@livestore/utils-dev' },
     { path: '../../repos/livestore/packages/@livestore/sqlite-wasm' },
     { path: '../../packages/@livestore/adapter-node' },
+    { path: '../../packages/@livestore/devtools-vite' },
     { path: '../../packages/@livestore/sync-electric' },
     { path: '../../packages/@livestore/sync-s2' },
     { path: '../../repos/livestore/packages/@livestore/livestore' },

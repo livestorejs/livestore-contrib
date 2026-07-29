@@ -10,9 +10,18 @@ export default tsconfigJson({
   compilerOptions: {
     ...baseTsconfigCompilerOptions,
     ...packageTsconfigCompilerOptions,
-    types: ['node'],
+    exactOptionalPropertyTypes: true,
+    rootDir: './src',
+    allowImportingTsExtensions: true,
+    rewriteRelativeImportExtensions: true,
+    erasableSyntaxOnly: true,
   },
   include: ['./src'],
   exclude: [...packageTsconfigExclude],
-  references: [{ path: '../devtools-vite' }, refs.common, refs.utils, refs.webmesh, refs.sqliteWasm],
+  references: [
+    { path: '../devtools-react' },
+    refs.adapterWeb,
+    refs.common,
+    refs.utils,
+  ],
 })

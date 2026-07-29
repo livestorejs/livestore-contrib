@@ -40,25 +40,22 @@
     "composite": true,
     "rootDir": "./src",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "types": ["node"]
+    "erasableSyntaxOnly": true
   },
   "include": ["./src"],
   "exclude": ["node_modules", "**/dist", "**/node_modules/.pnpm", "**/*.genie.ts"],
   "references": [
     {
-      "path": "../devtools-vite"
+      "path": "../devtools-react"
+    },
+    {
+      "path": "../../../repos/livestore/packages/@livestore/adapter-web"
     },
     {
       "path": "../../../repos/livestore/packages/@livestore/common"
     },
     {
       "path": "../../../repos/livestore/packages/@livestore/utils"
-    },
-    {
-      "path": "../../../repos/livestore/packages/@livestore/webmesh"
-    },
-    {
-      "path": "../../../repos/livestore/packages/@livestore/sqlite-wasm"
     }
   ]
 }

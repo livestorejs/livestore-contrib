@@ -37,7 +37,7 @@
     "@opentelemetry/api": "1.9.0"
   },
   "devDependencies": {
-    "@livestore/devtools-vite": "0.4.0-dev.25",
+    "@livestore/devtools-vite": "workspace:^",
     "@rollup/plugin-commonjs": "28.0.6",
     "@rollup/plugin-node-resolve": "16.0.1",
     "@rollup/plugin-terser": "0.4.4",
@@ -62,8 +62,16 @@
     "warning": "DO NOT EDIT - changes will be overwritten",
     "workspaceClosureDirs": [
       "packages/@livestore/adapter-node",
+      "packages/@livestore/devtools-common",
+      "packages/@livestore/devtools-react",
+      "packages/@livestore/devtools-vite",
+      "repos/effect-utils/packages/@overeng/react-inspector",
+      "repos/livestore/packages/@livestore/adapter-web",
       "repos/livestore/packages/@livestore/common",
       "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/framework-toolkit",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/react",
       "repos/livestore/packages/@livestore/sqlite-wasm",
       "repos/livestore/packages/@livestore/utils",
       "repos/livestore/packages/@livestore/utils-dev",

@@ -1,0 +1,101 @@
+{
+  "name": "@livestore/devtools-vite",
+  "version": "0.4.0",
+  "license": "LicenseRef-LiveStore-Community-1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/livestorejs/livestore-contrib.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/plugin.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/plugin.d.ts",
+        "default": "./dist/plugin.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "bun --tsconfig-override tsconfig.bun-runtime.json build.ts",
+    "build:dev": "bun --tsconfig-override tsconfig.bun-runtime.json build.ts --devBuild",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@effect/opentelemetry": "4.0.0-beta.98",
+    "@effect/platform-browser": "4.0.0-beta.98",
+    "@effect/platform-bun": "4.0.0-beta.98",
+    "@effect/platform-node": "4.0.0-beta.98",
+    "@effect/platform-node-shared": "4.0.0-beta.98",
+    "@effect/vitest": "4.0.0-beta.98",
+    "@livestore/adapter-web": "link:../../../repos/livestore/packages/@livestore/adapter-web",
+    "@livestore/devtools-react": "workspace:^",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/resources": "2.2.0",
+    "@parcel/watcher": "2.5.6",
+    "@standard-schema/spec": "1.1.0",
+    "effect": "4.0.0-beta.98",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@livestore/common": "link:../../../repos/livestore/packages/@livestore/common",
+    "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils",
+    "@livestore/utils-dev": "link:../../../repos/livestore/packages/@livestore/utils-dev",
+    "@types/bun": "1.3.10",
+    "@types/node": "25.3.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
+  },
+  "peerDependencies": {
+    "@effect/opentelemetry": "^4.0.0-beta.98",
+    "@effect/platform-browser": "^4.0.0-beta.98",
+    "@effect/platform-bun": "^4.0.0-beta.98",
+    "@effect/platform-node": "^4.0.0-beta.98",
+    "@effect/platform-node-shared": "^4.0.0-beta.98",
+    "@effect/vitest": "^4.0.0-beta.98",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@standard-schema/spec": "^1.1.0",
+    "effect": "^4.0.0-beta.98",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vite": "^7.3.1"
+  },
+  "$genie": {
+    "releaseBuild": {
+      "command": [
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "outputs": [
+        "dist"
+      ]
+    },
+    "workspaceClosureDirs": [
+      "packages/@livestore/devtools-common",
+      "packages/@livestore/devtools-react",
+      "packages/@livestore/devtools-vite",
+      "repos/effect-utils/packages/@overeng/react-inspector",
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/framework-toolkit",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/react",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh"
+    ]
+  }
+}
