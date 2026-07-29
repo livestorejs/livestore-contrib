@@ -142,9 +142,7 @@ const releaseBuildFor = ({ name, manifest }) => {
     return DEFAULT_RELEASE_BUILD
   }
   if (spec.command.length > 0 && ALLOWED_BUILD_BINARIES.has(spec.command[0]) === false) {
-    addError(
-      `${name} $genie.releaseBuild.command must start with one of: ${[...ALLOWED_BUILD_BINARIES].join(', ')}`,
-    )
+    addError(`${name} $genie.releaseBuild.command must start with one of: ${[...ALLOWED_BUILD_BINARIES].join(', ')}`)
   }
   return spec
 }

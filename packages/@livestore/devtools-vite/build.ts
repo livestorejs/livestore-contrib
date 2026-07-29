@@ -73,9 +73,7 @@ export const build = Cli.Command.make(
     const packageDir = `${workspaceRoot}/packages/@livestore/devtools-vite`
     const distDir = `${packageDir}/dist`
     const packageCwd = CurrentWorkingDirectory.fromPath(packageDir)
-    const devtoolsReactCwd = CurrentWorkingDirectory.fromPath(
-      `${workspaceRoot}/packages/@livestore/devtools-react`,
-    )
+    const devtoolsReactCwd = CurrentWorkingDirectory.fromPath(`${workspaceRoot}/packages/@livestore/devtools-react`)
 
     console.log('@livestore/devtools-vite/build')
     console.log({ isDevBuild })
@@ -115,8 +113,5 @@ export const build = Cli.Command.make(
 if (import.meta.main) {
   Cli.Command.run(build, {
     version: '0.0.0',
-  }).pipe(
-    Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer)),
-    PlatformNode.NodeRuntime.runMain,
-  )
+  }).pipe(Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer)), PlatformNode.NodeRuntime.runMain)
 }

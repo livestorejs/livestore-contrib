@@ -18,10 +18,5 @@ export default tsconfigJson({
   },
   include: ['./src'],
   exclude: [...packageTsconfigExclude],
-  references: [
-    { path: '../devtools-react' },
-    refs.adapterWeb,
-    refs.common,
-    refs.utils,
-  ],
+  references: [{ path: '../devtools-react' }, refs.adapterWeb, refs.common, refs.utils],
 })

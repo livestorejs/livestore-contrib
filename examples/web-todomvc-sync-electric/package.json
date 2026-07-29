@@ -19,7 +19,7 @@
     "todomvc-app-css": "2.4.3"
   },
   "devDependencies": {
-    "@livestore/devtools-vite": "0.4.0-dev.25",
+    "@livestore/devtools-vite": "workspace:*",
     "@parcel/watcher": "2.5.6",
     "@playwright/test": "1.59.1",
     "@tanstack/react-router": "1.145.7",

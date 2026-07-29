@@ -7,8 +7,8 @@ import {
 } from '../../../genie/repo.ts'
 import adapterWebPkg from '../../../repos/livestore/packages/@livestore/adapter-web/package.json.genie.ts'
 import commonPkg from '../../../repos/livestore/packages/@livestore/common/package.json.genie.ts'
-import utilsPkg from '../../../repos/livestore/packages/@livestore/utils/package.json.genie.ts'
 import utilsDevPkg from '../../../repos/livestore/packages/@livestore/utils-dev/package.json.genie.ts'
+import utilsPkg from '../../../repos/livestore/packages/@livestore/utils/package.json.genie.ts'
 import devtoolsReactPkg from '../devtools-react/package.json.genie.ts'
 
 const composition = catalog.compose({

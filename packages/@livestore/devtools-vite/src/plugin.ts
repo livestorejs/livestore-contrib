@@ -1,7 +1,7 @@
 import path from 'node:path'
 
 import { Devtools } from '@livestore/common'
-import { Effect, Logger, Schema } from '@livestore/utils/effect'
+import { Effect, Logger, Result, Schema } from '@livestore/utils/effect'
 import type { InlineConfig, ViteDevServer } from 'vite'
 import { createIdResolver, normalizePath, type Plugin, runnerImport } from 'vite'
 
@@ -33,7 +33,7 @@ export const PluginOptions = Schema.Struct({
    * })
    * ```
    */
-  schemaPath: Schema.Union(Schema.String, Schema.Array(Schema.String)),
+  schemaPath: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
   /**
    * Where to serve the devtools UI.
    *
@@ -62,9 +62,9 @@ type ViteDevServerWithOptimizeDeps = ViteDevServer & {
 }
 
 export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
-  const result = Schema.validateEither(PluginOptions)(options)
-  if (result._tag === 'Left') {
-    console.error(`[@livestore/devtools-vite] Invalid options: ${result.left}`)
+  const result = Schema.decodeUnknownResult(PluginOptions)(options)
+  if (Result.isFailure(result) === true) {
+    console.error(`[@livestore/devtools-vite] Invalid options: ${result.failure}`)
 
     return {
       name: pluginName,
@@ -96,7 +96,7 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
           schemaPath: options.schemaPath,
         })
 
-        const runtime = yield* Effect.runtime()
+        const services = yield* Effect.context()
 
         // Compute HTML once and avoid SSR-time imports to prevent Vite 7 runner races.
         // Both entry points resolve from the real devtools-react dependency; Vite
@@ -129,7 +129,9 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
                 '@livestore/adapter-web/shared-worker?sharedworker',
               ),
             ).pipe(
-              Effect.map((resolved) => normalizeClientImport(resolved)),
+              Effect.map((resolved: string | null | undefined) =>
+                normalizeClientImport(resolved),
+              ),
               Effect.orElseSucceed(() => undefined),
             )
 
@@ -156,15 +158,17 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
           server: serverWithOptimizeDeps,
           schemaEntries: schemaResolvedPaths,
           devtoolsEntry: devtoolsReactEntry,
-        }).pipe(Effect.either)
+        }).pipe(Effect.result)
 
         const schemaValidationPromise = scheduleEagerSchemaValidation(server, schemaResolvedPaths)
 
         server.middlewares.use(mountPath, async (req, res, next) => {
-          if (optimizeDepsOutcome._tag === 'Left') {
+          if (Result.isFailure(optimizeDepsOutcome) === true) {
             res.statusCode = 500
             res.setHeader('Content-Type', 'text/plain')
-            res.end(`LiveStore DevTools: optimizeDeps failed\n${String(optimizeDepsOutcome.left)}`)
+            res.end(
+              `LiveStore DevTools: optimizeDeps failed\n${String(optimizeDepsOutcome.failure)}`,
+            )
             return
           }
           if (res.writableEnded || req.url === undefined) {
@@ -193,7 +197,7 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
             // Serve the devtools index.html (compute/cached on demand)
             if (!htmlCache) {
               try {
-                const rawHtml = await computeHtml().pipe(Effect.provide(runtime), Effect.runPromise)
+                const rawHtml = await computeHtml().pipe(Effect.runPromiseWith(services))
                 htmlCache = rawHtml
               } catch (e) {
                 res.statusCode = 500
@@ -212,7 +216,8 @@ export const livestoreDevtoolsPlugin = (options: PluginOptions): Plugin => {
       }).pipe(
         Effect.scoped,
         Effect.tapCauseLogPretty,
-        Effect.provide(Logger.prettyWithThread('livestore-devtools-vite')),
+        Effect.annotateLogs({ thread: 'livestore-devtools-vite' }),
+        Effect.provide(Logger.layer([Logger.consolePretty()])),
         Effect.runPromise,
       ),
 
