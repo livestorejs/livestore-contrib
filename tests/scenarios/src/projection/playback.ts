@@ -10,7 +10,7 @@ import {
   summarizeMaterialSystemChange,
   summarizeTraceRecord,
 } from './system-state.ts'
-import type { EventTimelineMarker, ObservedSystemState, PlaybackMoment, TraceCapture } from './types.ts'
+import { ObservedSystemState, type EventTimelineMarker, type PlaybackMoment, type TraceCapture } from './types.ts'
 
 /** Reduces the authoritative trace prefix into the runner's accumulated observed state. */
 export const projectTraceAt = (args: {
