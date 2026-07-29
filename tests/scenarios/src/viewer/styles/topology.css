@@ -1,0 +1,137 @@
+.topology {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.component-card {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  min-width: 0;
+  padding: 14px 16px 16px;
+}
+
+.component-title {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.component-title h3 {
+  color: var(--component-color, var(--text));
+  font-size: 14px;
+  font-weight: 650;
+  margin: 0;
+}
+
+.eventlog {
+  border-left: 2px solid var(--component-color, var(--line-strong));
+  max-width: 100%;
+  min-height: 28px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 3px 0 3px 11px;
+  scrollbar-width: none;
+  width: 100%;
+}
+
+.eventlog-block {
+  min-width: 0;
+  width: 100%;
+}
+
+.eventlog::-webkit-scrollbar {
+  display: none;
+}
+
+.eventlog-track {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  justify-content: flex-start;
+  min-height: 22px;
+  min-width: 100%;
+  width: max-content;
+}
+
+.event-chip {
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.event-chip.pending {
+  border-color: var(--line-strong);
+  border-style: dashed;
+  color: var(--text);
+}
+
+.eventlog-pending-boundary {
+  border-left: 1px dashed var(--line-strong);
+  height: 18px;
+  margin: 0 4px;
+}
+
+.event-chip.selected {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--background);
+}
+
+.role-list {
+  display: grid;
+  margin-top: 10px;
+}
+
+.role-row {
+  align-items: baseline;
+  border-top: 1px dotted var(--line);
+  display: grid;
+  font-size: 12px;
+  gap: 12px;
+  grid-template-columns: 150px 1fr;
+  padding: 8px 0;
+}
+
+.role-row:last-child {
+  padding-bottom: 0;
+}
+
+.role-row strong {
+  color: var(--component-color, var(--text));
+  font-weight: 600;
+}
+
+.role-row.runtime-failed {
+  color: var(--bad);
+}
+
+.runtime-health {
+  color: var(--bad);
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 28px 0;
+}
+
