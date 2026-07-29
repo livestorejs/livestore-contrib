@@ -3,7 +3,6 @@ import * as ChildProcess from 'node:child_process'
 
 import { expect } from 'vitest'
 
-import { ClientSessionSyncProcessorSimulationParams } from '@livestore/common'
 import { IS_CI, stringifyObject } from '@livestore/utils'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { WranglerDevServer } from '@livestore/utils-dev/wrangler'
@@ -102,16 +101,6 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB: Schema.Literal(391),
           commitBatchSize: Schema.Literal(1),
           leaderPushBatchSize: Schema.Literal(2),
-          simulationParams: Schema.Struct({
-            // Keep values within allowed 0..15 range to avoid parse errors
-            pull: Schema.Struct({
-              '1_before_leader_push_fiber_interrupt': Schema.Literal(0),
-              '2_before_leader_push_queue_clear': Schema.Literal(10),
-              '3_before_rebase_rollback': Schema.Literal(0),
-              '4_before_leader_push_queue_offer': Schema.Literal(15),
-              '5_before_leader_push_fiber_run': Schema.Literal(0),
-            }),
-          }),
         }
       : {
           storageType: WorkerSchema.StorageType,
@@ -120,11 +109,9 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB: CreateCount,
           commitBatchSize: CommitBatchSize,
           leaderPushBatchSize: LEADER_PUSH_BATCH_SIZE,
-          // TODO extend simulation tests to cover all parts of the client session and leader sync processor
-          simulationParams: ClientSessionSyncProcessorSimulationParams,
         },
     (
-      { storageType, adapterType, todoCountA, todoCountB, commitBatchSize, leaderPushBatchSize, simulationParams },
+      { storageType, adapterType, todoCountA, todoCountB, commitBatchSize, leaderPushBatchSize },
       test,
       { numRuns, runIndex },
     ) =>
@@ -136,7 +123,6 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB,
           commitBatchSize,
           leaderPushBatchSize,
-          simulationParams,
         })
 
         const storeId = nanoid(10)
@@ -148,9 +134,8 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB,
           commitBatchSize,
           leaderPushBatchSize,
-          simulationParams,
         })
-        const params = { leaderPushBatchSize, simulation: simulationParams }
+        const params = { leaderPushBatchSize }
 
         const [clientA, clientB] = yield* Effect.all(
           [
@@ -192,7 +177,6 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
             todoCountB,
             commitBatchSize,
             leaderPushBatchSize,
-            simulationParams,
           }),
         })(test),
         // Logging without context (to make sure log is always displayed)
