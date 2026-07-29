@@ -1153,6 +1153,42 @@ importers:
         specifier: 4.1.9
         version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.3.3)(jsdom@26.1.0)(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/@livestore/devtools-common:
+    dependencies:
+      '@effect/opentelemetry':
+        specifier: 4.0.0-beta.98
+        version: 4.0.0-beta.98(@opentelemetry/api-logs@0.208.0)(@opentelemetry/api@1.9.0)(@opentelemetry/resources@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.208.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.41.1)(effect@4.0.0-beta.98)
+      '@effect/platform-browser':
+        specifier: 4.0.0-beta.98
+        version: 4.0.0-beta.98(effect@4.0.0-beta.98)
+      '@effect/platform-bun':
+        specifier: 4.0.0-beta.98
+        version: 4.0.0-beta.98(effect@4.0.0-beta.98)
+      '@effect/platform-node':
+        specifier: 4.0.0-beta.98
+        version: 4.0.0-beta.98(effect@4.0.0-beta.98)(ioredis@5.11.1)
+      '@effect/platform-node-shared':
+        specifier: 4.0.0-beta.98
+        version: 4.0.0-beta.98(effect@4.0.0-beta.98)
+      '@effect/vitest':
+        specifier: 4.0.0-beta.98
+        version: 4.0.0-beta.98(effect@4.0.0-beta.98)(vitest@4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.3.3)(jsdom@26.1.0)(vite@7.3.1(@types/node@25.3.3)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)))
+      '@livestore/utils':
+        specifier: link:../../../repos/livestore/packages/@livestore/utils
+        version: link:../../../repos/livestore/packages/@livestore/utils
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.0
+      '@opentelemetry/resources':
+        specifier: ^2.2.0
+        version: 2.2.0(@opentelemetry/api@1.9.0)
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
+      effect:
+        specifier: 4.0.0-beta.98
+        version: 4.0.0-beta.98
+
   packages/@livestore/devtools-expo:
     dependencies:
       '@effect/opentelemetry':

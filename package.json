@@ -19,6 +19,7 @@
     "packages/@livestore/adapter-expo",
     "packages/@livestore/adapter-node",
     "packages/@livestore/cli",
+    "packages/@livestore/devtools-common",
     "packages/@livestore/devtools-expo",
     "packages/@livestore/graphql",
     "packages/@livestore/solid",

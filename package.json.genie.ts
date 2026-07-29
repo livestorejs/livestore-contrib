@@ -5,6 +5,7 @@ import { packageJson } from './genie/repo.ts'
 import adapterExpoPkg from './packages/@livestore/adapter-expo/package.json.genie.ts'
 import adapterNodePkg from './packages/@livestore/adapter-node/package.json.genie.ts'
 import cliPkg from './packages/@livestore/cli/package.json.genie.ts'
+import devtoolsCommonPkg from './packages/@livestore/devtools-common/package.json.genie.ts'
 import devtoolsExpoPkg from './packages/@livestore/devtools-expo/package.json.genie.ts'
 import graphqlPkg from './packages/@livestore/graphql/package.json.genie.ts'
 import solidPkg from './packages/@livestore/solid/package.json.genie.ts'
@@ -18,6 +19,7 @@ export const rootWorkspacePackages = [
   adapterExpoPkg,
   adapterNodePkg,
   cliPkg,
+  devtoolsCommonPkg,
   devtoolsExpoPkg,
   graphqlPkg,
   solidPkg,
@@ -36,7 +38,11 @@ const materializedCorePackageClosureMemberPaths = [
           JSON.parse(readFileSync(`${pkg.meta.workspace.memberPath}/package.json`, 'utf8')) as {
             $genie?: { workspaceClosureDirs?: readonly string[] }
           }
-        ).$genie?.workspaceClosureDirs?.filter((path) => path.startsWith('repos/livestore/packages/@livestore/')) ?? [],
+        ).$genie?.workspaceClosureDirs?.filter(
+          (path) =>
+            path.startsWith('repos/livestore/packages/@livestore/') ||
+            path.startsWith('repos/effect-utils/packages/@overeng/'),
+        ) ?? [],
     ),
   ),
 ].toSorted()

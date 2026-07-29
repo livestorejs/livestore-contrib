@@ -42,6 +42,25 @@ const effectUtilsCatalogWithoutEffectV3 = Object.fromEntries(
 /** TODO: Remove once effect-utils upgrades its TypeScript catalog pin. */
 const contribCatalogOverrides = {
   typescript: '6.0.3',
+  // DevTools UI stack (#1497). Versions taken from the upstream devtools-react
+  // manifest so the import is a move rather than an upgrade.
+  '@dagrejs/dagre': '1.1.4',
+  '@dprint/formatter': '0.4.1',
+  '@dprint/sql': '0.2.0',
+  // alpha24, not the `latest` 6.0.3: it is the first release whose peer range
+  // includes React 19 (`^16.12.0 || 17.x || 18.x || 19.x`). alpha02 peers on
+  // <=18 and conflicts with contrib's React 19.2.3. Both packages track the
+  // upstream `beta` dist-tag, which is where this dependency has always been.
+  '@glideapps/glide-data-grid': '6.0.4-alpha24',
+  '@glideapps/glide-data-grid-cells': '6.0.4-alpha24',
+  clsx: '2.1.1',
+  'lucide-react': '0.488.0',
+  'react-aria': '3.50.0',
+  'react-error-boundary': '6.0.0',
+  'react-icons': '5.5.0',
+  reactflow: '11.11.4',
+  'tailwind-merge': '2.6.0',
+  tailwindcss: '4.3.1',
 } as const
 
 export const coreWorkspaceCatalog = Object.fromEntries(
