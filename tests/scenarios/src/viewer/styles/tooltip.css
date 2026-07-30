@@ -1,0 +1,67 @@
+.tooltip {
+  background: color-mix(in srgb, var(--background) 96%, var(--text));
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+  left: var(--tooltip-left);
+  max-width: min(340px, calc(100vw - 32px));
+  min-width: 180px;
+  padding: 10px 11px;
+  pointer-events: none;
+  position: fixed;
+  top: var(--tooltip-top);
+  transform: translate(-50%, -100%);
+  z-index: 100;
+}
+
+.tooltip-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.tooltip-heading strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.tooltip-heading span {
+  color: var(--warn);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tooltip-details {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding-top: 8px;
+}
+
+.tooltip-details div {
+  align-items: baseline;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(42px, auto) minmax(0, 1fr);
+}
+
+.tooltip-details dt {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.tooltip-details dd {
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}

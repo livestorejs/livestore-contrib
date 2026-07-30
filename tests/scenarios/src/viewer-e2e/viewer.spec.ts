@@ -127,6 +127,55 @@ test('event logs preserve manual scroll and follow new tail evidence', async ({ 
     .toBeLessThanOrEqual(2)
 })
 
+test('Event tooltips show arguments in topology and timeline markers', async ({ page }) => {
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
+
+  await expect(page.locator('[title]')).toHaveCount(0)
+  await expect(page.locator('svg title')).toHaveCount(0)
+
+  const eventChip = page.locator('.event-chip').first()
+  await eventChip.hover()
+  const topologyTooltip = page.getByRole('tooltip')
+  await expect(topologyTooltip).toBeVisible()
+  await expect(topologyTooltip.getByText('Todo created')).toBeVisible()
+  await expect(topologyTooltip.getByText('id', { exact: true })).toBeVisible()
+  await expect(topologyTooltip).not.toContainText('inferred correlation')
+  await expect(topologyTooltip).not.toContainText('observed change in capture')
+
+  await page.mouse.move(0, 0)
+  await expect(topologyTooltip).toBeHidden()
+
+  const timelineEvent = page.locator('svg.timeline-main [data-event-ref]').first()
+  await timelineEvent.hover()
+  const timelineTooltip = page.getByRole('tooltip')
+  await expect(timelineTooltip).toBeVisible()
+  await expect(timelineTooltip.getByText('Todo created')).toBeVisible()
+
+  await page.mouse.move(0, 0)
+  await eventChip.focus()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('tooltip')).toBeHidden()
+})
+
+test('shared tooltips cover trace labels and non-event timeline annotations', async ({ page }) => {
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
+
+  const traceName = page.locator('.trace-name')
+  await traceName.focus()
+  await expect(page.getByRole('tooltip')).toContainText('offline-writer-recovery')
+  await page.keyboard.press('Escape')
+
+  const timelineAnnotation = page.locator('svg.timeline-main [data-timeline-tooltip-id]:not([data-event-ref])').first()
+  await timelineAnnotation.hover()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+
+  await page.mouse.move(0, 0)
+  const rangeAnnotation = page.locator('svg.range-navigator [data-range-action="window"]')
+  await rangeAnnotation.hover()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+})
+
 const openArtifact = async (page: Page, url: string, artifactPath: string, scenarioId: string): Promise<void> => {
   await page.goto(url)
   await page.locator('input[type=file]').setInputFiles(artifactPath)

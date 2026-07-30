@@ -1,4 +1,12 @@
-import { createElement, useMemo, useRef, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react'
+import {
+  createElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+} from 'react'
 
 import type { ScenarioRunArtifact } from '../../model.ts'
 /* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop -- Controlled SVG handlers close over the current scene; geometry itself is memoized. */
@@ -12,6 +20,7 @@ import {
   type TimeScaleMode,
   type TraceVisibility,
 } from '../timeline-scene.ts'
+import { claimTooltip, FloatingTooltip, tooltipAnchor, type TooltipAnchor } from './Tooltip.tsx'
 
 interface TimelineLayerProps {
   readonly nodes: ReadonlyArray<SvgSceneNode>
@@ -80,6 +89,41 @@ export const ScenarioTimeline = (props: ScenarioTimelineProps) => {
 
 type InteractiveTimelineProps = ScenarioTimelineProps & { readonly scene: TimelineScene }
 
+const timelineTooltipTarget = (target: EventTarget | null): SVGElement | undefined =>
+  target instanceof Element ? (target.closest<SVGElement>('[data-timeline-tooltip-id]') ?? undefined) : undefined
+
+const useTimelineTooltip = (scene: TimelineScene) => {
+  const [hoveredTooltip, setHoveredTooltip] = useState<{ readonly tooltipId: string; readonly anchor: TooltipAnchor }>()
+  const handlePointerOver = (event: ReactPointerEvent<SVGSVGElement>): void => {
+    const target = timelineTooltipTarget(event.target)
+    const tooltipId = target?.dataset.timelineTooltipId
+    if (target === undefined || tooltipId === undefined || scene.tooltipContentById.has(tooltipId) === false) return
+    claimTooltip('timeline')
+    setHoveredTooltip({ tooltipId, anchor: tooltipAnchor(target.getBoundingClientRect()) })
+  }
+  const handlePointerOut = (event: ReactPointerEvent<SVGSVGElement>): void => {
+    const departedTooltip = timelineTooltipTarget(event.target)?.dataset.timelineTooltipId
+    const enteredTooltip = timelineTooltipTarget(event.relatedTarget)?.dataset.timelineTooltipId
+    if (departedTooltip !== undefined && departedTooltip === enteredTooltip) return
+    setHoveredTooltip(undefined)
+  }
+  useEffect(() => {
+    if (hoveredTooltip === undefined) return
+    const closeOnEscape = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') setHoveredTooltip(undefined)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [hoveredTooltip])
+  return {
+    anchor: hoveredTooltip?.anchor,
+    content: hoveredTooltip === undefined ? undefined : scene.tooltipContentById.get(hoveredTooltip.tooltipId),
+    dismiss: () => setHoveredTooltip(undefined),
+    handlePointerOut,
+    handlePointerOver,
+  }
+}
+
 interface MainDrag {
   readonly pointerId: number
   readonly startX: number
@@ -91,6 +135,7 @@ interface MainDrag {
 
 const MainTimelineSvg = ({ scene, ...props }: InteractiveTimelineProps) => {
   const drag = useRef<MainDrag | undefined>(undefined)
+  const tooltip = useTimelineTooltip(scene)
   const moveCursor = (clientX: number, bounds: DOMRect): void => {
     if (scene.scrubPositions.length === 0) return
     const svgX = ((clientX - bounds.left) / bounds.width) * scene.main.width
@@ -134,48 +179,54 @@ const MainTimelineSvg = ({ scene, ...props }: InteractiveTimelineProps) => {
     else if (active.recordIndex !== undefined) props.onCursor(active.recordIndex)
   }
   return (
-    <svg
-      className="timeline-main"
-      viewBox={`0 0 ${scene.main.width} ${scene.main.height}`}
-      role="slider"
-      tabIndex={0}
-      aria-label="Trace cursor"
-      aria-valuemin={0}
-      aria-valuemax={props.artifact.trace.length - 1}
-      aria-valuenow={Math.max(props.cursorIndex, 0)}
-      aria-valuetext={props.recordLabel}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onKeyDown={(event) => {
-        const nextCursor =
-          event.key === 'ArrowLeft'
-            ? props.cursorIndexes.findLast((index) => index < props.cursorIndex)
-            : event.key === 'ArrowRight'
-              ? props.cursorIndexes.find((index) => index > props.cursorIndex)
-              : event.key === 'Home'
-                ? props.cursorIndexes[0]
-                : event.key === 'End'
-                  ? props.cursorIndexes.at(-1)
-                  : undefined
-        if (nextCursor === undefined) return
-        event.preventDefault()
-        props.onCursor(nextCursor)
-      }}
-    >
-      <CompressedGapLayer nodes={scene.main.compressedGaps} />
-      <ConnectivityBandLayer nodes={scene.main.connectivityBands} />
-      <FailureBoundaryLayer nodes={scene.main.failureBoundaries} />
-      <LaneHierarchyLayer nodes={scene.main.laneHierarchy} />
-      <LaneLayer nodes={scene.main.laneLayer} />
-      <ParticipantMilestoneLayer nodes={scene.main.participantMilestones} />
-      <CaptureGuideLayer nodes={scene.main.captureGuides} />
-      <EventMarkerLayer nodes={scene.main.eventMarkers} />
-      <RuntimeFailureLayer nodes={scene.main.runtimeFailures} />
-      <TraceCarpetLayer nodes={scene.main.traceCarpet} />
-      <CursorLayer nodes={scene.main.cursorLayer} />
-    </svg>
+    <>
+      <svg
+        className="timeline-main"
+        viewBox={`0 0 ${scene.main.width} ${scene.main.height}`}
+        role="slider"
+        tabIndex={0}
+        aria-label="Trace cursor"
+        aria-valuemin={0}
+        aria-valuemax={props.artifact.trace.length - 1}
+        aria-valuenow={Math.max(props.cursorIndex, 0)}
+        aria-valuetext={props.recordLabel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerOver={tooltip.handlePointerOver}
+        onPointerOut={tooltip.handlePointerOut}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') tooltip.dismiss()
+          const nextCursor =
+            event.key === 'ArrowLeft'
+              ? props.cursorIndexes.findLast((index) => index < props.cursorIndex)
+              : event.key === 'ArrowRight'
+                ? props.cursorIndexes.find((index) => index > props.cursorIndex)
+                : event.key === 'Home'
+                  ? props.cursorIndexes[0]
+                  : event.key === 'End'
+                    ? props.cursorIndexes.at(-1)
+                    : undefined
+          if (nextCursor === undefined) return
+          event.preventDefault()
+          props.onCursor(nextCursor)
+        }}
+      >
+        <CompressedGapLayer nodes={scene.main.compressedGaps} />
+        <ConnectivityBandLayer nodes={scene.main.connectivityBands} />
+        <FailureBoundaryLayer nodes={scene.main.failureBoundaries} />
+        <LaneHierarchyLayer nodes={scene.main.laneHierarchy} />
+        <LaneLayer nodes={scene.main.laneLayer} />
+        <ParticipantMilestoneLayer nodes={scene.main.participantMilestones} />
+        <CaptureGuideLayer nodes={scene.main.captureGuides} />
+        <EventMarkerLayer nodes={scene.main.eventMarkers} />
+        <RuntimeFailureLayer nodes={scene.main.runtimeFailures} />
+        <TraceCarpetLayer nodes={scene.main.traceCarpet} />
+        <CursorLayer nodes={scene.main.cursorLayer} />
+      </svg>
+      <FloatingTooltip anchor={tooltip.anchor} content={tooltip.content} />
+    </>
   )
 }
 
@@ -190,6 +241,7 @@ interface RangeDrag {
 
 const RangeNavigatorSvg = ({ scene, ...props }: InteractiveTimelineProps) => {
   const drag = useRef<RangeDrag | undefined>(undefined)
+  const tooltip = useTimelineTooltip(scene)
   const positionAt = (clientX: number, bounds: DOMRect): number =>
     clamp((((clientX - bounds.left) / bounds.width) * scene.range.width - 180) / (scene.range.width - 180 - 35), 0, 1)
   const updateRange = (active: RangeDrag, clientX: number): void => {
@@ -239,45 +291,51 @@ const RangeNavigatorSvg = ({ scene, ...props }: InteractiveTimelineProps) => {
     updateRange(active, event.clientX)
   }
   return (
-    <svg
-      className="range-navigator"
-      viewBox={`0 0 ${scene.range.width} ${scene.range.height}`}
-      role="group"
-      tabIndex={0}
-      aria-label="Timeline visible range"
-      data-range-navigator
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onKeyDown={(event) => {
-        const span = props.viewport.end - props.viewport.start
-        const midpoint = (props.viewport.start + props.viewport.end) / 2
-        let next: TimelineViewport | undefined
-        if (event.key === 'Home' || event.key === 'Escape') next = { start: 0, end: 1 }
-        else if (event.key === '+' || event.key === '=') {
-          const nextSpan = span * 0.75
-          next = clampTimelineViewport(midpoint - nextSpan / 2, midpoint + nextSpan / 2)
-        } else if (event.key === '-') {
-          const nextSpan = Math.min(span / 0.75, 1)
-          next = clampTimelineViewport(midpoint - nextSpan / 2, midpoint + nextSpan / 2)
-        } else if (event.key === 'ArrowLeft') {
-          next = clampTimelineViewport(props.viewport.start - span * 0.1, props.viewport.end - span * 0.1)
-        } else if (event.key === 'ArrowRight') {
-          next = clampTimelineViewport(props.viewport.start + span * 0.1, props.viewport.end + span * 0.1)
-        }
-        if (next === undefined) return
-        event.preventDefault()
-        props.onViewport(next)
-      }}
-    >
-      <RangeWindow nodes={scene.range.windowLayer.slice(0, 3)} />
-      <DensityLayer nodes={scene.range.densityLayer} />
-      <ConditionLayer nodes={scene.range.conditionLayer} />
-      <FailureBoundaryLayer nodes={scene.range.failureLayer} />
-      <RangeWindow nodes={scene.range.windowLayer.slice(3)} />
-      <CursorLayer nodes={scene.range.cursorLayer} />
-    </svg>
+    <>
+      <svg
+        className="range-navigator"
+        viewBox={`0 0 ${scene.range.width} ${scene.range.height}`}
+        role="group"
+        tabIndex={0}
+        aria-label="Timeline visible range"
+        data-range-navigator
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerOver={tooltip.handlePointerOver}
+        onPointerOut={tooltip.handlePointerOut}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') tooltip.dismiss()
+          const span = props.viewport.end - props.viewport.start
+          const midpoint = (props.viewport.start + props.viewport.end) / 2
+          let next: TimelineViewport | undefined
+          if (event.key === 'Home' || event.key === 'Escape') next = { start: 0, end: 1 }
+          else if (event.key === '+' || event.key === '=') {
+            const nextSpan = span * 0.75
+            next = clampTimelineViewport(midpoint - nextSpan / 2, midpoint + nextSpan / 2)
+          } else if (event.key === '-') {
+            const nextSpan = Math.min(span / 0.75, 1)
+            next = clampTimelineViewport(midpoint - nextSpan / 2, midpoint + nextSpan / 2)
+          } else if (event.key === 'ArrowLeft') {
+            next = clampTimelineViewport(props.viewport.start - span * 0.1, props.viewport.end - span * 0.1)
+          } else if (event.key === 'ArrowRight') {
+            next = clampTimelineViewport(props.viewport.start + span * 0.1, props.viewport.end + span * 0.1)
+          }
+          if (next === undefined) return
+          event.preventDefault()
+          props.onViewport(next)
+        }}
+      >
+        <RangeWindow nodes={scene.range.windowLayer.slice(0, 3)} />
+        <DensityLayer nodes={scene.range.densityLayer} />
+        <ConditionLayer nodes={scene.range.conditionLayer} />
+        <FailureBoundaryLayer nodes={scene.range.failureLayer} />
+        <RangeWindow nodes={scene.range.windowLayer.slice(3)} />
+        <CursorLayer nodes={scene.range.cursorLayer} />
+      </svg>
+      <FloatingTooltip anchor={tooltip.anchor} content={tooltip.content} />
+    </>
   )
 }
 

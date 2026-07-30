@@ -34,6 +34,9 @@ describe('deriveTimelineScene', () => {
     )
     expect(scene.main.laneLayer).not.toHaveLength(0)
     expect(scene.scrubPositions.every(({ x }) => x >= 180 && x <= 1365)).toBe(true)
+    expect(
+      [...scene.tooltipContentById.values()].some((content) => content.details?.some(({ label }) => label === 'id')),
+    ).toBe(true)
   })
 
   test('uses bounded local aggregation for the dense shared-todo trace', () => {

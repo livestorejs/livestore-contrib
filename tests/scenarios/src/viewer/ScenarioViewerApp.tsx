@@ -14,6 +14,7 @@ import { PlaybackToolbar } from './components/PlaybackToolbar.tsx'
 import { StatusBadge, type StatusTone } from './components/Primitives.tsx'
 import { ScenarioTimeline } from './components/ScenarioTimeline.tsx'
 import { SystemTopology } from './components/SystemTopology.tsx'
+import { Tooltip } from './components/Tooltip.tsx'
 import { TraceInspector } from './components/TraceInspector.tsx'
 import { ArtifactPicker, ViewerHeader } from './components/ViewerHeader.tsx'
 import { useScenarioViewer, type ScenarioViewerInitialState } from './useScenarioViewer.ts'
@@ -122,9 +123,11 @@ export const ScenarioViewerApp = ({ initialArtifact, initialState, hidePicker = 
         <div className="section-heading timeline-heading">
           <div className="timeline-heading-copy">
             <h2 id="timeline-heading">Timeline</h2>
-            <p className="trace-name" title={artifact?.descriptor.runId}>
-              {artifact?.descriptor.runId ?? 'No trace loaded'}
-            </p>
+            <Tooltip content={{ title: artifact?.descriptor.runId ?? 'No trace loaded' }}>
+              <p className="trace-name" tabIndex={0}>
+                {artifact?.descriptor.runId ?? 'No trace loaded'}
+              </p>
+            </Tooltip>
           </div>
           <span id="record-label">{recordLabel}</span>
         </div>

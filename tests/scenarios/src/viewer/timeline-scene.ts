@@ -12,6 +12,8 @@ import {
   projectAdaptiveTime,
   sessionComponentKey,
 } from '../projection.ts'
+import type { TooltipContent } from './components/Tooltip.tsx'
+import { timelineEventTooltipContent } from './event-tooltip.ts'
 
 export type TimelineMode = 'flow' | 'time'
 export type TimeScaleMode = 'fit' | 'raw'
@@ -23,7 +25,7 @@ export interface TimelineViewport {
 
 export type SvgAttribute = string | number | boolean | undefined
 export interface SvgSceneNode {
-  readonly tag: 'circle' | 'g' | 'line' | 'path' | 'rect' | 'text' | 'title'
+  readonly tag: 'circle' | 'g' | 'line' | 'path' | 'rect' | 'text'
   readonly attrs?: Readonly<Record<string, SvgAttribute>>
   readonly children?: ReadonlyArray<SvgSceneNode>
   readonly text?: string
@@ -69,6 +71,8 @@ export interface TimelineScene {
   readonly lanes: ReadonlyArray<TimelineLaneScene>
   readonly main: MainTimelineScene
   readonly range: RangeNavigatorScene
+  /** Custom tooltip content for every semantic timeline marker. */
+  readonly tooltipContentById: ReadonlyMap<string, TooltipContent>
   /** Visible cursor targets after applying visibility, playback, and viewport projections. */
   readonly scrubPositions: ReadonlyArray<{ readonly index: number; readonly x: number }>
   readonly markerMode: 'label' | 'point' | 'aggregate'
@@ -96,11 +100,6 @@ const node = (
   text?: string,
 ): SvgSceneNode => ({ tag, attrs, children, text })
 
-const titled = (title: string, child: SvgSceneNode): SvgSceneNode => ({
-  ...child,
-  children: [node('title', undefined, undefined, title), ...(child.children ?? [])],
-})
-
 /**
  * Derives every timeline coordinate and semantic layer without reading or mutating the DOM.
  * Keeping geometry separate from rendering makes semantic thresholds directly testable.
@@ -110,6 +109,14 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
   const trace = artifact.trace
   const viewport = clampTimelineViewport(args.viewport.start, args.viewport.end)
   const markers = deriveEventTimeline(trace)
+  const tooltipContentById = new Map<string, TooltipContent>()
+  let nextTooltipId = 1
+  const withTooltip = (content: TooltipContent | string, child: SvgSceneNode): SvgSceneNode => {
+    const tooltipId = `timeline-tooltip-${nextTooltipId}`
+    nextTooltipId += 1
+    tooltipContentById.set(tooltipId, typeof content === 'string' ? { title: content } : content)
+    return { ...child, attrs: { ...child.attrs, 'data-timeline-tooltip-id': tooltipId } }
+  }
   const captures = deriveTraceCaptures(trace)
   const connectivityIntervals = deriveConnectivityIntervals(trace)
   const laneActivityIntervals = deriveLaneActivityIntervals({ scenario: artifact.scenario, trace })
@@ -229,6 +236,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
       const x = group.reduce((total, item) => total + item.x, 0) / group.length
       const y = yAt(first.marker.componentKey)
       const eventRef = group.length === 1 ? first.marker.event.eventRef : undefined
+      const tooltipContent = timelineEventTooltipContent(group.map(({ marker }) => marker.event))
       const commonAttrs = {
         class: `marker ${markerMode === 'label' ? 'marker-label' : `event-point ${markerMode}`} ${pending} ${selected} ${future}`,
         'data-event-ref': eventRef,
@@ -250,8 +258,8 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
                 }),
               ]
             : []
-        return titled(
-          markerGroupTitle(group),
+        return withTooltip(
+          tooltipContent,
           node('g', { ...commonAttrs, transform: `translate(${x - 24} ${y - 10})` }, [
             ...uncertainty,
             node('rect', { width: 48, height: 20, rx: 3 }),
@@ -260,15 +268,13 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
         )
       }
       const radius = group.length === 1 ? 3.8 : Math.min(8, 3.8 + Math.log2(group.length))
-      return titled(
-        markerGroupTitle(group),
-        node('g', commonAttrs, [
-          node('circle', { cx: x, cy: y, r: radius }),
-          ...(group.length > 1 && radius >= 5.8
-            ? [node('text', { x, y: y + 2.3, 'text-anchor': 'middle' }, undefined, String(group.length))]
-            : []),
-        ]),
-      )
+      const markerNode = node('g', commonAttrs, [
+        node('circle', { cx: x, cy: y, r: radius }),
+        ...(group.length > 1 && radius >= 5.8
+          ? [node('text', { x, y: y + 2.3, 'text-anchor': 'middle' }, undefined, String(group.length))]
+          : []),
+      ])
+      return withTooltip(tooltipContent, markerNode)
     })
 
   const compressedGaps =
@@ -316,7 +322,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
     const uncertain = interval.startEvidence === 'first-observed' || interval.endEvidence === 'first-observed'
     const boundaryDescription = `${interval.startEvidence} → ${interval.endEvidence ?? 'still disconnected'}`
     return [
-      titled(
+      withTooltip(
         `${interval.clientId} offline · ${boundaryDescription}`,
         node('g', { class: `offline-period ${uncertain === true ? 'uncertain' : ''}` }, [
           node('rect', { x: x1, y, width: x2 - x1, height: lastSessionY - leaderY + 46, rx: 2 }),
@@ -336,7 +342,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
     .map((record) => {
       const x = xForRecord(record.index)
       const message = 'message' in record.payload ? record.payload.message : 'Scenario execution failed'
-      return titled(
+      return withTooltip(
         message,
         node('g', { class: 'failure-boundary', 'data-record-index': record.index }, [
           node('line', { x1: x, x2: x, y1: 3, y2: carpetTop - 8 }),
@@ -362,7 +368,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
             ? leaderY
             : yAt(sessionComponentKey(client.id, lastSessionId))
       const milestone = (className: string, children: ReadonlyArray<SvgSceneNode>): ReadonlyArray<SvgSceneNode> => [
-        titled(
+        withTooltip(
           title,
           node('g', { class: `participant-milestone ${className}`, 'data-record-index': record.index }, children),
         ),
@@ -422,7 +428,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
     const duplicateCount = interval.recordIndexes.length
     const title = `${interval.clientId}${interval.sessionId === null ? '' : `/${interval.sessionId}`}: runtime failure: ${interval.summary}${duplicateCount > 1 ? ` · ${duplicateCount} related records` : ''}`
     return [
-      titled(
+      withTooltip(
         title,
         node('g', { class: 'runtime-failure-interval' }, [
           node('line', {
@@ -454,7 +460,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
     )
     .map((capture) => {
       const x = xForRecord(traceVisibility === 'system' ? capture.lastRecordIndex : capture.firstRecordIndex)
-      return titled(
+      return withTooltip(
         `capture ${capture.captureIndex + 1} · non-atomic sampling pass`,
         node('line', { class: 'capture-guide', x1: x, x2: x, y1: 12, y2: carpetTop - 8 }),
       )
@@ -476,7 +482,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
           .map((moment) => {
             const record = trace[moment.recordIndex]!
             const radius = moment.kind === 'capture' ? 2.1 : moment.kind === 'failure' ? 3.8 : 3.2
-            return titled(
+            return withTooltip(
               `moment ${moment.momentIndex + 1} · ${moment.label} · ${moment.summary} · record ${moment.recordIndex + 1}`,
               node('circle', {
                 class: `trace-dot system-moment moment-${moment.kind} ${record.evidence} ${moment.recordIndexes.includes(cursorIndex) === true ? 'selected' : ''}`,
@@ -492,7 +498,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
           .map((record) => {
             const stack = record.captureId === null ? 0 : (captureStack.get(record.captureId) ?? 0)
             if (record.captureId !== null) captureStack.set(record.captureId, stack + 1)
-            return titled(
+            return withTooltip(
               `#${record.index + 1} · ${record.payload._tag} · ${record.evidence}`,
               node('circle', {
                 class: `trace-dot ${record.evidence} ${record.index === cursorIndex ? 'selected' : ''}`,
@@ -585,7 +591,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
       const endRecordIndex = interval.endRecordIndex ?? trace.at(-1)?.index ?? interval.startRecordIndex
       const x1 = overviewXForNormalized(start)
       const x2 = Math.max(overviewXForNormalized(normalizedForRecord(endRecordIndex)), x1 + 1)
-      return titled(
+      return withTooltip(
         `${interval.clientId} offline`,
         node('rect', { class: 'range-offline-period', x: x1, y: 30, width: x2 - x1, height: 4 }),
       )
@@ -593,7 +599,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
     ...runtimeFailureIntervals.map((interval) => {
       const x = overviewXForNormalized(normalizedForRecord(interval.startRecordIndex))
       const participant = `${interval.clientId}${interval.sessionId === null ? '' : `/${interval.sessionId}`}`
-      return titled(
+      return withTooltip(
         `${participant}: ${interval.summary}`,
         node('line', { class: 'range-runtime-failure', x1: x, x2: x, y1: 18, y2: 36 }),
       )
@@ -601,7 +607,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
   ]
   const failureLayer = failureRecords.map((record) => {
     const x = overviewXForNormalized(normalizedForRecord(record.index))
-    return titled(record.payload._tag, node('line', { class: 'range-failure', x1: x, x2: x, y1: 5, y2: 37 }))
+    return withTooltip(record.payload._tag, node('line', { class: 'range-failure', x1: x, x2: x, y1: 5, y2: 37 }))
   })
   const rangeStartX = overviewXForNormalized(viewport.start)
   const rangeEndX = overviewXForNormalized(viewport.end)
@@ -621,7 +627,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
       rx: 2,
       'data-range-action': 'track',
     }),
-    titled(
+    withTooltip(
       'Drag to pan the visible timeline range',
       node('rect', {
         class: 'range-window',
@@ -672,6 +678,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
 
   return {
     lanes,
+    tooltipContentById,
     scrubPositions,
     markerMode,
     normalizedRecordPositions,
@@ -704,7 +711,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
         overviewCursorX === undefined
           ? []
           : [
-              titled(
+              withTooltip(
                 'Current trace cursor',
                 node('line', { class: 'range-cursor', x1: overviewCursorX, x2: overviewCursorX, y1: 4, y2: 39 }),
               ),
@@ -742,22 +749,6 @@ export const groupMarkersIntoBins = ({
     bins.set(bin, group)
   }
   return [...bins.entries()].toSorted(([a], [b]) => a - b).map(([, group]) => group)
-}
-
-const markerGroupTitle = (group: ReadonlyArray<PositionedTimelineMarker>): string => {
-  if (group.length === 1) {
-    const marker = group[0]!.marker
-    return `${marker.event.name} · inferred correlation ${marker.event.eventRef} · ${displayEventPosition(marker.event)} · observed change in capture ${marker.captureIndex + 1}`
-  }
-  const visibleItems = group
-    .slice(0, 8)
-    .map(
-      ({ marker }) =>
-        `${displayEventPosition(marker.event)} · ${marker.event.name} · inferred correlation ${marker.event.eventRef}`,
-    )
-    .join('\n')
-  const remainder = group.length > 8 ? `\n… ${group.length - 8} more` : ''
-  return `${group.length} observed event changes\n${visibleItems}${remainder}`
 }
 
 export const displayEventPosition = (event: Pick<ObservedEvent, 'position' | 'disposition'>): string =>

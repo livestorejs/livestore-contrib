@@ -1,8 +1,9 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop -- Disclosure callbacks bind the selected record and JSON path at leaf nodes. */
+/* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop -- Disclosure callbacks and tooltip content bind the selected record at leaf nodes. */
 import type { ScenarioTraceRecord } from '../../model.ts'
 import type { PlaybackMoment } from '../../projection.ts'
 import { summarizeTraceRecord } from '../../projection.ts'
 import { detailRecordScope, groupDetailRecords, traceRecordFacts } from '../trace-inspector-model.ts'
+import { Tooltip } from './Tooltip.tsx'
 
 export interface InspectorExpansionState {
   readonly traceMetadataOpen: boolean
@@ -255,7 +256,9 @@ export const TraceInspector = ({
               ? `RECORD ${selectedRecord.index + 1}`
               : `MOMENT ${selectedMoment.momentIndex + 1} · ${selectedMoment.kind.toUpperCase()}`}
           </p>
-          <h3 title={momentTitle}>{momentTitle}</h3>
+          <Tooltip content={{ title: momentTitle }}>
+            <h3 tabIndex={0}>{momentTitle}</h3>
+          </Tooltip>
         </div>
         <span>
           {records.length} {records.length === 1 ? 'record' : 'records'}

@@ -3,8 +3,15 @@ import { useLayoutEffect, useRef } from 'react'
 
 import type { ComponentSyncObservation, ObservedEvent } from '../../model.ts'
 import type { ObservedSystemState, ProjectedClient } from '../../projection.ts'
+import { eventTooltipContent } from '../event-tooltip.ts'
 import { clientColor, displayEventPosition } from '../timeline-scene.ts'
 import { StatusBadge, type StatusTone } from './Primitives.tsx'
+import { Tooltip, type TooltipContent } from './Tooltip.tsx'
+
+const pendingBoundaryTooltipContent = {
+  title: 'Pending boundary',
+  details: [{ label: 'Following events', value: 'Awaiting upstream confirmation' }],
+} satisfies TooltipContent
 
 export interface EventLogScrollState {
   readonly followTail: boolean
@@ -20,14 +27,15 @@ export const EventChip = ({
   readonly selected: boolean
   readonly onSelect: (eventRef: string) => void
 }) => (
-  <button
-    type="button"
-    className={`event-chip ${event.disposition} ${selected === true ? 'selected' : ''}`}
-    title={`${event.name} · inferred correlation ${event.eventRef} · ${event.disposition}`}
-    onClick={() => onSelect(event.eventRef)}
-  >
-    {displayEventPosition(event)}
-  </button>
+  <Tooltip content={eventTooltipContent(event)}>
+    <button
+      type="button"
+      className={`event-chip ${event.disposition} ${selected === true ? 'selected' : ''}`}
+      onClick={() => onSelect(event.eventRef)}
+    >
+      {displayEventPosition(event)}
+    </button>
+  </Tooltip>
 )
 
 export const EventLog = ({
@@ -77,11 +85,13 @@ export const EventLog = ({
           {events.map((event, index) => (
             <span key={`${event.eventRef}:${index}`} style={{ display: 'contents' }}>
               {event.disposition === 'pending' && events[index - 1]?.disposition !== 'pending' ? (
-                <span
-                  className="eventlog-pending-boundary"
-                  title="Events after this marker are pending backend confirmation"
-                  aria-hidden="true"
-                />
+                <Tooltip content={pendingBoundaryTooltipContent}>
+                  <span
+                    className="eventlog-pending-boundary"
+                    tabIndex={0}
+                    aria-label="Events after this marker are awaiting upstream confirmation"
+                  />
+                </Tooltip>
               ) : null}
               <EventChip event={event} selected={event.eventRef === selectedEventRef} onSelect={onSelectEvent} />
             </span>
