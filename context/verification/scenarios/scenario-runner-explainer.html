@@ -1,0 +1,2798 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>LiveStore scenario runner — architecture explainer</title>
+    <style>
+      :root {
+        --background: #ffffff;
+        --surface: #ffffff;
+        --text: #111111;
+        --muted: #666666;
+        --line: #dddddd;
+        --line-strong: #999999;
+        --code: #f2f2f2;
+        --backend: #1c1c1c;
+        --client-a: #484848;
+        --client-b: #707070;
+        --client-c: #949494;
+        --client-d: #b8b8b8;
+        --good: #333333;
+        --warn: #666666;
+        --bad: #111111;
+        --content: 1220px;
+        color: var(--text);
+        background: var(--background);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-synthesis: none;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .page {
+        width: min(calc(100% - 48px), var(--content));
+        margin: 0 auto;
+      }
+
+      .eyebrow,
+      .section-index,
+      .section-label,
+      .diagram-label,
+      .micro,
+      .status,
+      .legend,
+      .toc-number,
+      .delta-id {
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 11px;
+        font-weight: 720;
+      }
+
+      .hero {
+        min-height: 88vh;
+        display: grid;
+        align-content: center;
+        padding: 80px 0 56px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 0.42fr);
+        gap: 72px;
+        align-items: end;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        margin: 0 0 30px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 850px;
+        margin-bottom: 28px;
+        font-size: clamp(48px, 7.6vw, 104px);
+        line-height: 0.92;
+        letter-spacing: -0.07em;
+        font-weight: 640;
+      }
+
+      .hero-deck {
+        max-width: 760px;
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: clamp(16px, 2vw, 22px);
+        line-height: 1.5;
+      }
+
+      .hero-aside {
+        border-left: 1px solid var(--line-strong);
+        padding-left: 26px;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .hero-aside p {
+        margin-bottom: 22px;
+      }
+
+      .hero-aside p:last-child {
+        margin-bottom: 0;
+      }
+
+      .status {
+        display: inline-block;
+        color: var(--good);
+        margin-bottom: 6px;
+      }
+
+      .hero-principles {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+        margin-top: 72px;
+      }
+
+      .principle {
+        padding: 22px 28px 0 0;
+        min-height: 120px;
+        border-right: 1px solid var(--line);
+      }
+
+      .principle + .principle {
+        padding-left: 28px;
+      }
+
+      .principle:last-child {
+        border-right: 0;
+      }
+
+      .principle strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .principle span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: color-mix(in srgb, var(--background) 93%, transparent);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .toc-inner {
+        width: min(calc(100% - 48px), var(--content));
+        min-height: 54px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .toc-inner::-webkit-scrollbar {
+        display: none;
+      }
+
+      .toc-title {
+        flex: 0 0 auto;
+        font-size: 12px;
+        font-weight: 750;
+        margin-right: auto;
+      }
+
+      .toc a {
+        flex: 0 0 auto;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .toc a[aria-current="true"] {
+        color: var(--text);
+      }
+
+      .toc-number {
+        margin-right: 7px;
+        color: var(--line-strong);
+      }
+
+      .section {
+        scroll-margin-top: 54px;
+        padding: 88px 0 104px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: 130px minmax(0, 1fr);
+        gap: 32px;
+        margin-bottom: 60px;
+      }
+
+      .section-index {
+        color: var(--line-strong);
+        padding-top: 7px;
+      }
+
+      h2 {
+        max-width: 920px;
+        margin-bottom: 18px;
+        font-size: clamp(30px, 4.4vw, 58px);
+        line-height: 1.02;
+        letter-spacing: -0.045em;
+        font-weight: 610;
+      }
+
+      .section-intro {
+        max-width: 780px;
+        margin: 0;
+        color: var(--muted);
+        font: 16px/1.65 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .section-body {
+        margin-left: 162px;
+      }
+
+      .rule-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .rule-grid > div {
+        min-height: 142px;
+        padding: 24px 26px 24px 0;
+        border-right: 1px solid var(--line);
+      }
+
+      .rule-grid > div + div {
+        padding-left: 26px;
+      }
+
+      .rule-grid > div:last-child {
+        border-right: 0;
+      }
+
+      .rule-grid strong {
+        display: block;
+        margin: 8px 0 10px;
+        font-size: 15px;
+      }
+
+      .rule-grid p,
+      .short-copy,
+      .delta-copy,
+      .note {
+        margin-bottom: 0;
+        color: var(--muted);
+        font: 13px/1.58 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .section-label {
+        color: var(--muted);
+      }
+
+      .architecture {
+        padding: 8px 0;
+      }
+
+      .arch-line {
+        display: grid;
+        grid-template-columns: minmax(150px, 0.9fr) 62px minmax(190px, 1fr) 62px minmax(170px, 0.95fr);
+        align-items: center;
+      }
+
+      .arch-line + .arch-line {
+        margin-top: 20px;
+      }
+
+      .arch-node {
+        min-height: 90px;
+        display: grid;
+        align-content: center;
+        padding: 18px 20px;
+        border-top: 1px solid var(--line-strong);
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .arch-node strong {
+        font-size: 14px;
+      }
+
+      .arch-node span {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+        margin-top: 7px;
+      }
+
+      .arch-node.accent {
+        border-color: var(--text);
+      }
+
+      .arch-arrow {
+        position: relative;
+        height: 1px;
+        background: var(--line-strong);
+      }
+
+      .arch-arrow::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: -3px;
+        width: 7px;
+        height: 7px;
+        border-top: 1px solid var(--line-strong);
+        border-right: 1px solid var(--line-strong);
+        transform: rotate(45deg);
+      }
+
+      .arch-branch {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        margin: 42px 0 0 calc((100% - 124px) * 0.38 + 62px);
+      }
+
+      .arch-branch > div {
+        position: relative;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .arch-branch > div::before {
+        content: "";
+        position: absolute;
+        width: 1px;
+        height: 24px;
+        top: -24px;
+        left: 0;
+        background: var(--line);
+      }
+
+      .arch-branch strong {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 7px;
+      }
+
+      .arch-branch span {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .annotation {
+        max-width: 580px;
+        margin-top: 44px;
+        padding-left: 18px;
+        border-left: 2px solid var(--backend);
+      }
+
+      .annotation strong {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      .annotation p {
+        margin: 0;
+        color: var(--muted);
+        font: 13px/1.6 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .evidence-chain {
+        margin-top: 64px;
+      }
+
+      .evidence-chain-heading {
+        max-width: 760px;
+      }
+
+      .evidence-chain-heading strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+
+      .evidence-chain-heading span {
+        color: var(--muted);
+        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .evidence-source-groups {
+        display: grid;
+        grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+        gap: 36px;
+        margin-top: 22px;
+      }
+
+      .evidence-group-label {
+        display: block;
+        margin-bottom: 9px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 720;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .evidence-group-steps {
+        display: grid;
+        grid-template-columns: repeat(var(--step-count), minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .evidence-step {
+        position: relative;
+        min-height: 150px;
+        padding: 16px;
+        border: 1px solid var(--line-strong);
+      }
+
+      .evidence-step:not(:last-child)::after {
+        content: "→";
+        position: absolute;
+        right: -23px;
+        top: calc(50% - 10px);
+        width: 22px;
+        text-align: center;
+        color: var(--muted);
+        background: var(--background);
+      }
+
+      .evidence-step + .evidence-step {
+        padding-left: 16px;
+      }
+
+      .evidence-step strong {
+        display: block;
+        margin: 10px 0 8px;
+        font-size: 12px;
+      }
+
+      .evidence-step p {
+        margin: 0;
+        color: var(--muted);
+        font: 11px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .evidence-step .micro {
+        color: var(--line-strong);
+      }
+
+      .evidence-step:nth-child(1) .micro,
+      .evidence-step:nth-child(2) .micro {
+        color: var(--backend);
+      }
+
+      .evidence-step:nth-child(4) .micro,
+      .evidence-step:nth-child(5) .micro {
+        color: var(--client-a);
+      }
+
+      .evidence-support-arrow {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        padding: 14px 0 10px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      .evidence-support-arrow b {
+        font-size: 16px;
+        font-weight: 400;
+      }
+
+      .evidence-evaluation {
+        width: min(280px, 100%);
+        margin: 0 auto;
+      }
+
+      .evidence-summary {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr) 90px minmax(0, 1fr);
+        align-items: center;
+        margin-top: 22px;
+      }
+
+      .evidence-summary-box {
+        min-height: 150px;
+        display: grid;
+        align-content: start;
+        padding: 18px;
+        border: 1px solid var(--line-strong);
+      }
+
+      .evidence-summary-box > span:first-child {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 720;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .evidence-summary-box strong {
+        display: block;
+        margin: 10px 0 8px;
+        font-size: 13px;
+      }
+
+      .evidence-summary-box p,
+      .evidence-summary-box small {
+        margin: 0;
+        color: var(--muted);
+        font: 11px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .evidence-summary-box small {
+        display: block;
+        margin-top: 10px;
+        color: var(--text);
+      }
+
+      .evidence-summary-arrow {
+        display: grid;
+        justify-items: center;
+        gap: 3px;
+        color: var(--muted);
+        font-size: 9px;
+        text-align: center;
+      }
+
+      .evidence-summary-arrow b {
+        font-size: 16px;
+        font-weight: 400;
+      }
+
+      .profiles {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      .profiles th,
+      .profiles td {
+        padding: 18px 16px 18px 0;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .profiles th + th,
+      .profiles td + td {
+        padding-left: 20px;
+      }
+
+      .profiles th {
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .profiles td {
+        line-height: 1.55;
+      }
+
+      .profiles td:first-child {
+        width: 16%;
+        font-weight: 750;
+      }
+
+      .profiles .muted {
+        color: var(--muted);
+      }
+
+      .split-heading {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+        margin-top: 70px;
+        border-top: 1px solid var(--line);
+      }
+
+      .split-heading > div {
+        padding: 26px 36px 0 0;
+      }
+
+      .split-heading > div + div {
+        padding-left: 36px;
+        border-left: 1px solid var(--line);
+      }
+
+      .split-heading h3 {
+        font-size: 18px;
+        margin: 8px 0 12px;
+      }
+
+      .browser-architecture {
+        display: grid;
+        gap: 14px;
+        margin-top: 54px;
+      }
+
+      .ba-purpose {
+        max-width: 780px;
+        margin-bottom: 8px;
+      }
+
+      .ba-purpose strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 13px;
+      }
+
+      .ba-purpose span {
+        color: var(--muted);
+        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .ba-row {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr);
+        align-items: start;
+      }
+
+      .ba-label {
+        padding: 16px 18px 0 0;
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .ba-content {
+        display: grid;
+        align-items: center;
+        grid-template-columns: repeat(var(--ba-columns, 5), minmax(90px, 1fr));
+        gap: 24px;
+        padding-left: 26px;
+      }
+
+      .ba-node {
+        position: relative;
+        min-height: 78px;
+        display: grid;
+        align-content: center;
+        padding: 14px 16px;
+        border: 1px solid var(--line-strong);
+      }
+
+      .ba-node strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 12px;
+      }
+
+      .ba-node span {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.45;
+        margin-top: 4px;
+      }
+
+      .ba-node .ownership {
+        margin-top: 0;
+        color: var(--muted);
+        font-size: 8px;
+        font-weight: 720;
+        letter-spacing: 0.1em;
+        line-height: 1.3;
+        text-transform: uppercase;
+      }
+
+      .ba-node:not(:last-child)::after {
+        content: "→";
+        position: absolute;
+        right: -23px;
+        top: calc(50% - 9px);
+        width: 22px;
+        text-align: center;
+        color: var(--line-strong);
+        background: var(--background);
+      }
+
+      .ba-node.browser {
+        border-color: var(--client-a);
+      }
+
+      .ba-node.backend {
+        border-color: var(--backend);
+      }
+
+      .ba-node.persistence {
+        border-color: var(--client-c);
+      }
+
+      .ba-node.product {
+        border-color: var(--text);
+      }
+
+      .ba-node.local-infra {
+        border-color: var(--client-b);
+      }
+
+      .ba-boundary {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        margin-left: 136px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      .ba-boundary b {
+        font-size: 16px;
+        font-weight: 400;
+      }
+
+      .ba-subline {
+        grid-column: 2 / -1;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(90px, 1fr));
+        gap: 24px;
+        padding: 0 0 20px 30px;
+        margin-top: -8px;
+      }
+
+      .ba-subline span {
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .time-comparison {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-top: 1px solid var(--line-strong);
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .time-panel {
+        padding: 28px 34px 34px 0;
+      }
+
+      .time-panel + .time-panel {
+        padding-left: 34px;
+        border-left: 1px solid var(--line);
+      }
+
+      .time-panel h3 {
+        font-size: 17px;
+        margin: 8px 0 10px;
+      }
+
+      .time-panel .short-copy {
+        min-height: 64px;
+      }
+
+      .lane-plot {
+        margin-top: 34px;
+      }
+
+      .lane {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        min-height: 58px;
+        align-items: center;
+      }
+
+      .lane-name {
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .lane-track {
+        position: relative;
+        height: 1px;
+        background: var(--line);
+      }
+
+      .lane-track.colour-backend {
+        background: color-mix(in srgb, var(--backend) 70%, var(--line));
+      }
+
+      .lane-track.colour-a {
+        background: color-mix(in srgb, var(--client-a) 70%, var(--line));
+      }
+
+      .lane-track.colour-b {
+        background: color-mix(in srgb, var(--client-b) 70%, var(--line));
+      }
+
+      .marker {
+        position: absolute;
+        top: 0;
+        width: 0;
+        height: 0;
+        z-index: 2;
+        transform: translateX(-50%);
+      }
+
+      .marker::before {
+        content: "";
+        position: absolute;
+        left: -9px;
+        top: -9px;
+        width: 17px;
+        height: 17px;
+        transform: rotate(45deg);
+        background: var(--background);
+        border: 1px solid currentColor;
+      }
+
+      .marker::after {
+        content: attr(data-label);
+        position: absolute;
+        left: 14px;
+        top: -21px;
+        padding: 1px 2px;
+        background: var(--background);
+        color: var(--text);
+        font-size: 9px;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .marker.label-below::after {
+        top: 13px;
+      }
+
+      .marker.backend {
+        color: var(--backend);
+      }
+
+      .marker.a {
+        color: var(--client-a);
+      }
+
+      .marker.b {
+        color: var(--client-b);
+      }
+
+      .cause-line {
+        position: absolute;
+        top: -1px;
+        z-index: 1;
+        height: 1px;
+        border-top: 1px dashed var(--line-strong);
+      }
+
+      .wait-segment {
+        position: absolute;
+        top: -5px;
+        height: 10px;
+        background: color-mix(in srgb, var(--warn) 16%, transparent);
+        border-left: 1px solid var(--warn);
+        border-right: 1px solid var(--warn);
+      }
+
+      .plot-axis {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        margin-top: 8px;
+      }
+
+      .ticks {
+        display: flex;
+        justify-content: space-between;
+        color: var(--line-strong);
+        font-size: 9px;
+      }
+
+      .claim-line {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .claim-line > div {
+        padding: 20px 26px 20px 0;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .claim-line > div + div {
+        padding-left: 26px;
+        border-left: 1px solid var(--line);
+      }
+
+      .claim-line strong {
+        color: var(--good);
+      }
+
+      .claim-line span {
+        color: var(--bad);
+      }
+
+      .clock-diagram {
+        margin-top: 68px;
+        padding: 26px 0 30px;
+        border-top: 1px solid var(--line-strong);
+        border-bottom: 1px solid var(--line-strong);
+        overflow-x: auto;
+      }
+
+      .clock-sequence {
+        display: block;
+        width: 100%;
+        min-width: 760px;
+        height: auto;
+      }
+
+      .clock-sequence .clock-head {
+        fill: var(--muted);
+        font-size: 11px;
+        font-weight: 720;
+        letter-spacing: 0.12em;
+      }
+
+      .clock-sequence .clock-primary {
+        fill: var(--text);
+        font-size: 14px;
+        font-weight: 720;
+      }
+
+      .clock-sequence .clock-secondary,
+      .clock-sequence .clock-arrow-label {
+        fill: var(--muted);
+        font-size: 10.5px;
+      }
+
+      .clock-sequence .clock-lifeline,
+      .clock-sequence .clock-axis,
+      .clock-sequence .clock-envelope-line {
+        fill: none;
+        stroke: var(--line-strong);
+        stroke-width: 1;
+      }
+
+      .clock-sequence .clock-flow {
+        fill: none;
+        stroke: var(--text);
+        stroke-width: 1;
+        marker-end: url("#clock-arrow");
+      }
+
+      .clock-sequence .clock-projection {
+        fill: none;
+        stroke: var(--client-c);
+        stroke-width: 1;
+        marker-end: url("#clock-arrow-purple");
+      }
+
+      .clock-sequence .clock-controller-dot {
+        fill: var(--background);
+        stroke: var(--text);
+        stroke-width: 1.5;
+      }
+
+      .clock-sequence .clock-participant-dot {
+        fill: var(--client-c);
+      }
+
+      .clock-sequence .clock-interval-window {
+        fill: color-mix(in srgb, var(--client-c) 18%, var(--background));
+        stroke: var(--client-c);
+        stroke-width: 1;
+      }
+
+      .clock-sequence .clock-interval-label {
+        fill: var(--client-c);
+        font-size: 10.5px;
+      }
+
+      .clock-notes {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 30px;
+        margin-top: 42px;
+      }
+
+      .clock-notes strong {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+
+      .clock-notes p {
+        margin: 0;
+        color: var(--muted);
+        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .settlement-flow {
+        display: grid;
+        grid-template-columns: minmax(180px, 0.78fr) 32px minmax(320px, 1.35fr) 32px minmax(220px, 0.9fr);
+        align-items: stretch;
+        margin-top: 46px;
+      }
+
+      .settlement-box,
+      .settlement-outcomes {
+        border: 1px solid var(--line-strong);
+      }
+
+      .settlement-box {
+        padding: 20px 22px;
+      }
+
+      .settlement-box h3,
+      .settlement-outcome h3,
+      .settlement-conditional h3,
+      .settlement-after h3 {
+        margin: 8px 0 10px;
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      .settlement-box p,
+      .settlement-outcome p,
+      .settlement-conditional p,
+      .settlement-after p {
+        margin: 0;
+        color: var(--muted);
+        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .settlement-fields {
+        margin-top: 17px;
+        border-top: 1px solid var(--line);
+      }
+
+      .settlement-field {
+        display: grid;
+        grid-template-columns: 78px 1fr;
+        gap: 12px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--line);
+        font: 10px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .settlement-field span {
+        color: var(--muted);
+      }
+
+      .settlement-arrow {
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 18px;
+      }
+
+      .settlement-checks {
+        margin: 17px 0 0;
+        padding: 0;
+        list-style: none;
+        border-top: 1px solid var(--line);
+      }
+
+      .settlement-checks li {
+        position: relative;
+        padding: 9px 0 9px 20px;
+        border-bottom: 1px solid var(--line);
+        color: var(--ink);
+        font: 11px/1.5 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .settlement-checks li::before {
+        content: "—";
+        position: absolute;
+        left: 0;
+        color: var(--muted);
+      }
+
+      .settlement-repeat {
+        margin-top: 14px !important;
+        color: var(--ink) !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+        font-size: 10px !important;
+      }
+
+      .settlement-outcomes {
+        display: grid;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .settlement-outcome {
+        padding: 19px 21px;
+      }
+
+      .settlement-outcome + .settlement-outcome {
+        border-top: 1px solid var(--line-strong);
+      }
+
+      .settlement-conditional {
+        display: grid;
+        grid-template-columns: minmax(190px, 0.7fr) minmax(0, 2fr);
+        gap: 34px;
+        margin-top: 34px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .settlement-conditional > div {
+        padding: 24px 0 26px;
+      }
+
+      .settlement-conditional > div + div {
+        padding-left: 34px;
+        border-left: 1px solid var(--line);
+      }
+
+      .settlement-transition {
+        margin-bottom: 12px;
+        color: var(--ink);
+        font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .settlement-after {
+        display: grid;
+        grid-template-columns: minmax(190px, 0.7fr) minmax(0, 2fr);
+        gap: 34px;
+        margin-top: 34px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+      }
+
+      .settlement-after > div + div {
+        padding-left: 34px;
+        border-left: 1px solid var(--line);
+      }
+
+      .open-deltas {
+        margin-top: 54px;
+      }
+
+      .delta {
+        display: grid;
+        grid-template-columns: 110px minmax(220px, 0.72fr) minmax(280px, 1.2fr);
+        gap: 28px;
+        padding: 22px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .delta:last-child {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .delta-id {
+        color: var(--warn);
+        padding-top: 3px;
+      }
+
+      .delta h3 {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .delta-copy {
+        max-width: 680px;
+      }
+
+      .baseline-gates {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 66px;
+        border-top: 1px solid var(--line-strong);
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .gate {
+        position: relative;
+        min-height: 190px;
+        padding: 26px 28px 28px 0;
+      }
+
+      .gate + .gate {
+        padding-left: 28px;
+        border-left: 1px solid var(--line);
+      }
+
+      .gate h3 {
+        font-size: 14px;
+        margin: 10px 0 12px;
+      }
+
+      .gate p {
+        margin: 0;
+        color: var(--muted);
+        font: 12px/1.58 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .gate::after {
+        content: "";
+        position: absolute;
+        bottom: -32px;
+        left: 50%;
+        width: 1px;
+        height: 32px;
+        background: var(--line-strong);
+      }
+
+      .baseline-close {
+        margin: 31px auto 0;
+        width: fit-content;
+        padding: 13px 18px;
+        border-top: 1px solid var(--good);
+        border-bottom: 1px solid var(--good);
+        color: var(--good);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .closed-slice {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 28px;
+        margin-top: 64px;
+      }
+
+      .closed-slice > div {
+        padding-top: 20px;
+        border-top: 1px solid var(--good);
+      }
+
+      .closed-slice h3 {
+        margin: 9px 0 10px;
+        font-size: 13px;
+        color: var(--good);
+      }
+
+      .footer {
+        padding: 70px 0 90px;
+      }
+
+      .footer-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 60px;
+      }
+
+      .footer h2 {
+        font-size: clamp(28px, 4vw, 48px);
+      }
+
+      .footer p {
+        max-width: 760px;
+        color: var(--muted);
+        font: 14px/1.65 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .footer aside {
+        border-left: 1px solid var(--line);
+        padding-left: 24px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.65;
+      }
+
+      code {
+        padding: 1px 4px;
+        background: var(--code);
+        font-family: inherit;
+        font-size: 0.92em;
+      }
+
+      @media (max-width: 980px) {
+        .hero-grid {
+          grid-template-columns: 1fr;
+          gap: 48px;
+        }
+
+        .hero-aside {
+          max-width: 640px;
+        }
+
+        .section-head {
+          grid-template-columns: 84px minmax(0, 1fr);
+        }
+
+        .section-body {
+          margin-left: 116px;
+        }
+
+        .arch-line {
+          grid-template-columns: 1fr 40px 1fr 40px 1fr;
+        }
+
+        .arch-branch {
+          margin-left: 0;
+        }
+
+        .evidence-source-groups {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+
+        .evidence-step:nth-child(3)::after {
+          display: none;
+        }
+
+        .ba-content,
+        .ba-subline {
+          grid-template-columns: repeat(3, 1fr);
+        }
+
+        .ba-node:nth-child(3)::after {
+          display: none;
+        }
+
+        .settlement-flow {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+
+        .settlement-arrow {
+          min-height: 18px;
+          transform: rotate(90deg);
+        }
+      }
+
+      @media (max-width: 720px) {
+        .page,
+        .toc-inner {
+          width: min(calc(100% - 28px), var(--content));
+        }
+
+        .hero {
+          min-height: auto;
+          padding: 68px 0 48px;
+        }
+
+        .hero-principles,
+        .rule-grid,
+        .clock-notes,
+        .closed-slice,
+        .baseline-gates {
+          grid-template-columns: 1fr;
+        }
+
+        .principle,
+        .principle + .principle,
+        .rule-grid > div,
+        .rule-grid > div + div {
+          min-height: 0;
+          padding: 22px 0;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .principle:last-child,
+        .rule-grid > div:last-child {
+          border-bottom: 0;
+        }
+
+        .section {
+          padding: 68px 0 78px;
+        }
+
+        .section-head {
+          display: block;
+          margin-bottom: 40px;
+        }
+
+        .section-index {
+          display: block;
+          margin-bottom: 16px;
+        }
+
+        .section-body {
+          margin-left: 0;
+        }
+
+        .architecture {
+          display: grid;
+          gap: 12px;
+        }
+
+        .arch-line {
+          display: contents;
+        }
+
+        .arch-arrow {
+          width: 1px;
+          height: 24px;
+          margin-left: 24px;
+          background: var(--line-strong);
+        }
+
+        .arch-arrow::after {
+          right: -3px;
+          top: auto;
+          bottom: 0;
+          transform: rotate(135deg);
+        }
+
+        .arch-branch {
+          grid-template-columns: 1fr;
+          margin: 20px 0 0;
+        }
+
+        .arch-branch > div::before {
+          display: none;
+        }
+
+        .evidence-group-steps {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+
+        .evidence-step::after {
+          display: none;
+        }
+
+        .evidence-summary {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .evidence-summary-arrow b {
+          transform: rotate(90deg);
+        }
+
+        .profiles {
+          display: block;
+          overflow-x: auto;
+        }
+
+        .split-heading,
+        .time-comparison,
+        .claim-line,
+        .footer-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .split-heading > div,
+        .split-heading > div + div,
+        .time-panel,
+        .time-panel + .time-panel,
+        .claim-line > div,
+        .claim-line > div + div {
+          padding: 24px 0;
+          border-left: 0;
+        }
+
+        .split-heading > div + div,
+        .time-panel + .time-panel,
+        .claim-line > div + div {
+          border-top: 1px solid var(--line);
+        }
+
+        .ba-row {
+          grid-template-columns: 78px 1fr;
+        }
+
+        .ba-boundary {
+          margin-left: 98px;
+        }
+
+        .ba-content,
+        .ba-subline {
+          grid-template-columns: 1fr;
+          padding-left: 20px;
+          gap: 18px;
+        }
+
+        .ba-node::after {
+          display: none;
+        }
+
+        .settlement-conditional,
+        .settlement-after {
+          grid-template-columns: 1fr;
+          gap: 0;
+        }
+
+        .settlement-conditional > div + div,
+        .settlement-after > div + div {
+          padding-left: 0;
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+
+        .delta {
+          grid-template-columns: 74px 1fr;
+        }
+
+        .delta-copy {
+          grid-column: 2;
+        }
+
+        .gate,
+        .gate + .gate {
+          min-height: 0;
+          padding: 24px 0;
+          border-left: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .gate::after {
+          display: none;
+        }
+
+        .footer aside {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+          padding: 22px 0 0;
+        }
+      }
+
+      /* Compact contributor-document layout. */
+      body {
+        background: var(--background);
+      }
+
+      .page {
+        width: min(calc(100% - 32px), 1120px);
+      }
+
+      .hero {
+        min-height: 0;
+        display: block;
+        padding: 42px 0 30px;
+      }
+
+      .hero-grid {
+        grid-template-columns: minmax(0, 1fr) 310px;
+        gap: 48px;
+        align-items: start;
+      }
+
+      .eyebrow {
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        max-width: none;
+        margin-bottom: 10px;
+        font-size: 38px;
+        line-height: 1.12;
+        letter-spacing: -0.035em;
+        font-weight: 650;
+      }
+
+      .hero-deck {
+        max-width: 760px;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .hero-aside {
+        padding-left: 20px;
+        font-size: 11px;
+        line-height: 1.55;
+      }
+
+      .hero-aside p {
+        margin-bottom: 14px;
+      }
+
+      .hero-principles {
+        margin-top: 26px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .principle,
+      .principle + .principle {
+        min-height: 0;
+        padding-top: 14px;
+        padding-bottom: 14px;
+      }
+
+      .principle strong {
+        margin-bottom: 5px;
+        font-size: 12px;
+      }
+
+      .principle span {
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .section {
+        scroll-margin-top: 0;
+        padding: 42px 0 52px;
+      }
+
+      .section-head {
+        display: block;
+        margin-bottom: 30px;
+      }
+
+      .section-index {
+        display: block;
+        padding: 0;
+        margin-bottom: 8px;
+        color: var(--muted);
+      }
+
+      h2 {
+        max-width: none;
+        margin-bottom: 10px;
+        font-size: 24px;
+        line-height: 1.2;
+        letter-spacing: -0.025em;
+        font-weight: 680;
+      }
+
+      .section-intro {
+        max-width: 880px;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .section-body {
+        margin-left: 0;
+      }
+
+      .arch-node {
+        min-height: 72px;
+        padding: 14px 16px;
+      }
+
+      .arch-branch {
+        margin-top: 32px;
+      }
+
+      .architecture-simple {
+        display: grid;
+        gap: 18px;
+      }
+
+      .architecture-band {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr);
+        align-items: start;
+      }
+
+      .architecture-band-label {
+        padding: 16px 18px 0 0;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 720;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .architecture-inputs,
+      .architecture-execution,
+      .architecture-evidence {
+        display: grid;
+        align-items: center;
+        padding-left: 26px;
+      }
+
+      .architecture-inputs {
+        grid-template-columns: 1fr 34px 1fr 34px 1fr;
+      }
+
+      .architecture-execution {
+        grid-template-columns: 0.9fr 54px 0.8fr 54px 1.2fr 54px 0.85fr;
+      }
+
+      .architecture-evidence {
+        grid-template-columns: minmax(210px, 0.85fr) 76px minmax(0, 1.7fr);
+      }
+
+      .architecture-item {
+        min-height: 78px;
+        display: grid;
+        align-content: center;
+        padding: 14px 16px;
+        border: 1px solid var(--line-strong);
+      }
+
+      .architecture-item strong,
+      .architecture-consumers strong,
+      .architecture-artifact strong {
+        font-size: 12px;
+      }
+
+      .architecture-item span,
+      .architecture-consumers span,
+      .architecture-artifact span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.45;
+      }
+
+      .architecture-item.runner {
+        border-color: var(--text);
+      }
+
+      .architecture-item.host,
+      .architecture-item.components {
+        border-color: var(--client-a);
+      }
+
+      .architecture-item.backend {
+        border-color: var(--backend);
+      }
+
+      .architecture-item.trace {
+        border-color: var(--client-c);
+      }
+
+      .architecture-operator {
+        color: var(--line-strong);
+        font-size: 15px;
+        text-align: center;
+      }
+
+      .architecture-connector {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      .architecture-connector b {
+        font-size: 16px;
+        font-weight: 400;
+      }
+
+      .architecture-transition {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: 110px;
+        padding-left: 26px;
+        color: var(--muted);
+      }
+
+      .architecture-transition span {
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .architecture-transition b {
+        font-size: 16px;
+        font-weight: 400;
+      }
+
+      .architecture-feedback,
+      .architecture-artifact {
+        grid-column: 2;
+        margin: 14px 0 0 26px;
+        padding: 13px 15px;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font: 10px/1.5 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      .architecture-feedback strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--text);
+        font: 720 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .architecture-consumers {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .architecture-consumers > div {
+        min-height: 78px;
+        display: grid;
+        align-content: center;
+        padding: 14px 16px;
+        border: 1px solid var(--line-strong);
+      }
+
+      .architecture-artifact {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        align-items: baseline;
+        color: var(--text);
+      }
+
+      .architecture-artifact span {
+        margin-top: 0;
+      }
+
+      .architecture-evidence-stack {
+        grid-column: 2;
+        display: grid;
+        justify-items: stretch;
+        margin: 14px 0 0 26px;
+      }
+
+      .architecture-downstream-arrow {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        padding: 8px 0;
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      .architecture-downstream-arrow b {
+        font-size: 16px;
+        font-weight: 400;
+      }
+
+      .architecture-item.artifact {
+        border-color: var(--client-c);
+      }
+
+      .architecture-item.visualizer {
+        width: min(420px, 100%);
+        justify-self: center;
+        border-color: var(--text);
+      }
+
+      .annotation {
+        margin-top: 30px;
+      }
+
+      .evidence-chain {
+        margin-top: 40px;
+      }
+
+      .evidence-step {
+        min-height: 130px;
+      }
+
+      .split-heading {
+        margin-top: 42px;
+      }
+
+      .browser-architecture {
+        margin-top: 38px;
+      }
+
+      .time-panel {
+        padding-top: 22px;
+        padding-bottom: 26px;
+      }
+
+      .clock-diagram,
+      .settlement-flow {
+        margin-top: 42px;
+      }
+
+      .open-deltas {
+        margin-top: 42px;
+      }
+
+      .baseline-gates {
+        margin-top: 42px;
+      }
+
+      .closed-slice {
+        margin-top: 42px;
+      }
+
+      .footer {
+        padding: 38px 0 52px;
+      }
+
+      .footer-grid {
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 48px;
+      }
+
+      .footer h2 {
+        font-size: 18px;
+        line-height: 1.35;
+      }
+
+      .footer p {
+        font-size: 13px;
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          width: min(calc(100% - 24px), 1120px);
+        }
+
+        .hero {
+          padding: 30px 0 24px;
+        }
+
+        .hero-grid,
+        .footer-grid {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+
+        h1 {
+          font-size: 32px;
+        }
+
+        .hero-aside {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+          padding: 16px 0 0;
+        }
+
+        .section {
+          padding: 34px 0 40px;
+        }
+
+        h2 {
+          font-size: 21px;
+        }
+
+        .architecture-band {
+          grid-template-columns: 72px minmax(0, 1fr);
+        }
+
+        .architecture-transition {
+          margin-left: 72px;
+          padding-left: 16px;
+        }
+
+        .architecture-inputs,
+        .architecture-execution,
+        .architecture-evidence {
+          grid-template-columns: 1fr;
+          gap: 14px;
+          padding-left: 16px;
+        }
+
+        .architecture-operator,
+        .architecture-connector {
+          justify-self: start;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .architecture-connector b {
+          transform: rotate(90deg);
+        }
+
+        .architecture-feedback,
+        .architecture-artifact {
+          margin-left: 16px;
+        }
+
+        .architecture-evidence-stack {
+          margin-left: 16px;
+        }
+
+        .architecture-consumers {
+          grid-template-columns: 1fr;
+        }
+
+        .architecture-consumers > div {
+          border: 1px solid var(--line-strong);
+        }
+
+        .architecture-artifact {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+      }
+
+      @media print {
+        .hero {
+          min-height: 0;
+          page-break-after: always;
+        }
+
+        .section {
+          break-inside: avoid;
+          padding: 52px 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero page" id="top">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">LiveStore contributor notes</p>
+          <h1>Scenario runner</h1>
+          <p class="hero-deck">
+            Architecture, execution profiles, trace semantics, representative scenarios, and remaining implementation
+            deltas.
+          </p>
+        </div>
+        <aside class="hero-aside" aria-label="Feature status">
+          <p>
+            <span class="section-label">implemented profiles</span><br />
+            In-process · isolated process · persistent browser
+          </p>
+          <p>
+            <span class="section-label">location</span><br />
+            <code>tests/scenarios/</code>
+          </p>
+          <p>
+            <span class="section-label">versions</span><br />
+            Trace protocol v3 · run artifact v4
+          </p>
+        </aside>
+      </div>
+      <div class="hero-principles">
+        <div class="principle">
+          <strong>Same scenario</strong>
+          <span>Portable source remains unchanged across compatible execution profiles.</span>
+        </div>
+        <div class="principle">
+          <strong>Real components</strong>
+          <span>Stores, processors, materializers, SQLite, SharedWorkers, OPFS, and sync-cf are exercised in place.</span>
+        </div>
+        <div class="principle">
+          <strong>Truthful projections</strong>
+          <span>Every view is derived from one immutable trace without upgrading guesses into facts.</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section page" id="architecture">
+        <div class="section-head">
+          <span class="section-index">1. Architecture</span>
+          <div>
+            <h2>Architecture overview</h2>
+            <p class="section-intro">
+              Typed TypeScript scenarios normalize to a versioned, serializable AST. The runner resolves the application
+              and execution configuration, controls participants through a transport-neutral host boundary, and emits a
+              trace consumed by histories, oracles, artifacts, and the visualizer.
+            </p>
+          </div>
+        </div>
+
+        <div class="section-body">
+          <div class="architecture-simple" role="img" aria-label="Scenario runner architecture from inputs to evidence">
+            <div class="architecture-band">
+              <div class="architecture-band-label">inputs</div>
+              <div class="architecture-inputs">
+                <div class="architecture-item">
+                  <strong>scenario AST</strong>
+                  <span>topology · phases · operations · seed · oracles</span>
+                </div>
+                <div class="architecture-operator" aria-hidden="true">+</div>
+                <div class="architecture-item">
+                  <strong>application definition</strong>
+                  <span>actual LiveStoreSchema · named actions · State inspectors</span>
+                </div>
+                <div class="architecture-operator" aria-hidden="true">+</div>
+                <div class="architecture-item">
+                  <strong>execution configuration</strong>
+                  <span>participant profile · sync backend · State profile</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="architecture-transition">
+              <span>resolved by the runner</span>
+              <b aria-hidden="true">↓</b>
+            </div>
+
+            <div class="architecture-band">
+              <div class="architecture-band-label">execution</div>
+              <div class="architecture-execution">
+                <div class="architecture-item runner">
+                  <strong>scenario runner</strong>
+                  <span>validates capabilities · schedules operations · settles the run</span>
+                </div>
+                <div class="architecture-connector">
+                  <span>controls</span>
+                  <b aria-hidden="true">→</b>
+                </div>
+                <div class="architecture-item host">
+                  <strong>participant host</strong>
+                  <span>in-process · child process · browser</span>
+                </div>
+                <div class="architecture-connector">
+                  <span>owns</span>
+                  <b aria-hidden="true">→</b>
+                </div>
+                <div class="architecture-item components">
+                  <strong>real LiveStore components</strong>
+                  <span>Stores · sessions · leader · processors · materializers · SQLite</span>
+                </div>
+                <div class="architecture-connector">
+                  <span>sync</span>
+                  <b aria-hidden="true">↔</b>
+                </div>
+                <div class="architecture-item backend">
+                  <strong>backend realization</strong>
+                  <span>controlled mock or local sync-cf</span>
+                </div>
+              </div>
+              <div class="architecture-feedback">
+                <strong>feedback to runner</strong>
+                Host acknowledgements, operation outcomes, runtime failures, and component/backend observations.
+              </div>
+            </div>
+
+            <div class="architecture-transition">
+              <span>recorded as immutable evidence</span>
+              <b aria-hidden="true">↓</b>
+            </div>
+
+            <div class="architecture-band">
+              <div class="architecture-band-label">evidence</div>
+              <div class="architecture-evidence">
+                <div class="architecture-item trace">
+                  <strong>scenario trace</strong>
+                  <span>instructions · acknowledgements · observations · recovery · settlement · verdicts</span>
+                </div>
+                <div class="architecture-connector">
+                  <span>consumed by</span>
+                  <b aria-hidden="true">→</b>
+                </div>
+                <div class="architecture-consumers">
+                  <div><strong>operation history</strong><span>invocation/outcome projection</span></div>
+                  <div><strong>scenario oracles</strong><span>evaluate retained evidence and emit verdicts</span></div>
+                </div>
+              </div>
+              <div class="architecture-evidence-stack">
+                <div class="architecture-downstream-arrow">
+                  <span>trace + verdicts packaged as</span>
+                  <b aria-hidden="true">↓</b>
+                </div>
+                <div class="architecture-item artifact">
+                  <strong>run artifact</strong>
+                  <span>scenario AST + execution configuration + trace + verdicts + snapshots</span>
+                </div>
+                <div class="architecture-downstream-arrow">
+                  <span>opened by</span>
+                  <b aria-hidden="true">↓</b>
+                </div>
+                <div class="architecture-item visualizer">
+                  <strong>visualizer</strong>
+                  <span>loads the artifact; derives system, flow, and time views</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="annotation">
+            <strong>Dependency direction stays one-way.</strong>
+            <p><code>tests/scenarios</code> may use product packages. Product packages never depend on the runner.</p>
+          </div>
+
+          <div class="evidence-chain" aria-label="How trace records separate intent, observed facts, and claims">
+            <div class="evidence-chain-heading">
+              <strong>Three things the trace keeps separate</strong>
+              <span>The runner distinguishes a handled request from an observed result, and an observed result from a claim.</span>
+            </div>
+            <div class="evidence-summary">
+              <div class="evidence-summary-box">
+                <span>1. Control</span>
+                <strong>What we asked</strong>
+                <p>Instruction and control acknowledgement.</p>
+                <small>Acknowledged means handled, not that product state changed.</small>
+              </div>
+              <div class="evidence-summary-arrow">
+                <span>observe separately</span>
+                <b aria-hidden="true">→</b>
+              </div>
+              <div class="evidence-summary-box">
+                <span>2. Evidence</span>
+                <strong>What actually happened</strong>
+                <p>Component observations, recovery progress, and settlement.</p>
+                <small>These records are the retained facts.</small>
+              </div>
+              <div class="evidence-summary-arrow">
+                <span>evaluate</span>
+                <b aria-hidden="true">→</b>
+              </div>
+              <div class="evidence-summary-box">
+                <span>3. Claim</span>
+                <strong>What we can conclude</strong>
+                <p>An oracle verdict supported by specific evidence.</p>
+                <small>No evidence means no valid claim.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section page" id="execution">
+        <div class="section-head">
+          <span class="section-index">2. Execution</span>
+          <div>
+            <h2>Execution profiles</h2>
+            <p class="section-intro">
+              Each execution configuration selects participant placement, a sync backend, and State persistence. Results
+              are scoped to the selected profile and do not imply equivalent evidence across profiles.
+            </p>
+          </div>
+        </div>
+
+        <div class="section-body">
+          <table class="profiles">
+            <thead>
+              <tr>
+                <th>profile</th>
+                <th>participant placement</th>
+                <th>backend</th>
+                <th>State / persistence</th>
+                <th>best evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>in-process</td>
+                <td>Real Store + session/leader processors in the controller process</td>
+                <td>Controlled mock<br /><span class="muted">or local sync-cf</span></td>
+                <td>In-memory SQLite</td>
+                <td>Dense correctness, stress, controllable boundaries</td>
+              </tr>
+              <tr>
+                <td>process</td>
+                <td>One isolated Node child process per Client; commands over IPC</td>
+                <td>Local sync-cf</td>
+                <td>SQLite in the child</td>
+                <td>Isolation, lifecycle, serialized host boundary</td>
+              </tr>
+              <tr>
+                <td>browser</td>
+                <td>One persistent context per Client; one page per session</td>
+                <td>Local sync-cf</td>
+                <td>OPFS + browser SQLite</td>
+                <td>Web adapter, SharedWorker, Web Locks, persistence</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="split-heading">
+            <div>
+              <span class="section-label">in-process runner</span>
+              <h3>Production-shaped, tightly controlled</h3>
+              <p class="short-copy">
+                Each Client has a real leader, real session Store, real processors, materializers, and SQLite State.
+                In-memory boundaries make high participant counts and future decision replay practical.
+              </p>
+            </div>
+            <div>
+              <span class="section-label">browser + local backend</span>
+              <h3>Production topology, local infrastructure</h3>
+              <p class="short-copy">
+                The runner stays outside the browser. Each Client receives its own persistent context; pages share the
+                production SharedWorker leader and OPFS, then sync through the production WebSocket client.
+              </p>
+            </div>
+          </div>
+
+          <div class="browser-architecture" role="img" aria-label="Browser profile with local sync-cf architecture">
+            <div class="ba-purpose">
+              <strong>What this profile tests</strong>
+              <span>
+                The scenario runner owns orchestration and browser lifecycle. Inside those controlled containers, real
+                LiveStore browser components sync with the real sync-cf implementation running on local infrastructure.
+              </span>
+            </div>
+            <div class="ba-row">
+              <div class="ba-label">runner</div>
+              <div class="ba-content" style="--ba-columns: 2">
+                <div class="ba-node">
+                  <span class="ownership">scenario test harness</span>
+                  <strong>scenario runner</strong>
+                  <span>AST · operations · trace · settlement</span>
+                </div>
+                <div class="ba-node">
+                  <span class="ownership">scenario test harness</span>
+                  <strong>browser host</strong>
+                  <span>Playwright lifecycle · serialized control + observation</span>
+                </div>
+              </div>
+            </div>
+            <div class="ba-boundary">
+              <span>creates and controls</span>
+              <b aria-hidden="true">↓</b>
+            </div>
+            <div class="ba-row">
+              <div class="ba-label">browser shell</div>
+              <div class="ba-content" style="--ba-columns: 2">
+                <div class="ba-node browser">
+                  <span class="ownership">harness-managed container</span>
+                  <strong>persistent context</strong>
+                  <span>one isolated Client identity</span>
+                </div>
+                <div class="ba-node browser">
+                  <span class="ownership">scenario fixture bridge</span>
+                  <strong>page / session</strong>
+                  <span>boots the app · exposes control and observation hooks</span>
+                </div>
+              </div>
+            </div>
+            <div class="ba-boundary">
+              <span>boots actual LiveStore</span>
+              <b aria-hidden="true">↓</b>
+            </div>
+            <div class="ba-row">
+              <div class="ba-label">LiveStore</div>
+              <div class="ba-content" style="--ba-columns: 3">
+                <div class="ba-node product">
+                  <span class="ownership">LiveStore product code</span>
+                  <strong>Store session</strong>
+                  <span>real Store + persisted adapter</span>
+                </div>
+                <div class="ba-node product">
+                  <span class="ownership">LiveStore product code</span>
+                  <strong>actual SharedWorker leader</strong>
+                  <span>@livestore/adapter-web · Web Locks · shared Client state</span>
+                </div>
+                <div class="ba-node product">
+                  <span class="ownership">LiveStore product code</span>
+                  <strong>OPFS + WS sync</strong>
+                  <span>browser SQLite · production sync-cf client</span>
+                </div>
+              </div>
+            </div>
+            <div class="ba-boundary">
+              <span>production WebSocket protocol to local provider</span>
+              <b aria-hidden="true">↓</b>
+            </div>
+            <div class="ba-row">
+              <div class="ba-label">local provider</div>
+              <div class="ba-content" style="--ba-columns: 4">
+                <div class="ba-node">
+                  <span class="ownership">scenario test harness</span>
+                  <strong>provider lifecycle</strong>
+                  <span>isolated physical store · cleanup per run</span>
+                </div>
+                <div class="ba-node local-infra">
+                  <span class="ownership">local infrastructure</span>
+                  <strong>Wrangler / workerd</strong>
+                  <span>local Cloudflare runtime</span>
+                </div>
+                <div class="ba-node product">
+                  <span class="ownership">sync-cf product code</span>
+                  <strong>sync-cf Worker</strong>
+                  <span>repository implementation</span>
+                </div>
+                <div class="ba-node product">
+                  <span class="ownership">sync-cf product code</span>
+                  <strong>SQLite Durable Object</strong>
+                  <span>local persistence + reconnection</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="section page" id="time">
+        <div class="section-head">
+          <span class="section-index">3. Trace time</span>
+          <div>
+            <h2>Causal flow and elapsed time</h2>
+            <p class="section-intro">
+              The trace stores causal partial-order facts and calibrated elapsed-time evidence separately. The visualizer
+              projects both without treating timestamps as causality or flow-stage alignment as simultaneity.
+            </p>
+          </div>
+        </div>
+
+        <div class="section-body">
+          <div class="annotation" style="border-color: var(--warn); margin: 0 0 42px">
+            <strong>Current implementation</strong>
+            <p>
+              The flow view aligns observation captures and shows explicit control causation. Exact receive/apply arrows
+              remain unavailable: DELTA-008 closed by accepting that Scenario evidence alone does not justify sync-engine
+              lineage instrumentation.
+            </p>
+          </div>
+
+          <div class="time-comparison">
+            <article class="time-panel">
+              <span class="section-label">causal-flow projection</span>
+              <h3>Structural propagation stages</h3>
+              <p class="short-copy">
+                Sibling recipients can align because they occupy the same causal role. Alignment does not say they were
+                simultaneous.
+              </p>
+              <div class="lane-plot" aria-label="Causal flow example">
+                <div class="lane">
+                  <span class="lane-name">backend</span>
+                  <div class="lane-track colour-backend">
+                    <span class="marker backend" style="left: 28%" data-label="e2"></span>
+                  </div>
+                </div>
+                <div class="lane">
+                  <span class="lane-name">leader A</span>
+                  <div class="lane-track colour-a">
+                    <span class="marker a" style="left: 62%" data-label="apply"></span>
+                    <span class="cause-line" style="left: 28%; width: 34%"></span>
+                  </div>
+                </div>
+                <div class="lane">
+                  <span class="lane-name">leader B</span>
+                  <div class="lane-track colour-b">
+                    <span class="wait-segment" style="left: 28%; width: 34%"></span>
+                    <span class="marker b label-below" style="left: 62%" data-label="apply +420ms"></span>
+                    <span class="cause-line" style="left: 28%; width: 34%"></span>
+                  </div>
+                </div>
+                <div class="plot-axis">
+                  <span></span>
+                  <div class="ticks"><span>source</span><span>same structural stage</span></div>
+                </div>
+              </div>
+            </article>
+            <article class="time-panel">
+              <span class="section-label">elapsed-time projection</span>
+              <h3>Calibrated occurrence intervals</h3>
+              <p class="short-copy">
+                A delayed sibling moves later on the axis. Known causal links remain visible; timestamp order never
+                becomes causality.
+              </p>
+              <div class="lane-plot" aria-label="Elapsed time example">
+                <div class="lane">
+                  <span class="lane-name">backend</span>
+                  <div class="lane-track colour-backend">
+                    <span class="marker backend" style="left: 24%" data-label="e2"></span>
+                  </div>
+                </div>
+                <div class="lane">
+                  <span class="lane-name">leader A</span>
+                  <div class="lane-track colour-a">
+                    <span class="marker a" style="left: 41%" data-label="apply"></span>
+                    <span class="cause-line" style="left: 24%; width: 17%"></span>
+                  </div>
+                </div>
+                <div class="lane">
+                  <span class="lane-name">leader B</span>
+                  <div class="lane-track colour-b">
+                    <span class="wait-segment" style="left: 24%; width: 54%"></span>
+                    <span class="marker b" style="left: 78%" data-label="apply"></span>
+                    <span class="cause-line" style="left: 24%; width: 54%"></span>
+                  </div>
+                </div>
+                <div class="plot-axis">
+                  <span></span>
+                  <div class="ticks"><span>0ms</span><span>200ms</span><span>400ms</span><span>600ms</span></div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="claim-line">
+            <div><strong>flow may claim:</strong> A and B are sibling branches from the backend transition.</div>
+            <div><span>flow may not claim:</span> A and B happened at the same instant.</div>
+            <div><strong>time may claim:</strong> B was observed materially later, within stated uncertainty.</div>
+            <div><span>time may not claim:</span> A caused B because its timestamp is earlier.</div>
+          </div>
+
+          <div class="clock-diagram">
+            <svg
+              class="clock-sequence"
+              viewBox="0 0 1000 430"
+              role="img"
+              aria-labelledby="clock-sequence-title clock-sequence-description"
+            >
+              <title id="clock-sequence-title">Controller round-trip clock calibration</title>
+              <desc id="clock-sequence-description">
+                The controller records a time before sending a calibration request. The participant records a local
+                occurrence and returns it with its calibration identity. The controller records a time after receiving
+                the response. The full round trip is retained in the trace envelope and projects the participant point
+                observation to an uncertainty interval on the shared presentation coordinate.
+              </desc>
+              <defs>
+                <marker id="clock-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                  <path d="M 0 0 L 8 4 L 0 8 Z" fill="var(--text)"></path>
+                </marker>
+                <marker
+                  id="clock-arrow-purple"
+                  viewBox="0 0 8 8"
+                  refX="7"
+                  refY="4"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto"
+                >
+                  <path d="M 0 0 L 8 4 L 0 8 Z" fill="var(--client-c)"></path>
+                </marker>
+              </defs>
+
+              <text class="clock-head" x="200" y="22" text-anchor="middle">SCENARIO CONTROLLER</text>
+              <text class="clock-head" x="800" y="22" text-anchor="middle">PARTICIPANT</text>
+              <line class="clock-lifeline" x1="200" y1="42" x2="200" y2="246"></line>
+              <line class="clock-lifeline" x1="800" y1="42" x2="800" y2="246"></line>
+
+              <circle class="clock-controller-dot" cx="200" cy="76" r="5"></circle>
+              <text class="clock-primary" x="180" y="73" text-anchor="end">t_before</text>
+              <text class="clock-secondary" x="180" y="89" text-anchor="end">read controller clock</text>
+
+              <line class="clock-flow" x1="200" y1="112" x2="800" y2="112"></line>
+              <text class="clock-arrow-label" x="500" y="101" text-anchor="middle">scenario command / calibration request</text>
+
+              <circle class="clock-participant-dot" cx="800" cy="143" r="6"></circle>
+              <text class="clock-primary" x="820" y="140">local occurrence</text>
+              <text class="clock-secondary" x="820" y="156">sequence + monotonic time on participant clock</text>
+
+              <line class="clock-flow" x1="800" y1="184" x2="200" y2="184"></line>
+              <text class="clock-arrow-label" x="500" y="173" text-anchor="middle">
+                observation + calibration identity
+              </text>
+
+              <circle class="clock-controller-dot" cx="200" cy="219" r="5"></circle>
+              <text class="clock-primary" x="180" y="216" text-anchor="end">t_after</text>
+              <text class="clock-secondary" x="180" y="232" text-anchor="end">read controller clock</text>
+
+              <line class="clock-envelope-line" x1="200" y1="270" x2="800" y2="270"></line>
+              <text class="clock-head" x="500" y="258" text-anchor="middle">TRACE ENVELOPE</text>
+              <text class="clock-secondary" x="500" y="289" text-anchor="middle">
+                retain t_before, t_after, the participant observation, and calibration identity
+              </text>
+
+              <line class="clock-projection" x1="500" y1="300" x2="500" y2="343"></line>
+              <text class="clock-arrow-label" x="516" y="326">calibrate</text>
+
+              <text class="clock-head" x="120" y="356">SHARED PRESENTATION COORDINATE — NEVER A SYNC COORDINATE</text>
+              <line class="clock-axis" x1="120" y1="382" x2="880" y2="382"></line>
+              <rect class="clock-interval-window" x="420" y="374" width="160" height="16"></rect>
+              <text class="clock-interval-label" x="500" y="411" text-anchor="middle">
+                one local point observation → estimated scenario-time interval
+              </text>
+            </svg>
+          </div>
+
+          <div class="clock-notes">
+            <div>
+              <strong>Same process</strong>
+              <p>Participant and controller share a monotonic clock, so the transport uncertainty interval collapses.</p>
+            </div>
+            <div>
+              <strong>Process / browser</strong>
+              <p>The complete request round trip bounds the participant reading. Wider round trips produce wider uncertainty.</p>
+            </div>
+            <div>
+              <strong>Contradiction</strong>
+              <p>If calibrated time violates an explicit causal edge beyond uncertainty, report instrumentation or calibration trouble.</p>
+            </div>
+          </div>
+
+          <div class="annotation" style="border-color: var(--client-c)">
+            <strong>Important: these are coordinated observations, not synchronized product clocks.</strong>
+            <p>
+              Logical time still drives runner-owned scheduling. Wall time still supplies performance evidence. Neither
+              changes LiveStore event ordering or sync behaviour.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section page" id="evidence">
+        <div class="section-head">
+          <span class="section-index">4. Settlement</span>
+          <div>
+            <h2>Settlement is a bounded convergence check</h2>
+            <p class="section-intro">
+              A settle step names the participants to check and a timeout. It may reconnect named clients, then samples
+              the declared group until it is stably converged or the deadline expires.
+            </p>
+          </div>
+        </div>
+
+        <div class="section-body">
+          <div class="settlement-flow" aria-label="Settlement input, convergence checks, and possible outcomes">
+            <div class="settlement-box">
+              <span class="section-label">settle step</span>
+              <h3>Declare the boundary</h3>
+              <p>The step explicitly defines what “eventually” means for this check.</p>
+              <div class="settlement-fields">
+                <div class="settlement-field"><span>participants</span><strong>group to check</strong></div>
+                <div class="settlement-field"><span>timeoutMs</span><strong>maximum wait</strong></div>
+                <div class="settlement-field"><span>heal clients</span><strong>optional reconnects</strong></div>
+              </div>
+            </div>
+
+            <div class="settlement-arrow" aria-hidden="true">→</div>
+
+            <div class="settlement-box">
+              <span class="section-label">always checked</span>
+              <h3>Poll the declared group</h3>
+              <ul class="settlement-checks">
+                <li>No runner operation remains in flight.</li>
+                <li>Every participant is synced with zero pending events.</li>
+                <li>Each local head reaches its upstream global position.</li>
+                <li>All participants report the same upstream global position.</li>
+              </ul>
+              <p class="settlement-repeat">Complete only after the same settled signature is observed twice.</p>
+            </div>
+
+            <div class="settlement-arrow" aria-hidden="true">→</div>
+
+            <div class="settlement-outcomes">
+              <div class="settlement-outcome">
+                <span class="section-label">stable twice</span>
+                <h3>settlement.completed</h3>
+                <p>The convergence barrier is retained as evidence.</p>
+              </div>
+              <div class="settlement-outcome">
+                <span class="section-label">deadline expires</span>
+                <h3>settlement.failed</h3>
+                <p>The latest heads, pending counts, and synced flags are retained.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="settlement-conditional">
+            <div>
+              <span class="section-label">conditional path</span>
+              <h3>When a named client has an active disconnect fault</h3>
+              <p>No reconnect or recovery records are required for an ordinary settle step.</p>
+            </div>
+            <div>
+              <div class="settlement-transition">
+                reconnect.requested → connectivity.reconnected (ack) → observed connected → fault.removed
+              </div>
+              <p>
+                <strong>fault.removed is an observation, not the reconnect command.</strong> It says that a later system
+                sample confirmed the requested client connectivity. Recovery progress is recorded only for selected
+                participants recovering from such a removed fault.
+              </p>
+            </div>
+          </div>
+
+          <div class="settlement-after">
+            <div>
+              <span class="section-label">separate concern</span>
+              <h3>Oracles are not settlement steps</h3>
+            </div>
+            <div>
+              <h3>Declared properties run after the scenario steps succeed</h3>
+              <p>
+                Settlement proves only that its named participants crossed the convergence barrier. An oracle can still
+                reject a property without changing the retained settlement result.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section page" id="deltas">
+        <div class="section-head">
+          <span class="section-index">5. Follow-up work</span>
+          <div>
+            <h2>Current delta status</h2>
+            <p class="section-intro">
+              The coherent headless baseline is closed. Three deltas remain open for intentionally deferred scenario
+              surface, oracle coverage, and live visualizer control.
+            </p>
+          </div>
+        </div>
+
+        <div class="section-body">
+          <span class="section-label">baseline gates — closed</span>
+          <div class="baseline-gates">
+            <div class="gate">
+              <span class="delta-id">DELTA-006</span>
+              <h3>Controlled scheduling + replay — closed</h3>
+              <p>
+                Seeded inputs and declared parallelism are supported. Sync-path controlled replay remains intentionally
+                deferred because a seed reproduces inputs, not an interleaving.
+              </p>
+            </div>
+            <div class="gate">
+              <span class="delta-id">DELTA-007</span>
+              <h3>Backend-availability fault — closed</h3>
+              <p>
+                Exercise a baseline adverse condition beyond Client disconnect. Activation, removal, Recovery, and
+                convergence must each retain their own evidence.
+              </p>
+            </div>
+            <div class="gate">
+              <span class="delta-id">DELTA-010</span>
+              <h3>Shared host conformance — closed</h3>
+              <p>
+                Run one capability-driven suite against every host for identity, acknowledgements, certainty, lifecycle,
+                observations, and cleanup.
+              </p>
+            </div>
+          </div>
+          <div class="baseline-close">DELTA-001 closed · coherent headless baseline</div>
+
+          <div class="open-deltas">
+            <div class="delta">
+              <span class="delta-id">DELTA-005</span>
+              <h3>Scenario surface + reusable workloads</h3>
+              <p class="delta-copy">
+                Seeded workload nodes and dynamic Client/session additions are implemented. Rematerialization and
+                advanced rates, stop conditions, generated parallelism, and nesting remain deferred until a concrete
+                Scenario requires them.
+              </p>
+            </div>
+            <div class="delta">
+              <span class="delta-id">DELTA-009</span>
+              <h3>Broader oracle catalogue</h3>
+              <p class="delta-copy">
+                Application-visible rebase preservation is already covered by existing oracle composition. Additional
+                safety, liveness, rematerialization, resource, and performance checks remain open; every checker must
+                reject insufficient evidence rather than pass on absence.
+              </p>
+            </div>
+            <div class="delta">
+              <span class="delta-id">DELTA-011</span>
+              <h3>Live visualizer control</h3>
+              <p class="delta-copy">
+                Stream an active run, pause only at declared scheduling boundaries, issue capability-scoped controls, and
+                save the session as an ordinary replayable artifact.
+              </p>
+            </div>
+          </div>
+
+          <span class="section-label" style="display: block; margin-top: 66px">closed in this slice</span>
+          <div class="closed-slice">
+            <div>
+              <span class="micro">DELTA-002</span>
+              <h3>parallel operation history</h3>
+              <p class="short-copy">Child operations retain identities, outcomes, intervals, and real overlap evidence.</p>
+            </div>
+            <div>
+              <span class="micro">DELTA-003</span>
+              <h3>Recovery + quiescence</h3>
+              <p class="short-copy">Fault removal, progress, stable convergence, and settlement are explicit boundaries.</p>
+            </div>
+            <div>
+              <span class="micro">DELTA-004</span>
+              <h3>host failure taxonomy</h3>
+              <p class="short-copy">Portable failure categories are now independent from definite or indefinite outcomes.</p>
+            </div>
+            <div>
+              <span class="micro">DELTA-008</span>
+              <h3>exact transition lineage limit</h3>
+              <p class="short-copy">Sampled correlation remains explanatory; exact lineage awaits an independently justified product seam.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer page">
+      <div class="footer-grid">
+        <div>
+          <span class="section-label">Summary</span>
+          <h2>Evidence boundaries remain explicit throughout the runner.</h2>
+          <p>
+            Instructions, host acknowledgements, observations, recovery, settlement, and oracle verdicts are separate
+            record families. Flow and elapsed-time views are projections over the same immutable trace.
+          </p>
+        </div>
+        <aside>
+          Intent layer:<br />
+          <code>context/02-system/09-verification/06-scenarios/</code><br /><br />
+          Implementation:<br />
+          <code>tests/scenarios/</code>
+        </aside>
+      </div>
+    </footer>
+  </body>
+</html>
