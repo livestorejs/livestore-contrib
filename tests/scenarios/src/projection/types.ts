@@ -82,6 +82,7 @@ export interface RuntimeFailureInterval {
 export type PlaybackMomentKind =
   | 'run'
   | 'action'
+  | 'workload'
   | 'topology'
   | 'connectivity'
   | 'lifecycle'

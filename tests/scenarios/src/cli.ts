@@ -1,17 +1,12 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { gunzipSync } from 'node:zlib'
 
 import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
 import { getScenarioApplication } from './applications.ts'
-import {
-  buildArtifactCatalogFromEntries,
-  makeArtifactCatalogEntry,
-  type ArtifactCatalogEntry,
-} from './artifact-catalog.ts'
+import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
 import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
 import { concurrentHotelBooking } from './corpus/concurrent-hotel-booking.ts'
@@ -159,7 +154,8 @@ const program = Effect.gen(function* () {
   yield* Effect.tryPromise(async () => {
     await fs.mkdir(path.dirname(cli.outputPath), { recursive: true })
     await fs.writeFile(cli.outputPath, `${encoded}\n`, 'utf8')
-    await refreshArtifactCatalog(cli.outputPath)
+    const artifactDirectory = path.resolve(import.meta.dirname, '../artifacts')
+    if (path.dirname(cli.outputPath) === artifactDirectory) await writeArtifactCatalog(artifactDirectory)
   })
   yield* Effect.sync(() => {
     console.log(`Scenario ${artifact.status}: ${artifact.descriptor.scenarioId}`)
@@ -169,38 +165,5 @@ const program = Effect.gen(function* () {
     if (artifact.status === 'failed') process.exitCode = 1
   })
 }).pipe(Effect.withSpan('scenario-cli'), Effect.scoped, Effect.provide(OtelLiveDummy))
-
-/** Keeps the viewer catalog derived from the artifacts on disk, including artifacts from earlier runs. */
-const refreshArtifactCatalog = async (outputPath: string): Promise<void> => {
-  const artifactDirectory = path.resolve(import.meta.dirname, '../artifacts')
-  if (path.dirname(outputPath) !== artifactDirectory) return
-
-  const catalogEntries: ArtifactCatalogEntry[] = []
-  const artifactFiles = (await fs.readdir(artifactDirectory, { withFileTypes: true })).filter(
-    (entry) =>
-      entry.isFile() &&
-      (entry.name.endsWith('.json') || entry.name.endsWith('.json.gz')) &&
-      entry.name !== 'catalog.json',
-  )
-  for (const entry of artifactFiles) {
-    try {
-      const fileData = await fs.readFile(path.join(artifactDirectory, entry.name))
-      const artifactJson =
-        entry.name.endsWith('.gz') === true ? gunzipSync(fileData).toString('utf8') : fileData.toString('utf8')
-      const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(artifactJson)
-      catalogEntries.push(
-        makeArtifactCatalogEntry({
-          file: entry.name,
-          artifact,
-          reference: entry.name.startsWith('reference-'),
-        }),
-      )
-    } catch {
-      // A malformed or partial artifact must not make the remaining saved runs unavailable.
-    }
-  }
-  const catalog = buildArtifactCatalogFromEntries(catalogEntries)
-  await fs.writeFile(path.join(artifactDirectory, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`, 'utf8')
-}
 
 PlatformNode.NodeRuntime.runMain(program)

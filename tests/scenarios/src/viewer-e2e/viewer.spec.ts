@@ -5,6 +5,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const failureArtifact = path.join(packageRoot, 'artifacts/sf-01-concurrent-hotel-booking.json.gz')
+const manyWriterArtifact = path.join(packageRoot, 'artifacts/sf-03-many-writer-426.json.gz')
 const offlineArtifact = path.join(packageRoot, 'artifacts/reference-offline-writer-recovery-browser.json.gz')
 const lifecycleArtifact = path.join(packageRoot, 'artifacts/reference-browser-multi-session-recovery-browser.json.gz')
 const denseArtifact = path.join(packageRoot, 'artifacts/reference-shared-todo-workday-browser.json.gz')
@@ -17,7 +18,6 @@ test('canonical viewer matches the approved failure and interaction baselines', 
   await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
   await applyComparisonState(page)
   await expect(page).toHaveScreenshot('interaction-state.png', { fullPage: true })
-  await expect(page.getByText(/Highlighting inferred correlation/)).toBeVisible()
   await expect(page.getByText('Logical time')).toBeVisible()
   await expect(page.locator('svg.timeline-main')).toHaveAttribute('aria-valuenow', /\d+/)
 })
@@ -26,6 +26,13 @@ test('canonical viewer matches the approved passed lifecycle baseline', async ({
   await openArtifact(page, viewerUrl, lifecycleArtifact, 'browser-multi-session-recovery')
   await expect(page.getByLabel('System').locator('.section-heading .badge')).toHaveText('passed')
   await expect(page).toHaveScreenshot('loaded-success.png', { fullPage: true })
+})
+
+test('SF-03 keeps workload control traffic out of the sync-evidence geometry', async ({ page }) => {
+  await openArtifact(page, viewerUrl, manyWriterArtifact, 'many-writer-convergence')
+  const timeline = page.getByRole('region', { name: 'Timeline', exact: true })
+  await expect(timeline.locator('.evidence-moment')).toHaveCount(19)
+  await expect(timeline.locator('.moment-workload')).toContainText('426 actions')
 })
 
 test('playback, cursor, and range keyboard controls remain independent', async ({ page }) => {
@@ -186,7 +193,7 @@ const openArtifact = async (page: Page, url: string, artifactPath: string, scena
 const applyComparisonState = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'time', exact: true }).click()
   await page.getByRole('button', { name: 'raw', exact: true }).click()
-  await page.getByRole('button', { name: 'all', exact: true }).click()
+  await page.getByRole('button', { name: 'raw trace', exact: true }).click()
   await page.getByRole('button', { name: 'records', exact: true }).click()
 
   // Select correlation while the final projection still contains the event chips; selection survives cursor movement.

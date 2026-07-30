@@ -27,7 +27,6 @@ h2 {
 }
 
 .summary,
-.selection-copy,
 #record-label {
   color: var(--muted);
   font-size: 12px;

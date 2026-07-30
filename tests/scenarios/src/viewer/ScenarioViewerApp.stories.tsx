@@ -74,13 +74,11 @@ export const InteractionWorkbench: Story = {
     await canvas.findByText('offline-writer-recovery')
     await userEvent.click(canvas.getByRole('button', { name: 'time' }))
     await userEvent.click(canvas.getByRole('button', { name: 'raw' }))
-    await expect(canvas.getByText(/Raw calibrated elapsed time/)).toBeVisible()
-    await userEvent.click(canvas.getByRole('button', { name: 'all' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'raw trace' }))
     await expect(canvas.getByText(/records/)).toBeVisible()
     const eventButton = canvas.getAllByRole('button').find((button) => /^e\d+'?$/.test(button.textContent ?? ''))
     if (eventButton !== undefined) {
       await userEvent.click(eventButton)
-      await expect(canvas.getByText(/Highlighting inferred correlation/)).toBeVisible()
     }
     await userEvent.click(canvas.getByText('Trace metadata'))
     await expect(canvas.getByText('Logical time')).toBeVisible()

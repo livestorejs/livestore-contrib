@@ -53,16 +53,6 @@ export const ScenarioViewerApp = ({ initialArtifact, initialState, hidePicker = 
   const recordLabel = viewer.selectedMoment?.label ?? viewer.selectedRecord?.payload._tag ?? 'No observation applied'
   const runStatus = state.loadError === undefined ? (projected?.runStatus ?? 'Not loaded') : 'Load failed'
   const statusTone = statusToneFor(runStatus)
-  const eventSelection =
-    state.selectedEventRef === undefined
-      ? 'Select an event to highlight inferred matching observations.'
-      : `Highlighting inferred correlation ${state.selectedEventRef}`
-  const timelineModeNote =
-    state.timelineMode === 'flow'
-      ? 'Observation captures are aligned; no causal arrows are inferred.'
-      : state.timeScaleMode === 'fit'
-        ? 'Calibrated time with labelled long gaps compressed; the trace carpet retains raw elapsed time.'
-        : 'Raw calibrated elapsed time; distances are linear and may produce dense activity clusters.'
 
   return (
     <main className="shell">
@@ -131,8 +121,6 @@ export const ScenarioViewerApp = ({ initialArtifact, initialState, hidePicker = 
           </div>
           <span id="record-label">{recordLabel}</span>
         </div>
-        <p className="selection-copy">{timelineModeNote}</p>
-        <p className="selection-copy">{eventSelection}</p>
         {artifact === undefined ? (
           <div className="timeline empty-state">No trace loaded.</div>
         ) : (

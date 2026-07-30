@@ -31,7 +31,7 @@ const TimelineFixture = ({
   traceLimit,
   timelineMode = 'flow',
   timeScaleMode = 'fit',
-  traceVisibility = 'system',
+  traceVisibility = 'evidence',
   viewport: initialViewport = { start: 0, end: 1 },
   cursor = 'middle',
 }: FixtureProps) => (
@@ -126,7 +126,7 @@ export const SessionAndClientLifecycle: Story = {
 export const ManyLanes: Story = {
   render: () => <TimelineFixture name="reference-shared-todo-workday-browser-failure.json.gz" traceLimit={500} />,
 }
-export const AllRecordsTraceCarpet: Story = { render: () => <TimelineFixture traceVisibility="all" /> }
+export const RawTraceCarpet: Story = { render: () => <TimelineFixture traceVisibility="trace" /> }
 export const NarrowedRange: Story = { render: () => <TimelineFixture viewport={{ start: 0.2, end: 0.52 }} /> }
 export const PannedRangeCursorOutside: Story = {
   render: () => <TimelineFixture viewport={{ start: 0.62, end: 0.9 }} cursor="outside" />,

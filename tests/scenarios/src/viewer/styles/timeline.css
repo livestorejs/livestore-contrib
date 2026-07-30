@@ -7,10 +7,6 @@
   width: 100%;
 }
 
-.selection-copy {
-  margin-bottom: 10px;
-}
-
 .timeline svg {
   display: block;
   min-width: 1000px;
@@ -333,6 +329,30 @@
   opacity: 0.68;
   stroke: var(--line-strong);
   stroke-width: 1;
+}
+
+.timeline .trace-workload {
+  cursor: pointer;
+}
+
+.timeline .trace-workload rect {
+  fill: var(--background);
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.timeline .trace-workload text {
+  fill: var(--text);
+  font-size: 7px;
+  pointer-events: none;
+}
+
+.timeline .trace-workload.selected rect {
+  fill: var(--text);
+}
+
+.timeline .trace-workload.selected text {
+  fill: var(--background);
 }
 
 .timeline .trace-dot.moment-failure {

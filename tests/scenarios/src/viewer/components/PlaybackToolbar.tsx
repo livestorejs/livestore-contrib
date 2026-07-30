@@ -48,11 +48,11 @@ export const PlaybackToolbar = ({
       </ModeControl>
       <ModeControl label="show">
         <SegmentedControl
-          label="Trace visibility"
+          label="Timeline detail"
           value={traceVisibility}
           options={[
-            { value: 'system', label: 'system' },
-            { value: 'all', label: 'all' },
+            { value: 'evidence', label: 'sync evidence' },
+            { value: 'trace', label: 'raw trace' },
           ]}
           onChange={onTraceVisibility}
         />

@@ -50,7 +50,7 @@ pnpm --dir tests/scenarios viewer
 
 Open the printed URL (normally `http://localhost:5173`) and choose a generated
 artifact from **saved runs**. The
-scenario CLI refreshes this local catalog whenever it writes into `artifacts/`;
+viewer startup and scenario CLI refresh this local catalog from `artifacts/`;
 the file picker can still open a `.json` or `.json.gz` artifact from elsewhere.
 
 Only the four minimized sync failures carry identifiers: `SF-01` through
@@ -83,6 +83,12 @@ viewport, and inspector state. Event-log scroll and pointer-drag bookkeeping
 remain local to the relevant components. `deriveTimelineScene()` is DOM-free;
 the layered SVG renderer consumes its semantic layers and preserves the two-SVG
 main-timeline/range-navigator organization.
+
+The default timeline shows sync evidence: material observation captures and
+Scenario boundaries receive semantic flow space, while generated child actions
+are summarized by their enclosing Workload. Switch to raw trace and record
+playback when individual controller instructions and acknowledgements are
+needed; those records remain intact but do not stretch the default flow axis.
 
 Tracked `.json.gz` reference artifacts are also included in the saved-run
 catalog without adding the full uncompressed traces to the repository. The set

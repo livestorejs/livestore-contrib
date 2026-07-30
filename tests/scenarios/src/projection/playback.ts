@@ -12,6 +12,13 @@ import {
 } from './system-state.ts'
 import { ObservedSystemState, type EventTimelineMarker, type PlaybackMoment, type TraceCapture } from './types.ts'
 
+type WorkloadRequestRecord = ScenarioTraceRecord & {
+  readonly payload: Extract<ScenarioTraceRecord['payload'], { readonly _tag: 'workload.requested' }>
+}
+
+const isWorkloadRequest = (record: ScenarioTraceRecord): record is WorkloadRequestRecord =>
+  record.payload._tag === 'workload.requested'
+
 /** Reduces the authoritative trace prefix into the runner's accumulated observed state. */
 export const projectTraceAt = (args: {
   scenario: ScenarioAst
@@ -35,6 +42,18 @@ export const derivePlaybackMoments = (args: {
 }): ReadonlyArray<PlaybackMoment> => {
   const captures = deriveTraceCaptures(args.trace)
   const captureByLastRecord = new Map(captures.map((capture) => [capture.lastRecordIndex, capture]))
+  const workloadRequests = new Map(
+    args.trace
+      .filter(isWorkloadRequest)
+      .flatMap((record) => (record.correlationId === null ? [] : [[record.correlationId, record] as const])),
+  )
+  const workloadCompletions = new Map(
+    args.trace.flatMap((record) =>
+      record.payload._tag === 'workload.completed' && record.correlationId !== null
+        ? [[record.correlationId, record] as const]
+        : [],
+    ),
+  )
   const moments: Omit<PlaybackMoment, 'momentIndex'>[] = []
   let state = initialObservedSystemState(args.scenario, -1)
   let materialState = state
@@ -42,6 +61,32 @@ export const derivePlaybackMoments = (args: {
 
   for (const record of args.trace) {
     state = applyTraceRecord({ ...state, cursorIndex: record.index }, record, args.scenario)
+    if (record.payload._tag === 'workload.requested' && record.correlationId !== null) {
+      if (workloadCompletions.has(record.correlationId) === true) continue
+    }
+    if (
+      record.payload._tag === 'action.requested' &&
+      record.causationId !== null &&
+      workloadRequests.has(record.causationId) === true
+    ) {
+      continue
+    }
+    if (record.payload._tag === 'workload.completed' && record.correlationId !== null) {
+      const request = workloadRequests.get(record.correlationId)
+      if (request !== undefined) {
+        moments.push({
+          recordIndex: record.index,
+          recordIndexes: [request.index, record.index],
+          captureId: null,
+          kind: 'workload',
+          label: `workload · ${request.payload.workload}`,
+          summary: summarizeWorkload(args.trace, request),
+        })
+        materialState = state
+        materialSignature = materialSystemSignature(state)
+        continue
+      }
+    }
     const kind = semanticMomentKind(record)
     if (kind !== undefined) {
       moments.push({
@@ -74,6 +119,17 @@ export const derivePlaybackMoments = (args: {
   }
 
   return moments.map((moment, momentIndex) => ({ ...moment, momentIndex }))
+}
+
+const summarizeWorkload = (trace: ReadonlyArray<ScenarioTraceRecord>, request: WorkloadRequestRecord): string => {
+  const participantCounts = new Map<string, number>()
+  for (const record of trace) {
+    if (record.payload._tag !== 'action.requested' || record.causationId !== request.correlationId) continue
+    const participant = [record.clientId, record.sessionId].filter((value) => value !== null).join('/') || 'unscoped'
+    participantCounts.set(participant, (participantCounts.get(participant) ?? 0) + 1)
+  }
+  const distribution = [...participantCounts].map(([participant, count]) => `${participant}: ${count}`).join(' · ')
+  return `Workload ${request.payload.workload} · ${request.payload.count} actions${distribution.length === 0 ? '' : ` · ${distribution}`}`
 }
 
 /** Emits a marker only when one event's observed component position or disposition changes. */

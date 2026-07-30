@@ -17,7 +17,7 @@ import { timelineEventTooltipContent } from './event-tooltip.ts'
 
 export type TimelineMode = 'flow' | 'time'
 export type TimeScaleMode = 'fit' | 'raw'
-export type TraceVisibility = 'system' | 'all'
+export type TraceVisibility = 'evidence' | 'trace'
 export interface TimelineViewport {
   readonly start: number
   readonly end: number
@@ -123,7 +123,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
   const runtimeFailureIntervals = deriveRuntimeFailureIntervals(trace)
   const playbackMoments = derivePlaybackMoments({ scenario: artifact.scenario, trace })
   const clientsById = new Map(artifact.scenario.topology.clients.map((client) => [client.id, client]))
-  const systemCaptureIds = new Set(
+  const evidenceCaptureIds = new Set(
     playbackMoments.flatMap((moment) => (moment.captureId === null ? [] : [moment.captureId])),
   )
   const lanes: ReadonlyArray<TimelineLaneScene> = [
@@ -155,18 +155,33 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
   const height = carpetTop + 54
   const plotWidth = width - left - right
 
-  const projectionUnits = new Map<string, number>()
-  const unitByRecord = new Map<number, number>()
+  const traceProjectionUnits = new Map<string, number>()
+  const traceUnitByRecord = new Map<number, number>()
   for (const record of trace) {
     const key = record.captureId === null ? `record:${record.index}` : `capture:${record.captureId}`
-    let unit = projectionUnits.get(key)
+    let unit = traceProjectionUnits.get(key)
     if (unit === undefined) {
-      unit = projectionUnits.size
-      projectionUnits.set(key, unit)
+      unit = traceProjectionUnits.size
+      traceProjectionUnits.set(key, unit)
     }
-    unitByRecord.set(record.index, unit)
+    traceUnitByRecord.set(record.index, unit)
   }
-  const flowMax = Math.max(projectionUnits.size - 1, 1)
+  const evidenceUnitByRecord = new Map<number, number>()
+  let firstUnassignedRecordIndex = 0
+  for (const moment of playbackMoments) {
+    for (let index = firstUnassignedRecordIndex; index <= moment.recordIndex; index += 1) {
+      evidenceUnitByRecord.set(index, moment.momentIndex)
+    }
+    firstUnassignedRecordIndex = moment.recordIndex + 1
+  }
+  const finalEvidenceUnit = Math.max(playbackMoments.length - 1, 0)
+  for (let index = firstUnassignedRecordIndex; index < trace.length; index += 1) {
+    evidenceUnitByRecord.set(index, finalEvidenceUnit)
+  }
+  const flowMax = Math.max(
+    traceVisibility === 'evidence' ? playbackMoments.length - 1 : traceProjectionUnits.size - 1,
+    1,
+  )
   const recordTimes = trace.map((record) =>
     record.calibratedTime === null
       ? record.coordinatorReceiptMonotonicMs
@@ -184,7 +199,13 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
   const normalizedRawTime = (time: number): number => (time - timeMin) / (timeMax - timeMin)
   const normalizedFittedTime = (time: number): number => projectAdaptiveTime(adaptiveTimeLayout, time)
   const normalizedForRecord = (recordIndex: number): number => {
-    if (timelineMode === 'flow') return (unitByRecord.get(recordIndex) ?? 0) / flowMax
+    if (timelineMode === 'flow') {
+      const unit =
+        traceVisibility === 'evidence'
+          ? (evidenceUnitByRecord.get(recordIndex) ?? finalEvidenceUnit)
+          : (traceUnitByRecord.get(recordIndex) ?? 0)
+      return unit / flowMax
+    }
     const time = recordTimes[recordIndex] ?? timeMin
     return timeScaleMode === 'fit' ? normalizedFittedTime(time) : normalizedRawTime(time)
   }
@@ -203,7 +224,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
       ? rawOverviewXForTime(recordTimes[recordIndex] ?? timeMin)
       : xForRecord(recordIndex)
   const scrubRecordIndexes =
-    traceVisibility === 'system'
+    traceVisibility === 'evidence'
       ? playbackMoments.map((moment) => moment.recordIndex)
       : trace.map((record) => record.index)
   const scrubPositions = scrubRecordIndexes.filter(isVisibleRecord).map((index) => ({ index, x: xForRecord(index) }))
@@ -455,11 +476,11 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
   const captureGuides = captures
     .filter(
       (capture) =>
-        (traceVisibility === 'all' || systemCaptureIds.has(capture.captureId)) &&
-        isVisibleRecord(traceVisibility === 'system' ? capture.lastRecordIndex : capture.firstRecordIndex),
+        (traceVisibility === 'trace' || evidenceCaptureIds.has(capture.captureId)) &&
+        isVisibleRecord(traceVisibility === 'evidence' ? capture.lastRecordIndex : capture.firstRecordIndex),
     )
     .map((capture) => {
-      const x = xForRecord(traceVisibility === 'system' ? capture.lastRecordIndex : capture.firstRecordIndex)
+      const x = xForRecord(traceVisibility === 'evidence' ? capture.lastRecordIndex : capture.firstRecordIndex)
       return withTooltip(
         `capture ${capture.captureIndex + 1} · non-atomic sampling pass`,
         node('line', { class: 'capture-guide', x1: x, x2: x, y1: 12, y2: carpetTop - 8 }),
@@ -472,25 +493,48 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
       'text',
       { class: 'trace-carpet-label', x: 8, y: carpetTop + 18 },
       undefined,
-      `${traceVisibility === 'system' ? 'SYSTEM' : 'TRACE'}${timelineMode === 'time' && timeScaleMode === 'fit' ? ' · RAW TIME' : ''}`,
+      `${traceVisibility === 'evidence' ? 'SYNC EVIDENCE' : 'RAW TRACE'}${timelineMode === 'time' && timeScaleMode === 'fit' ? ' · RAW TIME' : ''}`,
     ),
-    ...(traceVisibility === 'system'
+    ...(traceVisibility === 'evidence'
       ? playbackMoments
           .filter(
             (moment) => (timelineMode === 'time' && timeScaleMode === 'fit') || isVisibleRecord(moment.recordIndex),
           )
           .map((moment) => {
             const record = trace[moment.recordIndex]!
+            const representedRecord = trace[moment.recordIndexes[0] ?? moment.recordIndex]!
             const radius = moment.kind === 'capture' ? 2.1 : moment.kind === 'failure' ? 3.8 : 3.2
+            const commonAttrs = {
+              class: `evidence-moment moment-${moment.kind} ${record.evidence} ${moment.recordIndexes.includes(cursorIndex) === true ? 'selected' : ''}`,
+              'data-record-index': moment.recordIndex,
+            }
+            const workloadCount =
+              representedRecord.payload._tag === 'workload.requested' ? representedRecord.payload.count : undefined
             return withTooltip(
               `moment ${moment.momentIndex + 1} · ${moment.label} · ${moment.summary} · record ${moment.recordIndex + 1}`,
-              node('circle', {
-                class: `trace-dot system-moment moment-${moment.kind} ${record.evidence} ${moment.recordIndexes.includes(cursorIndex) === true ? 'selected' : ''}`,
-                'data-record-index': moment.recordIndex,
-                cx: xForCarpetRecord(moment.recordIndex),
-                cy: carpetTop + 15,
-                r: radius,
-              }),
+              workloadCount === undefined
+                ? node('circle', {
+                    ...commonAttrs,
+                    class: `trace-dot ${commonAttrs.class}`,
+                    cx: xForCarpetRecord(moment.recordIndex),
+                    cy: carpetTop + 15,
+                    r: radius,
+                  })
+                : node('g', { ...commonAttrs, class: `trace-workload ${commonAttrs.class}` }, [
+                    node('rect', {
+                      x: xForCarpetRecord(moment.recordIndex) - 29,
+                      y: carpetTop + 8,
+                      width: 58,
+                      height: 14,
+                      rx: 7,
+                    }),
+                    node(
+                      'text',
+                      { x: xForCarpetRecord(moment.recordIndex), y: carpetTop + 18, 'text-anchor': 'middle' },
+                      undefined,
+                      `${workloadCount} actions`,
+                    ),
+                  ]),
             )
           })
       : trace

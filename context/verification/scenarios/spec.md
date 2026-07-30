@@ -70,6 +70,10 @@ projection, playback, cursor, selection, viewport, and inspector state;
 event-log scrolling and pointer bookkeeping stay component-local.
 `deriveTimelineScene()` is DOM-free and feeds layered topology, causal-flow,
 elapsed-time, range, and raw-record projections over the immutable trace.
+The default sync-evidence flow spaces material captures and Scenario
+boundaries as semantic steps. A Workload is one summarized narrative boundary;
+its generated child action instructions and acknowledgements remain available
+in raw-trace navigation without consuming the default flow axis.
 
 Storybook exercises primitives and complete viewer states from the tracked
 references. Playwright verifies interaction semantics and approved desktop

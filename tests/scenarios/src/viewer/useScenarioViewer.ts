@@ -63,7 +63,7 @@ const initialState: ScenarioViewerState = {
   playing: false,
   timelineMode: 'flow',
   timeScaleMode: 'fit',
-  traceVisibility: 'system',
+  traceVisibility: 'evidence',
   playbackMode: 'moments',
   viewport: { start: 0, end: 1 },
   expansion: initialExpansion,
