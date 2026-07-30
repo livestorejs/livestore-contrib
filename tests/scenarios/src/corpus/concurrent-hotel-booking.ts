@@ -6,19 +6,20 @@ const participants = [offlineWriter, onlineWriter]
 
 /**
  * Minimal reproduction of the command-replay RFC's invalid-rebase class:
- * both Clients validly decrement 1 to 0 in their own context, but replaying
- * Client A's pending event after Client B's confirmed event attempts 0 to -1.
+ * both Clients validly book the last hotel room in their own context, but
+ * replaying Client A's pending booking after Client B's confirmed booking
+ * attempts to materialize negative inventory.
  */
-export const concurrentDecrementRebase = defineScenario({
+export const concurrentHotelBooking = defineScenario({
   version: 1,
-  id: 'concurrent-decrement-rebase',
-  description: 'Rebase two locally valid decrements into a SQLite-enforced non-negative invariant violation.',
+  id: 'concurrent-hotel-booking',
+  description: 'Rebase two locally valid hotel bookings into a SQLite-enforced inventory violation.',
   tags: ['red-team', 'known-failure', 'rebase', 'materialization', 'sqlite-constraint'],
   seed: 2_002,
-  applicationId: 'scenario-todo-app',
+  applicationId: 'scenario-hotel-booking-app',
   requires: [],
   topology: {
-    storeId: 'concurrent-decrement-rebase',
+    storeId: 'concurrent-hotel-booking',
     clients: [
       { id: offlineWriter.clientId, sessions: [offlineWriter.sessionId], initiallyConnected: true },
       { id: onlineWriter.clientId, sessions: [onlineWriter.sessionId], initiallyConnected: true },
@@ -27,14 +28,14 @@ export const concurrentDecrementRebase = defineScenario({
   phases: [
     {
       id: 'establish-shared-base',
-      description: 'Both Clients confirm that one room remains available.',
+      description: 'Both Clients confirm that one standard hotel room remains available.',
       steps: [
         {
           _tag: 'action',
-          id: 'initialize-one-available-room',
+          id: 'initialize-one-hotel-room',
           target: onlineWriter,
-          action: 'initializeRoomAvailability',
-          input: { roomId: 'room-1', available: 1 },
+          action: 'initializeHotelRoomInventory',
+          input: { roomType: 'standard', available: 1 },
         },
         {
           _tag: 'settle',
@@ -47,26 +48,26 @@ export const concurrentDecrementRebase = defineScenario({
     },
     {
       id: 'create-concurrent-decrements',
-      description: 'Each Client independently performs the locally valid transition from one to zero.',
+      description: 'Each Client independently books the locally available final room.',
       steps: [
         { _tag: 'disconnect', id: 'isolate-client-a', clientId: offlineWriter.clientId },
         {
           _tag: 'action',
-          id: 'client-a-decrements-offline',
+          id: 'client-a-books-offline',
           target: offlineWriter,
-          action: 'decrementAvailableRoom',
-          input: { roomId: 'room-1' },
+          action: 'bookHotelRoom',
+          input: { roomType: 'standard' },
         },
         {
           _tag: 'action',
-          id: 'client-b-decrements-online',
+          id: 'client-b-books-online',
           target: onlineWriter,
-          action: 'decrementAvailableRoom',
-          input: { roomId: 'room-1' },
+          action: 'bookHotelRoom',
+          input: { roomType: 'standard' },
         },
         {
           _tag: 'settle',
-          id: 'confirm-client-b-decrement',
+          id: 'confirm-client-b-booking',
           participants: [onlineWriter],
           healDisconnectedClients: [],
           timeoutMs: 10_000,
@@ -75,7 +76,7 @@ export const concurrentDecrementRebase = defineScenario({
     },
     {
       id: 'rebase-invalid-pending-event',
-      description: 'Client A rebases its decrement over Client B and attempts to materialize minus one.',
+      description: 'Client A rebases its booking over Client B and attempts to materialize negative inventory.',
       steps: [
         { _tag: 'reconnect', id: 'reconnect-client-a', clientId: offlineWriter.clientId },
         {

@@ -39,6 +39,7 @@ export const ArtifactPicker = ({
           <option value="">{catalogError ?? 'select saved run'}</option>
           {catalog?.entries.map((entry) => (
             <option key={entry.file} value={entry.file}>
+              {entry.findingId === undefined ? '' : `(${entry.findingId}) `}
               {entry.label} · {entry.applicationEventCount} events · {entry.traceRecordCount} traces
               {entry.status === 'failed' ? ' · FAILED' : ''}
             </option>

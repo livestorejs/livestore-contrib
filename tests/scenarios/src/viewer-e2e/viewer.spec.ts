@@ -4,15 +4,17 @@ import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const offlineArtifact = path.join(packageRoot, 'artifacts/reference-offline-writer-recovery-browser-failure.json.gz')
+const failureArtifact = path.join(packageRoot, 'artifacts/sf-01-concurrent-hotel-booking.json.gz')
+const offlineArtifact = path.join(packageRoot, 'artifacts/reference-offline-writer-recovery-browser.json.gz')
 const lifecycleArtifact = path.join(packageRoot, 'artifacts/reference-browser-multi-session-recovery-browser.json.gz')
-const denseArtifact = path.join(packageRoot, 'artifacts/reference-shared-todo-workday-browser-failure.json.gz')
+const denseArtifact = path.join(packageRoot, 'artifacts/reference-shared-todo-workday-browser.json.gz')
 const viewerUrl = 'http://127.0.0.1:4173'
 
 test('canonical viewer matches the approved failure and interaction baselines', async ({ page }) => {
-  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
+  await openArtifact(page, viewerUrl, failureArtifact, 'concurrent-hotel-booking')
   await expect(page).toHaveScreenshot('loaded-failure.png', { fullPage: true })
 
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
   await applyComparisonState(page)
   await expect(page).toHaveScreenshot('interaction-state.png', { fullPage: true })
   await expect(page.getByText(/Highlighting inferred correlation/)).toBeVisible()

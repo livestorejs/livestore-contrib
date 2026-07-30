@@ -28,6 +28,11 @@ export interface BackendSnapshot {
 
 export type SerializedBackendConfig = ScenarioBackend['serializedConfig']
 
+/** Normalizes provider pagination/delivery order into the authoritative global Eventlog order. */
+export const orderBackendEvents = <TEvent extends { readonly seqNum: number }>(
+  events: ReadonlyArray<TEvent>,
+): ReadonlyArray<TEvent> => events.toSorted((left, right) => left.seqNum - right.seqNum)
+
 /** Backend realization owned by the runner, independently of participant placement. */
 export interface ScenarioBackend<TSyncMetadata = Schema.Json> {
   readonly id: 'mock' | 'local-sync-cf'
@@ -125,7 +130,7 @@ export const makeLocalSyncCfScenarioBackend: Effect.Effect<
         const connected = yield* availabilityProxy.isAvailable
         return {
           connected,
-          events: pages.flatMap((page) => page.batch.map(({ eventEncoded }) => eventEncoded)),
+          events: orderBackendEvents(pages.flatMap((page) => page.batch.map(({ eventEncoded }) => eventEncoded))),
         }
       }).pipe(UnknownError.mapToUnknownError),
     setAvailability: (available) => availabilityProxy.setAvailable(available),

@@ -326,8 +326,8 @@ Vitest.describe('scenario model', () => {
 
   Vitest.it('decodes the tracked version-3/version-4 reference artifacts without migration', () => {
     for (const name of [
-      'reference-offline-writer-recovery-browser-failure.json.gz',
-      'reference-shared-todo-workday-browser-failure.json.gz',
+      'reference-offline-writer-recovery-browser.json.gz',
+      'reference-shared-todo-workday-browser.json.gz',
     ]) {
       const json = gunzipSync(readFileSync(new URL(`../artifacts/${name}`, import.meta.url))).toString('utf8')
       const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(json)

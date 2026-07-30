@@ -15,7 +15,7 @@ pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile process --scenario backend-outage-recovery
 pnpm --dir tests/scenarios scenario:run --profile process --scenario seeded-todo-workload
 pnpm --dir tests/scenarios scenario:run --profile process --scenario late-client-catch-up
-pnpm --dir tests/scenarios scenario:run --scenario concurrent-decrement-rebase
+pnpm --dir tests/scenarios scenario:run --scenario concurrent-hotel-booking
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario browser-multi-session-recovery
 pnpm --dir tests/scenarios scenario:run --profile process --scenario shared-todo-workday --output artifacts/shared-todo-workday-process.json
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario shared-todo-workday --output artifacts/shared-todo-workday-browser.json
@@ -35,7 +35,7 @@ Set `SCENARIO_BROWSER_DB_SNAPSHOT_DIR=<directory>` to export the first session,
 leader, and eventlog databases immediately before each browser Client
 reconnects.
 
-`concurrent-decrement-rebase` is an intentional failure reproducer for the
+`concurrent-hotel-booking` is an intentional failure reproducer for the
 command-replay RFC's invalid-rebase class. Its CLI process exits non-zero after
 writing an inspectable artifact. See [RED_TEAMING.md](./RED_TEAMING.md) for the
 broader campaign and failure-reduction plan.
@@ -52,6 +52,12 @@ Open the printed URL (normally `http://localhost:5173`) and choose a generated
 artifact from **saved runs**. The
 scenario CLI refreshes this local catalog whenever it writes into `artifacts/`;
 the file picker can still open a `.json` or `.json.gz` artifact from elsewhere.
+
+Only the four minimized sync failures carry identifiers: `SF-01` through
+`SF-04`. The ID names the product-level finding and its one canonical viewer
+artifact; ordinary runs and the earlier reference artifacts do not receive an
+ID. The complete findings and reduction evidence are recorded in
+[`SYNC_CORRECTNESS_FINDINGS.md`](./SYNC_CORRECTNESS_FINDINGS.md).
 
 Storybook is the component and state workbench:
 
@@ -79,10 +85,10 @@ the layered SVG renderer consumes its semantic layers and preserves the two-SVG
 main-timeline/range-navigator organization.
 
 Tracked `.json.gz` reference artifacts are also included in the saved-run
-catalog. They preserve diagnostically useful failures without adding the full
-uncompressed traces to the repository. The set includes a passed
-`browser-multi-session-recovery` lifecycle run, an `offline-writer-recovery`
-failure, and the dense `shared-todo-workday` failure.
+catalog without adding the full uncompressed traces to the repository. The set
+includes passed `browser-multi-session-recovery`, `offline-writer-recovery`,
+and dense `shared-todo-workday` browser runs. The canonical `SF-*` artifacts
+provide the retained failure states.
 
 Host acknowledgements mean only that the participant host completed handling
 the controller request at its advertised boundary. They do not confirm backend

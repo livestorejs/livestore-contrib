@@ -45,7 +45,7 @@ advertised from sampled correlation (LSC.VER.SCEN-R03, R04).
 The baseline corpus covers offline-writer recovery, backend outage/recovery,
 late catch-up, seeded mixed todo work, dynamic Client/session addition,
 multi-session browser recovery and Leader turnover, and a shared workday
-topology. It also includes the intentional `concurrent-decrement-rebase`
+topology. It also includes the intentional `concurrent-hotel-booking`
 failure, which preserves a SQLite-enforced non-negative invariant violation
 during pending-Event reconciliation. The associated
 [red-team plan](../../../tests/scenarios/RED_TEAMING.md) defines the wider search,

@@ -4,15 +4,16 @@ import { createStorePromise, type Store, StoreInternalsSymbol } from '@livestore
 import { Effect } from '@livestore/utils/effect'
 
 import { dispatchApplicationAction, inspectApplicationState } from '../../application.ts'
+import { getScenarioApplication, type RegisteredApplication } from '../../applications.ts'
 import { makeParticipantClock, type ParticipantClock } from '../../clock.ts'
-import { todoApplication } from '../../fixtures/todo-application.ts'
 import { collectConfirmedEvents, makeComponentSyncObservation, makeEventRefRegistry } from '../../observations.ts'
 import type { BrowserPageObservation, BrowserStartOptions, ScenarioBrowserControl } from '../protocol.ts'
 import LiveStoreWorker from './livestore.worker.ts?worker'
 
 interface BrowserRuntime {
+  readonly application: RegisteredApplication
   readonly options: BrowserStartOptions
-  readonly store: Store<typeof todoApplication.schema>
+  readonly store: Store<RegisteredApplication['schema']>
 }
 
 let runtime: BrowserRuntime | undefined
@@ -27,8 +28,9 @@ const requireRuntime = (): BrowserRuntime => {
 
 const start = async (options: BrowserStartOptions): Promise<void> => {
   if (runtime !== undefined) throw new Error('Browser participant is already running')
+  const application = getScenarioApplication(options.applicationId)
   const store = await createStorePromise({
-    schema: todoApplication.schema,
+    schema: application.schema,
     storeId: options.storeId,
     disableDevtools: false,
     adapter: makePersistedAdapter({
@@ -49,7 +51,7 @@ const start = async (options: BrowserStartOptions): Promise<void> => {
       cause: error,
     })
   })
-  runtime = { options, store }
+  runtime = { application, options, store }
   participantClock = makeParticipantClock(`browser-session:${options.clientId}/${options.sessionId}`)
   document.querySelector('#status')!.textContent = `${options.clientId}/${options.sessionId}`
 }
@@ -120,7 +122,7 @@ const control: ScenarioBrowserControl = {
     const current = requireRuntime()
     await run(
       dispatchApplicationAction({
-        application: todoApplication,
+        application: current.application,
         store: current.store,
         participant: target,
         action,
@@ -133,7 +135,7 @@ const control: ScenarioBrowserControl = {
     const current = requireRuntime()
     return run(
       inspectApplicationState({
-        application: todoApplication,
+        application: current.application,
         store: current.store,
         participant,
         inspector,

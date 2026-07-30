@@ -6,14 +6,24 @@ import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
+import { getScenarioApplication } from './applications.ts'
+import {
+  buildArtifactCatalogFromEntries,
+  makeArtifactCatalogEntry,
+  type ArtifactCatalogEntry,
+} from './artifact-catalog.ts'
 import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
 import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
-import { concurrentDecrementRebase } from './corpus/concurrent-decrement-rebase.ts'
+import { concurrentHotelBooking } from './corpus/concurrent-hotel-booking.ts'
+import { largePayloadRecovery } from './corpus/large-payload-recovery.ts'
 import { lateClientCatchUp } from './corpus/late-client-catch-up.ts'
+import { manyWriterConvergence } from './corpus/many-writer-convergence.ts'
 import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
+import { pendingPushBoundary } from './corpus/pending-push-boundary.ts'
+import { pendingTailRecovery } from './corpus/pending-tail-recovery.ts'
+import { reconnectFlapping } from './corpus/reconnect-flapping.ts'
 import { seededTodoWorkload } from './corpus/seeded-todo-workload.ts'
 import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
-import { todoApplication } from './fixtures/todo-application.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
   type RunScenarioOptions,
@@ -38,33 +48,39 @@ const scenarios: Readonly<Record<string, ScenarioAst>> = {
   [offlineWriterRecovery.id]: offlineWriterRecovery,
   [seededTodoWorkload.id]: seededTodoWorkload,
   [browserMultiSessionRecovery.id]: browserMultiSessionRecovery,
-  [concurrentDecrementRebase.id]: concurrentDecrementRebase,
+  [concurrentHotelBooking.id]: concurrentHotelBooking,
   [lateClientCatchUp.id]: lateClientCatchUp,
+  [largePayloadRecovery.id]: largePayloadRecovery,
+  [manyWriterConvergence.id]: manyWriterConvergence,
+  [pendingPushBoundary.id]: pendingPushBoundary,
+  [pendingTailRecovery.id]: pendingTailRecovery,
+  [reconnectFlapping.id]: reconnectFlapping,
   [sharedTodoWorkday.id]: sharedTodoWorkday,
 }
 
 const runSelectedScenario = (options: CliOptions, runOptions: RunScenarioOptions) => {
+  const application = getScenarioApplication(options.scenario.applicationId)
   switch (options.profile) {
     case 'in-process':
       return options.backend === 'mock'
-        ? runInProcessScenario({ scenario: options.scenario, application: todoApplication, options: runOptions })
+        ? runInProcessScenario({ scenario: options.scenario, application, options: runOptions })
         : runInProcessLocalSyncCfScenario({
             scenario: options.scenario,
-            application: todoApplication,
+            application,
             options: runOptions,
           })
     case 'process':
       return runProcessLocalSyncCfScenario({
         scenario: options.scenario,
-        applicationId: todoApplication.id,
-        workloads: todoApplication.workloads,
+        applicationId: application.id,
+        workloads: application.workloads,
         options: runOptions,
       })
     case 'browser':
       return runBrowserLocalSyncCfScenario({
         scenario: options.scenario,
-        applicationId: todoApplication.id,
-        workloads: todoApplication.workloads,
+        applicationId: application.id,
+        workloads: application.workloads,
         options: runOptions,
       })
   }
@@ -154,59 +170,36 @@ const program = Effect.gen(function* () {
   })
 }).pipe(Effect.withSpan('scenario-cli'), Effect.scoped, Effect.provide(OtelLiveDummy))
 
-interface ArtifactCatalogEntry {
-  readonly file: string
-  readonly label: string
-  readonly scenarioId: string
-  readonly profile: ParticipantProfile
-  readonly backend: SyncBackend
-  readonly applicationEventCount: number
-  readonly traceRecordCount: number
-  readonly status: 'passed' | 'failed'
-}
-
 /** Keeps the viewer catalog derived from the artifacts on disk, including artifacts from earlier runs. */
 const refreshArtifactCatalog = async (outputPath: string): Promise<void> => {
   const artifactDirectory = path.resolve(import.meta.dirname, '../artifacts')
   if (path.dirname(outputPath) !== artifactDirectory) return
 
-  const entries = await Promise.all(
-    (await fs.readdir(artifactDirectory, { withFileTypes: true }))
-      .filter(
-        (entry) =>
-          entry.isFile() &&
-          (entry.name.endsWith('.json') || entry.name.endsWith('.json.gz')) &&
-          entry.name !== 'catalog.json',
-      )
-      .map(async (entry): Promise<ArtifactCatalogEntry | undefined> => {
-        try {
-          const fileData = await fs.readFile(path.join(artifactDirectory, entry.name))
-          const artifactJson =
-            entry.name.endsWith('.gz') === true ? gunzipSync(fileData).toString('utf8') : fileData.toString('utf8')
-          const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(artifactJson)
-          const profile = artifact.descriptor.execution.participantProfile
-          const backend = artifact.descriptor.execution.syncBackend
-          return {
-            file: entry.name,
-            label: `${artifact.descriptor.scenarioId} · ${profile} · ${backend}${entry.name.startsWith('reference-') === true ? ' · reference' : ''}`,
-            scenarioId: artifact.descriptor.scenarioId,
-            profile,
-            backend,
-            applicationEventCount: artifact.trace.filter((record) => record.payload._tag === 'action.completed').length,
-            traceRecordCount: artifact.trace.length,
-            status: artifact.status,
-          }
-        } catch {
-          return undefined
-        }
-      }),
+  const catalogEntries: ArtifactCatalogEntry[] = []
+  const artifactFiles = (await fs.readdir(artifactDirectory, { withFileTypes: true })).filter(
+    (entry) =>
+      entry.isFile() &&
+      (entry.name.endsWith('.json') || entry.name.endsWith('.json.gz')) &&
+      entry.name !== 'catalog.json',
   )
-  const catalog = {
-    version: 1,
-    entries: entries
-      .filter((entry): entry is ArtifactCatalogEntry => entry !== undefined)
-      .toSorted((left, right) => left.label.localeCompare(right.label) || left.file.localeCompare(right.file)),
+  for (const entry of artifactFiles) {
+    try {
+      const fileData = await fs.readFile(path.join(artifactDirectory, entry.name))
+      const artifactJson =
+        entry.name.endsWith('.gz') === true ? gunzipSync(fileData).toString('utf8') : fileData.toString('utf8')
+      const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(artifactJson)
+      catalogEntries.push(
+        makeArtifactCatalogEntry({
+          file: entry.name,
+          artifact,
+          reference: entry.name.startsWith('reference-'),
+        }),
+      )
+    } catch {
+      // A malformed or partial artifact must not make the remaining saved runs unavailable.
+    }
   }
+  const catalog = buildArtifactCatalogFromEntries(catalogEntries)
   await fs.writeFile(path.join(artifactDirectory, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`, 'utf8')
 }
 

@@ -3,6 +3,7 @@ import type { Schema } from '@livestore/utils/effect'
 import type { ComponentSyncObservation, ParticipantClockReading, ParticipantRef, SyncObservation } from '../model.ts'
 
 export interface BrowserStartOptions {
+  readonly applicationId: string
   readonly storeId: string
   readonly clientId: string
   readonly sessionId: string

@@ -1,19 +1,19 @@
 import {
   Effect,
   Vitest,
-  concurrentDecrementRebase,
+  concurrentHotelBooking,
   expect,
+  hotelBookingApplication,
   runInProcessScenario,
-  todoApplication,
 } from './test-support/scenario-test-kit.ts'
 
 Vitest.describe('materialization failure scenarios', () => {
   Vitest.live('reproduces a non-negative constraint failure after concurrent decrement rebase', (test) =>
     Effect.gen(function* () {
       const artifact = yield* runInProcessScenario({
-        scenario: concurrentDecrementRebase,
-        application: todoApplication,
-        options: { runId: 'concurrent-decrement-rebase-test', sourceRevision: 'test' },
+        scenario: concurrentHotelBooking,
+        application: hotelBookingApplication,
+        options: { runId: 'concurrent-hotel-booking-test', sourceRevision: 'test' },
       })
 
       expect(artifact.status).toBe('failed')
@@ -27,7 +27,7 @@ Vitest.describe('materialization failure scenarios', () => {
           // The leader logs MaterializeError, but the Store shutdown boundary
           // currently wraps the session-side SQLite failure as UnknownError.
           code: 'UnknownError',
-          message: expect.stringContaining('CHECK constraint failed: room_availability.available_nonnegative'),
+          message: expect.stringContaining('CHECK constraint failed: hotel_room_inventory.available_nonnegative'),
         }),
       )
       expect(runtimeFailure).toEqual(expect.objectContaining({ clientId: 'client-a', sessionId: 'session-a' }))
@@ -41,11 +41,11 @@ Vitest.describe('materialization failure scenarios', () => {
           observation: expect.objectContaining({
             events: [
               expect.objectContaining({
-                name: 'v1.RoomAvailabilityInitialized',
+                name: 'v1.HotelRoomInventoryInitialized',
                 origin: expect.objectContaining({ clientId: 'client-b' }),
               }),
               expect.objectContaining({
-                name: 'v1.AvailableRoomDecremented',
+                name: 'v1.HotelRoomBooked',
                 origin: expect.objectContaining({ clientId: 'client-b' }),
               }),
             ],

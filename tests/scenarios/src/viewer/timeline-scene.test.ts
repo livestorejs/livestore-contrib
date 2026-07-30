@@ -11,8 +11,8 @@ const decodeReference = (file: string) => {
   return decodeArtifactJson(gunzipSync(data).toString('utf8'))
 }
 
-const offlineArtifact = decodeReference('reference-offline-writer-recovery-browser-failure.json.gz')
-const denseArtifact = decodeReference('reference-shared-todo-workday-browser-failure.json.gz')
+const offlineArtifact = decodeReference('reference-offline-writer-recovery-browser.json.gz')
+const denseArtifact = decodeReference('reference-shared-todo-workday-browser.json.gz')
 const lifecycleArtifact = decodeReference('reference-browser-multi-session-recovery-browser.json.gz')
 
 describe('deriveTimelineScene', () => {

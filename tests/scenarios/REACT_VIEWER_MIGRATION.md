@@ -5,7 +5,8 @@ This checklist is the durable issue record for the completed scenario-viewer par
 ## Reference artifacts and states
 
 - [x] Catalog or fixture coverage for `browser-multi-session-recovery` (normal, moderately complex).
-- [x] Catalog or fixture coverage for the `offline-writer-recovery` reference failure.
+- [x] Catalog or fixture coverage for the `offline-writer-recovery` browser recovery.
+- [x] Failed-run coverage uses the canonical `SF-01` hotel-booking artifact.
 - [x] Catalog or fixture coverage for `shared-todo-workday` (dense trace).
 - [x] Baselines cover unloaded, loaded, mid-cursor, final success, and failed-run states.
 - [x] Baselines cover selected event, multi-record moment, expanded metadata, and expanded JSON.

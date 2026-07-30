@@ -9,6 +9,7 @@ import { EventSequenceNumber } from '@livestore/common/schema'
 import { Effect, Schema, type Scope } from '@livestore/utils/effect'
 
 import { participantHostFailure, ScenarioOperationError, type ScenarioOperationFailureOutcome } from '../application.ts'
+import { getScenarioApplication } from '../applications.ts'
 import type { ScenarioBackend } from '../backends.ts'
 import { calibrateParticipantReading, makeParticipantClock, readControllerOccurrence } from '../clock.ts'
 import type { ParticipantHost } from '../host.ts'
@@ -59,7 +60,9 @@ export const makeBrowserHost = (args: {
   backend: Pick<ScenarioBackend, 'id' | 'observe' | 'setAvailability' | 'serializedConfig' | 'componentVersions'>
 }): Effect.Effect<BrowserParticipantHost, ScenarioOperationError, Scope.Scope> =>
   Effect.gen(function* () {
-    if (args.applicationId !== 'scenario-todo-app') {
+    try {
+      getScenarioApplication(args.applicationId)
+    } catch {
       return yield* Effect.fail(
         new ScenarioOperationError('application-mismatch', `Browser fixture does not provide ${args.applicationId}`),
       )
@@ -102,6 +105,7 @@ export const makeBrowserHost = (args: {
           )
         }
         const controller = yield* makeBrowserClient({
+          applicationId: args.applicationId,
           baseUrl: server.baseUrl,
           storeId: command.storeId,
           clientId: command.client.id,
@@ -294,6 +298,7 @@ interface BrowserClientObservation {
 }
 
 const makeBrowserClient = (args: {
+  applicationId: string
   baseUrl: string
   storeId: string
   clientId: string
@@ -483,6 +488,7 @@ const makeBrowserClient = (args: {
 
 const startSessionPage = (args: {
   context: BrowserContext
+  applicationId: string
   baseUrl: string
   storeId: string
   clientId: string
@@ -526,6 +532,7 @@ const startSessionPage = (args: {
         browserInfrastructureFailure(`Failed to start ${args.clientId}/${args.sessionId}: ${String(cause)}`),
     })
     const options: BrowserStartOptions = {
+      applicationId: args.applicationId,
       storeId: args.storeId,
       clientId: args.clientId,
       sessionId: args.sessionId,

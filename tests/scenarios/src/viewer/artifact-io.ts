@@ -3,8 +3,9 @@ import { Schema } from '@livestore/utils/effect'
 import { ScenarioRunArtifact } from '../model.ts'
 
 export interface ArtifactCatalog {
-  readonly version: 1
+  readonly version: 3
   readonly entries: ReadonlyArray<{
+    readonly findingId?: string
     readonly file: string
     readonly label: string
     readonly applicationEventCount: number

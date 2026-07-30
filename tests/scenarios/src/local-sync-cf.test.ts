@@ -1,3 +1,4 @@
+import { orderBackendEvents } from './backends.ts'
 import { expectBackendOutageRecovery } from './test-support/runner-assertions.ts'
 /** Verifies the worker/process participant profile against the same portable scenario. */
 import {
@@ -11,6 +12,14 @@ import {
 } from './test-support/scenario-test-kit.ts'
 
 Vitest.describe('local sync-cf backend', () => {
+  Vitest.it('orders paged backend observations by authoritative global position', () => {
+    expect(orderBackendEvents([{ seqNum: 302 }, { seqNum: 101 }, { seqNum: 401 }])).toEqual([
+      { seqNum: 101 },
+      { seqNum: 302 },
+      { seqNum: 401 },
+    ])
+  })
+
   Vitest.live(
     'drops the participant route during a backend outage and recovers through the real WebSocket backend',
     (test) =>

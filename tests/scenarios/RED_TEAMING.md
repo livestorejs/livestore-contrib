@@ -5,11 +5,11 @@ durability, availability, and recovery failures. Every discovered failure must
 end as a deterministic artifact and then as the smallest Scenario that retains
 the same failure signature.
 
-The first proven seed is `concurrent-decrement-rebase`. It realizes the invalid
+The first proven seed is `concurrent-hotel-booking`. It realizes the invalid
 rebase described by the
 [command replay RFC](https://github.com/livestorejs/livestore/blob/main/contributor-docs/rfcs/0002-command-replay.md):
 
-1. Clients A and B confirm a room-availability counter at `1`.
+1. Clients A and B confirm hotel-room inventory at `1`.
 2. A disconnects; A and B each decrement their local `1` to `0`.
 3. B's decrement is confirmed upstream.
 4. A reconnects and rebases its pending decrement over B's confirmed event.
