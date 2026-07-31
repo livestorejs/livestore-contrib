@@ -10,25 +10,26 @@ export {
   participantHostFailure,
   type ParticipantHostFailureCode,
   type ScenarioOperationFailureOutcome,
-} from '../application.ts'
+} from '../application/definition.ts'
 export { makeMockScenarioBackend } from '../backends.ts'
-export { browserHostCapabilities } from '../browser/browser-host.ts'
+export { browserHostCapabilities } from '../profiles/browser/host.ts'
 export { deriveScenarioRequirements } from '../capabilities.ts'
-export { backendOutageRecovery } from '../corpus/backend-outage-recovery.ts'
-export { browserMultiSessionRecovery } from '../corpus/browser-multi-session-recovery.ts'
-export { concurrentHotelBooking } from '../corpus/concurrent-hotel-booking.ts'
-export { lateClientCatchUp } from '../corpus/late-client-catch-up.ts'
-export { largePayloadRecovery } from '../corpus/large-payload-recovery.ts'
-export { manyWriterConvergence } from '../corpus/many-writer-convergence.ts'
-export { offlineWriterRecovery } from '../corpus/offline-writer-recovery.ts'
-export { pendingPushBoundary } from '../corpus/pending-push-boundary.ts'
-export { pendingTailRecovery } from '../corpus/pending-tail-recovery.ts'
-export { reconnectFlapping } from '../corpus/reconnect-flapping.ts'
-export { seededTodoWorkload } from '../corpus/seeded-todo-workload.ts'
-export { sharedTodoWorkday } from '../corpus/shared-todo-workday.ts'
-export { hotelBookingApplication } from '../fixtures/hotel-booking-application.ts'
-export { todoApplication } from '../fixtures/todo-application.ts'
-export { inProcessHostCapabilities, makeInProcessHost, type ParticipantHost } from '../host.ts'
+export { hotelBookingApplication } from '../corpus/applications/hotel-booking.ts'
+export { todoApplication } from '../corpus/applications/todo.ts'
+export { backendOutageRecovery } from '../corpus/scenarios/backend-outage-recovery.ts'
+export { browserMultiSessionRecovery } from '../corpus/scenarios/browser-multi-session-recovery.ts'
+export { concurrentHotelBooking } from '../corpus/scenarios/concurrent-hotel-booking.ts'
+export { lateClientCatchUp } from '../corpus/scenarios/late-client-catch-up.ts'
+export { largePayloadRecovery } from '../corpus/scenarios/large-payload-recovery.ts'
+export { manyWriterConvergence } from '../corpus/scenarios/many-writer-convergence.ts'
+export { offlineWriterRecovery } from '../corpus/scenarios/offline-writer-recovery.ts'
+export { pendingPushBoundary } from '../corpus/scenarios/pending-push-boundary.ts'
+export { pendingTailRecovery } from '../corpus/scenarios/pending-tail-recovery.ts'
+export { reconnectFlapping } from '../corpus/scenarios/reconnect-flapping.ts'
+export { seededTodoWorkload } from '../corpus/scenarios/seeded-todo-workload.ts'
+export { sharedTodoWorkday } from '../corpus/scenarios/shared-todo-workday.ts'
+export type { ParticipantHost } from '../profiles/contract.ts'
+export { inProcessHostCapabilities, makeInProcessHost } from '../profiles/in-process/host.ts'
 export {
   defineScenario,
   deriveScenarioTopology,
@@ -37,7 +38,7 @@ export {
   ScenarioRunArtifact,
   type ScenarioTraceRecord,
 } from '../model.ts'
-export { processHostCapabilities } from '../process/process-host.ts'
+export { processHostCapabilities } from '../profiles/process/host.ts'
 export {
   deriveAdaptiveTimeLayout,
   deriveConnectivityIntervals,

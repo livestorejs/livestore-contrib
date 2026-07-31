@@ -1,7 +1,6 @@
 import { Deferred, Effect, Exit, type OtelTracer, type Scope } from '@livestore/utils/effect'
 
-import { type GeneratedWorkloadAction, ScenarioOperationError } from '../application.ts'
-import type { HostError, ParticipantHost } from '../host.ts'
+import { type GeneratedWorkloadAction, ScenarioOperationError } from '../application/definition.ts'
 import {
   type ClientDefinition,
   type ParallelOperationStep,
@@ -10,6 +9,7 @@ import {
   type ScenarioTraceRecord,
   type WorkloadStep,
 } from '../model.ts'
+import type { HostError, ParticipantHost } from '../profiles/contract.ts'
 import { syncObservationPayload } from './eventlog.ts'
 import { type ScenarioFaultState, recordOperationFailure } from './faults.ts'
 import { awaitSettlement } from './observations.ts'

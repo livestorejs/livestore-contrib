@@ -3,17 +3,18 @@ import type { WranglerDevServer } from '@livestore/utils-dev/wrangler'
 import { Effect, FetchHttpClient, Layer, type OtelTracer, type Scope } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
-import type { ApplicationDefinition, ApplicationWorkloadLibrary } from './application.ts'
+import type { ApplicationDefinition, ApplicationWorkloadLibrary } from './application/definition.ts'
 import { makeLocalSyncCfScenarioBackend, makeMockScenarioBackend } from './backends.ts'
-import { makeBrowserHost } from './browser/browser-host.ts'
-import { makeInProcessHost, type HostError, type ParticipantHost } from './host.ts'
 import {
   type ExecutionConfiguration,
   type ScenarioAst,
   type ScenarioRunArtifact,
   type ScenarioTraceRecord,
 } from './model.ts'
-import { makeProcessHost } from './process/process-host.ts'
+import { makeBrowserHost } from './profiles/browser/host.ts'
+import type { HostError, ParticipantHost } from './profiles/contract.ts'
+import { makeInProcessHost } from './profiles/in-process/host.ts'
+import { makeProcessHost } from './profiles/process/host.ts'
 import { executeClientCreation, executeParallelStep, executeStep } from './runner/execution.ts'
 import { makeFaultState, recordOperationFailure } from './runner/faults.ts'
 import { captureSnapshots, recordSystemObservation } from './runner/observations.ts'

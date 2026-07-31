@@ -5,20 +5,9 @@ import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
-import { getScenarioApplication } from './applications.ts'
 import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
-import { backendOutageRecovery } from './corpus/backend-outage-recovery.ts'
-import { browserMultiSessionRecovery } from './corpus/browser-multi-session-recovery.ts'
-import { concurrentHotelBooking } from './corpus/concurrent-hotel-booking.ts'
-import { largePayloadRecovery } from './corpus/large-payload-recovery.ts'
-import { lateClientCatchUp } from './corpus/late-client-catch-up.ts'
-import { manyWriterConvergence } from './corpus/many-writer-convergence.ts'
-import { offlineWriterRecovery } from './corpus/offline-writer-recovery.ts'
-import { pendingPushBoundary } from './corpus/pending-push-boundary.ts'
-import { pendingTailRecovery } from './corpus/pending-tail-recovery.ts'
-import { reconnectFlapping } from './corpus/reconnect-flapping.ts'
-import { seededTodoWorkload } from './corpus/seeded-todo-workload.ts'
-import { sharedTodoWorkday } from './corpus/shared-todo-workday.ts'
+import { getScenarioApplication } from './corpus/applications/registry.ts'
+import { getScenario, scenarioCorpus } from './corpus/scenarios/registry.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
   type RunScenarioOptions,
@@ -36,21 +25,6 @@ interface CliOptions {
   readonly backend: SyncBackend
   readonly scenario: ScenarioAst
   readonly outputPath: string
-}
-
-const scenarios: Readonly<Record<string, ScenarioAst>> = {
-  [backendOutageRecovery.id]: backendOutageRecovery,
-  [offlineWriterRecovery.id]: offlineWriterRecovery,
-  [seededTodoWorkload.id]: seededTodoWorkload,
-  [browserMultiSessionRecovery.id]: browserMultiSessionRecovery,
-  [concurrentHotelBooking.id]: concurrentHotelBooking,
-  [lateClientCatchUp.id]: lateClientCatchUp,
-  [largePayloadRecovery.id]: largePayloadRecovery,
-  [manyWriterConvergence.id]: manyWriterConvergence,
-  [pendingPushBoundary.id]: pendingPushBoundary,
-  [pendingTailRecovery.id]: pendingTailRecovery,
-  [reconnectFlapping.id]: reconnectFlapping,
-  [sharedTodoWorkday.id]: sharedTodoWorkday,
 }
 
 const runSelectedScenario = (options: CliOptions, runOptions: RunScenarioOptions) => {
@@ -92,7 +66,7 @@ Options:
   --output <path>                             Artifact output path
 
 Scenarios:
-  ${Object.keys(scenarios).join('\n  ')}`)
+  ${scenarioCorpus.map(({ id }) => id).join('\n  ')}`)
     process.exit(0)
   }
 
@@ -104,10 +78,8 @@ Scenarios:
     throw new Error(`${profile} requires --backend local-sync-cf`)
   }
 
-  const scenarioId = readOption(args, '--scenario') ?? offlineWriterRecovery.id
-  const scenario = scenarios[scenarioId]
-  if (scenario === undefined)
-    throw new Error(`Unknown scenario '${scenarioId}'. Expected: ${Object.keys(scenarios).join(', ')}`)
+  const scenarioId = readOption(args, '--scenario') ?? 'offline-writer-recovery'
+  const scenario = getScenario(scenarioId)
 
   const positionalOutput = args[0]?.startsWith('-') === false ? args[0] : undefined
   const output = readOption(args, '--output') ?? positionalOutput ?? `artifacts/${scenario.id}.json`

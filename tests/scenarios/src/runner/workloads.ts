@@ -1,6 +1,6 @@
 import { Effect } from '@livestore/utils/effect'
 
-import { type ApplicationWorkloadLibrary, ScenarioOperationError } from '../application.ts'
+import { type ApplicationWorkloadLibrary, ScenarioOperationError } from '../application/definition.ts'
 import { participantKey, type ScenarioAst, type WorkloadStep } from '../model.ts'
 import type { PreparedWorkloadAction, PreparedWorkloadExpansion, PreparedWorkloadExpansions } from './execution.ts'
 

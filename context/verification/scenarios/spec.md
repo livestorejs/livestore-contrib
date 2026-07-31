@@ -34,7 +34,7 @@ it adds no database-diagnostics product API. The local `sync-cf` availability
 fault affects only the participant route while the Worker and Durable Object
 remain running (LSC.VER.SCEN-R02).
 
-Every profile participates in `host-conformance.test.ts` for the capabilities
+Every profile participates in `src/profiles/conformance.test.ts` for the capabilities
 it advertises. Process IDs and browser profile directories are scoped resources
 and must be absent after host teardown. Seeded reproduction covers inputs and
 requested choices, not internal delivery order; exact Event lineage is not
@@ -47,7 +47,10 @@ late catch-up, seeded mixed todo work, dynamic Client/session addition,
 multi-session browser recovery and Leader turnover, and a shared workday
 topology. It also includes the intentional `concurrent-hotel-booking`
 failure, which preserves a SQLite-enforced non-negative invariant violation
-during pending-Event reconciliation. The associated
+during pending-Event reconciliation. Concrete Application definitions and
+portable Scenario definitions remain separate corpus registries under
+`src/corpus/applications` and `src/corpus/scenarios`; each Scenario references
+one registered Application by ID. The associated
 [red-team plan](../../../tests/scenarios/RED_TEAMING.md) defines the wider search,
 promotion, failure-signature, and reduction campaign. Workload v1 expands application-owned named workloads sequentially
 from a derived seed and retains the enclosing and child operation identities.

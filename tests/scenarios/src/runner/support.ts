@@ -1,8 +1,7 @@
 import { Effect, Schema } from '@livestore/utils/effect'
 
-import { ScenarioOperationError } from '../application.ts'
+import { ScenarioOperationError } from '../application/definition.ts'
 import { deriveScenarioRequirements, sessionsBeyondHostLimit } from '../capabilities.ts'
-import type { HostError, ParticipantHost } from '../host.ts'
 import {
   defineScenario,
   type ExecutionConfiguration,
@@ -14,6 +13,7 @@ import {
   type ScenarioTraceRecord,
   scenarioTraceVersion,
 } from '../model.ts'
+import type { HostError, ParticipantHost } from '../profiles/contract.ts'
 import type { RunScenarioOptions } from '../runner.ts'
 
 export const validateExecution = (args: {

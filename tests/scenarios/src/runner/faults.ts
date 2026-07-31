@@ -1,5 +1,4 @@
-import { ScenarioOperationError } from '../application.ts'
-import type { HostError } from '../host.ts'
+import { ScenarioOperationError } from '../application/definition.ts'
 import type {
   HostObservationOccurrence,
   ParticipantRef,
@@ -7,6 +6,7 @@ import type {
   SyncObservation,
   SyncObservationPayload,
 } from '../model.ts'
+import type { HostError } from '../profiles/contract.ts'
 import { canonicalJson, globalPosition } from './eventlog.ts'
 import { describeHostError } from './support.ts'
 import type { TraceRecorder } from './trace-recorder.ts'

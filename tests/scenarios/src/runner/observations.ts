@@ -1,8 +1,7 @@
 import { EventSequenceNumber } from '@livestore/common/schema'
 import { Effect, type Schema, type Scope } from '@livestore/utils/effect'
 
-import { ScenarioOperationError } from '../application.ts'
-import type { HostError, ParticipantHost } from '../host.ts'
+import { ScenarioOperationError } from '../application/definition.ts'
 import {
   deriveScenarioTopology,
   type HostSystemObservation,
@@ -13,6 +12,7 @@ import {
   type SyncObservation,
   type SyncObservationPayload,
 } from '../model.ts'
+import type { HostError, ParticipantHost } from '../profiles/contract.ts'
 import { canonicalJson, syncObservationPayload } from './eventlog.ts'
 import {
   observationsAreSettled,

@@ -2,8 +2,8 @@ import { expect } from 'vitest'
 
 import { Effect } from '@livestore/utils/effect'
 
-import type { ParticipantHost } from '../host.ts'
 import type { HostSystemObservation, ObservedEvent, ScenarioRunArtifact } from '../model.ts'
+import type { ParticipantHost } from '../profiles/contract.ts'
 
 export type TransientPrefixMutation = 'conflict' | 'delete' | 'duplicate' | 'rewrite' | 'reorder'
 

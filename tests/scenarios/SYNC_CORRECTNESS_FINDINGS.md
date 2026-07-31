@@ -100,7 +100,7 @@ browsers.
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/concurrent-hotel-booking.ts`
+`tests/scenarios/src/corpus/scenarios/concurrent-hotel-booking.ts`
 
 The reproducer is reduced to two Clients, one session each, three application
 events (initial inventory plus two bookings), one disconnection, one reconnect,
@@ -187,7 +187,7 @@ LiveStore revision:
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/pending-tail-recovery.ts`
+`tests/scenarios/src/corpus/scenarios/pending-tail-recovery.ts`
 
 Current reduction evidence:
 
@@ -280,7 +280,7 @@ LiveStore revision:
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/many-writer-convergence.ts`
+`tests/scenarios/src/corpus/scenarios/many-writer-convergence.ts`
 
 Current reduction evidence:
 
@@ -370,7 +370,7 @@ LiveStore revision:
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/large-payload-recovery.ts`
+`tests/scenarios/src/corpus/scenarios/large-payload-recovery.ts`
 
 Current reduction evidence:
 

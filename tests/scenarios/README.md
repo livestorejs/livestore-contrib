@@ -40,6 +40,22 @@ command-replay RFC's invalid-rebase class. Its CLI process exits non-zero after
 writing an inspectable artifact. See [RED_TEAMING.md](./RED_TEAMING.md) for the
 broader campaign and failure-reduction plan.
 
+## Add a scenario
+
+Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications)
+and portable Scenario definitions live in [`src/corpus/scenarios`](./src/corpus/scenarios).
+To add a Scenario against an existing Application:
+
+1. Add the Scenario file and reference the Application through
+   `applicationId: application.id`.
+2. Add the Scenario to `src/corpus/scenarios/registry.ts`.
+
+Only add and register a new Application definition when the Scenario needs a
+different schema, action, inspector, or workload surface. No per-Application
+test is required: `src/corpus/registry.test.ts` checks unique IDs, registry
+lookup, and every Scenario-to-Application reference. Add a focused test only
+for Application behavior that is not adequately exercised by its Scenarios.
+
 ## Inspect a scenario run
 
 The scenario viewer is a React single-page application:
@@ -163,7 +179,7 @@ proof of recovery.
 
 ```sh
 pnpm --dir tests/scenarios test
-pnpm --dir tests/scenarios exec vitest run src/scenario-runner.test.ts --testNamePattern "browser profile"
+pnpm --dir tests/scenarios exec vitest run src/profiles/browser/profile.test.ts
 pnpm --dir tests/scenarios exec tsc --noEmit -p tsconfig.json
 ```
 
@@ -175,5 +191,5 @@ requirements implied by topology, operations, observations, and oracles;
 shared profile contract directly with:
 
 ```sh
-pnpm --dir tests/scenarios exec vitest run src/host-conformance.test.ts
+pnpm --dir tests/scenarios exec vitest run src/profiles/conformance.test.ts
 ```
