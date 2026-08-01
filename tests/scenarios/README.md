@@ -12,6 +12,7 @@ pnpm --dir tests/scenarios scenario:run
 pnpm --dir tests/scenarios scenario:run --profile in-process --backend local-sync-cf
 pnpm --dir tests/scenarios scenario:run --profile process
 pnpm --dir tests/scenarios scenario:run --profile browser
+pnpm --dir tests/scenarios scenario:run --profile process --backend cloud-sync-cf
 pnpm --dir tests/scenarios scenario:run --profile process --scenario backend-outage-recovery
 pnpm --dir tests/scenarios scenario:run --profile process --scenario seeded-todo-workload
 pnpm --dir tests/scenarios scenario:run --profile process --scenario late-client-catch-up
@@ -56,6 +57,20 @@ use the local real `sync-cf` Worker and SQLite Durable Object. The browser
 profile launches headless Chromium with one persistent browser context per
 Client, one page per session, OPFS, a SharedWorker, and Web Locks. Set
 `SCENARIO_BROWSER_HEADLESS=0` to watch it run.
+
+Select `--backend cloud-sync-cf` to deploy or reuse a dedicated Worker and run
+against a real Cloudflare SQLite Durable Object. Local interactive use falls
+back to `wrangler login`; automated use sets `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`. Provisioning happens only when this backend is
+explicitly selected, caches its scoped sync credential under the ignored
+`.wrangler/` directory, and redeploys when the selected LiveStore source
+revision changes. Each run uses a unique physical Store ID and clears its DO
+storage during scope teardown. Override the managed Worker name with
+`SCENARIO_CLOUD_WORKER_NAME`.
+
+To attach to an already deployed compatible Worker without provisioning it,
+set both `SCENARIO_CLOUD_SYNC_URL` and `SCENARIO_CLOUD_SYNC_TOKEN`. Set
+`SCENARIO_CLOUD_FORCE_DEPLOY=1` to force a managed redeployment.
 
 Use `--output <path>` to choose the artifact path. By default it is written to
 `tests/scenarios/artifacts/<scenario-id>.json`.

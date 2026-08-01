@@ -1,5 +1,5 @@
 name = "livestore-scenario-sync-cf"
-compatibility_date = "2026-07-01"
+compatibility_date = "2026-08-01"
 compatibility_flags = ["enable_request_signal"]
 main = "./worker.ts"
 

@@ -6,7 +6,7 @@ export const scenarioArtifactVersion = 4 as const
 export const ParticipantProfile = Schema.Literals(['in-process', 'process', 'browser'])
 export type ParticipantProfile = typeof ParticipantProfile.Type
 
-export const SyncBackendRealization = Schema.Literals(['mock', 'local-sync-cf'])
+export const SyncBackendRealization = Schema.Literals(['mock', 'local-sync-cf', 'cloud-sync-cf'])
 export type SyncBackendRealization = typeof SyncBackendRealization.Type
 
 export const StateProfile = Schema.Literals(['sqlite', 'opfs'])

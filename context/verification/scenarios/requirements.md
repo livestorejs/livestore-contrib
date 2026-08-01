@@ -29,8 +29,11 @@ choices, and gaps for the private
   and persistent Chromium participant profiles. The in-process profile can use
   the controlled `makeMockSyncBackend`; process and browser evidence use a
   local real `sync-cf` Worker and Durable Object behind a Scenario-owned
-  availability proxy. Each composition advertises only the controls and
-  evidence it actually supplies.
+  availability proxy. An explicitly selected opt-in realization may deploy or
+  attach to the same `sync-cf` Worker and a real Cloudflare SQLite Durable
+  Object while preserving that participant/observer route separation. Ordinary
+  local and CI checks never provision cloud resources. Each composition
+  advertises only the controls and evidence it actually supplies.
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
   versioned Scenario ASTs, named actions, seeded Workloads,

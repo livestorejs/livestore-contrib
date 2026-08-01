@@ -4,7 +4,12 @@ import { Effect, FetchHttpClient, Layer, type OtelTracer, type Scope } from '@li
 import { PlatformNode } from '@livestore/utils/node'
 
 import type { ApplicationDefinition, ApplicationWorkloadLibrary } from './application/definition.ts'
-import { makeLocalSyncCfScenarioBackend, makeMockScenarioBackend } from './backends.ts'
+import {
+  type CloudSyncCfScenarioBackendOptions,
+  makeCloudSyncCfScenarioBackend,
+  makeLocalSyncCfScenarioBackend,
+  makeMockScenarioBackend,
+} from './backends.ts'
 import {
   type ExecutionConfiguration,
   type ScenarioAst,
@@ -149,6 +154,77 @@ export const runBrowserLocalSyncCfScenario = (args: {
           syncBackend: 'local-sync-cf',
           stateProfile: 'opfs',
         },
+      },
+    })
+  })
+
+export const runInProcessCloudSyncCfScenario = <TSchema extends LiveStoreSchema>(args: {
+  scenario: ScenarioAst
+  application: ApplicationDefinition<TSchema>
+  cloud: CloudSyncCfScenarioBackendOptions
+  options?: RunScenarioOptions
+}): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
+  Effect.gen(function* () {
+    const backend = yield* makeCloudSyncCfScenarioBackend(args.cloud).pipe(
+      Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer, FetchHttpClient.layer)),
+    )
+    const host = yield* makeInProcessHost({ application: args.application, backend })
+    return yield* runScenario({
+      scenario: args.scenario,
+      applicationId: args.application.id,
+      host,
+      workloads: args.application.workloads,
+      options: {
+        ...args.options,
+        execution: { participantProfile: 'in-process', syncBackend: 'cloud-sync-cf', stateProfile: 'sqlite' },
+      },
+    })
+  })
+
+export const runProcessCloudSyncCfScenario = (args: {
+  scenario: ScenarioAst
+  applicationId: string
+  workloads?: ApplicationWorkloadLibrary
+  cloud: CloudSyncCfScenarioBackendOptions
+  options?: RunScenarioOptions
+}): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
+  Effect.gen(function* () {
+    const backend = yield* makeCloudSyncCfScenarioBackend(args.cloud).pipe(
+      Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer, FetchHttpClient.layer)),
+    )
+    const host = yield* makeProcessHost({ applicationId: args.applicationId, backend })
+    return yield* runScenario({
+      scenario: args.scenario,
+      applicationId: args.applicationId,
+      host,
+      workloads: args.workloads,
+      options: {
+        ...args.options,
+        execution: { participantProfile: 'process', syncBackend: 'cloud-sync-cf', stateProfile: 'sqlite' },
+      },
+    })
+  })
+
+export const runBrowserCloudSyncCfScenario = (args: {
+  scenario: ScenarioAst
+  applicationId: string
+  workloads?: ApplicationWorkloadLibrary
+  cloud: CloudSyncCfScenarioBackendOptions
+  options?: RunScenarioOptions
+}): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
+  Effect.gen(function* () {
+    const backend = yield* makeCloudSyncCfScenarioBackend(args.cloud).pipe(
+      Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer, FetchHttpClient.layer)),
+    )
+    const host = yield* makeBrowserHost({ applicationId: args.applicationId, backend })
+    return yield* runScenario({
+      scenario: args.scenario,
+      applicationId: args.applicationId,
+      host,
+      workloads: args.workloads,
+      options: {
+        ...args.options,
+        execution: { participantProfile: 'browser', syncBackend: 'cloud-sync-cf', stateProfile: 'opfs' },
       },
     })
   })

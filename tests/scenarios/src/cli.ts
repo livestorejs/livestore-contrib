@@ -6,19 +6,24 @@ import { Effect, Schema } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
 import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
+import type { CloudSyncCfScenarioBackendOptions } from './backends.ts'
+import { ensureCloudSyncCf } from './cloud-sync-cf.ts'
 import { getScenarioApplication } from './corpus/applications/registry.ts'
 import { getScenario, scenarioCorpus } from './corpus/scenarios/registry.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
   type RunScenarioOptions,
+  runBrowserCloudSyncCfScenario,
   runBrowserLocalSyncCfScenario,
+  runInProcessCloudSyncCfScenario,
   runInProcessLocalSyncCfScenario,
   runInProcessScenario,
+  runProcessCloudSyncCfScenario,
   runProcessLocalSyncCfScenario,
 } from './runner.ts'
 
 type ParticipantProfile = 'in-process' | 'process' | 'browser'
-type SyncBackend = 'mock' | 'local-sync-cf'
+type SyncBackend = 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
 
 interface CliOptions {
   readonly profile: ParticipantProfile
@@ -27,32 +32,67 @@ interface CliOptions {
   readonly outputPath: string
 }
 
-const runSelectedScenario = (options: CliOptions, runOptions: RunScenarioOptions) => {
+const runSelectedScenario = (
+  options: CliOptions,
+  runOptions: RunScenarioOptions,
+  cloud: CloudSyncCfScenarioBackendOptions | undefined,
+) => {
   const application = getScenarioApplication(options.scenario.applicationId)
   switch (options.profile) {
-    case 'in-process':
-      return options.backend === 'mock'
-        ? runInProcessScenario({ scenario: options.scenario, application, options: runOptions })
-        : runInProcessLocalSyncCfScenario({
+    case 'in-process': {
+      if (options.backend === 'mock') {
+        return runInProcessScenario({ scenario: options.scenario, application, options: runOptions })
+      }
+      if (options.backend === 'local-sync-cf') {
+        return runInProcessLocalSyncCfScenario({
+          scenario: options.scenario,
+          application,
+          options: runOptions,
+        })
+      }
+      return runInProcessCloudSyncCfScenario({
+        scenario: options.scenario,
+        application,
+        cloud: requireCloud(cloud),
+        options: runOptions,
+      })
+    }
+    case 'process':
+      return options.backend === 'local-sync-cf'
+        ? runProcessLocalSyncCfScenario({
             scenario: options.scenario,
-            application,
+            applicationId: application.id,
+            workloads: application.workloads,
             options: runOptions,
           })
-    case 'process':
-      return runProcessLocalSyncCfScenario({
-        scenario: options.scenario,
-        applicationId: application.id,
-        workloads: application.workloads,
-        options: runOptions,
-      })
+        : runProcessCloudSyncCfScenario({
+            scenario: options.scenario,
+            applicationId: application.id,
+            workloads: application.workloads,
+            cloud: requireCloud(cloud),
+            options: runOptions,
+          })
     case 'browser':
-      return runBrowserLocalSyncCfScenario({
-        scenario: options.scenario,
-        applicationId: application.id,
-        workloads: application.workloads,
-        options: runOptions,
-      })
+      return options.backend === 'local-sync-cf'
+        ? runBrowserLocalSyncCfScenario({
+            scenario: options.scenario,
+            applicationId: application.id,
+            workloads: application.workloads,
+            options: runOptions,
+          })
+        : runBrowserCloudSyncCfScenario({
+            scenario: options.scenario,
+            applicationId: application.id,
+            workloads: application.workloads,
+            cloud: requireCloud(cloud),
+            options: runOptions,
+          })
   }
+}
+
+const requireCloud = (cloud: CloudSyncCfScenarioBackendOptions | undefined): CloudSyncCfScenarioBackendOptions => {
+  if (cloud === undefined) throw new Error('Cloud sync-cf backend was not provisioned')
+  return cloud
 }
 
 const parseCliOptions = (args: ReadonlyArray<string>): CliOptions => {
@@ -63,7 +103,7 @@ Options:
   --core-ref <branch|tag|commit>              Run against a dependency-compatible LiveStore Git ref
   --core-path <path>                          Run against an installed local LiveStore worktree
   --profile <in-process|process|browser>       Participant placement (default: in-process)
-  --backend <mock|local-sync-cf>              Sync backend (defaults by profile)
+  --backend <mock|local-sync-cf|cloud-sync-cf> Sync backend (defaults by profile)
   --scenario <scenario-id>                    Scenario (default: offline-writer-recovery)
   --output <path>                             Artifact output path
 
@@ -74,10 +114,10 @@ Scenarios:
 
   const profile = readChoice(args, '--profile', ['in-process', 'process', 'browser'] as const) ?? 'in-process'
   const backend =
-    readChoice(args, '--backend', ['mock', 'local-sync-cf'] as const) ??
+    readChoice(args, '--backend', ['mock', 'local-sync-cf', 'cloud-sync-cf'] as const) ??
     (profile === 'in-process' ? 'mock' : 'local-sync-cf')
-  if (profile !== 'in-process' && backend !== 'local-sync-cf') {
-    throw new Error(`${profile} requires --backend local-sync-cf`)
+  if (profile !== 'in-process' && backend === 'mock') {
+    throw new Error(`${profile} requires a sync-cf backend`)
   }
 
   const scenarioId = readOption(args, '--scenario') ?? 'offline-writer-recovery'
@@ -123,7 +163,16 @@ const program = Effect.gen(function* () {
           }
         : undefined,
   }
-  const artifact = yield* runSelectedScenario(cli, runOptions)
+  const cloud =
+    cli.backend === 'cloud-sync-cf'
+      ? yield* Effect.tryPromise(() =>
+          ensureCloudSyncCf({
+            backendRevision: runOptions.sourceRevision,
+            forceDeploy: process.env.SCENARIO_CLOUD_FORCE_DEPLOY === '1',
+          }),
+        )
+      : undefined
+  const artifact = yield* runSelectedScenario(cli, runOptions, cloud)
   const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(ScenarioRunArtifact))(artifact)
   yield* Effect.tryPromise(async () => {
     await fs.mkdir(path.dirname(cli.outputPath), { recursive: true })

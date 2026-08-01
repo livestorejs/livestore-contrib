@@ -1,4 +1,7 @@
-import { createConnection, createServer, type Server, type Socket } from 'node:net'
+import { createServer, type IncomingMessage, type Server } from 'node:http'
+import { connect as connectTcp, type Socket } from 'node:net'
+import type { Duplex } from 'node:stream'
+import { connect as connectTls } from 'node:tls'
 
 import { UnknownError } from '@livestore/common'
 import { Effect, type Scope } from '@livestore/utils/effect'
@@ -10,9 +13,10 @@ export interface AvailabilityProxy {
 }
 
 /**
- * Places a stable, protocol-agnostic TCP boundary in front of a local backend.
- * Closing the boundary withholds traffic on existing sockets and rejects new
- * connections while leaving the real backend and its persisted state untouched.
+ * Places a stable WebSocket boundary in front of a sync-cf endpoint. The local
+ * side remains plain HTTP while the upstream side can be HTTP or HTTPS. Closing
+ * the boundary withholds traffic on existing sockets and rejects new upgrades
+ * without stopping the Worker or Durable Object.
  */
 export const makeAvailabilityProxy = (
   upstreamUrl: string,
@@ -31,24 +35,52 @@ interface ManagedAvailabilityProxy extends AvailabilityProxy {
 
 const startProxy = async (upstreamUrl: string): Promise<ManagedAvailabilityProxy> => {
   const upstream = new URL(upstreamUrl)
-  const upstreamPort = Number(upstream.port)
-  if (upstream.hostname.length === 0 || Number.isFinite(upstreamPort) === false || upstreamPort <= 0) {
-    throw new Error(`Availability proxy requires an explicit upstream host and port: ${upstreamUrl}`)
+  if (upstream.protocol !== 'http:' && upstream.protocol !== 'https:') {
+    throw new Error(`Availability proxy requires an HTTP(S) upstream: ${upstreamUrl}`)
   }
+  if (upstream.hostname.length === 0) throw new Error(`Availability proxy requires an upstream host: ${upstreamUrl}`)
 
+  const upstreamPort = Number(upstream.port || (upstream.protocol === 'https:' ? 443 : 80))
   let available = true
-  const sockets = new Set<Socket>()
-  const server = createServer((downstream) => {
+  const sockets = new Set<Duplex>()
+  const server = createServer((_request, response) => {
+    response.writeHead(available === true ? 426 : 503).end()
+  })
+
+  server.on('upgrade', (request, downstream, head) => {
     trackSocket(sockets, downstream)
     if (available === false) {
       downstream.destroy()
       return
     }
 
-    const upstreamSocket = createConnection({ host: upstream.hostname, port: upstreamPort })
+    const onConnected = (upstreamSocket: Socket) => {
+      if (available === false) {
+        upstreamSocket.destroy()
+        downstream.destroy()
+        return
+      }
+      upstreamSocket.write(serializeUpgradeRequest(request, upstream))
+      if (head.length > 0) upstreamSocket.write(head)
+      downstream.pipe(upstreamSocket)
+      upstreamSocket.pipe(downstream)
+    }
+
+    let upstreamSocket: Socket
+    if (upstream.protocol === 'https:') {
+      upstreamSocket = connectTls(
+        {
+          host: upstream.hostname,
+          port: upstreamPort,
+          servername: upstream.hostname,
+        },
+        () => onConnected(upstreamSocket),
+      )
+    } else {
+      upstreamSocket = connectTcp({ host: upstream.hostname, port: upstreamPort }, () => onConnected(upstreamSocket))
+    }
+
     trackSocket(sockets, upstreamSocket)
-    downstream.pipe(upstreamSocket)
-    upstreamSocket.pipe(downstream)
     downstream.once('close', () => upstreamSocket.destroy())
     upstreamSocket.once('close', () => downstream.destroy())
   })
@@ -78,7 +110,21 @@ const startProxy = async (upstreamUrl: string): Promise<ManagedAvailabilityProxy
   }
 }
 
-const trackSocket = (sockets: Set<Socket>, socket: Socket): void => {
+const serializeUpgradeRequest = (request: IncomingMessage, upstream: URL): string => {
+  const basePath = upstream.pathname === '/' ? '' : upstream.pathname.replace(/\/$/, '')
+  const requestPath = request.url?.startsWith('/') === true ? request.url : `/${request.url ?? ''}`
+  const lines = [`${request.method ?? 'GET'}${' '}${basePath}${requestPath} HTTP/${request.httpVersion}`]
+
+  for (let index = 0; index < request.rawHeaders.length; index += 2) {
+    const name = request.rawHeaders[index]!
+    if (name.toLowerCase() === 'host') continue
+    lines.push(`${name}: ${request.rawHeaders[index + 1] ?? ''}`)
+  }
+  lines.push(`Host: ${upstream.host}`, '', '')
+  return lines.join('\r\n')
+}
+
+const trackSocket = (sockets: Set<Duplex>, socket: Duplex): void => {
   sockets.add(socket)
   socket.on('error', () => undefined)
   socket.once('close', () => sockets.delete(socket))
@@ -99,7 +145,7 @@ const listen = (server: Server): Promise<void> =>
     server.listen(0, '127.0.0.1')
   })
 
-const closeServer = (server: Server, sockets: Set<Socket>): Promise<void> => {
+const closeServer = (server: Server, sockets: Set<Duplex>): Promise<void> => {
   for (const socket of sockets) socket.destroy()
   return new Promise((resolve, reject) => {
     server.close((cause) => (cause === undefined ? resolve() : reject(cause)))

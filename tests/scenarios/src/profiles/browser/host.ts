@@ -73,13 +73,14 @@ export const makeBrowserHost = (args: {
     }
     if (args.backend.serializedConfig._tag !== 'sync-cf-ws') {
       return yield* Effect.fail(
-        new ScenarioOperationError('capability-unavailable', 'Browser profile currently requires local sync-cf'),
+        new ScenarioOperationError('capability-unavailable', 'Browser profile requires a WebSocket sync-cf backend'),
       )
     }
 
     const server = yield* startFixtureServer({
       backendUrl: args.backend.serializedConfig.url,
       storeIdSuffix: args.backend.serializedConfig.storeIdSuffix,
+      backendPayload: args.backend.serializedConfig.payload,
     })
     const clients = new Map<string, BrowserClientController>()
     const eventRefs = makeEventRefRegistry()
@@ -665,6 +666,7 @@ const inspectPageState = (page: Page, input: Parameters<Window['__scenarioBrowse
 const startFixtureServer = (args: {
   backendUrl: string
   storeIdSuffix: string
+  backendPayload?: Schema.Json
 }): Effect.Effect<{ baseUrl: string; server: ViteDevServer }, ScenarioOperationError, Scope.Scope> =>
   Effect.acquireRelease(
     Effect.tryPromise({
@@ -687,6 +689,8 @@ const startFixtureServer = (args: {
           define: {
             __SCENARIO_SYNC_URL__: jsonStringify(args.backendUrl),
             __SCENARIO_STORE_SUFFIX__: jsonStringify(args.storeIdSuffix),
+            __SCENARIO_SYNC_PAYLOAD__:
+              args.backendPayload === undefined ? 'undefined' : jsonStringify(args.backendPayload),
           },
         })
         await server.listen()

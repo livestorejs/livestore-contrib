@@ -24,6 +24,7 @@ const runtimeDeps = catalog.compose({
       '@storybook/react-vite': '10.5.4',
       storybook: '10.5.4',
       tsx: '^4.20.0',
+      ...catalog.pick('wrangler'),
     },
   },
 })

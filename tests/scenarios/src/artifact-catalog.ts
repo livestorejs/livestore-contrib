@@ -1,7 +1,7 @@
 import type { ParallelOperationStep, ScenarioRunArtifact, ScenarioStep } from './model.ts'
 
 type ParticipantProfile = 'in-process' | 'process' | 'browser'
-type SyncBackend = 'mock' | 'local-sync-cf'
+type SyncBackend = 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
 type SyncFailureId = 'SF-01' | 'SF-02' | 'SF-03' | 'SF-04'
 
 export interface ArtifactCatalogSource {

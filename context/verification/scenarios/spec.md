@@ -43,11 +43,11 @@ delivery order (LSC.VER.SCEN-R03).
 
 The same normalized Scenario and host contract are composed through:
 
-| Profile      | Placement and state                                                                     | Backend baseline                   | Evidence boundary                                                       |
-| ------------ | --------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| `in-process` | Store and host in the runner process; SQLite                                            | controlled mock or local `sync-cf` | direct host boundary, sampled product state and Store shutdown failures |
-| `process`    | isolated Node child process; SQLite                                                     | local `sync-cf`                    | serialized process protocol                                             |
-| `browser`    | persistent Chromium context per Client, page per session; OPFS, SharedWorker, Web Locks | local `sync-cf`                    | serialized page protocol and browser observations                       |
+| Profile      | Placement and state                                                                     | Backend baseline                          | Evidence boundary                                                       |
+| ------------ | --------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| `in-process` | Store and host in the runner process; SQLite                                            | controlled mock, local or cloud `sync-cf` | direct host boundary, sampled product state and Store shutdown failures |
+| `process`    | isolated Node child process; SQLite                                                     | local or cloud `sync-cf`                  | serialized process protocol                                             |
+| `browser`    | persistent Chromium context per Client, page per session; OPFS, SharedWorker, Web Locks | local or cloud `sync-cf`                  | serialized page protocol and browser observations                       |
 
 The improved core `makeMockSyncBackend` broadcasts pushed and advanced Events
 to every ordinary backend connection and seeds/filters each connection's pulls
@@ -57,6 +57,16 @@ performs a non-live pull; it consumes no special shared-connection-signal or
 authoritative-Event-list API. The local `sync-cf` availability fault affects
 only the participant route while the Worker and Durable Object remain running
 (LSC.VER.SCEN-R02).
+
+The opt-in `cloud-sync-cf` realization either attaches to an explicitly
+configured compatible endpoint or idempotently provisions a dedicated Worker
+when Wrangler credentials are present. A TLS-aware Scenario-owned WebSocket
+proxy retains the same availability-fault boundary while the authoritative
+observer connects directly. Managed runs record the deployed backend revision,
+isolate physical Store IDs, authenticate with a locally cached scoped
+credential, and clear per-run Durable Object storage on teardown. Cloud
+selection is explicit and therefore never makes the ordinary verification
+surface mutate an external account.
 
 Every profile participates in `src/profiles/conformance.test.ts` for the capabilities
 it advertises. Process IDs and browser profile directories are scoped resources

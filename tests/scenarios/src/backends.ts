@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
 import { makeMockSyncBackend, SyncBackend, UnknownError } from '@livestore/common'
@@ -35,7 +36,7 @@ export const orderBackendEvents = <TEvent extends { readonly seqNum: number }>(
 
 /** Backend realization owned by the runner, independently of participant placement. */
 export interface ScenarioBackend<TSyncMetadata = Schema.Json> {
-  readonly id: 'mock' | 'local-sync-cf'
+  readonly id: 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
   readonly makeBackend: (
     args: SyncBackend.MakeBackendArgs,
   ) => Effect.Effect<SyncBackend.SyncBackend<TSyncMetadata>, UnknownError, Scope.Scope>
@@ -43,7 +44,12 @@ export interface ScenarioBackend<TSyncMetadata = Schema.Json> {
   readonly setAvailability: (available: boolean) => Effect.Effect<void, UnknownError>
   readonly serializedConfig:
     | { readonly _tag: 'mock' }
-    | { readonly _tag: 'sync-cf-ws'; readonly url: string; readonly storeIdSuffix: string }
+    | {
+        readonly _tag: 'sync-cf-ws'
+        readonly url: string
+        readonly storeIdSuffix: string
+        readonly payload?: Schema.Json
+      }
   readonly componentVersions: Readonly<Record<string, string>>
 }
 
@@ -67,14 +73,21 @@ export const makeConnectivityControlledBackend = <TSyncMetadata>(args: {
 export const makeMockScenarioBackend: Effect.Effect<ScenarioBackend, UnknownError, Scope.Scope> = Effect.gen(
   function* () {
     const backend = yield* makeMockSyncBackend({ startConnected: true })
+    const observer = yield* backend.makeSyncBackend
 
     return {
       id: 'mock',
       makeBackend: () => backend.makeSyncBackend,
       observe: () =>
         Effect.all({
-          connected: SubscriptionRef.get(backend.isConnected),
-          events: backend.events,
+          connected: SubscriptionRef.get(observer.isConnected),
+          events: observer.pull(Option.none()).pipe(
+            Stream.runCollect,
+            Effect.map((items) =>
+              orderBackendEvents([...items].flatMap((item) => item.batch.map(({ eventEncoded }) => eventEncoded))),
+            ),
+            Effect.mapError((cause) => (cause._tag === 'UnknownError' ? cause : new UnknownError({ cause }))),
+          ),
         }),
       setAvailability: (available) => (available === true ? backend.connect : backend.disconnect),
       serializedConfig: { _tag: 'mock' },
@@ -141,3 +154,99 @@ export const makeLocalSyncCfScenarioBackend: Effect.Effect<
     },
   } satisfies ScenarioBackend<SyncMessage.SyncMetadata>
 })
+
+export interface CloudSyncCfScenarioBackendOptions {
+  readonly url: string
+  readonly token: string
+  readonly backendRevision: string
+}
+
+/** Connects the scenario profiles to a deployed sync-cf Worker and real SQLite Durable Object. */
+export const makeCloudSyncCfScenarioBackend = (
+  options: CloudSyncCfScenarioBackendOptions,
+): Effect.Effect<
+  ScenarioBackend<SyncMessage.SyncMetadata>,
+  UnknownError,
+  Scope.Scope | FileSystem.FileSystem | HttpClient.HttpClient
+> =>
+  Effect.gen(function* () {
+    const availabilityProxy = yield* makeAvailabilityProxy(options.url)
+    const storeIdSuffix = `scenario-${randomUUID()}`
+    const physicalStoreId = (storeId: string) => `${storeId}-${storeIdSuffix}`
+    const payload = { _tag: 'scenario-cloud-auth', token: options.token } as const
+    const makeWsBackend = makeWsSync({ url: availabilityProxy.url })
+    const makeObserverBackend = makeWsSync({ url: options.url })
+    const physicalStoreIds = new Set<string>()
+    const makeBackend = (args: SyncBackend.MakeBackendArgs) => {
+      const storeId = physicalStoreId(args.storeId)
+      physicalStoreIds.add(storeId)
+      return makeWsBackend({ ...args, storeId, payload }).pipe(
+        Effect.provide(Layer.mergeAll(FetchHttpClient.layer, KeyValueStore.layerMemory)),
+      )
+    }
+    const observers = new Map<string, SyncBackend.SyncBackend<SyncMessage.SyncMetadata>>()
+
+    const getObserver = (storeId: string) =>
+      Effect.gen(function* () {
+        const existing = observers.get(storeId)
+        if (existing !== undefined) return existing
+        const physicalId = physicalStoreId(storeId)
+        physicalStoreIds.add(physicalId)
+        const observer = yield* makeObserverBackend({
+          storeId: physicalId,
+          clientId: 'scenario-backend-observer',
+          payload,
+        }).pipe(Effect.provide(Layer.mergeAll(FetchHttpClient.layer, KeyValueStore.layerMemory)))
+        yield* observer.connect
+        observers.set(storeId, observer)
+        return observer
+      })
+
+    yield* Effect.addFinalizer(() =>
+      cleanupCloudStores({ ...options, storeIds: [...physicalStoreIds] }).pipe(
+        Effect.catchCause((cause) => Effect.logWarning('Failed to clean cloud scenario stores', cause)),
+      ),
+    )
+
+    return {
+      id: 'cloud-sync-cf',
+      makeBackend,
+      observe: (storeId: string) =>
+        Effect.gen(function* () {
+          const observer = yield* getObserver(storeId)
+          const pages = yield* observer
+            .pull(Option.none(), { live: false })
+            .pipe(Stream.runCollectReadonlyArray, UnknownError.mapToUnknownError)
+          const connected = yield* availabilityProxy.isAvailable
+          return {
+            connected,
+            events: orderBackendEvents(pages.flatMap((page) => page.batch.map(({ eventEncoded }) => eventEncoded))),
+          }
+        }).pipe(UnknownError.mapToUnknownError),
+      setAvailability: (available) => availabilityProxy.setAvailable(available),
+      serializedConfig: { _tag: 'sync-cf-ws', url: availabilityProxy.url, storeIdSuffix, payload },
+      componentVersions: {
+        '@livestore/sync-cf': options.backendRevision,
+        'cloudflare-runtime': 'deployed',
+      },
+    } satisfies ScenarioBackend<SyncMessage.SyncMetadata>
+  })
+
+const cleanupCloudStores = (args: CloudSyncCfScenarioBackendOptions & { readonly storeIds: ReadonlyArray<string> }) =>
+  Effect.tryPromise({
+    try: async () => {
+      if (args.storeIds.length === 0) return
+      const response = await fetch(new URL('/__scenario/cleanup', args.url), {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-scenario-sync-token': args.token,
+        },
+        body: JSON.stringify({ storeIds: args.storeIds }),
+      })
+      if (response.ok === false) {
+        throw new Error(`Cloud scenario cleanup failed (${response.status}): ${await response.text()}`)
+      }
+    },
+    catch: (cause) => new UnknownError({ cause }),
+  })

@@ -60,7 +60,7 @@ export const makeProcessHost = (args: {
   Effect.gen(function* () {
     if (args.backend.serializedConfig._tag !== 'sync-cf-ws') {
       return yield* Effect.fail(
-        new ScenarioOperationError('capability-unavailable', 'Process profile currently requires local sync-cf'),
+        new ScenarioOperationError('capability-unavailable', 'Process profile requires a WebSocket sync-cf backend'),
       )
     }
 

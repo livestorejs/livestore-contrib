@@ -54,7 +54,7 @@ const handle = async (request: ProcessClientRequest): Promise<ProcessClientResul
         throw new Error('Process profile currently supports exactly one session per Client')
       }
       if (request.command.backend._tag !== 'sync-cf-ws') {
-        throw new Error('Process profile currently requires the local sync-cf backend')
+        throw new Error('Process profile requires a WebSocket sync-cf backend')
       }
 
       const application = getScenarioApplication(request.command.applicationId)
@@ -66,7 +66,7 @@ const handle = async (request: ProcessClientRequest): Promise<ProcessClientResul
         makeBackend({
           storeId: `${request.command.storeId}-${request.command.backend.storeIdSuffix}`,
           clientId,
-          payload: undefined,
+          payload: request.command.backend.payload,
         }).pipe(Effect.provide(Layer.mergeAll(FetchHttpClient.layer, KeyValueStore.layerMemory))),
       )
       const backend = makeConnectivityControlledBackend({ clientId, connectivity, underlying })
