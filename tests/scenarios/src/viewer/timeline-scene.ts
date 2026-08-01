@@ -123,6 +123,9 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
   const runtimeFailureIntervals = deriveRuntimeFailureIntervals(trace)
   const playbackMoments = derivePlaybackMoments({ scenario: artifact.scenario, trace })
   const clientsById = new Map(artifact.scenario.topology.clients.map((client) => [client.id, client]))
+  const clientColorsById = new Map(
+    artifact.scenario.topology.clients.map((client, index) => [client.id, clientColor(index)]),
+  )
   const evidenceCaptureIds = new Set(
     playbackMoments.flatMap((moment) => (moment.captureId === null ? [] : [moment.captureId])),
   )
@@ -257,11 +260,15 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
       const x = group.reduce((total, item) => total + item.x, 0) / group.length
       const y = yAt(first.marker.componentKey)
       const eventRef = group.length === 1 ? first.marker.event.eventRef : undefined
+      const originClientId = group.length === 1 ? first.marker.event.origin.clientId : undefined
+      const originColor = originClientId === undefined ? undefined : clientColorsById.get(originClientId)
       const tooltipContent = timelineEventTooltipContent(group.map(({ marker }) => marker.event))
       const commonAttrs = {
-        class: `marker ${markerMode === 'label' ? 'marker-label' : `event-point ${markerMode}`} ${pending} ${selected} ${future}`,
+        class: `marker ${markerMode === 'label' ? 'marker-label' : `event-point ${markerMode}`} ${originColor === undefined ? '' : 'origin-colored'} ${pending} ${selected} ${future}`,
         'data-event-ref': eventRef,
+        'data-origin-client-id': originClientId,
         'data-record-index': recordIndex,
+        color: originColor,
       }
       if (markerMode === 'label') {
         const marker = first.marker

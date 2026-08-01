@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest'
 
 import { derivePlaybackMoments } from '../projection.ts'
 import { decodeArtifactJson } from './artifact-io.ts'
-import { clampTimelineViewport, deriveTimelineScene } from './timeline-scene.ts'
+import { clampTimelineViewport, clientColor, deriveTimelineScene } from './timeline-scene.ts'
 
 const decodeReference = (file: string) => {
   const data = fs.readFileSync(new URL(`../../artifacts/${file}`, import.meta.url))
@@ -55,6 +55,44 @@ describe('deriveTimelineScene', () => {
     expect(scene.main.eventMarkers.length).toBeGreaterThan(0)
     expect(scene.main.eventMarkers.length).toBeLessThan(denseArtifact.trace.length)
     expect(scene.range.densityLayer.length).toBeLessThanOrEqual(160)
+  })
+
+  test('colors individual Events by producer Client and leaves grouped markers neutral', () => {
+    const individualScene = deriveTimelineScene({
+      artifact: offlineArtifact,
+      cursorIndex: offlineArtifact.trace.length - 1,
+      timelineMode: 'flow',
+      timeScaleMode: 'fit',
+      traceVisibility: 'evidence',
+      viewport: { start: 0, end: 1 },
+    })
+    const producerEvent = individualScene.main.eventMarkers.find(
+      (marker) => marker.attrs?.['data-origin-client-id'] !== undefined,
+    )
+    const originClientId = producerEvent?.attrs?.['data-origin-client-id']
+    const originClientIndex = offlineArtifact.scenario.topology.clients.findIndex(
+      (client) => client.id === originClientId,
+    )
+
+    expect(producerEvent?.attrs?.class).toContain('origin-colored')
+    expect(originClientIndex).toBeGreaterThanOrEqual(0)
+    expect(producerEvent?.attrs?.color).toBe(clientColor(originClientIndex))
+
+    const aggregateScene = deriveTimelineScene({
+      artifact: denseArtifact,
+      cursorIndex: denseArtifact.trace.length - 1,
+      timelineMode: 'flow',
+      timeScaleMode: 'fit',
+      traceVisibility: 'evidence',
+      viewport: { start: 0, end: 1 },
+    })
+    const groupedMarker = aggregateScene.main.eventMarkers.find(
+      (marker) => marker.attrs?.['data-event-ref'] === undefined,
+    )
+
+    expect(groupedMarker).toBeDefined()
+    expect(groupedMarker?.attrs?.['data-origin-client-id']).toBeUndefined()
+    expect(groupedMarker?.attrs?.color).toBeUndefined()
   })
 
   test('recomputes semantic detail and keeps an outside cursor only in the overview', () => {

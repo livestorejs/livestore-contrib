@@ -58,10 +58,10 @@
 }
 
 .event-chip {
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--event-origin-color, var(--line-strong));
   border-radius: 2px;
   background: transparent;
-  color: var(--text);
+  color: var(--event-origin-color, var(--text));
   cursor: pointer;
   flex: 0 0 auto;
   font-size: 11px;
@@ -69,9 +69,9 @@
 }
 
 .event-chip.pending {
-  border-color: var(--line-strong);
+  border-color: var(--event-origin-color, var(--line-strong));
   border-style: dashed;
-  color: var(--text);
+  color: var(--event-origin-color, var(--text));
 }
 
 .eventlog-pending-boundary {
@@ -81,8 +81,8 @@
 }
 
 .event-chip.selected {
-  background: var(--text);
-  border-color: var(--text);
+  background: var(--event-origin-color, var(--text));
+  border-color: var(--event-origin-color, var(--text));
   color: var(--background);
 }
 

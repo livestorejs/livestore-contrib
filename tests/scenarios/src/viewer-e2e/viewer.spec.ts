@@ -38,6 +38,25 @@ test('SF-03 keeps workload control traffic out of the sync-evidence geometry', a
   await expect(timeline.locator('.moment-workload')).toContainText('426 actions')
 })
 
+test('Event color follows its producer through rebase and propagation', async ({ page }) => {
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
+  const clientAEvents = page.locator('.event-chip[data-origin-client-id="client-a"]')
+  await expect(clientAEvents).toHaveCount(3)
+
+  const producerColor = await page
+    .getByRole('heading', { name: 'client-a', level: 3 })
+    .evaluate((element) => getComputedStyle(element).color)
+  const eventColors = await clientAEvents.evaluateAll((elements) => [
+    ...new Set(elements.map((element) => getComputedStyle(element).color)),
+  ])
+  expect(eventColors).toEqual([producerColor])
+
+  await expect(page.getByRole('button', { name: 'e2r1', exact: true })).toHaveAttribute(
+    'data-origin-client-id',
+    'client-a',
+  )
+})
+
 test('playback, cursor, and range keyboard controls remain independent', async ({ page }) => {
   await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
   const cursor = page.locator('svg.timeline-main')

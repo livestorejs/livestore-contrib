@@ -212,9 +212,27 @@
   stroke: var(--warn);
 }
 
+.timeline .marker-label.origin-colored rect {
+  stroke: currentcolor;
+}
+
+.timeline .marker-label.origin-colored text {
+  fill: currentcolor;
+}
+
+.timeline .marker-label.origin-colored.pending rect {
+  stroke: currentcolor;
+  stroke-dasharray: 3 2;
+}
+
 .timeline .marker-label.selected rect {
   fill: var(--text);
   stroke: var(--text);
+}
+
+.timeline .marker-label.origin-colored.selected rect {
+  fill: currentcolor;
+  stroke: currentcolor;
 }
 
 .timeline .marker-label.selected text {
@@ -231,6 +249,15 @@
   stroke: var(--warn);
 }
 
+.timeline .event-point.origin-colored circle {
+  stroke: currentcolor;
+}
+
+.timeline .event-point.origin-colored.pending circle {
+  stroke: currentcolor;
+  stroke-dasharray: 2 1.5;
+}
+
 .timeline .event-point.aggregate circle {
   fill: var(--code-background);
 }
@@ -239,6 +266,11 @@
   fill: var(--text);
   stroke: var(--text);
   stroke-width: 2;
+}
+
+.timeline .event-point.origin-colored.selected circle {
+  fill: currentcolor;
+  stroke: currentcolor;
 }
 
 .timeline .event-point text {

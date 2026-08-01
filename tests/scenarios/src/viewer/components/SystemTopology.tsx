@@ -20,10 +20,12 @@ export interface EventLogScrollState {
 
 export const EventChip = ({
   event,
+  originColor,
   selected,
   onSelect,
 }: {
   readonly event: ObservedEvent
+  readonly originColor?: string
   readonly selected: boolean
   readonly onSelect: (eventRef: string) => void
 }) => (
@@ -31,6 +33,8 @@ export const EventChip = ({
     <button
       type="button"
       className={`event-chip ${event.disposition} ${selected === true ? 'selected' : ''}`}
+      data-origin-client-id={event.origin.clientId}
+      style={originColor === undefined ? undefined : ({ '--event-origin-color': originColor } as React.CSSProperties)}
       onClick={() => onSelect(event.eventRef)}
     >
       {displayEventPosition(event)}
@@ -44,6 +48,7 @@ export const EventLog = ({
   label,
   selectedEventRef,
   scrollStates,
+  clientIds,
   onSelectEvent,
 }: {
   readonly eventlogKey: string
@@ -51,6 +56,7 @@ export const EventLog = ({
   readonly label: string
   readonly selectedEventRef?: string
   readonly scrollStates?: Map<string, EventLogScrollState>
+  readonly clientIds?: ReadonlyArray<string>
   readonly onSelectEvent: (eventRef: string) => void
 }) => {
   const ref = useRef<HTMLDivElement>(null)
@@ -93,7 +99,12 @@ export const EventLog = ({
                   />
                 </Tooltip>
               ) : null}
-              <EventChip event={event} selected={event.eventRef === selectedEventRef} onSelect={onSelectEvent} />
+              <EventChip
+                event={event}
+                originColor={eventOriginColor(event, clientIds)}
+                selected={event.eventRef === selectedEventRef}
+                onSelect={onSelectEvent}
+              />
             </span>
           ))}
         </div>
@@ -131,11 +142,13 @@ export const BackendCard = ({
   backend,
   selectedEventRef,
   scrollStates,
+  clientIds,
   onSelectEvent,
 }: {
   readonly backend: ObservedSystemState['backend']
   readonly selectedEventRef?: string
   readonly scrollStates?: Map<string, EventLogScrollState>
+  readonly clientIds?: ReadonlyArray<string>
   readonly onSelectEvent: (eventRef: string) => void
 }) => {
   const status = backend === null ? 'unobserved' : backend.connected === true ? 'online' : 'offline'
@@ -152,6 +165,7 @@ export const BackendCard = ({
         label={backend === null ? 'No backend observation yet' : `Authoritative head ${backend.head}`}
         selectedEventRef={selectedEventRef}
         scrollStates={scrollStates}
+        clientIds={clientIds}
         onSelectEvent={onSelectEvent}
       />
     </article>
@@ -163,12 +177,14 @@ export const ClientCard = ({
   index,
   selectedEventRef,
   scrollStates,
+  clientIds,
   onSelectEvent,
 }: {
   readonly client: ProjectedClient
   readonly index: number
   readonly selectedEventRef?: string
   readonly scrollStates?: Map<string, EventLogScrollState>
+  readonly clientIds?: ReadonlyArray<string>
   readonly onSelectEvent: (eventRef: string) => void
 }) => {
   const [status, tone] = clientStatus(client)
@@ -186,6 +202,7 @@ export const ClientCard = ({
         }
         selectedEventRef={selectedEventRef}
         scrollStates={scrollStates}
+        clientIds={clientIds}
         onSelectEvent={onSelectEvent}
       />
       <div className="role-list">
@@ -217,26 +234,36 @@ export const SystemTopology = ({
   readonly selectedEventRef?: string
   readonly scrollStates?: Map<string, EventLogScrollState>
   readonly onSelectEvent: (eventRef: string) => void
-}) => (
-  <div className="topology">
-    <BackendCard
-      backend={state.backend}
-      selectedEventRef={selectedEventRef}
-      scrollStates={scrollStates}
-      onSelectEvent={onSelectEvent}
-    />
-    {state.clients.map((client, index) => (
-      <ClientCard
-        key={client.clientId}
-        client={client}
-        index={index}
+}) => {
+  const clientIds = state.clients.map((client) => client.clientId)
+  return (
+    <div className="topology">
+      <BackendCard
+        backend={state.backend}
         selectedEventRef={selectedEventRef}
         scrollStates={scrollStates}
+        clientIds={clientIds}
         onSelectEvent={onSelectEvent}
       />
-    ))}
-  </div>
-)
+      {state.clients.map((client, index) => (
+        <ClientCard
+          key={client.clientId}
+          client={client}
+          index={index}
+          selectedEventRef={selectedEventRef}
+          scrollStates={scrollStates}
+          clientIds={clientIds}
+          onSelectEvent={onSelectEvent}
+        />
+      ))}
+    </div>
+  )
+}
+
+const eventOriginColor = (event: ObservedEvent, clientIds: ReadonlyArray<string> | undefined): string | undefined => {
+  const index = clientIds?.indexOf(event.origin.clientId) ?? -1
+  return index < 0 ? undefined : clientColor(index)
+}
 
 const clientStatus = (client: ProjectedClient): readonly [string, StatusTone] => {
   if (client.health === 'failed' || client.health === 'degraded') return [client.health, 'bad']
