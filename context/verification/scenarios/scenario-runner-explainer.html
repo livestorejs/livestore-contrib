@@ -2128,7 +2128,7 @@
                 </div>
                 <div class="architecture-item backend">
                   <strong>backend realization</strong>
-                  <span>controlled mock or local sync-cf</span>
+                  <span>controlled mock · local sync-cf · cloud sync-cf</span>
                 </div>
               </div>
               <div class="architecture-feedback">
@@ -2248,21 +2248,21 @@
               <tr>
                 <td>in-process</td>
                 <td>Real Store + session/leader processors in the controller process</td>
-                <td>Controlled mock<br /><span class="muted">or local sync-cf</span></td>
+                <td>Controlled mock<br /><span class="muted">or local / cloud sync-cf</span></td>
                 <td>In-memory SQLite</td>
                 <td>Dense correctness, stress, controllable boundaries</td>
               </tr>
               <tr>
                 <td>process</td>
                 <td>One isolated Node child process per Client; commands over IPC</td>
-                <td>Local sync-cf</td>
+                <td>Local or cloud sync-cf</td>
                 <td>SQLite in the child</td>
                 <td>Isolation, lifecycle, serialized host boundary</td>
               </tr>
               <tr>
                 <td>browser</td>
                 <td>One persistent context per Client; one page per session</td>
-                <td>Local sync-cf</td>
+                <td>Local or cloud sync-cf</td>
                 <td>OPFS + browser SQLite</td>
                 <td>Web adapter, SharedWorker, Web Locks, persistence</td>
               </tr>
@@ -2279,21 +2279,22 @@
               </p>
             </div>
             <div>
-              <span class="section-label">browser + local backend</span>
-              <h3>Production topology, local infrastructure</h3>
+              <span class="section-label">browser + real sync-cf</span>
+              <h3>Production topology, local or cloud infrastructure</h3>
               <p class="short-copy">
                 The runner stays outside the browser. Each Client receives its own persistent context; pages share the
-                production SharedWorker leader and OPFS, then sync through the production WebSocket client.
+                production SharedWorker leader and OPFS, then sync through the production WebSocket client to local
+                workerd or an explicitly selected Cloudflare Worker.
               </p>
             </div>
           </div>
 
-          <div class="browser-architecture" role="img" aria-label="Browser profile with local sync-cf architecture">
+          <div class="browser-architecture" role="img" aria-label="Browser profile with local or cloud sync-cf architecture">
             <div class="ba-purpose">
               <strong>What this profile tests</strong>
               <span>
                 The scenario runner owns orchestration and browser lifecycle. Inside those controlled containers, real
-                LiveStore browser components sync with the real sync-cf implementation running on local infrastructure.
+                LiveStore browser components sync with the real sync-cf implementation running locally or on Cloudflare.
               </span>
             </div>
             <div class="ba-row">
@@ -2355,11 +2356,11 @@
               </div>
             </div>
             <div class="ba-boundary">
-              <span>production WebSocket protocol to local provider</span>
+              <span>production WebSocket protocol through the Scenario availability boundary</span>
               <b aria-hidden="true">↓</b>
             </div>
             <div class="ba-row">
-              <div class="ba-label">local provider</div>
+              <div class="ba-label">sync provider</div>
               <div class="ba-content" style="--ba-columns: 4">
                 <div class="ba-node">
                   <span class="ownership">scenario test harness</span>
@@ -2367,9 +2368,9 @@
                   <span>isolated physical store · cleanup per run</span>
                 </div>
                 <div class="ba-node local-infra">
-                  <span class="ownership">local infrastructure</span>
-                  <strong>Wrangler / workerd</strong>
-                  <span>local Cloudflare runtime</span>
+                  <span class="ownership">selected infrastructure</span>
+                  <strong>workerd / Cloudflare</strong>
+                  <span>local runtime or account-hosted Worker</span>
                 </div>
                 <div class="ba-node product">
                   <span class="ownership">sync-cf product code</span>
@@ -2379,10 +2380,20 @@
                 <div class="ba-node product">
                   <span class="ownership">sync-cf product code</span>
                   <strong>SQLite Durable Object</strong>
-                  <span>local persistence + reconnection</span>
+                  <span>local or Cloudflare persistence + reconnection</span>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="annotation">
+            <strong>Cloud execution is explicit and reuses the same evidence boundary.</strong>
+            <p>
+              Selecting <code>cloud-sync-cf</code> attaches to a compatible endpoint or deploys a dedicated Worker with
+              maintainer-supplied Wrangler credentials. Participant traffic crosses a local TLS-aware proxy so outage
+              controls remain available; the authoritative observer connects directly. Runs use unique Store IDs and
+              clear their Durable Object storage on teardown. Ordinary local and CI runs never provision Cloudflare.
+            </p>
           </div>
 
         </div>

@@ -27,13 +27,14 @@ choices, and gaps for the private
 - **LSC.VER.SCEN-R02 Three participant profiles with explicit backend
   composition:** The realization provides in-process, isolated Node process,
   and persistent Chromium participant profiles. The in-process profile can use
-  the controlled `makeMockSyncBackend`; process and browser evidence use a
-  local real `sync-cf` Worker and Durable Object behind a Scenario-owned
-  availability proxy. An explicitly selected opt-in realization may deploy or
-  attach to the same `sync-cf` Worker and a real Cloudflare SQLite Durable
-  Object while preserving that participant/observer route separation. Ordinary
-  local and CI checks never provision cloud resources. Each composition
-  advertises only the controls and evidence it actually supplies.
+  the controlled `makeMockSyncBackend`; every compatible profile can use a real
+  `sync-cf` Worker and Durable Object behind a Scenario-owned availability
+  proxy. The baseline runs that provider under local workerd. An explicitly
+  selected opt-in realization may instead deploy or attach to the provider on
+  Cloudflare with a real SQLite Durable Object while preserving that
+  participant/observer route separation. Ordinary local and CI checks never
+  provision cloud resources. Each composition advertises only the controls and
+  evidence it actually supplies.
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
   versioned Scenario ASTs, named actions, seeded Workloads,

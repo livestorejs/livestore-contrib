@@ -32,8 +32,16 @@ proximity or sampled state into stronger evidence than the runner recorded.
 The portable model is shared across in-process, isolated Node process, and
 persistent-browser profiles. Changing profile moves the participant boundary
 without rewriting the Scenario: a fast controlled run can use the mock backend,
-while process and browser runs can exercise a local `sync-cf` Worker, Durable
-Object, OPFS, SharedWorkers, Web Locks, and multi-session leadership.
+while every compatible profile can exercise the real `sync-cf` Worker and
+Durable Object either under local workerd or, when selected explicitly, on
+Cloudflare. Browser runs additionally cross OPFS, SharedWorkers, Web Locks, and
+multi-session leadership.
+
+Both `sync-cf` realizations place participant traffic behind the same
+Scenario-owned availability boundary while the authoritative observer remains
+direct. The cloud realization is opt-in: it attaches to a compatible endpoint
+or uses maintainer-supplied Wrangler credentials to deploy and reuse a dedicated
+Worker. Ordinary local and CI execution never provisions external resources.
 
 Each profile advertises its capabilities before execution. Unsupported
 controls or observations are rejected rather than silently simulated, so a

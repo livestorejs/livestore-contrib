@@ -63,10 +63,12 @@ configured compatible endpoint or idempotently provisions a dedicated Worker
 when Wrangler credentials are present. A TLS-aware Scenario-owned WebSocket
 proxy retains the same availability-fault boundary while the authoritative
 observer connects directly. Managed runs record the deployed backend revision,
-isolate physical Store IDs, authenticate with a locally cached scoped
-credential, and clear per-run Durable Object storage on teardown. Cloud
-selection is explicit and therefore never makes the ordinary verification
-surface mutate an external account.
+isolate physical Store IDs, authenticate sync connections with a generated
+Worker-level token cached in the ignored local Wrangler directory, and clear
+per-run Durable Object storage on teardown. Cloudflare account credentials
+remain environment- or Wrangler-owned and are never persisted by the Scenario
+workspace. Cloud selection is explicit and therefore never makes the ordinary
+verification surface mutate an external account.
 
 Every profile participates in `src/profiles/conformance.test.ts` for the capabilities
 it advertises. Process IDs and browser profile directories are scoped resources
@@ -209,6 +211,8 @@ Playwright parity task. The dedicated required `pr/scenarios` job runs the full
 aggregate with browsers supplied by the pinned Playwright devenv input.
 `tests/scenarios` is included in lint, root workspace, TypeScript references,
 workspace-shape enforcement, and lockfile generation (LSC.VER.SCEN-R07).
+The required aggregate uses only local backend realizations; real Cloudflare
+execution remains an explicit maintainer integration run.
 
 ## Core Integration Dependencies
 
