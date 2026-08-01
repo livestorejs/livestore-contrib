@@ -62,9 +62,12 @@ choices, and gaps for the private
   Storybook state fixtures, and Playwright screenshot/interaction parity. Its
   default sync-evidence projection aggregates Workload child actions and spaces
   material captures plus Scenario boundaries as semantic flow steps; the raw
-  trace remains available without determining that projection's geometry. It
-  never inspects or mutates participants directly; headless execution remains
-  authoritative.
+  trace remains available without determining that projection's geometry.
+  Individual Event presentations use the recorded producer Client's timeline
+  track color across observing components and Event position changes, while
+  aggregated Event markers remain neutral. This encoding does not strengthen
+  sampled correlation into exact Event lineage. The viewer never inspects or
+  mutates participants directly; headless execution remains authoritative.
 - **LSC.VER.SCEN-R07 Explicit local and CI verification surface:** Generated
   workspace and TypeScript composition register `tests/scenarios`; devenv
   provides runner, viewer, Storybook, build, and parity tasks with pinned

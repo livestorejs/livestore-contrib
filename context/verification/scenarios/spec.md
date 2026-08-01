@@ -175,6 +175,16 @@ boundaries as semantic steps. A Workload is one summarized narrative boundary;
 its generated child action instructions and acknowledgements remain available
 in raw-trace navigation without consuming the default flow axis.
 
+An individually rendered Event takes its color from the Client named by the
+Event's recorded `origin.clientId`, using the same palette as that Client's
+timeline tracks. The color therefore follows the recorded producer when the
+Event appears in backend, Leader, or session observations and when its pending,
+confirmed, position, or parent-position facts change. It does not use the
+observing component's color and does not claim that the run-local `eventRef`
+proves identity across samples. Timeline bins containing multiple Events keep
+their existing neutral aggregate styling rather than implying one producer.
+See [decision 0007](./.decisions/0007-color-individual-events-by-recorded-client.md).
+
 Storybook exercises primitives and complete viewer states from the tracked
 references. Playwright verifies interaction semantics and approved desktop
 light, desktop dark, and narrow light screenshots with reduced motion. The
