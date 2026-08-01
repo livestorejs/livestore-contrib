@@ -33,7 +33,7 @@ export default packageJson(
     name: '@local/tests-scenarios',
     ...localPackageDefaults,
     scripts: {
-      'scenario:run': 'tsx src/cli.ts',
+      'scenario:run': 'tsx src/launcher.ts',
       test: 'vitest run',
       'test:watch': 'vitest',
       viewer: 'pnpm exec vite --config scenario-viewer.vite.config.ts',

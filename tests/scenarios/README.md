@@ -21,6 +21,36 @@ pnpm --dir tests/scenarios scenario:run --profile process --scenario shared-todo
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario shared-todo-workday --output artifacts/shared-todo-workday-browser.json
 ```
 
+The default command runs directly against the materialized core source at
+`repos/livestore`. Select another dependency-compatible Git branch, tag, or
+commit without publishing a snapshot:
+
+```sh
+pnpm --dir tests/scenarios scenario:run --core-ref feature/rebase-solution --profile browser
+```
+
+Select an existing local LiveStore checkout or worktree, including its dirty
+and untracked source changes, with a path resolved from the contrib root:
+
+```sh
+pnpm --dir tests/scenarios scenario:run --core-path ../livestore --profile browser
+```
+
+The local worktree must already have its pinned dependencies installed. A Git
+ref reuses the current composed dependency installation and is therefore
+accepted only while the Scenario-relevant core packages have the same runtime
+dependency declarations; when a branch changes those declarations, install it
+as an ordinary LiveStore worktree and use `--core-path` instead.
+
+Core packages expose TypeScript source to the development workspace. The
+launcher selects the source before loading the runner, so implementation-only
+changes need neither a LiveStore build nor an npm snapshot. It serializes the
+temporary `repos/livestore` projection, restores the original materialization
+after success, failure, or an interrupt, and repairs an abandoned projection on
+the next run. Artifacts record the selected core commit plus a content hash when
+the selected working tree is dirty; machine-local paths are printed only to the
+terminal.
+
 `in-process` defaults to the controlled mock backend. `process` and `browser`
 use the local real `sync-cf` Worker and SQLite Durable Object. The browser
 profile launches headless Chromium with one persistent browser context per
@@ -68,6 +98,9 @@ Open the printed URL (normally `http://localhost:5173`) and choose a generated
 artifact from **saved runs**. The
 viewer startup and scenario CLI refresh this local catalog from `artifacts/`;
 the file picker can still open a `.json` or `.json.gz` artifact from elsewhere.
+Saved-run options show the compact LiveStore revision used for each run. Once
+opened, the header shows the full commit and dirty-content identity without
+persisting the selected worktree's local path.
 
 Only the four minimized sync failures carry identifiers: `SF-01` through
 `SF-04`. The ID names the product-level finding and its one canonical viewer

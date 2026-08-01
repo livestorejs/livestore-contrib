@@ -1,6 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-function-as-prop -- File and select handlers are local leaf interactions. */
 import type { ChangeEvent, ReactNode } from 'react'
 
+import { displaySourceRevision } from '../../source-revision.ts'
 import type { ArtifactCatalog } from '../artifact-io.ts'
 
 export const ArtifactPicker = ({
@@ -40,7 +41,8 @@ export const ArtifactPicker = ({
           {catalog?.entries.map((entry) => (
             <option key={entry.file} value={entry.file}>
               {entry.findingId === undefined ? '' : `(${entry.findingId}) `}
-              {entry.label} · {entry.applicationEventCount} events · {entry.traceRecordCount} traces
+              {entry.label} · core {displaySourceRevision(entry.sourceRevision).compact} · {entry.applicationEventCount}{' '}
+              events · {entry.traceRecordCount} traces
               {entry.status === 'failed' ? ' · FAILED' : ''}
             </option>
           ))}
@@ -56,16 +58,19 @@ export const ArtifactPicker = ({
 export const ViewerHeader = ({
   title,
   summary,
+  provenance,
   children,
 }: {
   readonly title: string
   readonly summary: string
+  readonly provenance?: string
   readonly children?: ReactNode
 }) => (
   <header className="toolbar">
     <div className="toolbar-copy">
       <h1>{title}</h1>
       <p className="summary">{summary}</p>
+      {provenance === undefined ? null : <p className="provenance">{provenance}</p>}
     </div>
     {children}
   </header>

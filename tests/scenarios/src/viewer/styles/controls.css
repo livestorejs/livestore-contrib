@@ -36,6 +36,16 @@ h2 {
   margin-top: 6px;
 }
 
+.provenance {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .controls {
   align-items: center;
   display: grid;

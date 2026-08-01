@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import { chromium, type BrowserContext, type Page } from '@playwright/test'
-import { createServer, type ViteDevServer } from 'vite'
+import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
 
 import { EventSequenceNumber } from '@livestore/common/schema'
 import { Effect, Schema, type Scope } from '@livestore/utils/effect'
@@ -672,7 +672,18 @@ const startFixtureServer = (args: {
         const server = await createServer({
           root: path.join(import.meta.dirname, 'fixture'),
           logLevel: 'error',
-          server: { host: '127.0.0.1', port: 0 },
+          server: {
+            host: '127.0.0.1',
+            port: 0,
+            fs: {
+              allow: [
+                searchForWorkspaceRoot(import.meta.dirname),
+                ...(process.env.LIVESTORE_SCENARIO_CORE_PATH === undefined
+                  ? []
+                  : [process.env.LIVESTORE_SCENARIO_CORE_PATH]),
+              ],
+            },
+          },
           define: {
             __SCENARIO_SYNC_URL__: jsonStringify(args.backendUrl),
             __SCENARIO_STORE_SUFFIX__: jsonStringify(args.storeIdSuffix),

@@ -60,6 +60,8 @@ const parseCliOptions = (args: ReadonlyArray<string>): CliOptions => {
     console.log(`Usage: pnpm scenario:run [options]
 
 Options:
+  --core-ref <branch|tag|commit>              Run against a dependency-compatible LiveStore Git ref
+  --core-path <path>                          Run against an installed local LiveStore worktree
   --profile <in-process|process|browser>       Participant placement (default: in-process)
   --backend <mock|local-sync-cf>              Sync backend (defaults by profile)
   --scenario <scenario-id>                    Scenario (default: offline-writer-recovery)
@@ -111,7 +113,7 @@ const cli = parseCliOptions(process.argv.slice(2))
 const program = Effect.gen(function* () {
   const runOptions = {
     runId: `${cli.scenario.id}-${cli.profile}-${Date.now()}`,
-    sourceRevision: process.env.GITHUB_SHA ?? 'working-tree',
+    sourceRevision: process.env.LIVESTORE_SCENARIO_SOURCE_REVISION ?? process.env.GITHUB_SHA ?? 'working-tree',
     onProgress:
       process.env.SCENARIO_PROGRESS === '1'
         ? (progress: Parameters<NonNullable<RunScenarioOptions['onProgress']>>[0]) => {

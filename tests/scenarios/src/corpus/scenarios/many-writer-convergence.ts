@@ -58,7 +58,7 @@ export const manyWriterConvergence = defineScenario({
       id: 'boundary-items-preserved',
       participants: writers,
       inspector: 'todos',
-      expectedIds: ['many-writer-001', `many-writer-${eventCount}`],
+      expectedIds: ['many-writer-001', `many-writer-${String(eventCount).padStart(3, '0')}`],
     },
   ],
 })

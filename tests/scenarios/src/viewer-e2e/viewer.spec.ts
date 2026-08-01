@@ -13,6 +13,9 @@ const viewerUrl = 'http://127.0.0.1:4173'
 
 test('canonical viewer matches the approved failure and interaction baselines', async ({ page }) => {
   await openArtifact(page, viewerUrl, failureArtifact, 'concurrent-hotel-booking')
+  await expect(
+    page.getByLabel('Saved scenario run').locator('option').filter({ hasText: 'core working tree' }).first(),
+  ).toBeAttached()
   await expect(page).toHaveScreenshot('loaded-failure.png', { fullPage: true })
 
   await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
@@ -187,6 +190,7 @@ const openArtifact = async (page: Page, url: string, artifactPath: string, scena
   await page.goto(url)
   await page.locator('input[type=file]').setInputFiles(artifactPath)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(scenarioId)
+  await expect(page.getByText(/^LiveStore source /)).toBeVisible()
   await expect(page.locator('svg.timeline-main')).toBeVisible()
 }
 

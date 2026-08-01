@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import type { ScenarioRunArtifact } from '../model.ts'
 import { projectTraceAt, summarizeTraceRecord } from '../projection.ts'
+import { displaySourceRevision } from '../source-revision.ts'
 import {
   fetchArtifactCatalog,
   fetchArtifactJson,
@@ -63,6 +64,9 @@ export const ScenarioViewerApp = ({ initialArtifact, initialState, hidePicker = 
           (artifact === undefined
             ? 'Load a completed run artifact to begin.'
             : `${artifact.scenario.description} · seed ${artifact.descriptor.seed}`)
+        }
+        provenance={
+          artifact === undefined ? undefined : displaySourceRevision(artifact.descriptor.sourceRevision).detail
         }
       >
         {hidePicker === true ? null : (

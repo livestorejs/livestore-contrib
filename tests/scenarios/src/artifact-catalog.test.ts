@@ -25,12 +25,24 @@ describe('artifact catalog', () => {
     expect(catalog.entries[0]?.findingId).toBeUndefined()
     expect(catalog.entries[0]?.label).toContain('reference')
   })
+
+  it('carries source provenance into the saved-run catalog', () => {
+    const catalog = buildArtifactCatalog([
+      { file: 'run.json.gz', artifact: makeArtifact('offline-writer-recovery'), reference: false },
+    ])
+
+    expect(catalog).toMatchObject({
+      version: 4,
+      entries: [{ sourceRevision: 'livestore@0123456789abcdef0123456789abcdef01234567' }],
+    })
+  })
 })
 
 const makeArtifact = (scenarioId: string) =>
   ({
     descriptor: {
       scenarioId,
+      sourceRevision: 'livestore@0123456789abcdef0123456789abcdef01234567',
       execution: { participantProfile: 'in-process', syncBackend: 'mock' },
     },
     scenario: { topology: { clients: [] }, phases: [] },

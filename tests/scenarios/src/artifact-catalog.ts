@@ -15,6 +15,7 @@ export interface ArtifactCatalogEntry {
   readonly file: string
   readonly label: string
   readonly scenarioId: string
+  readonly sourceRevision: string
   readonly profile: ParticipantProfile
   readonly backend: SyncBackend
   readonly applicationEventCount: number
@@ -31,13 +32,13 @@ const syncFailureIds: Readonly<Partial<Record<string, SyncFailureId>>> = {
 
 export const buildArtifactCatalog = (
   sources: ReadonlyArray<ArtifactCatalogSource>,
-): { readonly version: 3; readonly entries: ReadonlyArray<ArtifactCatalogEntry> } =>
+): { readonly version: 4; readonly entries: ReadonlyArray<ArtifactCatalogEntry> } =>
   buildArtifactCatalogFromEntries(sources.map(makeArtifactCatalogEntry))
 
 export const buildArtifactCatalogFromEntries = (
   entries: ReadonlyArray<ArtifactCatalogEntry>,
-): { readonly version: 3; readonly entries: ReadonlyArray<ArtifactCatalogEntry> } => ({
-  version: 3,
+): { readonly version: 4; readonly entries: ReadonlyArray<ArtifactCatalogEntry> } => ({
+  version: 4,
   entries: entries.toSorted(
     (left, right) =>
       (left.findingId ?? 'ZZ').localeCompare(right.findingId ?? 'ZZ') ||
@@ -58,6 +59,7 @@ export const makeArtifactCatalogEntry = ({
     file,
     label: makeArtifactLabel({ artifact, profile, backend, reference }),
     scenarioId: artifact.descriptor.scenarioId,
+    sourceRevision: artifact.descriptor.sourceRevision,
     profile,
     backend,
     applicationEventCount: artifact.trace.filter((record) => record.payload._tag === 'action.completed').length,
@@ -93,14 +95,14 @@ const makeArtifactLabel = ({
     ...(largestPayloadBytes >= 1_024 ? [`${largestPayloadBytes}-bytes`] : []),
     ...workloadCounts.map((count) => `${count}-workload`),
   ]
-  return [artifact.descriptor.scenarioId, profile, backend, ...dimensions, reference ? 'reference' : undefined]
+  return [artifact.descriptor.scenarioId, profile, backend, ...dimensions, reference === true ? 'reference' : undefined]
     .filter((part): part is string => part !== undefined)
     .join(' · ')
 }
 
 const largestStringLength = (value: unknown): number => {
   if (typeof value === 'string') return value.length
-  if (Array.isArray(value)) return Math.max(0, ...value.map(largestStringLength))
+  if (Array.isArray(value) === true) return Math.max(0, ...value.map(largestStringLength))
   if (value !== null && typeof value === 'object') return Math.max(0, ...Object.values(value).map(largestStringLength))
   return 0
 }
