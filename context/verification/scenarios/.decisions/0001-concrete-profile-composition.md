@@ -5,9 +5,10 @@ Status: accepted (existing `tests/scenarios` profile and conformance evidence,
 
 ## Context
 
-The core contract requires capability-described, production-shaped participant
-hosts without selecting a mechanism. The imported realization already has one
-portable host API and corpus spanning three useful placement boundaries.
+Core requires evidence through actual LiveStore boundaries with explicit claim
+scope, but does not select an execution mechanism. This realization needs one
+portable host API and corpus spanning useful placement boundaries while
+remaining honest about the capabilities and evidence each composition offers.
 
 ## Decision
 

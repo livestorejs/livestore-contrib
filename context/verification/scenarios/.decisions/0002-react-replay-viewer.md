@@ -5,9 +5,9 @@ interaction suite in `tests/scenarios`, 2026-07-29)
 
 ## Context
 
-Core requires truth-preserving visualization over the authoritative trace but
-does not choose a framework. The realization needs a contributor workbench and
-repeatable visual migration evidence alongside the runner.
+The realization needs a truth-preserving contributor workbench over its
+authoritative evidence and repeatable visual migration evidence alongside the
+runner. Core requires neither visualization nor a particular framework.
 
 ## Decision
 

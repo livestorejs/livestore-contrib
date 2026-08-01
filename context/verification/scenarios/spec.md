@@ -1,8 +1,10 @@
 # Scenario Verification Realization — Spec
 
 Specifies the contrib-owned `tests/scenarios` realization. Builds on
-[requirements.md](./requirements.md); portable Scenario semantics remain in the
-[core contract](https://github.com/livestorejs/livestore/blob/main/context/02-system/09-verification/06-scenarios/spec.md).
+[requirements.md](./requirements.md) and realizes core
+[`LS.SYS.VER-R08`](https://github.com/livestorejs/livestore/blob/main/context/02-system/09-verification/requirements.md).
+The Scenario mechanism and terminology specified here are contrib-owned; core
+intentionally prescribes neither.
 
 ## Status
 
@@ -17,6 +19,25 @@ must continue to ignore this workspace. The runner/viewer and all associated
 test-only browser dependencies therefore move together without creating a
 published Scenario product package (LSC.VER.SCEN-R01).
 
+## Scenario and Application Model
+
+Typed TypeScript constructors validate a version-1 serializable Scenario AST.
+It records stable Scenario/Application identity, seed, topology, phases,
+operations, faults, Workloads, Settlement steps, and selected oracles as data.
+Concrete Application definitions wrap the actual `LiveStoreSchema`; named
+actions decode JSON inputs before dispatch, State inspectors encode their
+output as JSON, and named Workloads expand to ordinary application actions.
+The Scenario never redeclares Events or materializers.
+
+The topology separates the backend from stable Client identities and their
+sessions. Initial topology plus ordered Client/session additions defines the
+complete participant set. Lifecycle, connectivity, and backend-availability
+operations retain stable IDs, as do actions generated from a Workload's
+derived seed. Workload expansion and capability derivation happen before the
+first Client is created. A recorded seed reproduces generated inputs and
+requested choices; it does not claim to reproduce internal host or Sync
+delivery order (LSC.VER.SCEN-R03).
+
 ## Execution Profiles
 
 The same normalized Scenario and host contract are composed through:
@@ -27,18 +48,73 @@ The same normalized Scenario and host contract are composed through:
 | `process`    | isolated Node child process; SQLite                                                     | local `sync-cf`                    | serialized process protocol                                             |
 | `browser`    | persistent Chromium context per Client, page per session; OPFS, SharedWorker, Web Locks | local `sync-cf`                    | serialized page protocol and browser observations                       |
 
-The improved core `makeMockSyncBackend` gives each connection an independent
-live Event broadcast, cursor-seeded/filtered pulls, a shared connection signal,
-and an authoritative Event list. The Scenario realization consumes that seam;
-it adds no database-diagnostics product API. The local `sync-cf` availability
-fault affects only the participant route while the Worker and Durable Object
-remain running (LSC.VER.SCEN-R02).
+The improved core `makeMockSyncBackend` broadcasts pushed and advanced Events
+to every ordinary backend connection and seeds/filters each connection's pulls
+from its requested cursor. The Scenario creates one additional normal
+`SyncBackend` connection for observation, reads its standard `isConnected`, and
+performs a non-live pull; it consumes no special shared-connection-signal or
+authoritative-Event-list API. The local `sync-cf` availability fault affects
+only the participant route while the Worker and Durable Object remain running
+(LSC.VER.SCEN-R02).
 
 Every profile participates in `src/profiles/conformance.test.ts` for the capabilities
 it advertises. Process IDs and browser profile directories are scoped resources
 and must be absent after host teardown. Seeded reproduction covers inputs and
 requested choices, not internal delivery order; exact Event lineage is not
 advertised from sampled correlation (LSC.VER.SCEN-R03, R04).
+
+## Evidence Semantics
+
+Trace protocol v3 is the authoritative evidence envelope. Each record has a
+monotonic runner receipt index plus run, participant, phase, operation,
+emitter, and payload identity where applicable. The record's origin and
+evidence semantics distinguish an instruction, host acknowledgement, sampled
+observation, controller event, and oracle verdict. Acknowledgement means that
+the host handled the request at its advertised boundary; it never proves
+backend acceptance, propagation, or the requested product state.
+
+Receipt index, participant-local sequence, logical time, wall time, local
+monotonic time, calibrated elapsed-time interval, correlation, explicit
+`causedBy` edges, and observation-capture membership remain distinct facts.
+Logical time orders runner-owned phases and steps; wall time is retained for
+externally comparable elapsed evidence. Same-process calibrated intervals
+collapse to one controller-clock point, while process/browser readings retain
+the full controller round trip as uncertainty. Timestamp order, correlation,
+and capture membership never create a causal edge or affect LiveStore Sync
+semantics. See [decision 0005](./.decisions/0005-causal-and-calibrated-time.md).
+
+The viewer's cursor reduces the complete receipt-ordered trace prefix, not an
+atomic distributed snapshot. System captures group component-scoped samples
+from one collection pass. Participant hosts and backend observers collect
+actual LiveStore Eventlogs, State, connectivity, and runtime failures rather
+than deriving product state from requested controls. Current `eventRef` values
+are run-local fingerprint/occurrence correlations for navigation; every host
+explicitly withholds the `event-lineage` capability, so positions, equal
+fields, timing, and these correlations cannot prove lineage. See
+[decision 0004](./.decisions/0004-sampled-state-and-event-correlation.md).
+
+Runner-invoked operations keep one stable ID across instruction,
+acknowledgement, related observations, and outcome. Host failure category is
+independent from whether the controller knows a failure is definite or lost a
+response boundary and therefore marks the outcome indefinite. Fault requests,
+acknowledgements, observed injection/removal, Recovery, Quiescence, Settlement,
+and oracle verdicts are separate records. In particular, `fault.removed` is
+emitted only after a later system sample observes restored connectivity or
+availability; removal does not establish Recovery.
+
+A Settlement names its participants, timeout, and any disconnected Clients to
+heal. It rejects other in-flight Scenario operations, records Quiescence, and
+requires two consecutive identical observations in which every selected
+participant is synced, has no pending Events, has reached the backend global
+position, and agrees on that position. This is a bounded convergence barrier,
+not proof of Eventlog contents or State equality. Oracles evaluate separate
+properties from retained evidence; snapshot-based oracles require a terminal
+Settlement covering their participants. Once execution begins, an operation
+or Settlement failure produces a failed artifact containing the available
+trace prefix. Scenario/application/capability/workload preflight can fail
+before a run begins and therefore without an artifact. See
+[decision 0006](./.decisions/0006-operation-settlement-and-property-evidence.md)
+(LSC.VER.SCEN-R04, R05).
 
 ## Corpus, Workloads, and Oracles
 
@@ -65,12 +141,32 @@ Artifacts preserve failed as well as successful runs. Three compressed tracked
 browser references back Storybook and parity coverage while ignored generated
 `.json` runs remain local (LSC.VER.SCEN-R05).
 
+## Core Source Selection
+
+The interactive entrypoint is an outer source launcher: it resolves the
+megarepo materialization, a dependency-compatible Git ref, or an installed
+local LiveStore worktree before spawning the product-importing Scenario CLI.
+Core development exports address TypeScript source, so selection does not imply
+an npm snapshot or `dist` build. Git-ref worktrees reuse the composed install
+only when the Scenario closure's runtime dependency declarations match; a
+dependency-changing or dirty local realization supplies its own installed
+worktree through `--core-path`.
+
+The fixed `repos/livestore` package-link seam is projected under an exclusive,
+recoverable lock and restored on every ordinary exit path. A subsequent run
+repairs a projection abandoned by a dead launcher. Artifact `sourceRevision`
+records the selected core commit and, for a dirty worktree, a hash of tracked
+diffs plus untracked contents; it never records the machine-local source path
+(decision 0003).
+
 ## React Viewer
 
 The React viewer is the canonical artifact consumer per
 [decision 0002](./.decisions/0002-react-replay-viewer.md). Its controller owns
 projection, playback, cursor, selection, viewport, and inspector state;
 event-log scrolling and pointer bookkeeping stay component-local.
+Saved-run choices include a compact LiveStore source revision, while an open
+run shows its full commit and dirty-content identity in one provenance line.
 `deriveTimelineScene()` is DOM-free and feeds layered topology, causal-flow,
 elapsed-time, range, and raw-record projections over the immutable trace.
 The default sync-evidence flow spaces material captures and Scenario
@@ -93,11 +189,18 @@ aggregate with browsers supplied by the pinned Playwright devenv input.
 `tests/scenarios` is included in lint, root workspace, TypeScript references,
 workspace-shape enforcement, and lockfile generation (LSC.VER.SCEN-R07).
 
-## Core Integration Dependency
+## Core Integration Dependencies
 
-The realization must pin an upstream merged core commit containing
-`livestorejs/livestore#1518`, the canonical `LS.SYS.VER.SCEN-R01`…`R21`
-contract, core decision 0003, and the `makeMockSyncBackend` seam. The draft
-fork head is coordination evidence only and is not a durable megarepo pin.
-Effect prerelease overrides must be reconciled against that merged core before
-full workspace and browser validation is claimed.
+The intent relationship depends on
+[`livestorejs/livestore#1534`](https://github.com/livestorejs/livestore/pull/1534)
+and its eventual merged core commit containing `LS.SYS.VER-R08`. Separately,
+the executable mock profile depends on
+[`livestorejs/livestore#1535`](https://github.com/livestorejs/livestore/pull/1535)
+and its eventual merged `makeMockSyncBackend` broadcast/cursor fix. Neither PR
+introduces or registers the contrib Scenario mechanism, and #1535 adds no
+Scenario-specific observation API.
+
+Draft fork heads are coordination evidence only, not durable megarepo pins.
+Contrib must repin to the upstream merge of both dependencies, and Effect
+prerelease overrides must be reconciled against that composed core before full
+workspace and browser validation is claimed.

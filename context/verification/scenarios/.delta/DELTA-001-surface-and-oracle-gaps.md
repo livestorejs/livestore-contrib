@@ -13,6 +13,5 @@ serializable instructions/outcomes, capability derivation, and evidence-aware
 oracles that reject missing prerequisites. Performance verdicts must use
 wall-clock evidence and remain distinct from logical time.
 
-VRS: LSC.VER.SCEN-R03, LSC.VER.SCEN-R05; core
-LS.SYS.VER.SCEN-R04, LS.SYS.VER.SCEN-R14, LS.SYS.VER.SCEN-DQ1,
-LS.SYS.VER.SCEN-DQ3.
+VRS: LSC.VER.SCEN-R03, LSC.VER.SCEN-R05, LSC.VER.SCEN-DQ1,
+LSC.VER.SCEN-DQ3.

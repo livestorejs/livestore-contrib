@@ -12,5 +12,4 @@ an explicit runner control API. Headless execution remains authoritative, live
 controls may use only declared scheduling boundaries, and a captured session
 must remain loadable through the ordinary artifact decoder.
 
-VRS: LSC.VER.SCEN-R06; core LS.SYS.VER.SCEN-R17,
-LS.SYS.VER.SCEN-R20.
+VRS: LSC.VER.SCEN-R06.

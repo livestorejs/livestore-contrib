@@ -68,10 +68,15 @@ live under the parent's directory. IDs are sequential per namespace.
 - Core contracts constrain realizations here; a contrib node states
   deviations explicitly rather than silently diverging.
 - The core registries
-  (`context/02-system/<dimension>/realizations.md`) list every realization;
-  when a node is added here, the corresponding registry row links it.
+  (`context/02-system/<dimension>/realizations.md`) list every product/plugin
+  realization of a registered pluggable dimension; when such a node is added
+  here, the corresponding registry row links it. A contrib-owned verification
+  tool may instead refine a core verification requirement directly when core
+  intentionally defines only the evidence boundary and no realization
+  registry.
 - Conformance suites live in core (`02-system/09-verification/`); a contrib
-  realization's conformance status is tracked in the core registry.
+  product/plugin realization's conformance status is tracked in its core
+  registry.
 
 ## Enforcement
 
