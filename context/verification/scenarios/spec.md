@@ -4,7 +4,8 @@ Specifies the contrib-owned `tests/scenarios` realization. Builds on
 [requirements.md](./requirements.md) and realizes core
 [`LS.SYS.VER-R08`](https://github.com/livestorejs/livestore/blob/main/context/02-system/09-verification/requirements.md).
 The Scenario mechanism and terminology specified here are contrib-owned; core
-intentionally prescribes neither.
+intentionally prescribes neither. A core discovery pointer may name this
+realization and link here without taking ownership of its detailed intent.
 
 ## Status
 
@@ -197,8 +198,10 @@ and its eventual merged core commit containing `LS.SYS.VER-R08`. Separately,
 the executable mock profile depends on
 [`livestorejs/livestore#1535`](https://github.com/livestorejs/livestore/pull/1535)
 and its eventual merged `makeMockSyncBackend` broadcast/cursor fix. Neither PR
-introduces or registers the contrib Scenario mechanism, and #1535 adds no
-Scenario-specific observation API.
+defines the contrib Scenario mechanism. Consistent with core decision 0003,
+#1534 may include a minimal discovery pointer naming the contrib Scenario
+runner/viewer and this intent home; #1535 adds no Scenario-specific observation
+API.
 
 Draft fork heads are coordination evidence only, not durable megarepo pins.
 Contrib must repin to the upstream merge of both dependencies, and Effect

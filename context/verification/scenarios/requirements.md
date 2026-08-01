@@ -9,8 +9,11 @@ hosts, backend profiles, corpus, evidence protocol, artifacts, and React viewer.
 Refines core
 [`LS.SYS.VER-R08`](https://github.com/livestorejs/livestore/blob/main/context/02-system/09-verification/requirements.md),
 which defines the required composed-system evidence boundary without
-prescribing or registering a Scenario mechanism. This node owns the concrete
-model, protocol, terminology, realization choices, and gaps for the private
+prescribing a Scenario mechanism. Core may name this realization through a
+minimal discovery pointer under
+[core decision 0003](https://github.com/livestorejs/livestore/blob/main/context/.decisions/0003-contrib-referencing.md);
+this node still owns the concrete model, protocol, terminology, realization
+choices, and gaps for the private
 [`@local/tests-scenarios`](../../../tests/scenarios) workspace.
 `refines: LS.SYS.VER-R08`
 
