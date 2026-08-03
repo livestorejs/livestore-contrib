@@ -63,7 +63,16 @@ choices, and gaps for the private
 - **LSC.VER.SCEN-R06 React replay viewer with parity evidence:** The canonical
   viewer is a React application over immutable run artifacts, with causal-flow
   and elapsed-time projections, topology, playback, raw record inspection,
-  Storybook state fixtures, and Playwright screenshot/interaction parity. Its
+  reconstructed Client Leader State inspection, Storybook state fixtures, and
+  Playwright screenshot/interaction parity. At a timeline cursor, the viewer
+  may lazily replay the latest recorded Leader Event facts at or before that
+  cursor through the registered Scenario Application schema and its real
+  materializers in an isolated in-memory Store. It labels the result with the
+  source capture and record, exposes generic user-table contents plus sync
+  heads, pending count, and Event count, and represents loading and replay
+  failure explicitly. This is derived reconstruction from one sampled Leader
+  observation, never the Client's actual historical database, a session State,
+  or an atomic distributed snapshot. Its
   default sync-evidence projection aggregates Workload child actions and spaces
   material captures plus Scenario boundaries as semantic flow steps; the raw
   trace remains available without determining that projection's geometry.

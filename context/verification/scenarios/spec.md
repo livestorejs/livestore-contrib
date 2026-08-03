@@ -197,6 +197,28 @@ proves identity across samples. Timeline bins containing multiple Events keep
 their existing neutral aggregate styling rather than implying one producer.
 See [decision 0007](./.decisions/0007-color-individual-events-by-recorded-client.md).
 
+Each observed Client Leader role can open a reconstructed State inspector. For
+the selected Client and cursor, the viewer chooses the latest
+`leader.sync.observed` record at or before the cursor, reports that record and
+its capture as provenance, and lazily replays the observation's retained Event
+facts into an isolated in-memory LiveStore using the artifact's registered
+Scenario Application schema and real materializers. The generic result lists
+user tables and rows and retains the source local/upstream heads, pending
+count, and Event count. Loading and replay/materialization failures remain
+visible instead of falling back to a requested operation or sampled inspector.
+
+This derived result is always described as reconstructed or replayed State. It
+is neither actual captured historical SQLite State nor session State, and it
+does not strengthen a component sample into an atomic distributed snapshot.
+Event order comes from the selected recorded Leader Event list; `eventRef` is
+not used as exact lineage. Work is demand-driven and cached by artifact,
+Client, and source record so timeline playback only changes the eligible source
+and does not boot and materialize a Store every frame. The completed artifact
+and trace remain authoritative. Session reconstruction, provenance across
+historical Application/materializer revisions, and opt-in captured SQLite
+snapshots remain follow-ups. See
+[decision 0009](./.decisions/0009-reconstruct-leader-state-from-recorded-events.md).
+
 Storybook exercises primitives and complete viewer states from the tracked
 references. Playwright verifies interaction semantics and approved desktop
 light, desktop dark, and narrow light screenshots with reduced motion. The

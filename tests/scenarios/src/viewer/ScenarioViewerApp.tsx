@@ -11,6 +11,7 @@ import {
   decodeArtifactJson,
   type ArtifactCatalog,
 } from './artifact-io.ts'
+import { LeaderStateInspector } from './components/LeaderStateInspector.tsx'
 import { PlaybackToolbar } from './components/PlaybackToolbar.tsx'
 import { StatusBadge, type StatusTone } from './components/Primitives.tsx'
 import { ScenarioTimeline } from './components/ScenarioTimeline.tsx'
@@ -94,8 +95,18 @@ export const ScenarioViewerApp = ({ initialArtifact, initialState, hidePicker = 
             selectedEventRef={state.selectedEventRef}
             scrollStates={viewer.eventlogScrollStates}
             onSelectEvent={(eventRef) => dispatch({ type: 'event', eventRef })}
+            onOpenLeaderState={(clientId) => dispatch({ type: 'leader-state', clientId })}
           />
         )}
+        {artifact !== undefined && state.selectedLeaderStateClientId !== undefined ? (
+          <LeaderStateInspector
+            artifact={artifact}
+            clientId={state.selectedLeaderStateClientId}
+            cursorIndex={state.cursorIndex}
+            playing={state.playing}
+            onClose={() => dispatch({ type: 'leader-state', clientId: undefined })}
+          />
+        ) : null}
       </section>
 
       <PlaybackToolbar

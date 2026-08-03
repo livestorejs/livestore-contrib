@@ -56,4 +56,12 @@
     gap: 5px;
     grid-template-columns: 1fr;
   }
+
+  .leader-state-status-summary span:nth-of-type(n + 3) {
+    display: none;
+  }
+
+  .reconstructed-table-toolbar {
+    padding-inline: 10px;
+  }
 }

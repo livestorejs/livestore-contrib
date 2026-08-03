@@ -1,5 +1,7 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gunzipSync } from 'node:zlib'
 
 import { expect, test, type Page } from '@playwright/test'
 
@@ -55,6 +57,84 @@ test('Event color follows its producer through rebase and propagation', async ({
     'data-origin-client-id',
     'client-a',
   )
+})
+
+test('opens reconstructed Client Leader State with source-record provenance', async ({ page }) => {
+  await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
+  await page.getByRole('button', { name: 'open reconstructed State' }).first().click()
+
+  const inspector = page.getByRole('article', { name: /client-a reconstructed Leader State/i })
+  await expect(inspector).toHaveCSS('position', 'fixed')
+  expect(
+    await inspector
+      .locator('.leader-state-status-bar > .badge')
+      .evaluate((element) => element.getBoundingClientRect().width),
+  ).toBeGreaterThan(60)
+  await expect(inspector.getByLabel('Reconstructed table', { exact: true })).toHaveValue('todos')
+  await expect(inspector.getByText('replayed record #104')).toBeVisible()
+  await expect(inspector.getByText(/capture offline-writer-recovery-browser-/)).toBeAttached()
+  await expect(inspector.getByText('2 events')).toBeAttached()
+  await expect(inspector.getByRole('region', { name: 'Reconstructed table todos' })).toBeVisible()
+  await expect(inspector).toContainText('todo-offline')
+  await expect(inspector).not.toContainText('historical')
+
+  const resizeHandle = inspector.getByRole('separator', { name: 'Resize reconstructed State drawer' })
+  const initialHeight = await inspector.evaluate((element) => element.getBoundingClientRect().height)
+  const resizeHandleBounds = await resizeHandle.boundingBox()
+  if (resizeHandleBounds === null) throw new Error('State drawer resize handle has no bounds')
+  await page.mouse.move(
+    resizeHandleBounds.x + resizeHandleBounds.width / 2,
+    resizeHandleBounds.y + resizeHandleBounds.height / 2,
+  )
+  await page.mouse.down()
+  await page.mouse.move(resizeHandleBounds.x + resizeHandleBounds.width / 2, resizeHandleBounds.y + 48, { steps: 4 })
+  await page.mouse.up()
+  await expect
+    .poll(() => inspector.evaluate((element) => element.getBoundingClientRect().height))
+    .toBeGreaterThan(initialHeight)
+
+  await inspector.getByRole('button', { name: 'close' }).click()
+  await expect(inspector).toBeHidden()
+})
+
+test('keeps dense reconstructed table rows scrollable inside the drawer', async ({ page }) => {
+  await openArtifact(page, viewerUrl, denseArtifact, 'shared-todo-workday')
+  await page.getByRole('button', { name: 'open reconstructed State' }).first().click()
+
+  const inspector = page.getByRole('article', { name: /alice-laptop reconstructed Leader State/i })
+  await expect(inspector.getByLabel('Reconstructed table', { exact: true })).toHaveValue('todos')
+  const rows = inspector.getByRole('region', { name: 'Reconstructed table todos' }).locator('tbody tr')
+  expect(await rows.count()).toBeGreaterThan(20)
+  await expect
+    .poll(() =>
+      inspector
+        .locator('.reconstructed-table-scroll')
+        .evaluate((element) => element.scrollHeight > element.clientHeight),
+    )
+    .toBe(true)
+})
+
+test('shows reconstructed Leader materialization failures without partial tables', async ({ page }) => {
+  const malformed = JSON.parse(gunzipSync(fs.readFileSync(offlineArtifact)).toString('utf8'))
+  const sourceRecord = malformed.trace.findLast(
+    (record: { clientId: string | null; payload: { _tag: string } }) =>
+      record.clientId === 'client-a' && record.payload._tag === 'leader.sync.observed',
+  )
+  sourceRecord.payload.observation.events[0].args = { id: 'missing-required-text' }
+
+  await page.goto(viewerUrl)
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'malformed-leader-event.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(malformed)),
+  })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('offline-writer-recovery')
+  await page.getByRole('button', { name: 'open reconstructed State' }).first().click()
+
+  const inspector = page.getByRole('article', { name: /client-a reconstructed Leader State/i })
+  await expect(inspector.getByText(/Materialization failed:/)).toBeVisible()
+  await expect(inspector.getByText('error', { exact: true })).toBeVisible()
+  await expect(inspector.getByRole('region', { name: /Reconstructed table/ })).toHaveCount(0)
 })
 
 test('playback, cursor, and range keyboard controls remain independent', async ({ page }) => {

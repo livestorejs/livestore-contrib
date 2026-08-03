@@ -54,6 +54,20 @@ export const DenseSharedTodoFailure: Story = {
   ),
 }
 
+export const ReconstructedLeaderState: Story = {
+  render: () => (
+    <ReferenceFixture name="reference-offline-writer-recovery-browser-failure.json.gz">
+      {(artifact) => (
+        <ScenarioViewerApp
+          initialArtifact={artifact}
+          initialState={{ selectedLeaderStateClientId: 'client-a' }}
+          hidePicker
+        />
+      )}
+    </ReferenceFixture>
+  ),
+}
+
 export const NarrowViewport: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   render: () => (

@@ -117,10 +117,14 @@ export const SyncRoleRow = ({
   label,
   sync,
   health,
+  actionLabel,
+  onAction,
 }: {
   readonly label: string
   readonly sync: ComponentSyncObservation | null
   readonly health?: 'unknown' | 'healthy' | 'failed'
+  readonly actionLabel?: string
+  readonly onAction?: () => void
 }) => (
   <div className={`role-row ${health === 'failed' ? 'runtime-failed' : ''}`}>
     <strong>{label}</strong>
@@ -135,6 +139,11 @@ export const SyncRoleRow = ({
         </>
       ) : null}
     </span>
+    {actionLabel !== undefined && onAction !== undefined ? (
+      <button type="button" className="text-button" onClick={onAction}>
+        {actionLabel}
+      </button>
+    ) : null}
   </div>
 )
 
@@ -179,6 +188,7 @@ export const ClientCard = ({
   scrollStates,
   clientIds,
   onSelectEvent,
+  onOpenLeaderState,
 }: {
   readonly client: ProjectedClient
   readonly index: number
@@ -186,6 +196,7 @@ export const ClientCard = ({
   readonly scrollStates?: Map<string, EventLogScrollState>
   readonly clientIds?: ReadonlyArray<string>
   readonly onSelectEvent: (eventRef: string) => void
+  readonly onOpenLeaderState?: (clientId: string) => void
 }) => {
   const [status, tone] = clientStatus(client)
   return (
@@ -210,6 +221,14 @@ export const ClientCard = ({
           label="Leader role"
           sync={client.leader}
           health={client.health === 'failed' ? 'failed' : undefined}
+          actionLabel={
+            client.leader === null || onOpenLeaderState === undefined ? undefined : 'open reconstructed State'
+          }
+          onAction={
+            client.leader === null || onOpenLeaderState === undefined
+              ? undefined
+              : () => onOpenLeaderState(client.clientId)
+          }
         />
         {client.sessions.map((session) => (
           <SyncRoleRow
@@ -229,11 +248,13 @@ export const SystemTopology = ({
   selectedEventRef,
   scrollStates,
   onSelectEvent,
+  onOpenLeaderState,
 }: {
   readonly state: ObservedSystemState
   readonly selectedEventRef?: string
   readonly scrollStates?: Map<string, EventLogScrollState>
   readonly onSelectEvent: (eventRef: string) => void
+  readonly onOpenLeaderState?: (clientId: string) => void
 }) => {
   const clientIds = state.clients.map((client) => client.clientId)
   return (
@@ -254,6 +275,7 @@ export const SystemTopology = ({
           scrollStates={scrollStates}
           clientIds={clientIds}
           onSelectEvent={onSelectEvent}
+          onOpenLeaderState={onOpenLeaderState}
         />
       ))}
     </div>

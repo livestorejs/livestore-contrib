@@ -20,6 +20,7 @@ export interface ScenarioViewerState {
   readonly cursorIndex: number
   readonly selectedDetailRecordIndex?: number
   readonly selectedEventRef?: string
+  readonly selectedLeaderStateClientId?: string
   readonly playing: boolean
   readonly timelineMode: TimelineMode
   readonly timeScaleMode: TimeScaleMode
@@ -32,7 +33,13 @@ export interface ScenarioViewerState {
 export type ScenarioViewerInitialState = Partial<
   Pick<
     ScenarioViewerState,
-    'cursorIndex' | 'timelineMode' | 'timeScaleMode' | 'traceVisibility' | 'playbackMode' | 'viewport'
+    | 'cursorIndex'
+    | 'selectedLeaderStateClientId'
+    | 'timelineMode'
+    | 'timeScaleMode'
+    | 'traceVisibility'
+    | 'playbackMode'
+    | 'viewport'
   >
 >
 
@@ -42,6 +49,7 @@ type Action =
   | { readonly type: 'cursor'; readonly cursorIndex: number }
   | { readonly type: 'playback-cursor'; readonly cursorIndex: number }
   | { readonly type: 'event'; readonly eventRef?: string }
+  | { readonly type: 'leader-state'; readonly clientId?: string }
   | { readonly type: 'detail-record'; readonly recordIndex: number }
   | { readonly type: 'playing'; readonly playing: boolean }
   | { readonly type: 'timeline-mode'; readonly mode: TimelineMode }
@@ -151,6 +159,8 @@ const reducer = (state: ScenarioViewerState, action: Action): ScenarioViewerStat
       return { ...state, cursorIndex: action.cursorIndex }
     case 'event':
       return { ...state, selectedEventRef: action.eventRef }
+    case 'leader-state':
+      return { ...state, selectedLeaderStateClientId: action.clientId }
     case 'detail-record':
       return { ...state, selectedDetailRecordIndex: action.recordIndex }
     case 'playing': {
