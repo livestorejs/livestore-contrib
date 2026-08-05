@@ -7,13 +7,13 @@ if (process.execArgv.includes('--inspect') === true) {
 }
 
 import type { ClientSessionLeaderThreadProxy, MakeSqliteDb, SqliteDb, SyncOptions } from '@livestore/common'
-import { Devtools, liveStoreStorageFormatVersion, migrateDb, UnknownError } from '@livestore/common'
+import { Devtools, liveStoreStorageFormatVersion, migrateDb, StateHead, UnknownError } from '@livestore/common'
 import type { DevtoolsOptions, LeaderSqliteDb, LeaderThreadCtx } from '@livestore/common/leader-thread'
 import { configureConnection, makeLeaderThreadLayer } from '@livestore/common/leader-thread'
-import type { LiveStoreSchema } from '@livestore/common/schema'
+import { getStateDbBaseName, type LiveStoreSchema } from '@livestore/common/schema'
 import type { MakeNodeSqliteDb } from '@livestore/sqlite-wasm/node'
-import type { FileSystem, HttpClient, Layer, Schema, Scope } from '@livestore/utils/effect'
-import { Effect } from '@livestore/utils/effect'
+import type { FileSystem, HttpClient, Schema, Scope } from '@livestore/utils/effect'
+import { Effect, Layer } from '@livestore/utils/effect'
 import * as Webmesh from '@livestore/webmesh'
 
 import { makeShutdownChannel } from './shutdown-channel.ts'
@@ -66,9 +66,6 @@ export const makeLeaderThread = ({
   Effect.gen(function* () {
     const services = yield* Effect.context()
 
-    const schemaHashSuffix =
-      schema.state.sqlite.migrations.strategy === 'manual' ? 'fixed' : schema.state.sqlite.hash.toString()
-
     const makeDb = (kind: 'state' | 'eventlog') => {
       if (testing?.makeLeaderThread !== undefined) {
         return testing
@@ -86,7 +83,7 @@ export const makeLeaderThread = ({
               _tag: 'fs',
               directory: path.join(storage.baseDirectory ?? '', storeId),
               fileName:
-                kind === 'state' ? getStateDbFileName(schemaHashSuffix) : `eventlog@${liveStoreStorageFormatVersion}.db`,
+                kind === 'state' ? getStateDbFileName(schema) : `eventlog@${liveStoreStorageFormatVersion}.db`,
               // TODO enable WAL for nodejs
               configureDb: (db) => configureConnection(db, { foreignKeys: true }).pipe(Effect.runSyncWith(services)),
             }),
@@ -118,7 +115,7 @@ export const makeLeaderThread = ({
       shutdownChannel,
       syncPayloadEncoded,
       syncPayloadSchema: syncPayloadSchema as Schema.Decoder<Schema.Json, never> | undefined,
-    })
+    }).pipe(Layer.provide(StateHead.layer({ dbState })))
   }).pipe(
     Effect.tapCauseLogPretty,
     UnknownError.mapToUnknownError,
@@ -127,7 +124,8 @@ export const makeLeaderThread = ({
     }),
   )
 
-const getStateDbFileName = (suffix: string) => `state${suffix}@${liveStoreStorageFormatVersion}.db`
+const getStateDbFileName = (schema: LiveStoreSchema) =>
+  `${getStateDbBaseName(schema)}@${liveStoreStorageFormatVersion}.db`
 
 const makeDevtoolsOptions = ({
   dbState,

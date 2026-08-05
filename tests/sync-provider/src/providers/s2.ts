@@ -27,6 +27,8 @@ export const name = 'S2-Lite'
 
 export const prepare = Effect.void
 
+const jsonStringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+
 export type ProviderSpecific = {
   appendRaw: (storeId: string, bodies: string[]) => Effect.Effect<void>
   failNextAppend: (storeId: string, count: number) => Effect.Effect<void>
@@ -127,7 +129,7 @@ const startS2LiteProxy = Effect.gen(function* () {
     fetch(`${s2LiteApiBase}/basins`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ basin }),
+      body: jsonStringify({ basin }),
     }),
   ).pipe(
     Effect.retry(Schedule.exponentialBackoff10Sec),
