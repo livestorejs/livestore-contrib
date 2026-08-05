@@ -40,11 +40,10 @@ deviation from core LS.SYS.RT-R09 (see
 - **`file`** — `SQLite.openDatabaseSync(databaseName, {}, directory)`
   (`src/make-sqlite-db.ts:51`). Leader state and eventlog databases are files
   (`src/index.ts:251`, `:255`) under a resolved directory
-  `directoryBasePath/subDirectory/storeId`
-  (`src/index.ts:356`, `:358`): the state db is
-  `livestore-{schemaHashSuffix}@{formatVersion}.db` (suffix `fixed` under manual
-  migration, else the schema hash; `src/index.ts:360`, `:362`) and the eventlog
-  db is `livestore-eventlog@{formatVersion}.db` (`src/index.ts:363`).
+  `directoryBasePath/subDirectory/storeId` (`src/index.ts:351`, `:355`): the
+  state db is `livestore-{getStateDbBaseName(schema)}@{formatVersion}.db`, where
+  the core helper keys it by the schema hash (`src/index.ts:357`), and the
+  eventlog db is `livestore-eventlog@{formatVersion}.db` (`src/index.ts:358`).
 - **`in-memory`** — `SQLite.openDatabaseSync(':memory:', { useNewConnection: true })`
   (`src/make-sqlite-db.ts:37`).
 
@@ -84,7 +83,9 @@ The adapter listens on the shutdown channel and routes an
 Boot offers `{ stage: 'loading' }` to the session boot-status queue on start
 (`src/index.ts:141`). The leader thread is built by `makeLeaderThread`
 (`src/index.ts:216`) over `makeLeaderThreadLayer` from
-`@livestore/common/leader-thread` (`src/index.ts:270`); a forked fiber drains the
+`@livestore/common/leader-thread` (`src/index.ts:270`). The adapter supplies
+core's `StateHead` service from the same state database (`src/index.ts:283`); a
+forked fiber drains the
 leader-thread boot-status queue into the session's boot-status queue
 (`src/index.ts:297`), interrupted when the session queue shuts down
 (`src/index.ts:304`). Migrations run inside the leader layer and their

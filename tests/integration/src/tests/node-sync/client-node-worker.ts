@@ -9,6 +9,7 @@ import { OtelLiveHttp } from '@livestore/utils-dev/node'
 import {
   Deferred,
   Effect,
+  Layer,
   OtelTracer,
   pipe,
   ReadonlyArray,
@@ -124,19 +125,30 @@ const makeWorkerRunnerInner = WorkerSchema.WorkerRpcs.toLayer(
   }),
 )
 
+const nodeServicesLayer = PlatformNode.NodeServices.layer
+const workerProtocolLayer = RpcServer.layerProtocolWorkerRunner.pipe(
+  Layer.provideMerge(PlatformNode.NodeWorkerRunner.layer),
+  Layer.provide(nodeServicesLayer),
+)
+const otelLayer = (IS_CI === true ? OtelLiveDummy : OtelLiveHttp({ serviceName, skipLogUrl: true })).pipe(
+  Layer.provide(nodeServicesLayer),
+)
+const workerLayer = makeWorkerRunnerInner.pipe(
+  Layer.provideMerge(workerProtocolLayer),
+  Layer.provideMerge(otelLayer),
+)
+
 RpcServer.make(WorkerSchema.WorkerRpcs).pipe(
-  Effect.provide(makeWorkerRunnerInner),
-  Effect.provide(RpcServer.layerProtocolWorkerRunner),
-  Effect.provide(PlatformNode.NodeWorkerRunner.layer),
   Effect.scoped,
   // TODO this parent span is currently missing in the trace
   Effect.withSpan(`@livestore/adapter-node-sync:run-worker-${clientId}`),
-  Effect.provide(IS_CI === true ? OtelLiveDummy : OtelLiveHttp({ serviceName, skipLogUrl: true })),
   Effect.tapCauseLogPretty,
   Effect.annotateLogs({ thread: serviceName, clientId }),
   Effect.annotateSpans({ clientId }),
-  Effect.provide(makeFileLogger(`worker-${clientId}`)),
-  Effect.provide(PlatformNode.NodeServices.layer),
-  Effect.provideService(References.MinimumLogLevel, 'Debug'),
+  Effect.provide([
+    workerLayer,
+    makeFileLogger(`worker-${clientId}`),
+    Layer.succeed(References.MinimumLogLevel, 'Debug'),
+  ]),
   PlatformNode.NodeRuntime.runMain,
 )

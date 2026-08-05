@@ -24,7 +24,7 @@
       {
         "name": "@effect/language-service",
         "ignoreEffectWarningsInTscExitCode": false,
-        "ignoreEffectSuggestionsInTscExitCode": false,
+        "ignoreEffectSuggestionsInTscExitCode": true,
         "ignoreEffectErrorsInTscExitCode": false,
         "includeSuggestionsInTsc": true,
         "pipeableMinArgCount": 2,

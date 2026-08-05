@@ -32,7 +32,8 @@ LS.SYS.VER.CONF-R03).
 - **LSC.ADAPT.EXPO-R02 Native `expo-sqlite` file persistence:** Leader state and
   eventlog databases are files on the device filesystem via `expo-sqlite`, under
   `directory/subDirectory/storeId`; the client-session database is always
-  in-memory and hydrated from the leader's exported snapshot. Persistence uses
+  in-memory and hydrated from the leader's exported snapshot. The state
+  filename is keyed by the core-computed schema hash. Persistence uses
   `expo-sqlite`'s native SQLite, **not** the portable WASM SQLite build that core
   LS.SYS.RT-R09 names for browser/node/cf — a deviation
   ([.delta/DELTA-002](./.delta/DELTA-002-native-sqlite-substrate.md)).
