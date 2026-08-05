@@ -13,6 +13,7 @@ import { prepareCiScriptsStep } from '../repos/effect-utils/genie/ci-workflow.ts
 import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import {
   applyMegarepoLockStep,
+  baseTsconfigCompilerOptions as coreBaseTsconfigCompilerOptions,
   checkoutStep,
   installNixStep,
   livestorePackageDefaults as coreLivestorePackageDefaults,
@@ -52,6 +53,19 @@ export const packageJson = contribPackageJson
  */
 export const effectDevDeps = (...additionalDeps: Parameters<typeof contribCatalog.pick>) =>
   contribCatalog.pick(...utilsEffectPeerDeps, ...additionalDeps)
+
+/**
+ * Keep Effect warnings and errors gating while the existing suggestion backlog
+ * remains advisory. This is the repository-local transition override supported
+ * by the shared Effect diagnostics policy.
+ */
+export const baseTsconfigCompilerOptions = {
+  ...coreBaseTsconfigCompilerOptions,
+  plugins: coreBaseTsconfigCompilerOptions.plugins.map((plugin) => ({
+    ...plugin,
+    ignoreEffectSuggestionsInTscExitCode: true,
+  })),
+}
 
 export const githubRepositorySettings = <const TSettings extends Record<string, unknown>>(settings: TSettings) =>
   jsonArtifact({ data: settings })
