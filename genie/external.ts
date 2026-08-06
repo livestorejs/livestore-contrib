@@ -39,21 +39,32 @@ const effectUtilsCatalogWithoutEffectV3 = Object.fromEntries(
   ),
 )
 
+/**
+ * Deliberate holds against the shared catalog. Every entry names what clears it, so
+ * moving the pin that clears it is a matter of deleting the listed entries rather than
+ * rediscovering why they exist.
+ *
+ * The `@livestore/*` block below is held by one event — the `livestore` member pin in
+ * `megarepo.lock` moving off `8dc44e65`. The bumped effect-utils catalog is ahead of
+ * that core, and taking its newer versions here does not merely duplicate: it breaks
+ * core's declared peers or its type signatures. Drop all of them together with that bump.
+ */
 const contribCatalogOverrides = {
   /** TODO: Remove once effect-utils upgrades its TypeScript catalog pin. */
   typescript: '6.0.3',
   /**
-   * effect-utils has moved to Vite 8, but the pinned core still peers on Vite 7
-   * (`@livestore/devtools-vite` on `^7.3.1`, `@sveltejs/vite-plugin-svelte@6.2.1`
-   * on `^6.3.0 || ^7.0.0`). Hold the catalog at core's line until the core pin
-   * moves; taking Vite 8 here would break those peers rather than just duplicate.
+   * TODO(core pin): drop when `megarepo.lock` moves `livestore` off `8dc44e65`.
+   * effect-utils has moved to Vite 8; the pinned core still peers on Vite 7
+   * (`@livestore/devtools-vite` on `^7.3.1`, `@sveltejs/vite-plugin-svelte@6.2.1` on
+   * `^6.3.0 || ^7.0.0`), so taking Vite 8 breaks those peers rather than just duplicating.
    */
   vite: '7.3.1',
   /**
-   * Same shape as the Vite hold: effect-utils moved the OTel SDK forward, but core's
-   * tracing helpers are typed against the 2.2.0 family, so taking the newer line here
-   * makes contrib's own spans structurally incompatible with core's signatures
-   * (`InMemorySpanExporter@2.8.0` vs `@2.2.0`). Hold until the core pin moves.
+   * TODO(core pin): drop when `megarepo.lock` moves `livestore` off `8dc44e65`.
+   * effect-utils moved the OTel SDK forward while the pinned core's tracing helpers stay
+   * typed against the 2.2.0 family, so the newer line is not assignable across core's
+   * signatures (`InMemorySpanExporter@2.8.0` vs `@2.2.0` in
+   * `packages/@livestore/solid/src/useClientDocument.client.test.tsx`).
    */
   '@opentelemetry/api': '1.9.0',
   '@opentelemetry/resources': '2.2.0',
