@@ -33,8 +33,7 @@
           "schemaUnionOfLiterals": "warning",
           "anyUnknownInErrorContext": "warning",
           "preferSchemaOverJson": "warning"
-        },
-        "allowedDuplicatedPackages": ["@livestore/utils"]
+        }
       }
     ],
     "noEmit": true,

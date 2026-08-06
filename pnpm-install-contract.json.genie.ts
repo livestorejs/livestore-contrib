@@ -1,7 +1,10 @@
-import { projectionArtifact } from './genie/repo.ts'
 import rootPackageJson from './package.json.genie.ts'
 import rootPnpmWorkspaceYaml from './pnpm-workspace.yaml.genie.ts'
-import { pnpmInstallStorageContractV2 as storage } from './repos/effect-utils/genie/external.ts'
+/** The pinned core does not re-export `projectionArtifact` yet, so source it from effect-utils directly. */
+import {
+  pnpmInstallStorageContractV2 as storage,
+  projectionArtifact,
+} from './repos/effect-utils/genie/external.ts'
 
 /**
  * Root pnpm install contract consumed by effect-utils' shared pnpm task module

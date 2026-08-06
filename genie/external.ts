@@ -39,9 +39,25 @@ const effectUtilsCatalogWithoutEffectV3 = Object.fromEntries(
   ),
 )
 
-/** TODO: Remove once effect-utils upgrades its TypeScript catalog pin. */
 const contribCatalogOverrides = {
+  /** TODO: Remove once effect-utils upgrades its TypeScript catalog pin. */
   typescript: '6.0.3',
+  /**
+   * effect-utils has moved to Vite 8, but the pinned core still peers on Vite 7
+   * (`@livestore/devtools-vite` on `^7.3.1`, `@sveltejs/vite-plugin-svelte@6.2.1`
+   * on `^6.3.0 || ^7.0.0`). Hold the catalog at core's line until the core pin
+   * moves; taking Vite 8 here would break those peers rather than just duplicate.
+   */
+  vite: '7.3.1',
+  /**
+   * Same shape as the Vite hold: effect-utils moved the OTel SDK forward, but core's
+   * tracing helpers are typed against the 2.2.0 family, so taking the newer line here
+   * makes contrib's own spans structurally incompatible with core's signatures
+   * (`InMemorySpanExporter@2.8.0` vs `@2.2.0`). Hold until the core pin moves.
+   */
+  '@opentelemetry/api': '1.9.0',
+  '@opentelemetry/resources': '2.2.0',
+  '@opentelemetry/sdk-trace-base': '2.2.0',
 } as const
 
 export const coreWorkspaceCatalog = Object.fromEntries(

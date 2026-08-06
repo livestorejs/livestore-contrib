@@ -102,23 +102,42 @@ const contribCatalogDuplicateExceptions = [
     issue: '#29',
   })),
 
-  // --- 5. Effect v4 pulls a newer OTel resources/core than the catalog ---------
-  // `@effect/opentelemetry@4.0.0-beta.98` requires `@opentelemetry/resources@2.7.1`
-  // while the shared effect-utils catalog pins the 2.2.0 family, and the rest of the
-  // SDK (sdk-metrics, sdk-trace-base, sdk-trace-node) stays at 2.2.0. An artifact of
-  // contrib deliberately running one Effect beta ahead of core; it resolves when the
-  // catalog's OTel pins catch up to what Effect v4 peers on.
+  // --- 5. Effect v4 pulls a newer OTel core than the catalog -------------------
+  // The catalog still pins `@opentelemetry/core@2.2.0`; `@effect/opentelemetry`
+  // resolves the newer line for itself. An artifact of contrib deliberately running
+  // one Effect beta ahead of core; it resolves when the catalog's OTel pins catch up
+  // to what Effect v4 peers on.
+  {
+    package: '@opentelemetry/core',
+    versions: ['2.8.0', '2.2.0'],
+    reason: '@effect/opentelemetry@4.0.0-beta.98 requires a newer OTel core than the effect-utils catalog pins',
+    issue: '#29',
+  },
+
+  // --- 6. The pinned core lags the bumped effect-utils catalog -----------------
+  // These duplicates are the effect-utils bump itself: the newer catalog moved OTel,
+  // `@types/node` and Vite forward while `megarepo.lock` still pins
+  // `livestore@8dc44e65`, whose own catalog holds the older line. The older side is
+  // core's, not a stale contrib pin, so it is not ours to bump in isolation — each
+  // entry expires when the core pin moves.
+  //
+  // `vite` is the inverse of the others: contrib holds the *catalog* at core's Vite 7
+  // (see `contribCatalogOverrides`) because core's `@livestore/devtools-vite` peers on
+  // `^7.3.1`, while `vitest@4.1.9` still resolves Vite 8 for its own use.
   ...[
-    { package: '@opentelemetry/core', versions: ['2.7.1', '2.2.0'] },
-    { package: '@opentelemetry/resources', versions: ['2.7.1', '2.2.0'] },
+    { package: '@opentelemetry/api', versions: ['1.9.1', '1.9.0'] },
+    { package: '@opentelemetry/resources', versions: ['2.8.0', '2.2.0'] },
+    { package: '@opentelemetry/sdk-trace-base', versions: ['2.8.0', '2.2.0'] },
+    { package: '@types/node', versions: ['26.0.0', '25.3.3'] },
+    { package: 'vite', versions: ['8.0.16', '7.3.1'] },
   ].map((entry) => ({
     ...entry,
     reason:
-      '@effect/opentelemetry@4.0.0-beta.98 requires the 2.7.x line while the effect-utils catalog still pins the 2.2.0 OTel family',
+      'the megarepo-pinned core (livestore@8dc44e65) holds the older line while the bumped effect-utils catalog moved ahead',
     issue: '#29',
   })),
 
-  // --- 6. A published @livestore/utils resolves beside the workspace one --------
+  // --- 7. A published @livestore/utils resolves beside the workspace one --------
   {
     package: '@livestore/utils',
     versions: ['0.4.0', '0.4.0-dev.25'],

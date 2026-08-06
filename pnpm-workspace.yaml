@@ -53,7 +53,7 @@ overrides:
   '@effect/vitest': 4.0.0-beta.98
 
 allowBuilds:
-  '@parcel/watcher': true
+  '@parcel/watcher': false
   '@myobie/pty': false
   esbuild: false
   fsevents: false
@@ -81,7 +81,11 @@ strictPeerDependencies: false
 
 injectWorkspacePackages: false
 
-packageImportMethod: auto
+enableGlobalVirtualStore: true
+
+storeDir: .devenv/pnpm-store-pure-v1
+
+packageImportMethod: clone-or-copy
 
 optimisticRepeatInstall: false
 
