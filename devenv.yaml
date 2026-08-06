@@ -5,6 +5,7 @@ inputs:
   nixpkgs:
     follows: effect-utils/nixpkgs
   effect-utils:
-    # Pinned to the revision megarepo.lock records; mr:lock-sync-check requires
-    # every Nix lock revision of a megarepo member to match it.
-    url: github:overengineeringstudio/effect-utils/165e63eefb6ccb3e70bddc6d0ba0272be25976fe
+    # Tracks `main` (the default-ref policy first-party inputs must follow); the
+    # concrete revision stays frozen in devenv.lock and must match the one
+    # megarepo.lock records — mr:lock-sync-check compares them.
+    url: github:overengineeringstudio/effect-utils/main
