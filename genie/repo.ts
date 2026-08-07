@@ -8,21 +8,23 @@
  * `../../../genie/repo.ts`.
  */
 
-/** Core consumes this step but does not re-export it, so source it from effect-utils directly. */
-import { prepareCiScriptsStep } from '../repos/effect-utils/genie/ci-workflow.ts'
+/** CI setup atoms must come from contrib's pinned effect-utils member as one coherent version. */
+import {
+  checkoutStep,
+  installNixStep,
+  pnpmStateSetupStep,
+  prepareCiScriptsStep,
+  preparePinnedDevenvStep,
+  restorePnpmStateStep,
+  validateNixStoreStep,
+} from '../repos/effect-utils/genie/ci-workflow.ts'
 import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import {
   applyMegarepoLockStep as coreApplyMegarepoLockStep,
   baseTsconfigCompilerOptions as coreBaseTsconfigCompilerOptions,
-  checkoutStep,
-  installNixStep,
   livestorePackageDefaults as coreLivestorePackageDefaults,
-  pnpmStateSetupStep,
-  preparePinnedDevenvStep,
-  restorePnpmStateStep,
   type PnpmPackageClosureConfig,
   utilsEffectPeerDeps,
-  validateNixStoreStep,
   type WorkspaceIdentity,
 } from '../repos/livestore/genie/repo.ts'
 import { catalog as contribCatalog, packageJson as contribPackageJson } from './external.ts'
