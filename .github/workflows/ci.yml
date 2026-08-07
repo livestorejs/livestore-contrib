@@ -49,6 +49,7 @@ jobs:
           DEFAULT_REFS_JSON: '{}'
           VERIFY_REACHABLE: '1'
           NORMALIZE_GIT_BRANCH_REFS: '1'
+          ALLOW_LEGACY_MEMBER_COMMIT_REFS: '0'
         run: |
           nix shell nixpkgs#nodejs_24 -c node <<'NODE'
           const fs = require('node:fs')
@@ -61,6 +62,7 @@ jobs:
           const defaultRef = process.env.DEFAULT_REF || 'main'
           const defaultRefs = new Map(Object.entries(JSON.parse(process.env.DEFAULT_REFS_JSON || '{}')).map(([repo, ref]) => [repo.toLowerCase(), ref]))
           const verifyReachable = process.env.VERIFY_REACHABLE === '1'
+          const allowLegacyMemberCommitRefs = process.env.ALLOW_LEGACY_MEMBER_COMMIT_REFS === '1'
           const violations = []
 
           const repoKey = (repo) => repo.owner.toLowerCase() + '/' + repo.repo.toLowerCase()
@@ -68,6 +70,12 @@ jobs:
           const normalizeGitBranchRefs = process.env.NORMALIZE_GIT_BRANCH_REFS === '1'
           const normalizeRef = (ref) => normalizeGitBranchRefs && ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : ref
           const expectedRefFor = (repo) => normalizeRef(defaultRefs.get(repoKey(repo)) || defaultRef)
+          const immutableCommitRef = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i
+          const isAllowedLegacyMemberRef = ({ memberName, ref }) =>
+            allowLegacyMemberCommitRefs &&
+            typeof memberName === 'string' &&
+            memberName.endsWith('-legacy') &&
+            immutableCommitRef.test(ref)
 
           const githubRepoFromUrl = (url) => {
             const match = url.match(/github\.com[/:]([^/]+)\/([^/#?]+?)(?:\.git)?(?:[#?].*)?$/)
@@ -122,6 +130,7 @@ jobs:
             const expectedRef = expectedRefFor(repo)
             const normalizedRef = normalizeRef(ref)
             if (normalizedRef === expectedRef) return
+            if (isAllowedLegacyMemberRef({ memberName, ref: normalizedRef })) return
             violations.push({
               type: 'ref',
               file,
@@ -347,6 +356,12 @@ jobs:
             for (const [memberName, member] of Object.entries((lock && lock.members) || {})) {
               const repo = typeof member.url === 'string' ? githubRepoFromUrl(member.url) : undefined
               if (!repo || !isFirstParty(repo)) continue
+              if (
+                typeof member.ref === 'string' &&
+                isAllowedLegacyMemberRef({ memberName, ref: normalizeRef(member.ref) })
+              ) {
+                continue
+              }
               const expectedRef = expectedRefFor(repo)
               const remote = 'https://github.com/' + repo.owner + '/' + repo.repo + '.git'
               const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'default-ref-policy-'))
@@ -437,7 +452,7 @@ jobs:
             printf 'MEGAREPO_STORE=%s\n' "$MEGAREPO_STORE" >> "$GITHUB_ENV"
           fi
 
-          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
+          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all --worktree-mode commit --lock-sync off
         shell: bash
       - name: Use pinned devenv from lock
         run: |
@@ -452,8 +467,8 @@ jobs:
       - name: Isolate pnpm state
         shell: bash
         run: |
-          echo "PNPM_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
-          echo "PNPM_CONFIG_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
+          echo "PNPM_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
+          echo "PNPM_CONFIG_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
           echo "PNPM_HOME=${{ github.workspace }}/.pnpm-home" >> "$GITHUB_ENV"
       - id: restore-pnpm-state
         name: Restore pnpm state
@@ -461,8 +476,8 @@ jobs:
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev devenv.lock)
@@ -471,15 +486,7 @@ jobs:
             exit 1
           fi
 
-          resolve_devenv() {
-            nix build \
-              --accept-flake-config \
-              --option extra-substituters https://devenv.cachix.org \
-              --option extra-trusted-public-keys devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw= \
-              --no-link \
-              --print-out-paths \
-              "github:cachix/devenv/$DEVENV_REV#devenv"
-          }
+          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -517,21 +524,30 @@ jobs:
             DEVENV_BIN="$DEVENV_OUT/bin/devenv"
           fi
 
+          # resolve_devenv_once uses this out-link directly, so Nix registers the GC
+          # root before a successful build returns. RUNNER_TEMP cleanup removes it after
+          # the job; the run/attempt/job namespace prevents cross-job replacement.
+          if [ ! -L "$DEVENV_GC_ROOT" ] || [ ! "$DEVENV_GC_ROOT" -ef "$DEVENV_OUT" ]; then
+            echo "::error::devenv resolution did not publish the expected job-scoped GC root: $DEVENV_GC_ROOT"
+            exit 1
+          fi
+          echo "DEVENV_GC_ROOT=$DEVENV_GC_ROOT" >> "$GITHUB_ENV"
+
           echo "DEVENV_BIN=$DEVENV_BIN" >> "$GITHUB_ENV"
           "$DEVENV_BIN" version | tee "$DIAG_ROOT/devenv-version.txt"
         shell: bash
       - name: Run quality checks
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
-          bash "$__genie_ci_retry_script" 'devenv tasks run ci:quality' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:quality'
+          bash "$__genie_ci_retry_script" 'devenv tasks run ci:quality' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:quality'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Upload Nix diagnostics artifact
         if: failure() && env.NIX_STORE_DIAGNOSTICS_DIR != ''
         uses: actions/upload-artifact@v4
@@ -589,7 +605,7 @@ jobs:
             printf 'MEGAREPO_STORE=%s\n' "$MEGAREPO_STORE" >> "$GITHUB_ENV"
           fi
 
-          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
+          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all --worktree-mode commit --lock-sync off
         shell: bash
       - name: Use pinned devenv from lock
         run: |
@@ -604,8 +620,8 @@ jobs:
       - name: Isolate pnpm state
         shell: bash
         run: |
-          echo "PNPM_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
-          echo "PNPM_CONFIG_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
+          echo "PNPM_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
+          echo "PNPM_CONFIG_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
           echo "PNPM_HOME=${{ github.workspace }}/.pnpm-home" >> "$GITHUB_ENV"
       - id: restore-pnpm-state
         name: Restore pnpm state
@@ -613,8 +629,8 @@ jobs:
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev devenv.lock)
@@ -623,15 +639,7 @@ jobs:
             exit 1
           fi
 
-          resolve_devenv() {
-            nix build \
-              --accept-flake-config \
-              --option extra-substituters https://devenv.cachix.org \
-              --option extra-trusted-public-keys devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw= \
-              --no-link \
-              --print-out-paths \
-              "github:cachix/devenv/$DEVENV_REV#devenv"
-          }
+          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -669,21 +677,30 @@ jobs:
             DEVENV_BIN="$DEVENV_OUT/bin/devenv"
           fi
 
+          # resolve_devenv_once uses this out-link directly, so Nix registers the GC
+          # root before a successful build returns. RUNNER_TEMP cleanup removes it after
+          # the job; the run/attempt/job namespace prevents cross-job replacement.
+          if [ ! -L "$DEVENV_GC_ROOT" ] || [ ! "$DEVENV_GC_ROOT" -ef "$DEVENV_OUT" ]; then
+            echo "::error::devenv resolution did not publish the expected job-scoped GC root: $DEVENV_GC_ROOT"
+            exit 1
+          fi
+          echo "DEVENV_GC_ROOT=$DEVENV_GC_ROOT" >> "$GITHUB_ENV"
+
           echo "DEVENV_BIN=$DEVENV_BIN" >> "$GITHUB_ENV"
           "$DEVENV_BIN" version | tee "$DIAG_ROOT/devenv-version.txt"
         shell: bash
       - name: Run type checks
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
-          bash "$__genie_ci_retry_script" 'devenv tasks run ci:types' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:types'
+          bash "$__genie_ci_retry_script" 'devenv tasks run ci:types' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:types'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Upload Nix diagnostics artifact
         if: failure() && env.NIX_STORE_DIAGNOSTICS_DIR != ''
         uses: actions/upload-artifact@v4
@@ -741,7 +758,7 @@ jobs:
             printf 'MEGAREPO_STORE=%s\n' "$MEGAREPO_STORE" >> "$GITHUB_ENV"
           fi
 
-          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
+          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all --worktree-mode commit --lock-sync off
         shell: bash
       - name: Use pinned devenv from lock
         run: |
@@ -756,8 +773,8 @@ jobs:
       - name: Isolate pnpm state
         shell: bash
         run: |
-          echo "PNPM_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
-          echo "PNPM_CONFIG_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
+          echo "PNPM_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
+          echo "PNPM_CONFIG_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
           echo "PNPM_HOME=${{ github.workspace }}/.pnpm-home" >> "$GITHUB_ENV"
       - id: restore-pnpm-state
         name: Restore pnpm state
@@ -765,8 +782,8 @@ jobs:
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev devenv.lock)
@@ -775,15 +792,7 @@ jobs:
             exit 1
           fi
 
-          resolve_devenv() {
-            nix build \
-              --accept-flake-config \
-              --option extra-substituters https://devenv.cachix.org \
-              --option extra-trusted-public-keys devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw= \
-              --no-link \
-              --print-out-paths \
-              "github:cachix/devenv/$DEVENV_REV#devenv"
-          }
+          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -821,21 +830,30 @@ jobs:
             DEVENV_BIN="$DEVENV_OUT/bin/devenv"
           fi
 
+          # resolve_devenv_once uses this out-link directly, so Nix registers the GC
+          # root before a successful build returns. RUNNER_TEMP cleanup removes it after
+          # the job; the run/attempt/job namespace prevents cross-job replacement.
+          if [ ! -L "$DEVENV_GC_ROOT" ] || [ ! "$DEVENV_GC_ROOT" -ef "$DEVENV_OUT" ]; then
+            echo "::error::devenv resolution did not publish the expected job-scoped GC root: $DEVENV_GC_ROOT"
+            exit 1
+          fi
+          echo "DEVENV_GC_ROOT=$DEVENV_GC_ROOT" >> "$GITHUB_ENV"
+
           echo "DEVENV_BIN=$DEVENV_BIN" >> "$GITHUB_ENV"
           "$DEVENV_BIN" version | tee "$DIAG_ROOT/devenv-version.txt"
         shell: bash
       - name: Run package unit tests
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
-          bash "$__genie_ci_retry_script" 'devenv tasks run ci:packages' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:packages'
+          bash "$__genie_ci_retry_script" 'devenv tasks run ci:packages' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:packages'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Upload Nix diagnostics artifact
         if: failure() && env.NIX_STORE_DIAGNOSTICS_DIR != ''
         uses: actions/upload-artifact@v4
@@ -893,7 +911,7 @@ jobs:
             printf 'MEGAREPO_STORE=%s\n' "$MEGAREPO_STORE" >> "$GITHUB_ENV"
           fi
 
-          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
+          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all --worktree-mode commit --lock-sync off
         shell: bash
       - name: Use pinned devenv from lock
         run: |
@@ -908,8 +926,8 @@ jobs:
       - name: Isolate pnpm state
         shell: bash
         run: |
-          echo "PNPM_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
-          echo "PNPM_CONFIG_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
+          echo "PNPM_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
+          echo "PNPM_CONFIG_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
           echo "PNPM_HOME=${{ github.workspace }}/.pnpm-home" >> "$GITHUB_ENV"
       - id: restore-pnpm-state
         name: Restore pnpm state
@@ -917,8 +935,8 @@ jobs:
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev devenv.lock)
@@ -927,15 +945,7 @@ jobs:
             exit 1
           fi
 
-          resolve_devenv() {
-            nix build \
-              --accept-flake-config \
-              --option extra-substituters https://devenv.cachix.org \
-              --option extra-trusted-public-keys devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw= \
-              --no-link \
-              --print-out-paths \
-              "github:cachix/devenv/$DEVENV_REV#devenv"
-          }
+          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -973,21 +983,30 @@ jobs:
             DEVENV_BIN="$DEVENV_OUT/bin/devenv"
           fi
 
+          # resolve_devenv_once uses this out-link directly, so Nix registers the GC
+          # root before a successful build returns. RUNNER_TEMP cleanup removes it after
+          # the job; the run/attempt/job namespace prevents cross-job replacement.
+          if [ ! -L "$DEVENV_GC_ROOT" ] || [ ! "$DEVENV_GC_ROOT" -ef "$DEVENV_OUT" ]; then
+            echo "::error::devenv resolution did not publish the expected job-scoped GC root: $DEVENV_GC_ROOT"
+            exit 1
+          fi
+          echo "DEVENV_GC_ROOT=$DEVENV_GC_ROOT" >> "$GITHUB_ENV"
+
           echo "DEVENV_BIN=$DEVENV_BIN" >> "$GITHUB_ENV"
           "$DEVENV_BIN" version | tee "$DIAG_ROOT/devenv-version.txt"
         shell: bash
       - name: Build contrib examples
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
-          bash "$__genie_ci_retry_script" 'devenv tasks run ci:examples-build' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:examples-build'
+          bash "$__genie_ci_retry_script" 'devenv tasks run ci:examples-build' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:examples-build'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Upload Nix diagnostics artifact
         if: failure() && env.NIX_STORE_DIAGNOSTICS_DIR != ''
         uses: actions/upload-artifact@v4
@@ -1045,7 +1064,7 @@ jobs:
             printf 'MEGAREPO_STORE=%s\n' "$MEGAREPO_STORE" >> "$GITHUB_ENV"
           fi
 
-          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
+          nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all --worktree-mode commit --lock-sync off
         shell: bash
       - name: Use pinned devenv from lock
         run: |
@@ -1060,8 +1079,8 @@ jobs:
       - name: Isolate pnpm state
         shell: bash
         run: |
-          echo "PNPM_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
-          echo "PNPM_CONFIG_STORE_DIR=${{ runner.temp }}/pnpm-store/${{ github.job }}" >> "$GITHUB_ENV"
+          echo "PNPM_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
+          echo "PNPM_CONFIG_STORE_DIR=${{ github.workspace }}/.pnpm-store" >> "$GITHUB_ENV"
           echo "PNPM_HOME=${{ github.workspace }}/.pnpm-home" >> "$GITHUB_ENV"
       - id: restore-pnpm-state
         name: Restore pnpm state
@@ -1069,8 +1088,8 @@ jobs:
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev devenv.lock)
@@ -1079,15 +1098,7 @@ jobs:
             exit 1
           fi
 
-          resolve_devenv() {
-            nix build \
-              --accept-flake-config \
-              --option extra-substituters https://devenv.cachix.org \
-              --option extra-trusted-public-keys devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw= \
-              --no-link \
-              --print-out-paths \
-              "github:cachix/devenv/$DEVENV_REV#devenv"
-          }
+          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -1125,21 +1136,30 @@ jobs:
             DEVENV_BIN="$DEVENV_OUT/bin/devenv"
           fi
 
+          # resolve_devenv_once uses this out-link directly, so Nix registers the GC
+          # root before a successful build returns. RUNNER_TEMP cleanup removes it after
+          # the job; the run/attempt/job namespace prevents cross-job replacement.
+          if [ ! -L "$DEVENV_GC_ROOT" ] || [ ! "$DEVENV_GC_ROOT" -ef "$DEVENV_OUT" ]; then
+            echo "::error::devenv resolution did not publish the expected job-scoped GC root: $DEVENV_GC_ROOT"
+            exit 1
+          fi
+          echo "DEVENV_GC_ROOT=$DEVENV_GC_ROOT" >> "$GITHUB_ENV"
+
           echo "DEVENV_BIN=$DEVENV_BIN" >> "$GITHUB_ENV"
           "$DEVENV_BIN" version | tee "$DIAG_ROOT/devenv-version.txt"
         shell: bash
       - name: Run node integration coverage
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
-          bash "$__genie_ci_retry_script" 'devenv tasks run ci:node' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ runner.temp }}/pnpm-store/${{ github.job }}}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:node'
+          bash "$__genie_ci_retry_script" 'devenv tasks run ci:node' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:node'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
             ${{ github.workspace }}/.pnpm-home
-            ${{ runner.temp }}/pnpm-store/${{ github.job }}
-          key: "livestore-contrib-pnpm-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
+            ${{ github.workspace }}/.pnpm-store
+          key: "livestore-contrib-pnpm-state-v1-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Upload Nix diagnostics artifact
         if: failure() && env.NIX_STORE_DIAGNOSTICS_DIR != ''
         uses: actions/upload-artifact@v4

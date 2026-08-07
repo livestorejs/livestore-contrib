@@ -12,7 +12,7 @@
 import { prepareCiScriptsStep } from '../repos/effect-utils/genie/ci-workflow.ts'
 import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import {
-  applyMegarepoLockStep,
+  applyMegarepoLockStep as coreApplyMegarepoLockStep,
   baseTsconfigCompilerOptions as coreBaseTsconfigCompilerOptions,
   checkoutStep,
   installNixStep,
@@ -69,6 +69,19 @@ export const baseTsconfigCompilerOptions = {
 
 export const githubRepositorySettings = <const TSettings extends Record<string, unknown>>(settings: TSettings) =>
   jsonArtifact({ data: settings })
+
+/**
+ * Core's shared CI step resolves the megarepo CLI from the locked effect-utils
+ * commit, but its default tracking worktree can still advance a branch-backed
+ * member past that lock. Contrib CI is a lock materialization boundary.
+ */
+export const applyMegarepoLockStep = (opts?: Parameters<typeof coreApplyMegarepoLockStep>[0]) => {
+  const step = coreApplyMegarepoLockStep(opts)
+  return {
+    ...step,
+    run: `${step.run} --worktree-mode commit --lock-sync off`,
+  }
+}
 
 export const livestorePackageDefaults = {
   ...coreLivestorePackageDefaults,

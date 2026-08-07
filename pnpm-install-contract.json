@@ -4,7 +4,7 @@
     "allowBuilds": {
       "@mixedbread/cli": true,
       "@myobie/pty": false,
-      "@parcel/watcher": false,
+      "@parcel/watcher": true,
       "cbor-extract": true,
       "dtrace-provider": true,
       "esbuild": false,

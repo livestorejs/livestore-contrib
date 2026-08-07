@@ -147,8 +147,11 @@ in
       exit 0
     fi
 
-    mr apply --only effect-utils
-    mr apply --only livestore
+    # effect-utils is configured from a moving branch but locked to a tested
+    # commit. Materialize the lockfile commit rather than the branch tip so
+    # generation and CI remain reproducible between lock refreshes.
+    mr apply --only effect-utils --worktree-mode commit --lock-sync off
+    mr apply --only livestore --lock-sync off
 
     # pnpm omits lockfile importers for workspace members under symlinked
     # directories. Dereference the pinned core repo after megarepo apply so the
@@ -170,6 +173,17 @@ in
     test -d repos/effect-utils
     test -d repos/livestore
     test ! -L repos/livestore
+  '';
+  tasks."mr:setup".exec = lib.mkForce ''
+    set -euo pipefail
+    if [ ! -f ./megarepo.kdl ] && [ ! -f ./megarepo.json ]; then
+      exit 0
+    fi
+
+    # Tracking worktrees may advance branch-backed members past megarepo.lock.
+    # Setup is a lock materialization operation, so always select commit
+    # worktrees and leave lock refreshes to the explicit fetch workflow.
+    mr apply --lock-sync off --worktree-mode commit
   '';
   tasks."ts:build".after = lib.mkForce generatedInstalledWorkspaceTasks;
   tasks."ts:build-watch".after = lib.mkForce generatedInstalledWorkspaceTasks;

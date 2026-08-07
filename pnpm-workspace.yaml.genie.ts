@@ -114,16 +114,12 @@ const contribCatalogDuplicateExceptions = [
     issue: '#29',
   },
 
-  // --- 6. The pinned core lags the bumped effect-utils catalog -----------------
-  // These duplicates are the effect-utils bump itself: the newer catalog moved OTel,
-  // `@types/node` and Vite forward while `megarepo.lock` still pins
-  // `livestore@8dc44e65`, whose own catalog holds the older line. The older side is
-  // core's, not a stale contrib pin, so it is not ours to bump in isolation — each
-  // entry expires when the core pin moves.
-  //
-  // `vite` is the inverse of the others: contrib holds the *catalog* at core's Vite 7
-  // (see `contribCatalogOverrides`) because core's `@livestore/devtools-vite` peers on
-  // `^7.3.1`, while `vitest@4.1.9` still resolves Vite 8 for its own use.
+  // --- 6. Current core deliberately holds pre-upgrade dependency lines ----------
+  // Core 63cb2f26 inherits the bumped effect-utils catalog but intentionally pins
+  // these external dependencies to the prior compatible lines pending its dedicated
+  // dependency-upgrade work. Contrib composes that core catalog while newer tooling
+  // still resolves the newer lines transitively, so both versions remain until core's
+  // hold is removed.
   ...[
     { package: '@opentelemetry/api', versions: ['1.9.1', '1.9.0'] },
     { package: '@opentelemetry/resources', versions: ['2.8.0', '2.2.0'] },
@@ -133,7 +129,7 @@ const contribCatalogDuplicateExceptions = [
   ].map((entry) => ({
     ...entry,
     reason:
-      'the megarepo-pinned core (livestore@8dc44e65) holds the older line while the bumped effect-utils catalog moved ahead',
+      'core 63cb2f26 deliberately holds the prior compatible dependency line pending its dedicated dependency-upgrade work',
     issue: '#29',
   })),
 
