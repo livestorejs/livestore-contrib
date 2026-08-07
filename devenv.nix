@@ -147,11 +147,11 @@ in
       exit 0
     fi
 
-    # effect-utils is configured from a moving branch but locked to a tested
-    # commit. Materialize the lockfile commit rather than the branch tip so
-    # generation and CI remain reproducible between lock refreshes.
+    # Branch-backed members are locked to tested commits. Materialize those
+    # commits rather than the branch tips so generation and CI remain
+    # reproducible between explicit lock refreshes.
     mr apply --only effect-utils --worktree-mode commit --lock-sync off
-    mr apply --only livestore --lock-sync off
+    mr apply --only livestore --worktree-mode commit --lock-sync off
 
     # pnpm omits lockfile importers for workspace members under symlinked
     # directories. Dereference the pinned core repo after megarepo apply so the

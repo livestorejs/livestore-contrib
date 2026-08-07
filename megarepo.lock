@@ -3,7 +3,7 @@
   "members": {
     "livestore": {
       "url": "https://github.com/livestorejs/livestore",
-      "ref": "63cb2f26448608d4747d5ec881d7188f3a81bfa4",
+      "ref": "main",
       "commit": "63cb2f26448608d4747d5ec881d7188f3a81bfa4",
       "pinned": true,
       "lockedAt": "2026-08-05T07:19:59.000Z"
