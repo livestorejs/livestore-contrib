@@ -15,7 +15,7 @@ mapped to `UnknownError` (`:374`, `:377`) — the core **defect** family, which 
 surfaced and not retried. There is no `ServerAheadError` and no client-side
 head-chain check.
 
-What *is* satisfied: total order (core LS.SYS.SYNC-R01) holds at the storage
+What _is_ satisfied: total order (core LS.SYS.SYNC-R01) holds at the storage
 layer, because `seqNum` is the Postgres PRIMARY KEY
 (`src/make-electric-url.ts:123`), so concurrent appends of the same sequence
 number cannot both commit. The gap is not "no ordering authority" — it is "no

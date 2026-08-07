@@ -63,24 +63,28 @@ export const makeWorkerEffect = (options: WorkerOptions) => {
 
   // Merge the runtime dependencies once so we can provide them together without chaining Effect.provide.
   const runtimeLayer = Layer.mergeAll(FetchHttpClient.layer, PlatformNode.NodeFileSystem.layer, TracingLive)
+  const workerProtocolLayer = RpcServer.layerProtocolWorkerRunner.pipe(
+    Layer.provideMerge(PlatformNode.NodeWorkerRunner.layer),
+  )
+  const workerLayer = makeWorkerRunnerInner(options).pipe(
+    Layer.provideMerge(workerProtocolLayer),
+    Layer.provide(runtimeLayer),
+  )
 
   return RpcServer.make(WorkerSchema.LeaderWorkerInnerRpcs).pipe(
-    Effect.provide(makeWorkerRunnerInner(options)),
-    Effect.provide(RpcServer.layerProtocolWorkerRunner),
-    Effect.provide(PlatformNode.NodeWorkerRunner.layer),
     Effect.scoped,
     Effect.tapCauseLogPretty,
     Effect.annotateLogs({
       thread: options.otelOptions?.serviceName ?? 'livestore-node-leader-thread',
       processId: process.pid,
     }),
-    Effect.provide(
+    Effect.provide([
+      workerLayer,
       Layer.mergeAll(
         options.logger ?? Layer.empty,
         Layer.succeed(References.MinimumLogLevel, options.logLevel ?? (isDevEnv() === true ? 'Debug' : 'Info')),
       ),
-    ),
-    Effect.provide(runtimeLayer),
+    ]),
   )
 }
 

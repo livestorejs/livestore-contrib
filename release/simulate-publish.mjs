@@ -182,7 +182,7 @@ if (errors.length > 0) {
 const run = (command, args, options = {}) =>
   execFileSync(command, args, {
     cwd: rootDir,
-    env: { ...process.env, DT_PASSTHROUGH: '1' },
+    env: { ...process.env, DEVENV_TASK_PASSTHROUGH: '1' },
     stdio: 'inherit',
     ...options,
   })
@@ -252,7 +252,7 @@ const restoreManifestRewrites = () => {
 }
 
 const restoreGeneratedFiles = () => {
-  const env = { ...process.env, DT_PASSTHROUGH: '1' }
+  const env = { ...process.env, DEVENV_TASK_PASSTHROUGH: '1' }
   delete env.LIVESTORE_RELEASE_VERSION
   execFileSync('genie', ['--writeable'], {
     cwd: rootDir,

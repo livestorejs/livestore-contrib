@@ -127,7 +127,7 @@ const startS2LiteProxy = Effect.gen(function* () {
     fetch(`${s2LiteApiBase}/basins`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ basin }),
+      body: Schema.encodeSync(Schema.UnknownFromJsonString)({ basin }),
     }),
   ).pipe(
     Effect.retry(Schedule.exponentialBackoff10Sec),
@@ -311,7 +311,6 @@ const makeRouter = ({
           return yield* HttpServerResponse.json({ success: true })
         }),
       )
-
     }),
   )
 }

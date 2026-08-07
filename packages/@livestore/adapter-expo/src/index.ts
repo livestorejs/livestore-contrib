@@ -9,6 +9,7 @@ import {
   type LockStatus,
   liveStoreStorageFormatVersion,
   makeClientSession,
+  StateHead,
   type SyncOptions,
   UnknownError,
 } from '@livestore/common'
@@ -19,8 +20,7 @@ import {
   makeLeaderThreadLayer,
   streamEventsWithSyncState,
 } from '@livestore/common/leader-thread'
-import type { LiveStoreSchema } from '@livestore/common/schema'
-import { LiveStoreEvent } from '@livestore/common/schema'
+import { getStateDbBaseName, type LiveStoreSchema, LiveStoreEvent } from '@livestore/common/schema'
 import { shouldNeverHappen } from '@livestore/utils'
 import type { Schema, Scope } from '@livestore/utils/effect'
 import {
@@ -280,7 +280,7 @@ const makeLeaderThread = ({
         syncOptions,
         syncPayloadEncoded,
         syncPayloadSchema,
-      }).pipe(Layer.provideMerge(FetchHttpClient.layer)),
+      }).pipe(Layer.provide(StateHead.layer({ dbState })), Layer.provideMerge(FetchHttpClient.layer)),
     )
 
     return yield* Effect.gen(function* () {
@@ -354,9 +354,7 @@ const resolveExpoPersistencePaths = ({
 
   const directory = pathJoin(directoryBasePath, subDirectory, storeId)
 
-  const schemaHashSuffix =
-    schema.state.sqlite.migrations.strategy === 'manual' ? 'fixed' : schema.state.sqlite.hash.toString()
-  const stateDatabaseName = `livestore-${schemaHashSuffix}@${liveStoreStorageFormatVersion}.db`
+  const stateDatabaseName = `livestore-${getStateDbBaseName(schema)}@${liveStoreStorageFormatVersion}.db`
   const eventlogDatabaseName = `livestore-eventlog@${liveStoreStorageFormatVersion}.db`
 
   return { directory, stateDatabaseName, eventlogDatabaseName }

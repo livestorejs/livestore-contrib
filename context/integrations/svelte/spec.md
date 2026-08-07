@@ -14,8 +14,8 @@ Draft.
 
 One export, re-exported from `.` (`src/mod.ts:1`).
 
-| Export | File | Purpose |
-| --- | --- | --- |
+| Export        | File                            | Purpose                                                                    |
+| ------------- | ------------------------------- | -------------------------------------------------------------------------- |
 | `createStore` | `src/create-store.svelte.ts:41` | Async factory: boots a store and returns it with a Svelte-reactive `query` |
 
 There is no hooks surface, no `StoreRegistryContext`, no client-document or

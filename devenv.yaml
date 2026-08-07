@@ -5,4 +5,7 @@ inputs:
   nixpkgs:
     follows: effect-utils/nixpkgs
   effect-utils:
+    # Tracks `main` (the default-ref policy first-party inputs must follow); the
+    # concrete revision stays frozen in devenv.lock and must match the one
+    # megarepo.lock records — mr:lock-sync-check compares them.
     url: github:overengineeringstudio/effect-utils/main

@@ -1,13 +1,13 @@
 # ElectricSQL Sync Provider — Intuition
 
-*For: contributors to `sync-electric` · Assumes: the core sync mental model
+_For: contributors to `sync-electric` · Assumes: the core sync mental model
 (backend as ordering authority, leader ⇄ backend push/pull) · Covers: how
-Electric realizes that as a read-replica, and where it stops short*
+Electric realizes that as a read-replica, and where it stops short_
 
 The Cloudflare provider owns its backend: a Durable Object holds the log,
 arbitrates every push against the current head, and answers `ServerAheadError`
 so a losing writer knows to rebase and try again. Electric is a different animal.
-It is a *read path over Postgres* — you write events into a Postgres table, and
+It is a _read path over Postgres_ — you write events into a Postgres table, and
 Electric streams that table's changes to clients as a "shape". The provider is
 mostly that read path plus a thin write path, and the whole thing talks to a
 consumer-owned proxy rather than to Electric directly (so secrets stay on the
@@ -28,7 +28,7 @@ navigate by Electric's own `{offset, handle}` cursor (not the global seqNum),
 long-poll for liveness (Electric closes at ~20 s with a 204; you retry where you
 left off), and report `MoreUnknown`/`NoMore` because Electric's immutable caching
 won't tell you how many events remain. Two traps live here: because Electric
-syncs a *table*, a stray `update`/`delete` can appear — that's someone mutating
+syncs a _table_, a stray `update`/`delete` can appear — that's someone mutating
 the eventlog, and the provider rejects it loudly (`InvalidOperationError`). And
 shape handles rotate; when they do, Electric answers 409 and the resync path is
 still a `notYetImplemented` TODO, so a live pull can die on rotation

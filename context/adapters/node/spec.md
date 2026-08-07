@@ -15,10 +15,10 @@ Draft.
 Two factories, exported from `.` (`src/index.ts:1`); persistence is a `storage`
 option on either, not a separate factory. Both return the same `ClientSession`.
 
-| Variant | Factory | Leader location | Sync config |
-| --- | --- | --- | --- |
-| Single-threaded | `makeAdapter` (`src/client-session/adapter.ts:129`) | in-process (same thread as the app; `src/client-session/adapter.ts:354`) | `sync` option, threaded into the leader layer (`src/client-session/adapter.ts:274`) |
-| Worker | `makeWorkerAdapter` (`src/client-session/adapter.ts:168`) | one `node:worker_threads` worker, serialized pool of size 1 (`src/client-session/adapter.ts:462`, `:473`) | configured inside the worker entry file passed to `makeWorker` (`src/make-leader-worker.ts:25`) |
+| Variant         | Factory                                                   | Leader location                                                                                           | Sync config                                                                                     |
+| --------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Single-threaded | `makeAdapter` (`src/client-session/adapter.ts:129`)       | in-process (same thread as the app; `src/client-session/adapter.ts:354`)                                  | `sync` option, threaded into the leader layer (`src/client-session/adapter.ts:274`)             |
+| Worker          | `makeWorkerAdapter` (`src/client-session/adapter.ts:168`) | one `node:worker_threads` worker, serialized pool of size 1 (`src/client-session/adapter.ts:462`, `:473`) | configured inside the worker entry file passed to `makeWorker` (`src/make-leader-worker.ts:25`) |
 
 Options (`NodeAdapterOptions`, `src/client-session/adapter.ts:49`): `storage`
 (required), `clientId` (default OS `hostname()`, `:187`), `sessionId` (default
@@ -38,11 +38,11 @@ WASM SQLite (`@livestore/sqlite-wasm/node`) backs every database — no
 
 - **`fs`** — leader state and eventlog databases are files under
   `baseDirectory/storeId` (default `baseDirectory` = cwd)
-  (`src/leader-thread-shared.ts:87`): `state{schemaHashSuffix}@{formatVersion}.db`
-  (suffix `fixed` under manual migration, else the schema hash;
-  `src/leader-thread-shared.ts:69`, `:89`, `:129`) and
-  `eventlog@{formatVersion}.db` (`:89`). Opened with `foreignKeys: true`; WAL is
-  not yet enabled (`// TODO enable WAL for nodejs`, `:90`) — see
+  (`src/leader-thread-shared.ts:84`):
+  `{getStateDbBaseName(schema)}@{formatVersion}.db`, where the core helper keys
+  the state database by the schema hash (`:86`, `:127`), and
+  `eventlog@{formatVersion}.db` (`:86`). Opened with `foreignKeys: true`; WAL is
+  not yet enabled (`// TODO enable WAL for nodejs`, `:87`) — see
   LSC.ADAPT.NODE-DQ1.
 - **`in-memory`** — leader databases are in-memory; an optional `importSnapshot`
   is imported then migrated (single-threaded only)
@@ -72,7 +72,9 @@ unsupported (LSC.ADAPT.NODE-R03).
 
 Boot offers `{ stage: 'loading' }` to the session boot-status queue on start
 (`src/client-session/adapter.ts:210`). Migrations run inside the leader-thread
-layer and their `migrationsReport` is surfaced on the proxy's initial state
+layer. The adapter provides core's `StateHead` service from that same state
+database when constructing the layer (`src/leader-thread-shared.ts:106`,
+`:118`), and the resulting `migrationsReport` is surfaced on the proxy's initial state
 (single-threaded `src/client-session/adapter.ts:416`; worker
 `GetRecreateSnapshot` → `{ snapshot, migrationsReport }`,
 `src/make-leader-worker.ts:130`, consumed `src/client-session/adapter.ts:532`).

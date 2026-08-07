@@ -31,8 +31,9 @@ LS.SYS.VER.CONF-R03).
   selected by the `storage` option (`fs` | `in-memory`), not a separate factory.
   The `fs` variant stores the state and eventlog databases as files under
   `baseDirectory/storeId` on the LiveStore WASM SQLite build (not a native
-  binding); the client-session database is always in-memory and hydrated from
-  the leader's exported snapshot. `refines: LS.SYS.RT-R07, LS.SYS.RT-R09`
+  binding); the state filename is keyed by the core-computed schema hash, and
+  the client-session database is always in-memory and hydrated from the
+  leader's exported snapshot. `refines: LS.SYS.RT-R07, LS.SYS.RT-R09`
 - **LSC.ADAPT.NODE-R03 Single-session, always-leader:** Node runs exactly one
   session per store; that session is unconditionally the leader and its lock
   status is a constant `has-lock`. Multi-session leadership handover (core

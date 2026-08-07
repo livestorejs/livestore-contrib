@@ -31,7 +31,6 @@ let
 in
 {
   imports = [
-    effectUtils.devenvModules.dt
     taskModules.genie
     (taskModules.megarepo {
       syncAll = false;
@@ -57,15 +56,6 @@ in
         "package.json.genie.ts"
         "pnpm-workspace.yaml.genie.ts"
         "tsconfig.dev.json.genie.ts"
-      ];
-      execIfModifiedPatterns = [
-        "*.ts"
-        "*.json"
-        "*.yaml"
-        "genie/**/*.ts"
-        ".github/**/*.ts"
-        ".github/**/*.yml"
-        ".github/**/*.yaml"
       ];
       geniePatterns = [ "**/*.genie.ts" ];
       genieCoverageDirs = [ "." ];
@@ -157,8 +147,11 @@ in
       exit 0
     fi
 
-    mr apply --only effect-utils
-    mr apply --only livestore
+    # Branch-backed members are locked to tested commits. Materialize those
+    # commits rather than the branch tips so generation and CI remain
+    # reproducible between explicit lock refreshes.
+    mr apply --only effect-utils --worktree-mode commit --lock-sync off
+    mr apply --only livestore --worktree-mode commit --lock-sync off
 
     # pnpm omits lockfile importers for workspace members under symlinked
     # directories. Dereference the pinned core repo after megarepo apply so the
@@ -180,6 +173,17 @@ in
     test -d repos/effect-utils
     test -d repos/livestore
     test ! -L repos/livestore
+  '';
+  tasks."mr:setup".exec = lib.mkForce ''
+    set -euo pipefail
+    if [ ! -f ./megarepo.kdl ] && [ ! -f ./megarepo.json ]; then
+      exit 0
+    fi
+
+    # Tracking worktrees may advance branch-backed members past megarepo.lock.
+    # Setup is a lock materialization operation, so always select commit
+    # worktrees and leave lock refreshes to the explicit fetch workflow.
+    mr apply --lock-sync off --worktree-mode commit
   '';
   tasks."ts:build".after = lib.mkForce generatedInstalledWorkspaceTasks;
   tasks."ts:build-watch".after = lib.mkForce generatedInstalledWorkspaceTasks;
@@ -252,7 +256,7 @@ in
       release_version="''${LIVESTORE_RELEASE_VERSION:-0.0.0-snapshot-$git_sha}"
       core_release_version="''${LIVESTORE_CORE_RELEASE_VERSION:-0.0.0-snapshot-$core_sha}"
 
-      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
       node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --dry-run
     '';
   };
@@ -276,7 +280,7 @@ in
         exit 1
       fi
 
-      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
       node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --verify-core --publish
     '';
   };
@@ -298,7 +302,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-misc/vitest.config.ts
+      WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-misc/vitest.config.ts
     '';
   };
   tasks."test:integration:node-sync" = {
@@ -308,7 +312,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-sync/vitest.config.ts
+      WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-sync/vitest.config.ts
     '';
   };
   tasks."test:integration:node-sync:allow-flaky" = {
@@ -339,7 +343,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts";
   };
   tasks."test:packages:svelte" = {
     description = "Run @livestore/svelte unit tests";
@@ -348,7 +352,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/svelte exec vitest run --config tests/vitest.config.ts
+      WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 pnpm --dir packages/@livestore/svelte exec vitest run --config tests/vitest.config.ts
     '';
   };
   tasks."test:packages:sync-s2" = {
@@ -357,7 +361,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/sync-s2 exec vitest run --config vitest.config.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir packages/@livestore/sync-s2 exec vitest run --config vitest.config.ts";
   };
   tasks."test:examples:build" = {
     description = "Build contrib examples with build scripts";
@@ -366,7 +370,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      DT_PASSTHROUGH=1 pnpm \
+      DEVENV_TASK_PASSTHROUGH=1 pnpm \
         --filter "./examples/cf-chat" \
         --filter "./examples/cf-chat-solid" \
         --filter "./examples/web-*" \
@@ -379,7 +383,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=electric pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/electric-specific.test.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 TEST_SYNC_PROVIDER=electric pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/electric-specific.test.ts";
   };
   tasks."test:sync-provider:s2" = {
     description = "Run moved S2 sync-provider tests";
@@ -387,7 +391,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=s2 pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/s2-specific.test.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 TEST_SYNC_PROVIDER=s2 pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/s2-specific.test.ts";
   };
   tasks."workspace:shape-check" = {
     description = "Validate the contrib workspace shape";
