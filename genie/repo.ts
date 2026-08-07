@@ -11,7 +11,9 @@
 /** CI setup atoms must come from contrib's pinned effect-utils member as one coherent version. */
 import {
   checkoutStep,
+  defaultRefPolicyCheckJob,
   installNixStep,
+  namespaceRunner as namespaceRunnerBase,
   pnpmStateSetupStep,
   prepareCiScriptsStep,
   preparePinnedDevenvStep,
@@ -71,6 +73,17 @@ export const baseTsconfigCompilerOptions = {
 
 export const githubRepositorySettings = <const TSettings extends Record<string, unknown>>(settings: TSettings) =>
   jsonArtifact({ data: settings })
+
+export const namespaceRunner = (runId: string) =>
+  namespaceRunnerBase({ profile: 'namespace-profile-linux-x86-64', runId })
+
+/** Source policy must use the same pinned effect-utils implementation as every other CI atom. */
+export const livestoreDefaultRefPolicyJob = defaultRefPolicyCheckJob({
+  runsOn: namespaceRunner('${{ github.run_id }}'),
+  firstPartyOwners: ['overengineeringstudio'],
+  normalizeGitBranchRefs: true,
+  verifyReachable: true,
+})
 
 /**
  * Core's shared CI step resolves the megarepo CLI from the locked effect-utils
