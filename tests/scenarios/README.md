@@ -14,8 +14,9 @@ pnpm --dir tests/scenarios scenario:run --profile process
 pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile process --backend cloud-sync-cf
 pnpm --dir tests/scenarios scenario:run --scenario concurrent-hotel-booking
-pnpm --dir tests/scenarios scenario:run --profile browser --scenario browser-multi-session-recovery
-pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.ts
+pnpm --dir tests/scenarios scenario:run --profile browser --scenario multi-session-recovery
+pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.scenario
+pnpm --dir tests/scenarios scenario:run --scenario many-writer-convergence --set event_count=100
 ```
 
 The default command runs directly against the materialized core source at
@@ -88,13 +89,14 @@ They contain only the real LiveStore schema, materializers, normal application
 actions, and State inspectors. Scenario scheduling and generated activity never
 enter an Application definition.
 
-The human-readable Scenario DSL has an accepted design but is not yet an
-implemented authoring path. See [DSL_PROPOSAL.md](./DSL_PROPOSAL.md) for the
-syntax, complete construct reference, examples, and implementation slices.
-TypeScript definitions remain authoritative until those slices land.
+Scenario source uses the deterministic, human-readable `.scenario` language.
+See [DSL_PROPOSAL.md](./DSL_PROPOSAL.md) for the syntax, complete construct
+reference, examples, and compilation semantics. The CLI compiles retained or
+local source before the runner starts; `--set name=value` overrides a declared
+parameter without coupling the source to environment variables.
 
 Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
-by Git. Copy `scenario.template.ts`, define its ordered instructions, and
+by Git. Copy `scenario.template.scenario`, define its ordered instructions, and
 run it with `--scenario-file`. This tier is for generated cases, parameter
 sweeps, reductions, and hypotheses whose durable purpose is not established.
 
@@ -103,7 +105,7 @@ purpose. Move it to `src/corpus/scenarios/retained/findings/` or
 `src/corpus/scenarios/retained/examples/`, add focused evidence, and register it
 in `src/corpus/scenarios/registry.ts`. The retained CLI corpus intentionally has
 six cases: SF-01 through SF-04 plus `offline-writer-recovery` and
-`browser-multi-session-recovery`. Narrow host-contract fixtures live under
+`multi-session-recovery`. Narrow host-contract fixtures live under
 `src/test-support/scenarios` and are not presented as corpus cases.
 
 Only register another Application when a Scenario genuinely needs a different
@@ -166,7 +168,7 @@ needed; those records remain intact but do not stretch the default flow axis.
 
 Tracked current-format `.json.gz` artifacts are also included in the saved-run
 catalog without adding the full uncompressed traces to the repository. The set
-includes passed browser runs for `browser-multi-session-recovery` and
+includes passed browser runs for `multi-session-recovery` and
 `offline-writer-recovery`, a dense seeded-action browser fixture, and current
 SF-03 failure evidence.
 
@@ -213,7 +215,7 @@ An `annotation` is an optional zero-effect instruction. Reaching it emits an
 markers execution actually crossed. It is not an operation, grouping
 construct, lifecycle stage, or Settlement boundary.
 
-`browser-multi-session-recovery` also covers behavioral Leader turnover using
+`multi-session-recovery` also covers behavioral Leader turnover using
 ordinary session lifecycle: the fixture starts the first page through blocking
 Web Lock election, adds a sibling, closes the initial lock holder, writes
 through the sibling, and then converges after restart. The artifact proves that

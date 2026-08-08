@@ -54,6 +54,7 @@ const BookRoomInput = Schema.Struct({ roomType: Schema.String })
 
 export const hotelBookingApplication = defineApplication({
   id: 'scenario-hotel-booking-app',
+  scenarioName: 'hotel-booking',
   schema: hotelBookingSchema,
   actions: {
     initializeHotelRoomInventory: defineAction<typeof hotelBookingSchema, typeof InitializeInventoryInput>({

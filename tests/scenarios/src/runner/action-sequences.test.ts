@@ -38,27 +38,25 @@ Vitest.describe('Scenario-owned generated actions', () => {
         expect(generatedActionSignature(first)).toEqual(generatedActionSignature(second))
         expect(generatedActionSignature(first)).not.toEqual(generatedActionSignature(differentSeed))
 
+        const sequence = first.scenario.instructions.find((instruction) => instruction._tag === 'action-sequence')
+        expect(sequence?._tag).toBe('action-sequence')
+        if (sequence?._tag !== 'action-sequence') return
         const requested = first.trace.find((record) => record.payload._tag === 'action-sequence.requested')
         const completed = first.trace.find((record) => record.payload._tag === 'action-sequence.completed')
         expect(requested?.payload).toEqual(expect.objectContaining({ _tag: 'action-sequence.requested', count: 40 }))
         expect(completed?.payload).toEqual(
           expect.objectContaining({
             _tag: 'action-sequence.completed',
-            actionIds: Array.from(
-              { length: 40 },
-              (_, index) => `create-seeded-todos:${String(index + 1).padStart(4, '0')}`,
-            ),
+            actionIds: Array.from({ length: 40 }, (_, index) => `${sequence.id}:${String(index + 1).padStart(4, '0')}`),
           }),
         )
         expect(
           first.trace.filter(
-            (record) => record.payload._tag === 'action.requested' && record.causationId === 'create-seeded-todos',
+            (record) => record.payload._tag === 'action.requested' && record.causationId === sequence.id,
           ),
         ).toHaveLength(40)
         expect(
-          deriveScenarioOperationHistory(first.trace).find(
-            (operation) => operation.operationId === 'create-seeded-todos',
-          ),
+          deriveScenarioOperationHistory(first.trace).find((operation) => operation.operationId === sequence.id),
         ).toEqual(expect.objectContaining({ family: 'action-sequence', status: 'succeeded' }))
         const moments = derivePlaybackMoments({ scenario: first.scenario, trace: first.trace })
         expect(moments.filter((moment) => moment.kind === 'action-sequence')).toEqual([

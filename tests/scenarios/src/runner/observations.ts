@@ -140,13 +140,14 @@ export const recordSystemObservation = (args: {
     }
   })
 
-export const awaitSettlement = (args: {
+export const awaitStabilization = (args: {
   host: ParticipantHost
   participants: ReadonlyArray<ParticipantRef>
   timeoutMs: number
   record: TraceRecorder
   correlationId: string
   faultState: ScenarioFaultState
+  kind: 'settlement' | 'terminal-stabilization'
 }): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> => {
   const deadline = Date.now() + args.timeoutMs
   let lastLoggedSignature: string | undefined
@@ -161,7 +162,9 @@ export const awaitSettlement = (args: {
       // of imposing a second, shorter deadline on the same bounded operation.
       const remainingMs = deadline - Date.now()
       if (remainingMs <= 0) {
-        return yield* Effect.fail(settlementTimeoutError(args.correlationId, args.timeoutMs, lastObservations))
+        return yield* Effect.fail(
+          settlementTimeoutError(args.correlationId, args.timeoutMs, lastObservations, args.kind),
+        )
       }
       const observationTimeoutMs = remainingMs
       const systemObservation = yield* args.host.observeSystem.pipe(
@@ -186,15 +189,26 @@ export const awaitSettlement = (args: {
         console.log(`  settlement ${args.correlationId}: ${signature}`)
         lastLoggedSignature = signature
       }
-      const progress = args.record({
-        origin: 'observation',
-        correlationId: args.correlationId,
-        payload: {
-          _tag: 'settlement.progress',
-          settled: isStable,
-          observations: observations.map(syncObservationPayload),
-        },
-      })
+      const progress =
+        args.kind === 'settlement'
+          ? args.record({
+              origin: 'observation',
+              correlationId: args.correlationId,
+              payload: {
+                _tag: 'settlement.progress',
+                settled: isStable,
+                observations: observations.map(syncObservationPayload),
+              },
+            })
+          : args.record({
+              origin: 'observation',
+              correlationId: args.correlationId,
+              payload: {
+                _tag: 'terminal-stabilization.progress',
+                settled: isStable,
+                observations: observations.map(syncObservationPayload),
+              },
+            })
       yield* recordSystemObservation({
         host: args.host,
         record: args.record,
@@ -251,7 +265,9 @@ export const awaitSettlement = (args: {
         return observations
       }
       if (Date.now() >= deadline) {
-        return yield* Effect.fail(settlementTimeoutError(args.correlationId, args.timeoutMs, lastObservations))
+        return yield* Effect.fail(
+          settlementTimeoutError(args.correlationId, args.timeoutMs, lastObservations, args.kind),
+        )
       }
       // A browser settlement probe crosses every page plus the backend. A
       // moderate cadence leaves room for the sync work being observed.
@@ -262,16 +278,29 @@ export const awaitSettlement = (args: {
   return Effect.suspend(() => loop(undefined)).pipe(
     Effect.catch((error) => {
       const failure = describeHostError(error)
-      args.record({
-        origin: 'observation',
-        correlationId: args.correlationId,
-        payload: {
-          _tag: 'settlement.failed',
-          ...failure,
-          timeoutMs: args.timeoutMs,
-          observations: lastObservations,
-        },
-      })
+      if (args.kind === 'settlement') {
+        args.record({
+          origin: 'observation',
+          correlationId: args.correlationId,
+          payload: {
+            _tag: 'settlement.failed',
+            ...failure,
+            timeoutMs: args.timeoutMs,
+            observations: lastObservations,
+          },
+        })
+      } else {
+        args.record({
+          origin: 'observation',
+          correlationId: args.correlationId,
+          payload: {
+            _tag: 'terminal-stabilization.failed',
+            ...failure,
+            timeoutMs: args.timeoutMs,
+            observations: lastObservations,
+          },
+        })
+      }
       return Effect.fail(error)
     }),
   )

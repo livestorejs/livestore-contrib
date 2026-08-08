@@ -26,6 +26,7 @@ Vitest.describe('browser profile', () => {
           participantProfile: 'browser',
           syncBackend: 'local-sync-cf',
           stateProfile: 'opfs',
+          stabilizationTimeoutMs: 60_000,
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('browser-shared-worker')
         expectOfflineEventCorrelationLifecycle(artifact)
@@ -78,40 +79,31 @@ Vitest.describe('browser profile', () => {
             ?.sessions.find((session) => session.sessionId === 'session-a2')?.lifecycle,
         ).toBe('created')
         const initialLeaderStopped = artifact.trace.find(
-          (record) => record.correlationId === 'stop-session-a1' && record.payload._tag === 'lifecycle.session-stopped',
+          (record) =>
+            record.clientId === 'client-a' &&
+            record.sessionId === 'session-a1' &&
+            record.payload._tag === 'lifecycle.session-stopped',
         )
         const successorWrite = artifact.trace.find(
           (record) =>
-            record.correlationId === 'session-a2-write-after-leader-turnover' &&
-            record.payload._tag === 'action.completed',
+            record.clientId === 'client-a' &&
+            record.sessionId === 'session-a2' &&
+            record.payload._tag === 'action.requested' &&
+            typeof record.payload.input === 'object' &&
+            record.payload.input !== null &&
+            'id' in record.payload.input &&
+            record.payload.input.id === 'todo-after-leader-turnover',
         )
         const initialLeaderRestarted = artifact.trace.find(
           (record) =>
-            record.correlationId === 'restart-session-a1' && record.payload._tag === 'lifecycle.session-restarted',
+            record.clientId === 'client-a' &&
+            record.sessionId === 'session-a1' &&
+            record.payload._tag === 'lifecycle.session-restarted',
         )
         expect(initialLeaderStopped?.index).toBeLessThan(successorWrite?.index ?? -1)
         expect(successorWrite?.index).toBeLessThan(initialLeaderRestarted?.index ?? -1)
-        const prefixVerdict = artifact.verdicts.find(
-          (verdict) => verdict.oracleId === 'confirmed-eventlogs-append-only',
-        )
-        const beforeStopObservation = artifact.trace.find(
-          (record) =>
-            record.index < (initialLeaderStopped?.index ?? -1) &&
-            record.clientId === 'client-a' &&
-            record.sessionId === 'session-a1' &&
-            record.payload._tag === 'session.sync.observed',
-        )
-        const afterRestartObservation = artifact.trace.find(
-          (record) =>
-            record.index > (initialLeaderRestarted?.index ?? Number.POSITIVE_INFINITY) &&
-            record.clientId === 'client-a' &&
-            record.sessionId === 'session-a1' &&
-            record.payload._tag === 'session.sync.observed',
-        )
-        expect(prefixVerdict).toEqual(expect.objectContaining({ status: 'passed' }))
-        expect(prefixVerdict?.evidence).toEqual(
-          expect.arrayContaining([beforeStopObservation?.index, afterRestartObservation?.index]),
-        )
+        const eventlogVerdict = artifact.verdicts.find((verdict) => verdict.oracle === 'eventlog-convergence')
+        expect(eventlogVerdict).toEqual(expect.objectContaining({ status: 'passed' }))
         expect(artifact.trace.map((record) => record.payload._tag)).toEqual(
           expect.arrayContaining([
             'lifecycle.session-stopped',

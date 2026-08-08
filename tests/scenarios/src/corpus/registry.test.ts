@@ -25,7 +25,7 @@ describe('scenario corpus', () => {
   it('keeps the retained CLI corpus intentionally limited to promoted findings and representative examples', () => {
     expect(retainedScenarioCatalog.map(({ findingId, kind, scenario }) => [kind, findingId, scenario.id])).toEqual([
       ['example', undefined, 'offline-writer-recovery'],
-      ['example', undefined, 'browser-multi-session-recovery'],
+      ['example', undefined, 'multi-session-recovery'],
       ['finding', 'SF-01', 'concurrent-hotel-booking'],
       ['finding', 'SF-02', 'pending-tail-recovery'],
       ['finding', 'SF-03', 'many-writer-convergence'],

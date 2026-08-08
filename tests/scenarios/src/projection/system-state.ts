@@ -291,6 +291,14 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return 'Settlement completed'
     case 'settlement.failed':
       return `Settlement failed: ${summarizeFailureMessage(record.payload.message)}`
+    case 'terminal-stabilization.requested':
+      return `Terminal stabilization requested for ${record.payload.participants.length} participants`
+    case 'terminal-stabilization.progress':
+      return `Terminal stabilization ${record.payload.settled === true ? 'reached' : 'pending'} · ${record.payload.observations.length} observations`
+    case 'terminal-stabilization.completed':
+      return 'Terminal stabilization completed'
+    case 'terminal-stabilization.failed':
+      return `Terminal stabilization failed: ${summarizeFailureMessage(record.payload.message)}`
     case 'runtime.failure.observed':
       return scoped(`runtime failure: ${summarizeFailureMessage(record.payload.message)}`)
     case 'sync.snapshot':

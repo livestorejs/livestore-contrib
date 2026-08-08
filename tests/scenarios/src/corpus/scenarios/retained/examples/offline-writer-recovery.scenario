@@ -1,0 +1,33 @@
+application todo
+about "An offline Client and an online Client both write before reconnecting and converging."
+
+client client-a with session-a
+client client-b with session-b
+participants both = client-a/session-a, client-b/session-b
+
+note "Client A writes offline while Client B writes against the shared backend."
+
+disconnect client-a
+
+concurrently:
+  client-a/session-a runs createTodo with
+    id: "todo-offline-a"
+    text: "Written while Client A is offline"
+
+  client-b/session-b runs createTodo with
+    id: "todo-online-b"
+    text: "Written while Client B is online"
+
+  expect overlap
+
+settle client-b/session-b
+
+note "Client A reconnects before the final expectations establish a stable shared head."
+
+reconnect client-a
+
+expect both:
+  pending resolved
+  eventlogs converge
+  todos converges
+  todos contains ids "todo-offline-a", "todo-online-b"

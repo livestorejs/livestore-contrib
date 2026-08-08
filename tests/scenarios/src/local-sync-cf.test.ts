@@ -50,6 +50,7 @@ Vitest.describe('local sync-cf backend', () => {
           participantProfile: 'in-process',
           syncBackend: 'local-sync-cf',
           stateProfile: 'sqlite',
+          stabilizationTimeoutMs: 60_000,
         })
         expect(artifact.trace.some((record) => record.payload._tag === 'backend.observed')).toBe(true)
         expect(artifact.snapshots.every((snapshot) => snapshot.sync.pendingCount === 0)).toBe(true)

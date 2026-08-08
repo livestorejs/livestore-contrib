@@ -1,8 +1,8 @@
 import { Schema } from '@livestore/utils/effect'
 
-export const scenarioVersion = 3 as const
-export const scenarioTraceVersion = 5 as const
-export const scenarioArtifactVersion = 6 as const
+export const scenarioVersion = 4 as const
+export const scenarioTraceVersion = 6 as const
+export const scenarioArtifactVersion = 7 as const
 
 export const ParticipantProfile = Schema.Literals(['in-process', 'process', 'browser'])
 export type ParticipantProfile = typeof ParticipantProfile.Type
@@ -40,6 +40,7 @@ export const ExecutionConfiguration = Schema.Struct({
   participantProfile: ParticipantProfile,
   syncBackend: SyncBackendRealization,
   stateProfile: StateProfile,
+  stabilizationTimeoutMs: Schema.Finite,
 })
 export type ExecutionConfiguration = typeof ExecutionConfiguration.Type
 
@@ -146,7 +147,6 @@ export const SettleStep = Schema.TaggedStruct('settle', {
   id: Schema.String,
   participants: Schema.Array(ParticipantRef),
   healDisconnectedClients: Schema.Array(Schema.String),
-  timeoutMs: Schema.Finite,
 })
 
 export const ScenarioInstruction = Schema.Union([

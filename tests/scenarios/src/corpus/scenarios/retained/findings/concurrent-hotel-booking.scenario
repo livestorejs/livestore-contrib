@@ -1,0 +1,30 @@
+application hotel-booking
+about "Rebase two locally valid hotel bookings into a SQLite-enforced inventory violation."
+
+client client-a with session-a
+client client-b with session-b
+participants both = client-a/session-a, client-b/session-b
+
+note "Both Clients confirm that one standard hotel room remains available."
+
+client-b/session-b runs initializeHotelRoomInventory with
+  roomType: "standard"
+  available: 1
+
+settle both
+
+note "Each Client independently books the locally available final room."
+
+disconnect client-a
+
+client-a/session-a runs bookHotelRoom with
+  roomType: "standard"
+
+client-b/session-b runs bookHotelRoom with
+  roomType: "standard"
+
+settle client-b/session-b
+
+note "Client A rebases its booking over Client B and attempts to materialize negative inventory."
+
+reconnect client-a

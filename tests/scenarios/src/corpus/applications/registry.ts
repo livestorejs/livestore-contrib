@@ -19,9 +19,15 @@ export const scenarioApplications: ReadonlyArray<RegisteredApplication> = [
 const applicationsById: ReadonlyMap<string, RegisteredApplication> = new Map(
   scenarioApplications.map((application) => [application.id, application]),
 )
+const applicationsByScenarioName: ReadonlyMap<string, RegisteredApplication> = new Map(
+  scenarioApplications.map((application) => [application.scenarioName, application]),
+)
 
-if (applicationsById.size !== scenarioApplications.length) {
-  throw new Error('Scenario application IDs must be unique')
+if (
+  applicationsById.size !== scenarioApplications.length ||
+  applicationsByScenarioName.size !== scenarioApplications.length
+) {
+  throw new Error('Scenario application IDs and source names must be unique')
 }
 
 /** Runtime registry used by the CLI and serialized participant hosts. */

@@ -53,6 +53,7 @@ export const participantHostFailure = (args: {
 }): ScenarioOperationError => new ScenarioOperationError(args.code, args.message, args.operationOutcome)
 
 export interface ApplicationAction<TSchema extends LiveStoreSchema> {
+  readonly validateInput: (input: Schema.Json) => void
   readonly dispatch: (store: Store<TSchema>, input: Schema.Json) => Effect.Effect<void, ScenarioOperationError>
 }
 
@@ -62,6 +63,7 @@ export interface ApplicationInspector<TSchema extends LiveStoreSchema> {
 
 export interface ApplicationDefinition<TSchema extends LiveStoreSchema> {
   readonly id: string
+  readonly scenarioName: string
   readonly schema: TSchema
   readonly actions: Readonly<Record<string, ApplicationAction<TSchema>>>
   readonly inspectors: Readonly<Record<string, ApplicationInspector<TSchema>>>
@@ -79,6 +81,9 @@ export const defineAction = <
   input: TInputSchema
   run: (args: { store: Store<TSchema>; input: TInputSchema['Type'] }) => Effect.Effect<void, never>
 }): ApplicationAction<TSchema> => ({
+  validateInput: (input) => {
+    Schema.decodeUnknownSync(args.input)(input)
+  },
   dispatch: (store, encodedInput) =>
     Schema.decodeUnknownEffect(args.input)(encodedInput).pipe(
       Effect.mapError(

@@ -26,65 +26,88 @@ import {
   projectTraceAt,
   runInProcessScenario,
   runScenario,
+  scenarioVersion,
   todoApplication,
 } from './test-support/scenario-test-kit.ts'
 
+const offlineWriterRecoveryWithPrefixOracle = defineScenario({
+  ...offlineWriterRecovery,
+  id: 'offline-writer-recovery-with-prefix-oracle',
+  oracles: [
+    ...offlineWriterRecovery.oracles,
+    {
+      _tag: 'confirmed-eventlog-prefix',
+      id: 'confirmed-eventlogs-append-only',
+      participants: [
+        { clientId: 'client-a', sessionId: 'session-a' },
+        { clientId: 'client-b', sessionId: 'session-b' },
+      ],
+    },
+  ],
+})
+
 Vitest.describe('offline writer recovery', () => {
   for (const mutation of ['conflict', 'delete', 'rewrite', 'reorder'] as const) {
-    Vitest.live(`rejects a transient confirmed Eventlog ${mutation} repaired before terminal capture`, (test) =>
+    Vitest.live(
+      `rejects a transient confirmed Eventlog ${mutation} repaired before terminal capture`,
+      (test) =>
+        Effect.gen(function* () {
+          const backend = yield* makeMockScenarioBackend
+          const host = yield* makeInProcessHost({ application: todoApplication, backend })
+          const artifact = yield* runScenario({
+            scenario: offlineWriterRecoveryWithPrefixOracle,
+            applicationId: todoApplication.id,
+            host: withTransientSessionEventlogMutation(host, mutation),
+            options: { runId: `transient-prefix-${mutation}-test`, sourceRevision: 'test' },
+          })
+          const prefixVerdict = artifact.verdicts.find(
+            (candidate) => candidate.oracleId === 'confirmed-eventlogs-append-only',
+          )
+
+          expect(artifact.status).toBe('failed')
+          expect(prefixVerdict).toEqual(expect.objectContaining({ status: 'failed' }))
+          expect(prefixVerdict?.evidence.length).toBeGreaterThan(0)
+          if (mutation === 'rewrite' || mutation === 'reorder') expect(prefixVerdict?.evidence).toHaveLength(2)
+          expect(artifact.verdicts.find((candidate) => candidate.oracle === 'eventlog-convergence')?.status).toBe(
+            'passed',
+          )
+        }).pipe(Vitest.withTestCtx(test, { timeout: 20_000 })),
+      20_000,
+    )
+  }
+
+  Vitest.live(
+    'coalesces one repeated encoding of the same confirmed global Event fact',
+    (test) =>
       Effect.gen(function* () {
         const backend = yield* makeMockScenarioBackend
         const host = yield* makeInProcessHost({ application: todoApplication, backend })
         const artifact = yield* runScenario({
-          scenario: offlineWriterRecovery,
+          scenario: offlineWriterRecoveryWithPrefixOracle,
           applicationId: todoApplication.id,
-          host: withTransientSessionEventlogMutation(host, mutation),
-          options: { runId: `transient-prefix-${mutation}-test`, sourceRevision: 'test' },
+          host: withTransientSessionEventlogMutation(host, 'duplicate'),
+          options: { runId: 'repeated-prefix-encoding-test', sourceRevision: 'test' },
         })
         const prefixVerdict = artifact.verdicts.find(
           (candidate) => candidate.oracleId === 'confirmed-eventlogs-append-only',
         )
 
-        expect(artifact.status).toBe('failed')
-        expect(prefixVerdict).toEqual(expect.objectContaining({ status: 'failed' }))
-        expect(prefixVerdict?.evidence.length).toBeGreaterThan(0)
-        if (mutation === 'rewrite' || mutation === 'reorder') expect(prefixVerdict?.evidence).toHaveLength(2)
-        expect(artifact.verdicts.find((candidate) => candidate.oracleId === 'eventlogs-converged')?.status).toBe(
-          'passed',
+        expect(artifact.status).toBe('passed')
+        expect(prefixVerdict).toEqual(
+          expect.objectContaining({
+            status: 'passed',
+            summary: expect.stringContaining('coalesced 1 repeated same-position encodings'),
+          }),
         )
-      }).pipe(Vitest.withTestCtx(test)),
-    )
-  }
-
-  Vitest.live('coalesces one repeated encoding of the same confirmed global Event fact', (test) =>
-    Effect.gen(function* () {
-      const backend = yield* makeMockScenarioBackend
-      const host = yield* makeInProcessHost({ application: todoApplication, backend })
-      const artifact = yield* runScenario({
-        scenario: offlineWriterRecovery,
-        applicationId: todoApplication.id,
-        host: withTransientSessionEventlogMutation(host, 'duplicate'),
-        options: { runId: 'repeated-prefix-encoding-test', sourceRevision: 'test' },
-      })
-      const prefixVerdict = artifact.verdicts.find(
-        (candidate) => candidate.oracleId === 'confirmed-eventlogs-append-only',
-      )
-
-      expect(artifact.status).toBe('passed')
-      expect(prefixVerdict).toEqual(
-        expect.objectContaining({
-          status: 'passed',
-          summary: expect.stringContaining('coalesced 1 repeated same-position encodings'),
-        }),
-      )
-    }).pipe(Vitest.withTestCtx(test)),
+      }).pipe(Vitest.withTestCtx(test, { timeout: 20_000 })),
+    20_000,
   )
 
   Vitest.live('fails rather than passing a component with only one retained observation', (test) =>
     Effect.gen(function* () {
       const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
       const scenario = defineScenario({
-        version: 3,
+        version: scenarioVersion,
         id: 'insufficient-prefix-evidence',
         description: 'Creates a participant but retains no later component observation.',
         tags: ['safety'],
@@ -157,7 +180,7 @@ Vitest.describe('offline writer recovery', () => {
         host: divergentHost,
         options: { runId: 'divergent-eventlog-test', sourceRevision: 'test' },
       })
-      const verdict = artifact.verdicts.find((candidate) => candidate.oracleId === 'eventlogs-converged')
+      const verdict = artifact.verdicts.find((candidate) => candidate.oracle === 'eventlog-convergence')
 
       expect(artifact.status).toBe('failed')
       expect(verdict).toEqual(
@@ -176,14 +199,14 @@ Vitest.describe('offline writer recovery', () => {
     (test) =>
       Effect.gen(function* () {
         const artifact = yield* runInProcessScenario({
-          scenario: offlineWriterRecovery,
+          scenario: offlineWriterRecoveryWithPrefixOracle,
           application: todoApplication,
           options: { runId: 'offline-writer-recovery-test', sourceRevision: 'test' },
         })
 
         expect(artifact.status).toBe('passed')
-        expect(artifact.artifactVersion).toBe(6)
-        expect(artifact.descriptor.traceVersion).toBe(5)
+        expect(artifact.artifactVersion).toBe(7)
+        expect(artifact.descriptor.traceVersion).toBe(6)
         expect(artifact.verdicts).toHaveLength(6)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
         expect(artifact.verdicts).toContainEqual(
@@ -206,6 +229,7 @@ Vitest.describe('offline writer recovery', () => {
             'recovery.observed',
             'recovery.completed',
             'settlement.completed',
+            'terminal-stabilization.completed',
             'state.snapshot',
             'oracle.verdict',
           ]),
@@ -288,30 +312,31 @@ Vitest.describe('offline writer recovery', () => {
 
         const injectedFault = artifact.trace.find((record) => record.payload._tag === 'fault.injected')
         const removedFault = artifact.trace.find((record) => record.payload._tag === 'fault.removed')
+        const terminalCorrelationId = 'terminal-stabilization'
         const quiescence = artifact.trace.find(
-          (record) => record.payload._tag === 'quiescence.reached' && record.correlationId === 'settle-after-reconnect',
+          (record) => record.payload._tag === 'quiescence.reached' && record.correlationId === terminalCorrelationId,
         )
         const recoveryObservations = artifact.trace.filter((record) => record.payload._tag === 'recovery.observed')
         const recoveryCompleted = artifact.trace.find((record) => record.payload._tag === 'recovery.completed')
-        const settlementCompleted = artifact.trace.find(
+        const stabilizationCompleted = artifact.trace.find(
           (record) =>
-            record.payload._tag === 'settlement.completed' && record.correlationId === 'settle-after-reconnect',
+            record.payload._tag === 'terminal-stabilization.completed' &&
+            record.correlationId === terminalCorrelationId,
         )
-        expect(injectedFault?.payload).toEqual(
-          expect.objectContaining({ faultId: 'disconnect-client-a', fault: 'client-disconnected' }),
-        )
-        expect(removedFault?.payload).toEqual(
-          expect.objectContaining({ faultId: 'disconnect-client-a', fault: 'client-disconnected' }),
-        )
+        expect(injectedFault?.payload).toEqual(expect.objectContaining({ fault: 'client-disconnected' }))
+        expect(removedFault?.payload).toEqual(expect.objectContaining({ fault: 'client-disconnected' }))
+        if (injectedFault?.payload._tag === 'fault.injected' && removedFault?.payload._tag === 'fault.removed') {
+          expect(removedFault.payload.faultId).toBe(injectedFault.payload.faultId)
+        }
         expect(quiescence?.payload).toEqual(expect.objectContaining({ inFlightOperationIds: [] }))
         expect(
           deriveInFlightScenarioOperationIds(artifact.trace.slice(0, (quiescence?.index ?? -1) + 1), [
-            'settle-after-reconnect',
+            terminalCorrelationId,
           ]),
         ).toEqual([])
         expect(recoveryObservations.length).toBeGreaterThan(0)
         expect(recoveryObservations.at(-1)?.payload).toEqual(expect.objectContaining({ converged: true }))
-        expect(recoveryCompleted?.index).toBeLessThan(settlementCompleted?.index ?? 0)
+        expect(recoveryCompleted?.index).toBeLessThan(stabilizationCompleted?.index ?? 0)
         expect(injectedFault?.index).toBeLessThan(removedFault?.index ?? 0)
         expect(removedFault?.index).toBeLessThan(recoveryCompleted?.index ?? 0)
 
@@ -339,7 +364,7 @@ Vitest.describe('offline writer recovery', () => {
           (record) =>
             record.clientId === 'client-a' &&
             record.payload._tag === 'leader.sync.observed' &&
-            record.payload.reason === 'concurrent-writes',
+            record.payload.reason === 'concurrently-0001',
         )
         expect(offlineCursor).toBeDefined()
         const offlineProjection = projectTraceAt({

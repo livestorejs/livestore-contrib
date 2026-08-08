@@ -25,6 +25,7 @@ Vitest.describe('process profile', () => {
           participantProfile: 'process',
           syncBackend: 'local-sync-cf',
           stateProfile: 'sqlite',
+          stabilizationTimeoutMs: 60_000,
         })
         expect(artifact.descriptor.capabilities.capabilities).toContain('process-isolation')
         expectOfflineEventCorrelationLifecycle(artifact)

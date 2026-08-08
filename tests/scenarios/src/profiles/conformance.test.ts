@@ -16,6 +16,7 @@ import {
   type HostCapabilities,
   type ScenarioAst,
   ScenarioRunArtifact,
+  scenarioVersion,
 } from '../model.ts'
 import { runScenario } from '../runner.ts'
 import { browserHostCapabilities, makeBrowserHost } from './browser/host.ts'
@@ -50,7 +51,12 @@ const makeLocalBackend = makeLocalSyncCfScenarioBackend.pipe(
 const profiles: ReadonlyArray<HostConformanceProfile> = [
   {
     capabilities: inProcessHostCapabilities,
-    execution: { participantProfile: 'in-process', syncBackend: 'mock', stateProfile: 'sqlite' },
+    execution: {
+      participantProfile: 'in-process',
+      syncBackend: 'mock',
+      stateProfile: 'sqlite',
+      stabilizationTimeoutMs: 10_000,
+    },
     makeFixture: Effect.gen(function* () {
       const backend = yield* makeMockScenarioBackend
       const host = yield* makeInProcessHost({ application: todoApplication, backend })
@@ -59,7 +65,12 @@ const profiles: ReadonlyArray<HostConformanceProfile> = [
   },
   {
     capabilities: processHostCapabilities,
-    execution: { participantProfile: 'process', syncBackend: 'local-sync-cf', stateProfile: 'sqlite' },
+    execution: {
+      participantProfile: 'process',
+      syncBackend: 'local-sync-cf',
+      stateProfile: 'sqlite',
+      stabilizationTimeoutMs: 10_000,
+    },
     makeFixture: Effect.gen(function* () {
       const backend = yield* makeLocalBackend
       const host = yield* makeProcessHost({ applicationId: todoApplication.id, backend })
@@ -71,7 +82,12 @@ const profiles: ReadonlyArray<HostConformanceProfile> = [
   },
   {
     capabilities: browserHostCapabilities,
-    execution: { participantProfile: 'browser', syncBackend: 'local-sync-cf', stateProfile: 'opfs' },
+    execution: {
+      participantProfile: 'browser',
+      syncBackend: 'local-sync-cf',
+      stateProfile: 'opfs',
+      stabilizationTimeoutMs: 15_000,
+    },
     makeFixture: Effect.gen(function* () {
       const backend = yield* makeLocalBackend
       const host = yield* makeBrowserHost({ applicationId: todoApplication.id, backend })
@@ -196,7 +212,7 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
   const sessionB = { clientId: 'conformance-b', sessionId: 'session-b' } as const
 
   return defineScenario({
-    version: 3,
+    version: scenarioVersion,
     id: `host-conformance-${capabilities.profile}`,
     description: 'Shared host contract scenario derived from advertised capabilities.',
     tags: ['host-conformance'],
@@ -286,7 +302,6 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
         id: 'settle-conformance',
         participants: supportsDynamicSessionAddition === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
         healDisconnectedClients: [],
-        timeoutMs: 15_000,
       },
     ],
     oracles: [
@@ -309,7 +324,7 @@ const makeFailureScenario = (args: { profile: HostCapabilities['profile']; suffi
   const clientId = `failure-${args.suffix}`
   const sessionId = `session-${args.suffix}`
   return defineScenario({
-    version: 3,
+    version: scenarioVersion,
     id: `host-conformance-${args.profile}-${args.suffix}`,
     description: 'Exercises the portable host failure boundary.',
     tags: ['host-conformance', 'failure'],
@@ -341,7 +356,7 @@ const makeFailureScenario = (args: { profile: HostCapabilities['profile']; suffi
 const makeUnsupportedScenario = (capabilities: HostCapabilities): ScenarioAst => {
   const unsupported = capabilities.capabilities.includes('client-restart') === true ? 'event-lineage' : 'client-restart'
   return defineScenario({
-    version: 3,
+    version: scenarioVersion,
     id: `host-conformance-${capabilities.profile}-unsupported`,
     description: 'Must fail preflight before participant creation.',
     tags: ['host-conformance', 'preflight'],

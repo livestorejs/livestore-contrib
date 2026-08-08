@@ -15,6 +15,7 @@ import {
   participantHostFailure,
   projectTraceAt,
   runScenario,
+  scenarioVersion,
   todoApplication,
 } from '../../test-support/scenario-test-kit.ts'
 
@@ -25,7 +26,7 @@ Vitest.describe('in-process host conformance', () => {
       const host = yield* makeInProcessHost({ application: todoApplication, backend })
       let createClientCalls = 0
       const incompatibleScenario = defineScenario({
-        version: 3,
+        version: scenarioVersion,
         id: 'preflight-incompatible-lifecycle',
         description: 'Requires a Client restart without declaring it manually.',
         tags: ['preflight'],
@@ -94,7 +95,7 @@ Vitest.describe('in-process host conformance', () => {
       const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
       const timeoutMs = 250
       const scenario = defineScenario({
-        version: 3,
+        version: scenarioVersion,
         id: 'captured-settlement-failure',
         description: 'Exercises the failed-settlement artifact contract.',
         tags: ['failure-capture'],
@@ -124,7 +125,6 @@ Vitest.describe('in-process host conformance', () => {
             id: 'must-time-out',
             participants: [participant],
             healDisconnectedClients: [participant.clientId],
-            timeoutMs,
           },
         ],
         oracles: [],
@@ -158,7 +158,16 @@ Vitest.describe('in-process host conformance', () => {
             ),
           ),
         },
-        options: { runId: 'captured-settlement-failure-test', sourceRevision: 'test' },
+        options: {
+          runId: 'captured-settlement-failure-test',
+          sourceRevision: 'test',
+          execution: {
+            participantProfile: 'in-process',
+            syncBackend: 'mock',
+            stateProfile: 'sqlite',
+            stabilizationTimeoutMs: timeoutMs,
+          },
+        },
       })
 
       expect(artifact.status).toBe('failed')
@@ -206,7 +215,7 @@ Vitest.describe('in-process host conformance', () => {
   Vitest.live('retains an indefinite operation outcome when the host loses completion evidence', (test) =>
     Effect.gen(function* () {
       const scenario = defineScenario({
-        version: 3,
+        version: scenarioVersion,
         id: 'indefinite-operation-outcome',
         description: 'Exercises ambiguous participant-host completion.',
         tags: ['failure-capture'],
@@ -274,13 +283,32 @@ Vitest.describe('in-process host conformance', () => {
     Effect.gen(function* () {
       const backend = yield* makeMockScenarioBackend
       const host = yield* makeInProcessHost({ application: todoApplication, backend })
+      const participants = [
+        { clientId: 'client-a', sessionId: 'session-a' },
+        { clientId: 'client-b', sessionId: 'session-b' },
+      ]
+      const scenario = defineScenario({
+        ...offlineWriterRecovery,
+        id: 'nested-settlement-control-failure',
+        instructions: [
+          ...offlineWriterRecovery.instructions.filter(
+            (instruction) => instruction._tag !== 'settle' && instruction._tag !== 'reconnect',
+          ),
+          {
+            _tag: 'settle',
+            id: 'settle-with-heal',
+            participants,
+            healDisconnectedClients: ['client-a'],
+          },
+        ],
+      })
       const artifact = yield* runScenario({
-        scenario: offlineWriterRecovery,
+        scenario,
         applicationId: todoApplication.id,
         host: {
           ...host,
           setConnectivity: (command) =>
-            command.operationId === 'settle-after-reconnect:heal:client-a'
+            command.operationId === 'settle-with-heal:heal:client-a'
               ? Effect.fail(
                   participantHostFailure({
                     code: 'host-transport-failure',
@@ -295,15 +323,15 @@ Vitest.describe('in-process host conformance', () => {
 
       const history = deriveScenarioOperationHistory(artifact.trace)
       expect(artifact.status).toBe('failed')
-      expect(history.find((operation) => operation.operationId === 'settle-after-reconnect:heal:client-a')).toEqual(
+      expect(history.find((operation) => operation.operationId === 'settle-with-heal:heal:client-a')).toEqual(
         expect.objectContaining({ status: 'indefinite' }),
       )
-      expect(history.find((operation) => operation.operationId === 'settle-after-reconnect')).toEqual(
+      expect(history.find((operation) => operation.operationId === 'settle-with-heal')).toEqual(
         expect.objectContaining({ status: 'indefinite' }),
       )
       expect(deriveInFlightScenarioOperationIds(artifact.trace)).toEqual([])
       expect(artifact.trace.at(-1)?.payload).toEqual(
-        expect.objectContaining({ _tag: 'run.failed', instructionId: 'settle-after-reconnect' }),
+        expect.objectContaining({ _tag: 'run.failed', instructionId: 'settle-with-heal' }),
       )
     }).pipe(Vitest.withTestCtx(test)),
   )

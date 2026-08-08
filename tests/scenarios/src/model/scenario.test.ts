@@ -7,7 +7,9 @@ import {
   expect,
   offlineWriterRecovery,
   makeSeededTodoActions,
+  scenarioVersion,
   seededTodoActions,
+  terminalStabilizationParticipants,
   todoApplication,
 } from '../test-support/scenario-test-kit.ts'
 
@@ -27,7 +29,7 @@ Vitest.describe('scenario model', () => {
     const sequence = decoded.instructions.find((instruction) => instruction._tag === 'action-sequence')
 
     expect(decoded).toEqual(seededTodoActions)
-    expect(sequence).toEqual(expect.objectContaining({ id: 'create-seeded-todos' }))
+    expect(sequence).toEqual(expect.objectContaining({ id: 'repeat-0001' }))
     expect(sequence?._tag === 'action-sequence' ? sequence.actions : []).toHaveLength(40)
     expect(decoded.instructions.some((instruction) => instruction._tag === 'action')).toBe(false)
     expect(deriveScenarioRequirements(decoded)).toContain('named-actions')
@@ -75,7 +77,7 @@ Vitest.describe('scenario model', () => {
 
   Vitest.it('validates dynamic participant additions in plan order', () => {
     const scenario = defineScenario({
-      version: 3,
+      version: scenarioVersion,
       id: 'dynamic-topology-model',
       description: 'Adds a Client and a session after startup.',
       tags: ['topology'],
@@ -125,7 +127,7 @@ Vitest.describe('scenario model', () => {
   Vitest.it('rejects participant use before its creation step', () => {
     expect(() =>
       defineScenario({
-        version: 3,
+        version: scenarioVersion,
         id: 'dynamic-topology-use-before-create',
         description: 'Invalid ordering.',
         tags: ['topology'],
@@ -172,60 +174,21 @@ Vitest.describe('scenario model', () => {
     ])
   })
 
-  Vitest.it('requires a terminal Settlement for snapshot-based oracles', () => {
-    expect(() =>
-      defineScenario({
-        ...offlineWriterRecovery,
-        id: 'missing-terminal-settlement',
-        instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
-      }),
-    ).toThrow('Snapshot-based oracles require a terminal Settlement')
-  })
-
-  Vitest.it('allows annotations after the terminal executable Settlement', () => {
+  Vitest.it('accepts snapshot-based oracles without an authored terminal Settlement', () => {
     const scenario = defineScenario({
       ...offlineWriterRecovery,
-      id: 'annotation-after-terminal-settlement',
-      instructions: [
-        ...offlineWriterRecovery.instructions,
-        { _tag: 'annotation', id: 'finished', text: 'The executable instructions are complete.' },
-      ],
+      id: 'implicit-terminal-stabilization',
+      instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
     })
 
-    expect(scenario.instructions.at(-1)).toEqual(expect.objectContaining({ _tag: 'annotation', id: 'finished' }))
+    expect(scenario.instructions.every((instruction) => instruction._tag !== 'settle')).toBe(true)
   })
 
-  Vitest.it('rejects a modifying operation after the Settlement used by snapshot-based oracles', () => {
-    expect(() =>
-      defineScenario({
-        ...offlineWriterRecovery,
-        id: 'stale-terminal-settlement',
-        instructions: [
-          ...offlineWriterRecovery.instructions,
-          {
-            _tag: 'action' as const,
-            id: 'write-after-settlement',
-            target: { clientId: 'client-a', sessionId: 'session-a' },
-            action: 'createTodo',
-            input: { id: 'too-late', text: 'This invalidates the Settlement evidence' },
-          },
-        ],
-      }),
-    ).toThrow('Snapshot-based oracles require a terminal Settlement')
-  })
-
-  Vitest.it('requires the terminal Settlement to cover every snapshot-oracle participant', () => {
-    expect(() =>
-      defineScenario({
-        ...offlineWriterRecovery,
-        id: 'incomplete-terminal-settlement',
-        instructions: offlineWriterRecovery.instructions.map((instruction) =>
-          instruction._tag === 'settle'
-            ? { ...instruction, participants: [{ clientId: 'client-a', sessionId: 'session-a' }] }
-            : instruction,
-        ),
-      }),
-    ).toThrow('Terminal Settlement is missing snapshot-oracle participants: client-b/session-b')
+  Vitest.it('derives terminal stabilization from the union of snapshot-oracle participants', () => {
+    expect(terminalStabilizationParticipants(offlineWriterRecovery)).toEqual([
+      { clientId: 'client-a', sessionId: 'session-a' },
+      { clientId: 'client-b', sessionId: 'session-b' },
+    ])
   })
 
   Vitest.it('allows operation-history-only scenarios without Settlement', () => {
@@ -239,19 +202,28 @@ Vitest.describe('scenario model', () => {
     expect(scenario.instructions.every((instruction) => instruction._tag !== 'settle')).toBe(true)
   })
 
-  Vitest.it('allows a confirmed Eventlog prefix oracle without Settlement', () => {
+  Vitest.it('excludes history-only oracles from terminal stabilization', () => {
+    const prefixOracle = {
+      _tag: 'confirmed-eventlog-prefix' as const,
+      id: 'confirmed-eventlogs-append-only',
+      participants: [{ clientId: 'client-a', sessionId: 'session-a' }],
+    }
     const scenario = defineScenario({
       ...offlineWriterRecovery,
       id: 'prefix-history-without-settlement',
       instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
-      oracles: offlineWriterRecovery.oracles.filter((oracle) => oracle._tag === 'confirmed-eventlog-prefix'),
+      oracles: [prefixOracle],
     })
 
-    expect(scenario.instructions.every((instruction) => instruction._tag !== 'settle')).toBe(true)
+    expect(terminalStabilizationParticipants(scenario)).toEqual([])
   })
 
   Vitest.it('requires a non-empty, unique participant selection for confirmed Eventlog prefix evidence', () => {
-    const prefixOracle = offlineWriterRecovery.oracles.find((oracle) => oracle._tag === 'confirmed-eventlog-prefix')!
+    const prefixOracle = {
+      _tag: 'confirmed-eventlog-prefix' as const,
+      id: 'confirmed-eventlogs-append-only',
+      participants: [{ clientId: 'client-a', sessionId: 'session-a' }],
+    }
     expect(() =>
       defineScenario({
         ...offlineWriterRecovery,

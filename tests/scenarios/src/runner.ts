@@ -3,7 +3,7 @@ import type { WranglerDevServer } from '@livestore/utils-dev/wrangler'
 import { Effect, FetchHttpClient, Layer, type OtelTracer, type Scope } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
-import type { ApplicationDefinition } from './application/definition.ts'
+import { type ApplicationDefinition, ScenarioOperationError } from './application/definition.ts'
 import {
   type CloudSyncCfScenarioBackendOptions,
   makeCloudSyncCfScenarioBackend,
@@ -15,14 +15,16 @@ import {
   type ScenarioAst,
   type ScenarioRunArtifact,
   type ScenarioTraceRecord,
+  terminalStabilizationParticipants,
 } from './model.ts'
 import { makeBrowserHost } from './profiles/browser/host.ts'
 import type { HostError, ParticipantHost } from './profiles/contract.ts'
 import { makeInProcessHost } from './profiles/in-process/host.ts'
 import { makeProcessHost } from './profiles/process/host.ts'
+import { syncObservationPayload } from './runner/eventlog.ts'
 import { executeClientCreation, executeInstruction, executeParallelInstruction } from './runner/execution.ts'
 import { makeFaultState, recordOperationFailure } from './runner/faults.ts'
-import { captureSnapshots, recordSystemObservation } from './runner/observations.ts'
+import { awaitStabilization, captureSnapshots, recordSystemObservation } from './runner/observations.ts'
 import { evaluateOracles } from './runner/oracles.ts'
 import { describeHostError, makeScenarioArtifact, validateExecution } from './runner/support.ts'
 import { makeTraceRecorder } from './runner/trace-recorder.ts'
@@ -45,6 +47,7 @@ export const defaultInProcessExecution: ExecutionConfiguration = {
   participantProfile: 'in-process',
   syncBackend: 'mock',
   stateProfile: 'sqlite',
+  stabilizationTimeoutMs: 60_000,
 }
 
 export const runInProcessScenario = <TSchema extends LiveStoreSchema>(args: {
@@ -87,6 +90,7 @@ export const runInProcessLocalSyncCfScenario = <TSchema extends LiveStoreSchema>
           participantProfile: 'in-process',
           syncBackend: 'local-sync-cf',
           stateProfile: 'sqlite',
+          stabilizationTimeoutMs: args.options?.execution?.stabilizationTimeoutMs ?? 60_000,
         },
       },
     })
@@ -116,6 +120,7 @@ export const runProcessLocalSyncCfScenario = (args: {
           participantProfile: 'process',
           syncBackend: 'local-sync-cf',
           stateProfile: 'sqlite',
+          stabilizationTimeoutMs: args.options?.execution?.stabilizationTimeoutMs ?? 60_000,
         },
       },
     })
@@ -145,6 +150,7 @@ export const runBrowserLocalSyncCfScenario = (args: {
           participantProfile: 'browser',
           syncBackend: 'local-sync-cf',
           stateProfile: 'opfs',
+          stabilizationTimeoutMs: args.options?.execution?.stabilizationTimeoutMs ?? 60_000,
         },
       },
     })
@@ -167,7 +173,12 @@ export const runInProcessCloudSyncCfScenario = <TSchema extends LiveStoreSchema>
       host,
       options: {
         ...args.options,
-        execution: { participantProfile: 'in-process', syncBackend: 'cloud-sync-cf', stateProfile: 'sqlite' },
+        execution: {
+          participantProfile: 'in-process',
+          syncBackend: 'cloud-sync-cf',
+          stateProfile: 'sqlite',
+          stabilizationTimeoutMs: args.options?.execution?.stabilizationTimeoutMs ?? 60_000,
+        },
       },
     })
   })
@@ -189,7 +200,12 @@ export const runProcessCloudSyncCfScenario = (args: {
       host,
       options: {
         ...args.options,
-        execution: { participantProfile: 'process', syncBackend: 'cloud-sync-cf', stateProfile: 'sqlite' },
+        execution: {
+          participantProfile: 'process',
+          syncBackend: 'cloud-sync-cf',
+          stateProfile: 'sqlite',
+          stabilizationTimeoutMs: args.options?.execution?.stabilizationTimeoutMs ?? 60_000,
+        },
       },
     })
   })
@@ -211,7 +227,12 @@ export const runBrowserCloudSyncCfScenario = (args: {
       host,
       options: {
         ...args.options,
-        execution: { participantProfile: 'browser', syncBackend: 'cloud-sync-cf', stateProfile: 'opfs' },
+        execution: {
+          participantProfile: 'browser',
+          syncBackend: 'cloud-sync-cf',
+          stateProfile: 'opfs',
+          stabilizationTimeoutMs: args.options?.execution?.stabilizationTimeoutMs ?? 60_000,
+        },
       },
     })
   })
@@ -287,6 +308,7 @@ export const runScenario = (args: {
             record,
             operations: instruction.operations,
             faultState,
+            stabilizationTimeoutMs: execution.stabilizationTimeoutMs,
             onFailure: (operationId) => {
               activeInstructionId = operationId
             },
@@ -298,6 +320,7 @@ export const runScenario = (args: {
             record,
             instruction,
             faultState,
+            stabilizationTimeoutMs: execution.stabilizationTimeoutMs,
           })
         }
         activeOperationId = undefined
@@ -315,6 +338,53 @@ export const runScenario = (args: {
           instructionId: instruction.id,
           instructionNumber,
           totalInstructions,
+        })
+        activeInstructionId = undefined
+      }
+
+      const terminalParticipants = terminalStabilizationParticipants(args.scenario)
+      if (terminalParticipants.length > 0) {
+        const correlationId = 'terminal-stabilization'
+        activeInstructionId = correlationId
+        record({
+          origin: 'observation',
+          correlationId,
+          payload: {
+            _tag: 'terminal-stabilization.requested',
+            participants: terminalParticipants.map((participant) => `${participant.clientId}/${participant.sessionId}`),
+            timeoutMs: execution.stabilizationTimeoutMs,
+          },
+        })
+        const inFlightOperationIds = record.pendingOperationIds([])
+        if (inFlightOperationIds.length > 0) {
+          return yield* Effect.fail(
+            new ScenarioOperationError(
+              'operations-in-flight',
+              `Terminal stabilization cannot begin with operations in flight: ${inFlightOperationIds.join(', ')}`,
+            ),
+          )
+        }
+        record({
+          origin: 'observation',
+          correlationId,
+          payload: { _tag: 'quiescence.reached', inFlightOperationIds },
+        })
+        const stabilized = yield* awaitStabilization({
+          host: args.host,
+          participants: terminalParticipants,
+          timeoutMs: execution.stabilizationTimeoutMs,
+          record,
+          correlationId,
+          faultState,
+          kind: 'terminal-stabilization',
+        })
+        record({
+          origin: 'observation',
+          correlationId,
+          payload: {
+            _tag: 'terminal-stabilization.completed',
+            observations: stabilized.map(syncObservationPayload),
+          },
         })
         activeInstructionId = undefined
       }

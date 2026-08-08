@@ -54,6 +54,7 @@ const TodoRows = Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.St
 
 export const todoApplication = defineApplication({
   id: 'scenario-todo-app',
+  scenarioName: 'todo',
   schema: todoSchema,
   actions: {
     createTodo: defineAction<typeof todoSchema, typeof CreateTodoInput>({

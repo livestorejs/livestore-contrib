@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 
 import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
@@ -9,9 +8,10 @@ import { PlatformNode } from '@livestore/utils/node'
 import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
 import type { CloudSyncCfScenarioBackendOptions } from './backends.ts'
 import { ensureCloudSyncCf } from './cloud-sync-cf.ts'
-import { getScenarioApplication } from './corpus/applications/registry.ts'
+import { getScenarioApplication, scenarioApplications } from './corpus/applications/registry.ts'
 import { getScenario, retainedScenarioCatalog } from './corpus/scenarios/registry.ts'
-import { defineScenario, type ScenarioAst, ScenarioRunArtifact } from './model.ts'
+import { compileScenarioFileSync } from './dsl/file.ts'
+import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
   type RunScenarioOptions,
   runBrowserCloudSyncCfScenario,
@@ -31,6 +31,7 @@ interface CliOptions {
   readonly backend: SyncBackend
   readonly scenario: ScenarioAst
   readonly outputPath: string
+  readonly stabilizationTimeoutMs: number
 }
 
 const runSelectedScenario = (
@@ -102,7 +103,9 @@ Options:
   --profile <in-process|process|browser>       Participant placement (default: in-process)
   --backend <mock|local-sync-cf|cloud-sync-cf> Sync backend (defaults by profile)
   --scenario <scenario-id>                    Retained Scenario (default: offline-writer-recovery)
-  --scenario-file <path>                      Local TypeScript Scenario module
+  --scenario-file <path>                      Local .scenario source file
+  --set <name=value>                          Override a declared Scenario parameter (repeatable)
+  --stabilization-timeout <duration>           Run-policy timeout for settle/stabilization (default: 60s)
   --output <path>                             Artifact output path
 
 Scenarios:
@@ -125,24 +128,43 @@ Scenarios:
   if (scenarioId !== undefined && scenarioFile !== undefined) {
     throw new Error('Choose either --scenario or --scenario-file, not both')
   }
+  const parameters = readParameterOverrides(args)
   const scenario =
     scenarioFile === undefined
-      ? getScenario(scenarioId ?? 'offline-writer-recovery')
-      : await loadScenarioFile(path.resolve(scenarioFile))
+      ? getScenario(scenarioId ?? 'offline-writer-recovery', { parameters })
+      : loadScenarioFile(path.resolve(scenarioFile), parameters)
 
   const positionalOutput = args[0]?.startsWith('-') === false ? args[0] : undefined
   const output = readOption(args, '--output') ?? positionalOutput ?? `artifacts/${scenario.id}.json`
 
-  return { profile, backend, scenario, outputPath: path.resolve(output) }
+  const stabilizationTimeoutMs = parseDuration(readOption(args, '--stabilization-timeout') ?? '60s')
+
+  return { profile, backend, scenario, outputPath: path.resolve(output), stabilizationTimeoutMs }
 }
 
-const loadScenarioFile = async (file: string): Promise<ScenarioAst> => {
-  const module = (await import(pathToFileURL(file).href)) as Record<string, unknown>
-  const candidate = module.default ?? module.scenario
-  if (candidate === undefined) {
-    throw new Error(`Scenario file must export the Scenario as default or as 'scenario': ${file}`)
+const loadScenarioFile = (file: string, parameters: Readonly<Record<string, string>>): ScenarioAst =>
+  compileScenarioFileSync(file, { applications: scenarioApplications, parameters })
+
+const readParameterOverrides = (args: ReadonlyArray<string>): Readonly<Record<string, string>> => {
+  const parameters: Record<string, string> = {}
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] !== '--set') continue
+    const assignment = args[index + 1]
+    const match = assignment === undefined ? null : /^([A-Za-z][A-Za-z0-9_-]*)=(.*)$/.exec(assignment)
+    if (match === null) throw new Error('Expected --set name=value')
+    parameters[match[1]!] = match[2]!
+    index += 1
   }
-  return defineScenario(candidate)
+  return parameters
+}
+
+const parseDuration = (source: string): number => {
+  const match = /^(\d+)(ms|s|m)$/.exec(source)
+  if (match === null)
+    throw new Error(`Invalid duration '${source}'. Expected a positive integer followed by ms, s, or m`)
+  const value = Number(match[1]) * (match[2] === 'm' ? 60_000 : match[2] === 's' ? 1_000 : 1)
+  if (value <= 0) throw new Error(`Duration must be positive: ${source}`)
+  return value
 }
 
 const readChoice = <const TChoices extends ReadonlyArray<string>>(
@@ -170,6 +192,12 @@ const program = Effect.gen(function* () {
   const runOptions = {
     runId: `${cli.scenario.id}-${cli.profile}-${Date.now()}`,
     sourceRevision: process.env.LIVESTORE_SCENARIO_SOURCE_REVISION ?? process.env.GITHUB_SHA ?? 'working-tree',
+    execution: {
+      participantProfile: cli.profile,
+      syncBackend: cli.backend,
+      stateProfile: cli.profile === 'browser' ? ('opfs' as const) : ('sqlite' as const),
+      stabilizationTimeoutMs: cli.stabilizationTimeoutMs,
+    },
     onProgress:
       process.env.SCENARIO_PROGRESS === '1'
         ? (progress: Parameters<NonNullable<RunScenarioOptions['onProgress']>>[0]) => {

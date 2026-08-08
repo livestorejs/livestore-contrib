@@ -1,0 +1,27 @@
+application todo
+about "Two Clients retain local writes while the backend route is unavailable, then recover and converge."
+
+client client-a with session-a
+client client-b with session-b
+participants both = client-a/session-a, client-b/session-b
+
+note "Remove the shared backend route and retain local writes on both Clients."
+
+backend unavailable
+
+concurrently:
+  client-a/session-a runs createTodo with
+    id: "todo-outage-a"
+    text: "Written by Client A during the backend outage"
+
+  client-b/session-b runs createTodo with
+    id: "todo-outage-b"
+    text: "Written by Client B during the backend outage"
+
+backend available
+
+expect both:
+  pending resolved
+  eventlogs converge
+  todos converges
+  todos contains ids "todo-outage-a", "todo-outage-b"

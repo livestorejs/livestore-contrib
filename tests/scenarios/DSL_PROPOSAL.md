@@ -1,7 +1,7 @@
 # Scenario DSL syntax and semantics
 
-Status: accepted design, implementation pending. TypeScript remains the current
-Scenario authoring format until the implementation slices below land.
+Status: deterministic language implemented. Elapsed waits and repeat pacing are
+the next contract slice described below.
 
 ## Purpose
 

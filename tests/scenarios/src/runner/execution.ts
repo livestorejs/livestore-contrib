@@ -13,7 +13,7 @@ import {
 import type { HostError, ParticipantHost } from '../profiles/contract.ts'
 import { syncObservationPayload } from './eventlog.ts'
 import { type ScenarioFaultState, recordOperationFailure } from './faults.ts'
-import { awaitSettlement } from './observations.ts'
+import { awaitStabilization } from './observations.ts'
 import type { TraceRecorder } from './trace-recorder.ts'
 
 export const executeParallelInstruction = (args: {
@@ -22,6 +22,7 @@ export const executeParallelInstruction = (args: {
   record: TraceRecorder
   operations: ReadonlyArray<ParallelOperationStep>
   faultState: ScenarioFaultState
+  stabilizationTimeoutMs: number
   onFailure: (operationId: string) => void
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
@@ -64,6 +65,7 @@ export const executeInstruction = (args: {
   record: TraceRecorder
   instruction: Exclude<ScenarioInstruction, { readonly _tag: 'parallel' }>
   faultState: ScenarioFaultState
+  stabilizationTimeoutMs: number
   onInvoked?: () => Effect.Effect<void>
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> => {
   switch (args.instruction._tag) {
@@ -192,7 +194,7 @@ export const executeInstruction = (args: {
             _tag: 'settlement.requested',
             participants: instruction.participants.map(participantKey),
             healDisconnectedClients: [...instruction.healDisconnectedClients],
-            timeoutMs: instruction.timeoutMs,
+            timeoutMs: args.stabilizationTimeoutMs,
           },
         })
         for (const clientId of instruction.healDisconnectedClients) {
@@ -226,13 +228,14 @@ export const executeInstruction = (args: {
           causedBy: args.record.instructionIndex(instruction.id),
           payload: { _tag: 'quiescence.reached', inFlightOperationIds },
         })
-        const settled = yield* awaitSettlement({
+        const settled = yield* awaitStabilization({
           host: args.host,
           participants: instruction.participants,
-          timeoutMs: instruction.timeoutMs,
+          timeoutMs: args.stabilizationTimeoutMs,
           record: args.record,
           correlationId: instruction.id,
           faultState: args.faultState,
+          kind: 'settlement',
         })
         args.record({
           origin: 'acknowledgement',

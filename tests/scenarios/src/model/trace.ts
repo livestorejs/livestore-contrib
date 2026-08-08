@@ -109,6 +109,23 @@ export const ScenarioTracePayload = Schema.Union([
     message: Schema.String,
   }),
   Schema.TaggedStruct('settlement.completed', { observations: Schema.Array(SyncObservationPayload) }),
+  Schema.TaggedStruct('terminal-stabilization.requested', {
+    participants: Schema.Array(Schema.String),
+    timeoutMs: Schema.Finite,
+  }),
+  Schema.TaggedStruct('terminal-stabilization.progress', {
+    settled: Schema.Boolean,
+    observations: Schema.Array(SyncObservationPayload),
+  }),
+  Schema.TaggedStruct('terminal-stabilization.failed', {
+    code: Schema.String,
+    message: Schema.String,
+    timeoutMs: Schema.Finite,
+    observations: Schema.Array(SyncObservationPayload),
+  }),
+  Schema.TaggedStruct('terminal-stabilization.completed', {
+    observations: Schema.Array(SyncObservationPayload),
+  }),
   Schema.TaggedStruct('sync.snapshot', SyncObservationPayload.fields),
   Schema.TaggedStruct('state.snapshot', { inspector: Schema.String, value: Schema.Json }),
   Schema.TaggedStruct('backend.observed', { reason: Schema.String, observation: BackendObservation }),

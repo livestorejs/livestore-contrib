@@ -176,10 +176,11 @@ export const settlementTimeoutError = (
   correlationId: string,
   timeoutMs: number,
   observations: ReadonlyArray<SyncObservationPayload>,
+  kind: 'settlement' | 'terminal-stabilization' = 'settlement',
 ): ScenarioOperationError =>
   new ScenarioOperationError(
     'settlement-timeout',
-    `Settlement ${correlationId} did not reach a stable fixed point within ${timeoutMs}ms: ${canonicalJson(observations)}`,
+    `${kind === 'settlement' ? 'Settlement' : 'Terminal stabilization'} ${correlationId} did not reach a stable fixed point within ${timeoutMs}ms: ${canonicalJson(observations)}`,
   )
 
 export const observationsAreSettled = (observations: ReadonlyArray<SyncObservation>): boolean => {

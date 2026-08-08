@@ -106,9 +106,11 @@ export const expectOfflineEventCorrelationLifecycle = (artifact: ScenarioRunArti
 
   const recoveredObservation = artifact.trace.findLast(
     (record) =>
+      reconnectIndex !== undefined &&
+      record.index > reconnectIndex &&
       record.clientId === 'client-a' &&
       record.payload._tag === 'leader.sync.observed' &&
-      record.payload.reason === 'settle-after-reconnect',
+      record.payload.observation.pendingCount === 0,
   )
   expect(recoveredObservation?.payload._tag).toBe('leader.sync.observed')
   if (pendingEvent === undefined || recoveredObservation?.payload._tag !== 'leader.sync.observed') return
@@ -129,7 +131,10 @@ export const expectBackendOutageRecovery = (artifact: ScenarioRunArtifact): void
   )
   const recovered = artifact.trace.find(
     (record) =>
-      record.payload._tag === 'recovery.completed' && record.payload.faultIds.includes('backend-outage-started'),
+      record.payload._tag === 'recovery.completed' &&
+      injected?.correlationId !== null &&
+      injected?.correlationId !== undefined &&
+      record.payload.faultIds.includes(injected.correlationId),
   )
   expect(injected).toBeDefined()
   expect(removed?.index).toBeGreaterThan(injected?.index ?? Number.POSITIVE_INFINITY)
@@ -154,9 +159,10 @@ export const expectBackendOutageRecovery = (artifact: ScenarioRunArtifact): void
   expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
 }
 
-export const generatedActionSignature = (artifact: ScenarioRunArtifact): ReadonlyArray<unknown> =>
-  artifact.trace.flatMap((record) =>
-    record.payload._tag === 'action.requested' && record.causationId === 'create-seeded-todos'
+export const generatedActionSignature = (artifact: ScenarioRunArtifact): ReadonlyArray<unknown> => {
+  const sequenceId = artifact.scenario.instructions.find((instruction) => instruction._tag === 'action-sequence')?.id
+  return artifact.trace.flatMap((record) =>
+    record.payload._tag === 'action.requested' && record.causationId === sequenceId
       ? [
           {
             operationId: record.correlationId,
@@ -167,3 +173,4 @@ export const generatedActionSignature = (artifact: ScenarioRunArtifact): Readonl
         ]
       : [],
   )
+}

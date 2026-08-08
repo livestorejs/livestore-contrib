@@ -1,13 +1,7 @@
 import { Schema } from '@livestore/utils/effect'
 
 import { expandScenarioAuthoring, scenarioAuthoring, type ScenarioDefinitionFactory } from './authoring.ts'
-import {
-  type ClientDefinition,
-  type ParallelOperationStep,
-  type ParticipantRef,
-  ScenarioAst,
-  type ScenarioInstruction,
-} from './scenario.ts'
+import { type ClientDefinition, type ParallelOperationStep, type ParticipantRef, ScenarioAst } from './scenario.ts'
 
 export class ScenarioValidationError extends Error {
   readonly _tag = 'ScenarioValidationError'
@@ -59,7 +53,6 @@ export function defineScenario(input: unknown): ScenarioAst {
 
   const instructionIds = new Set<string>()
   const operationIds = new Set<string>()
-  const executableInstructions: ScenarioInstruction[] = []
   const validateOperation = (operation: ParallelOperationStep) => {
     if (instructionIds.has(operation.id) === true) {
       throw new ScenarioValidationError(`Duplicate instruction id: ${operation.id}`)
@@ -78,7 +71,6 @@ export function defineScenario(input: unknown): ScenarioAst {
       throw new ScenarioValidationError(`Duplicate instruction id: ${instruction.id}`)
     }
     instructionIds.add(instruction.id)
-    if (instruction._tag !== 'annotation') executableInstructions.push(instruction)
     if (instruction._tag === 'parallel') {
       if (instruction.operations.length < 2) {
         throw new ScenarioValidationError(
@@ -140,15 +132,11 @@ export function defineScenario(input: unknown): ScenarioAst {
       }
     }
     if (instruction._tag === 'settle') {
-      if (instruction.timeoutMs <= 0) {
-        throw new ScenarioValidationError(`Settle timeout must be positive: ${instruction.id}`)
-      }
       instruction.participants.forEach(assertParticipant)
       instruction.healDisconnectedClients.forEach(assertClient)
     }
   }
 
-  const snapshotOracleParticipants = new Set<string>()
   for (const oracle of scenario.oracles) {
     if (oracle._tag === 'operation-history') {
       if (oracle.operationIds.length === 0) {
@@ -184,26 +172,7 @@ export function defineScenario(input: unknown): ScenarioAst {
     } else {
       for (const participant of oracle.participants) {
         assertParticipant(participant)
-        snapshotOracleParticipants.add(participantKey(participant))
       }
-    }
-  }
-
-  if (snapshotOracleParticipants.size > 0) {
-    const terminalInstruction = executableInstructions.at(-1)
-    if (terminalInstruction?._tag !== 'settle') {
-      throw new ScenarioValidationError(
-        'Snapshot-based oracles require a terminal Settlement as the final executable Scenario instruction',
-      )
-    }
-    const settledParticipants = new Set(terminalInstruction.participants.map(participantKey))
-    const missingParticipants = [...snapshotOracleParticipants].filter(
-      (participant) => settledParticipants.has(participant) === false,
-    )
-    if (missingParticipants.length > 0) {
-      throw new ScenarioValidationError(
-        `Terminal Settlement is missing snapshot-oracle participants: ${missingParticipants.join(', ')}`,
-      )
     }
   }
 
@@ -229,3 +198,13 @@ export const deriveScenarioTopology = (scenario: ScenarioAst): ReadonlyArray<Cli
 }
 
 export const participantKey = ({ clientId, sessionId }: ParticipantRef): string => `${clientId}/${sessionId}`
+
+/** Snapshot properties establish one terminal stable boundary over their union. */
+export const terminalStabilizationParticipants = (scenario: ScenarioAst): ReadonlyArray<ParticipantRef> => {
+  const participants = new Map<string, ParticipantRef>()
+  for (const oracle of scenario.oracles) {
+    if (oracle._tag === 'operation-history' || oracle._tag === 'confirmed-eventlog-prefix') continue
+    for (const participant of oracle.participants) participants.set(participantKey(participant), participant)
+  }
+  return [...participants.values()]
+}

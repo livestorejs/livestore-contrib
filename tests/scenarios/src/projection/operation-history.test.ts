@@ -11,6 +11,7 @@ import {
   makeMockScenarioBackend,
   participantHostFailure,
   runScenario,
+  scenarioVersion,
   todoApplication,
 } from '../test-support/scenario-test-kit.ts'
 
@@ -22,7 +23,7 @@ Vitest.describe('scenario operation history', () => {
         const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
         const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
         const scenario = defineScenario({
-          version: 3,
+          version: scenarioVersion,
           id: 'parallel-operation-history',
           description: 'Exercises overlapping application operations and history checking.',
           tags: ['operation-history', 'parallel'],
@@ -61,13 +62,6 @@ Vitest.describe('scenario operation history', () => {
                   input: { id: 'parallel-b', text: 'Written by Client B' },
                 },
               ],
-            },
-            {
-              _tag: 'settle',
-              id: 'settle-parallel-writes',
-              participants: [clientA, clientB],
-              healDisconnectedClients: [],
-              timeoutMs: 3_000,
             },
           ],
           oracles: [
@@ -123,7 +117,7 @@ Vitest.describe('scenario operation history', () => {
       const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
       const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
       const scenario = defineScenario({
-        version: 3,
+        version: scenarioVersion,
         id: 'parallel-operation-failure',
         description: 'Retains all child outcomes when a parallel operation fails.',
         tags: ['operation-history', 'parallel', 'failure'],
