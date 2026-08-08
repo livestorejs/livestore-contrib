@@ -1,7 +1,7 @@
 import { scenarioApplications } from '../../corpus/applications/registry.ts'
-import { compileScenarioFileSync } from '../../dsl/file.ts'
+import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
 
-export const backendOutageRecovery = compileScenarioFileSync(
-  new URL('./backend-outage-recovery.scenario', import.meta.url),
+export const backendOutageRecovery = compileScenarioYamlFileSync(
+  new URL('./backend-outage-recovery.scenario.yaml', import.meta.url),
   { applications: scenarioApplications },
 )

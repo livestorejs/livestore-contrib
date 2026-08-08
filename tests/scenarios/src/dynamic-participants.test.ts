@@ -19,11 +19,17 @@ Vitest.describe('dynamic participant addition', () => {
 
       expect(artifact.status).toBe('passed')
       expect(artifact.snapshots).toHaveLength(2)
+      const initialSettlementId = lateClientCatchUp.instructions.find(
+        (instruction) => instruction._tag === 'settle',
+      )?.id
+      const lateCreationId = lateClientCatchUp.instructions.find(
+        (instruction) => instruction._tag === 'create-client',
+      )?.id
       const initialSettlement = artifact.trace.find(
-        (record) => record.correlationId === 'settle-initial-history' && record.payload._tag === 'settlement.completed',
+        (record) => record.correlationId === initialSettlementId && record.payload._tag === 'settlement.completed',
       )
       const lateCreation = artifact.trace.find(
-        (record) => record.correlationId === 'create-client-b' && record.payload._tag === 'client.created',
+        (record) => record.correlationId === lateCreationId && record.payload._tag === 'client.created',
       )
       expect(initialSettlement?.index).toBeLessThan(lateCreation?.index ?? -1)
       expect(

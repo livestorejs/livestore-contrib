@@ -14,6 +14,7 @@ const runtimeDeps = catalog.compose({
       ...catalog.pick('@cloudflare/workers-types'),
       '@playwright/test': '1.61.0',
       ...catalog.pick('react', 'react-dom'),
+      yaml: '2.9.0',
     },
   },
   devDependencies: {

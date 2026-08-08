@@ -4,6 +4,34 @@ import { Effect, Schema } from '@livestore/utils/effect'
 
 import type { ParticipantRef } from '../model.ts'
 
+export interface ScenarioGeneratorRandom {
+  /** Returns a stable value in [0, 1) for this iteration and key. */
+  readonly next: (key: string) => number
+  readonly integer: (key: string, maximumExclusive: number) => number
+  readonly pick: <T>(key: string, values: ReadonlyArray<T>) => T
+}
+
+export interface ScenarioGeneratorRandomSource {
+  /** Iterations are authored as positive, one-based numbers. */
+  readonly iteration: (iteration: number) => ScenarioGeneratorRandom
+}
+
+export interface GeneratedScenarioAction {
+  readonly target: ParticipantRef
+  readonly action: string
+  readonly input: Schema.Json
+}
+
+export interface ScenarioGeneratorContext {
+  readonly random: ScenarioGeneratorRandomSource
+  readonly participant: (reference: string) => ParticipantRef
+  readonly participants: (selection: string | ReadonlyArray<string>) => ReadonlyArray<ParticipantRef>
+}
+
+export interface RegisteredScenarioGenerator {
+  readonly generate: (input: Schema.Json, context: ScenarioGeneratorContext) => ReadonlyArray<GeneratedScenarioAction>
+}
+
 export type ScenarioOperationFailureOutcome = 'definite-failure' | 'indefinite'
 
 export type ParticipantHostFailureCode =
@@ -67,11 +95,23 @@ export interface ApplicationDefinition<TSchema extends LiveStoreSchema> {
   readonly schema: TSchema
   readonly actions: Readonly<Record<string, ApplicationAction<TSchema>>>
   readonly inspectors: Readonly<Record<string, ApplicationInspector<TSchema>>>
+  readonly scenarioGenerators?: Readonly<Record<string, RegisteredScenarioGenerator>>
 }
 
 export const defineApplication = <TSchema extends LiveStoreSchema>(
   definition: ApplicationDefinition<TSchema>,
 ): ApplicationDefinition<TSchema> => definition
+
+/** Registers typed, trusted authoring code that expands to concrete application actions. */
+export const defineScenarioGenerator = <TInputSchema extends Schema.Codec<unknown, unknown, never, never>>(args: {
+  readonly input: TInputSchema
+  readonly generate: (args: {
+    readonly input: TInputSchema['Type']
+    readonly context: ScenarioGeneratorContext
+  }) => ReadonlyArray<GeneratedScenarioAction>
+}): RegisteredScenarioGenerator => ({
+  generate: (input, context) => args.generate({ input: Schema.decodeUnknownSync(args.input)(input), context }),
+})
 
 /** Binds schema decoding to an action before it crosses the participant-host boundary. */
 export const defineAction = <

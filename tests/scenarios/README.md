@@ -15,7 +15,7 @@ pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile process --backend cloud-sync-cf
 pnpm --dir tests/scenarios scenario:run --scenario concurrent-hotel-booking
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario multi-session-recovery
-pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.scenario
+pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.scenario.yaml
 pnpm --dir tests/scenarios scenario:run --scenario many-writer-convergence --set event_count=100
 ```
 
@@ -85,23 +85,25 @@ broader campaign and failure-reduction plan.
 ## Author and promote a scenario
 
 Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications).
-They contain only the real LiveStore schema, materializers, normal application
-actions, and State inspectors. Scenario scheduling and generated activity never
-enter an Application definition.
+They contain the real LiveStore schema, materializers, normal application
+actions, State inspectors, and any named TypeScript generators needed by YAML
+Scenario source. Generators can produce concrete actions but cannot schedule
+arbitrary runner instructions or define oracles.
 
-Scenario source uses the deterministic, human-readable `.scenario` language.
-See [DSL_PROPOSAL.md](./DSL_PROPOSAL.md) for the syntax, complete construct
-reference, examples, and compilation semantics. The CLI compiles retained or
-local source before the runner starts; `--set name=value` overrides a declared
-parameter without coupling the source to environment variables.
+Scenario source uses deterministic, human-readable `.scenario.yaml` documents.
+See [YAML_SCENARIOS.md](./YAML_SCENARIOS.md) for the schema, complete construct
+reference, generator boundary, examples, and compilation semantics. The CLI
+compiles retained or local source before the runner starts; `--set name=value`
+overrides a declared parameter without coupling the source to environment
+variables.
 
-Use `wait 2s` when elapsed delay is part of the Scenario story. Repeated actions
-can use `repeat ... with 250ms between:` for fixed delay after each acknowledged
-action except the last. Both forms retain requested and actual controller-time
-evidence; neither implies Settlement or a timing assertion.
+Use `- wait: 2s` when elapsed delay is part of the Scenario story. Repeated or
+generated actions can set `between: 250ms` for fixed delay after each
+acknowledged action except the last. Both forms retain requested and actual
+controller-time evidence; neither implies Settlement or a timing assertion.
 
 Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
-by Git. Copy `scenario.template.scenario`, define its ordered instructions, and
+by Git. Copy `scenario.template.scenario.yaml`, define its ordered instructions, and
 run it with `--scenario-file`. This tier is for generated cases, parameter
 sweeps, reductions, and hypotheses whose durable purpose is not established.
 

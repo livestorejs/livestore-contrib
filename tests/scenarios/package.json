@@ -22,7 +22,8 @@
     "@livestore/utils": "workspace:^",
     "@playwright/test": "1.61.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "@effect/opentelemetry": "4.0.0-beta.99",

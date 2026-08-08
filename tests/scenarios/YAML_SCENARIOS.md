@@ -289,14 +289,15 @@ The generator uses ordinary TypeScript:
 ```ts
 export const distributedTodos = defineScenarioGenerator({
   input: Schema.Struct({
-    participants: Schema.Array(ParticipantRef),
+    participants: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
     count: Schema.Int,
     idPrefix: Schema.String,
   }),
-  generate: ({ input, random }) =>
-    Array.from({ length: input.count }, (_, offset) => {
+  generate: ({ input, context }) => {
+    const participants = context.participants(input.participants)
+    return Array.from({ length: input.count }, (_, offset) => {
       const event = offset + 1
-      const target = random.iteration(event).pick('target', input.participants)
+      const target = context.random.iteration(event).pick('target', participants)
 
       return {
         target,
@@ -306,7 +307,8 @@ export const distributedTodos = defineScenarioGenerator({
           text: `Distributed write ${event}`,
         },
       }
-    }),
+    })
+  },
 })
 ```
 

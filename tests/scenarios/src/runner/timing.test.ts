@@ -1,5 +1,4 @@
 import { scenarioApplications } from '../corpus/applications/registry.ts'
-import { compileScenarioSource } from '../dsl/compiler.ts'
 import {
   Effect,
   Vitest,
@@ -10,23 +9,31 @@ import {
   runInProcessScenario,
   todoApplication,
 } from '../test-support/scenario-test-kit.ts'
+import { compileScenarioYamlSource } from '../yaml/compiler.ts'
 
 Vitest.describe('Scenario elapsed-time instructions', () => {
   Vitest.live('waits explicitly and leaves fixed delays only between repeated actions', (test) =>
     Effect.gen(function* () {
-      const compiled = compileScenarioSource({
-        fileName: 'timed-actions.scenario',
+      const compiled = compileScenarioYamlSource({
+        fileName: 'timed-actions.scenario.yaml',
         applications: scenarioApplications,
         source: `
-application todo
-client client-a with main
-
-wait 20ms
-
-repeat 3 times as item with 15ms between:
-  client-a/main runs createTodo with
-    id: "timed-${'${item}'}"
-    text: "Timed action ${'${item}'}"
+application: todo
+clients:
+  client-a:
+    sessions: [main]
+do:
+  - wait: 20ms
+  - repeat:
+      times: 3
+      as: item
+      between: 15ms
+      action:
+        run: createTodo
+        as: client-a/main
+        with:
+          id: timed-${'${item}'}
+          text: Timed action ${'${item}'}
 `,
       })
       const scenario = defineScenario({ ...compiled, oracles: [] })

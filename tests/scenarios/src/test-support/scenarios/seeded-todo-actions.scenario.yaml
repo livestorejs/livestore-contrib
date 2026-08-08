@@ -1,0 +1,18 @@
+application: todo
+seed: 1445
+about: A seeded Scenario expands a readable generator call into concrete todo actions.
+
+clients:
+  client-a:
+    sessions: [session-a]
+
+do:
+  - note: Generate concrete createTodo actions here in the Scenario and dispatch them in order.
+
+  - generate: todoSeries
+    with:
+      target: client-a/session-a
+      count: 40
+      idPrefix: seeded-todo
+      textPrefix: Seeded task
+    expect: all-finish

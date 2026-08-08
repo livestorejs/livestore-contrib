@@ -1,0 +1,19 @@
+application: todo
+about: Describe the behavior or hypothesis this Scenario exercises.
+
+clients:
+  client-a:
+    sessions: [main]
+
+do:
+  # Add ordered instructions here.
+  - run: createTodo
+    as: client-a/main
+    with:
+      id: todo-1
+      text: Replace this example action
+
+expect:
+  participants: client-a/main
+  pending: resolved
+  eventlogs: converge

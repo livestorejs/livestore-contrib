@@ -23,13 +23,13 @@ Vitest.describe('scenario model', () => {
     expect(() => defineScenario({ ...offlineWriterRecovery, version: 1 })).toThrow('Invalid scenario AST')
   })
 
-  Vitest.it('expands Scenario-owned repetition into one self-contained serializable action sequence', () => {
+  Vitest.it('retains generator expansion as one self-contained serializable action sequence', () => {
     const encoded = JSON.parse(JSON.stringify(seededTodoActions))
     const decoded = defineScenario(encoded)
     const sequence = decoded.instructions.find((instruction) => instruction._tag === 'action-sequence')
 
     expect(decoded).toEqual(seededTodoActions)
-    expect(sequence).toEqual(expect.objectContaining({ id: 'repeat-0001' }))
+    expect(sequence).toEqual(expect.objectContaining({ id: 'generate-0001' }))
     expect(sequence?._tag === 'action-sequence' ? sequence.actions : []).toHaveLength(40)
     expect(decoded.instructions.some((instruction) => instruction._tag === 'action')).toBe(false)
     expect(deriveScenarioRequirements(decoded)).toContain('named-actions')
@@ -51,27 +51,26 @@ Vitest.describe('scenario model', () => {
     expect(first.actions).not.toEqual(different.actions)
   })
 
-  Vitest.it('rejects empty or unbounded repeated action counts', () => {
+  Vitest.it('rejects empty or unbounded generated action sequences', () => {
+    const sequence = seededTodoActions.instructions.find((instruction) => instruction._tag === 'action-sequence')!
+    if (sequence._tag !== 'action-sequence') throw new Error('Expected generated action sequence')
     for (const count of [0, 10_001]) {
       expect(() =>
-        defineScenario(({ repeatActions }) => ({
+        defineScenario({
           ...seededTodoActions,
           id: `invalid-action-count-${count}`,
           instructions: [
-            repeatActions({
-              id: 'invalid-actions',
-              description: 'Invalid actions',
-              count,
-              generate: () => ({
-                target: { clientId: 'client-a', sessionId: 'session-a' },
-                action: 'createTodo',
-                input: { id: 'invalid', text: 'Invalid' },
-              }),
-            }),
+            {
+              ...sequence,
+              actions: Array.from({ length: count }, (_, index) => ({
+                ...sequence.actions[0]!,
+                id: `generated:${index}`,
+              })),
+            },
           ],
           oracles: [],
-        })),
-      ).toThrow('Repeated action count must be between 1 and 10000')
+        }),
+      ).toThrow('Action sequence must contain between 1 and 10000 actions')
     }
   })
 

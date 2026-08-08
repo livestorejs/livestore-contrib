@@ -10,7 +10,6 @@ import type { CloudSyncCfScenarioBackendOptions } from './backends.ts'
 import { ensureCloudSyncCf } from './cloud-sync-cf.ts'
 import { getScenarioApplication, scenarioApplications } from './corpus/applications/registry.ts'
 import { getScenario, retainedScenarioCatalog } from './corpus/scenarios/registry.ts'
-import { compileScenarioFileSync } from './dsl/file.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
   type RunScenarioOptions,
@@ -22,6 +21,7 @@ import {
   runProcessCloudSyncCfScenario,
   runProcessLocalSyncCfScenario,
 } from './runner.ts'
+import { compileScenarioYamlFileSync } from './yaml/file.ts'
 
 type ParticipantProfile = 'in-process' | 'process' | 'browser'
 type SyncBackend = 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
@@ -103,7 +103,7 @@ Options:
   --profile <in-process|process|browser>       Participant placement (default: in-process)
   --backend <mock|local-sync-cf|cloud-sync-cf> Sync backend (defaults by profile)
   --scenario <scenario-id>                    Retained Scenario (default: offline-writer-recovery)
-  --scenario-file <path>                      Local .scenario source file
+  --scenario-file <path>                      Local .scenario.yaml source file
   --set <name=value>                          Override a declared Scenario parameter (repeatable)
   --stabilization-timeout <duration>           Run-policy timeout for settle/stabilization (default: 60s)
   --output <path>                             Artifact output path
@@ -143,7 +143,7 @@ Scenarios:
 }
 
 const loadScenarioFile = (file: string, parameters: Readonly<Record<string, string>>): ScenarioAst =>
-  compileScenarioFileSync(file, { applications: scenarioApplications, parameters })
+  compileScenarioYamlFileSync(file, { applications: scenarioApplications, parameters })
 
 const readParameterOverrides = (args: ReadonlyArray<string>): Readonly<Record<string, string>> => {
   const parameters: Record<string, string> = {}

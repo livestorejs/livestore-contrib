@@ -1,0 +1,37 @@
+application: todo
+parameters:
+  payload_bytes:
+    type: integer
+    default: 899643
+about: An Event with a ${payload_bytes}-byte string crosses offline storage and backend synchronization.
+
+clients:
+  client-a:
+    sessions: [session-a]
+  client-b:
+    sessions: [session-b]
+
+participants:
+  both: [client-a/session-a, client-b/session-b]
+
+do:
+  - note: Commit the payload while Client A cannot reach the backend.
+
+  - disconnect: client-a
+
+  - generate: largePayloadTodo
+    with:
+      target: client-a/session-a
+      id: large-payload
+      payloadBytes: ${payload_bytes}
+
+  - reconnect: client-a
+
+expect:
+  participants: both
+  pending: resolved
+  eventlogs: converge
+  state:
+    todos:
+      converge: true
+      containsIds: [large-payload]

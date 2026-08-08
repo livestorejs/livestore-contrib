@@ -2,6 +2,7 @@ import { Events, makeSchema, State } from '@livestore/common/schema'
 import { Effect, Schema } from '@livestore/utils/effect'
 
 import { defineAction, defineApplication, defineInspector } from '../../application/definition.ts'
+import { todoScenarioGenerators } from './todo-generators.ts'
 
 export const todoEvents = {
   created: Events.synced({
@@ -80,4 +81,5 @@ export const todoApplication = defineApplication({
       read: ({ store }) => store.query(todosTable).toSorted((left, right) => left.id.localeCompare(right.id)),
     }),
   },
+  scenarioGenerators: todoScenarioGenerators,
 })

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { RegisteredApplication } from '../corpus/applications/registry.ts'
 import type { ScenarioAst } from '../model.ts'
-import { compileScenarioSource } from './compiler.ts'
+import { compileScenarioYamlSource } from './compiler.ts'
 
 export interface ScenarioFileCompileOptions {
   readonly applications: ReadonlyArray<RegisteredApplication>
@@ -12,7 +12,7 @@ export interface ScenarioFileCompileOptions {
   readonly seed?: number
 }
 
-export const compileScenarioFileSync = (file: string | URL, options: ScenarioFileCompileOptions): ScenarioAst => {
+export const compileScenarioYamlFileSync = (file: string | URL, options: ScenarioFileCompileOptions): ScenarioAst => {
   const fileName = file instanceof URL ? fileURLToPath(file) : path.resolve(file)
-  return compileScenarioSource({ fileName, source: fs.readFileSync(fileName, 'utf8'), ...options })
+  return compileScenarioYamlSource({ fileName, source: fs.readFileSync(fileName, 'utf8'), ...options })
 }

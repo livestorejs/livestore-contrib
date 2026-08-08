@@ -1,0 +1,49 @@
+application: todo
+seed: 3001
+parameters:
+  pending_count:
+    type: integer
+    default: 400
+about: An offline Client rebases ${pending_count} pending Events over one confirmed remote Event.
+
+clients:
+  client-a:
+    sessions: [session-a]
+  client-b:
+    sessions: [session-b]
+
+participants:
+  both: [client-a/session-a, client-b/session-b]
+
+do:
+  - note: Client A accumulates a large pending tail while Client B confirms independent history.
+
+  - disconnect: client-a
+
+  - generate: todoSeries
+    with:
+      target: client-a/session-a
+      count: ${pending_count}
+      idPrefix: pending
+      textPrefix: Offline pending item
+
+  - run: createTodo
+    as: client-b/session-b
+    with:
+      id: remote-confirmed
+      text: Confirmed ahead of the pending tail
+
+  - settle: client-b/session-b
+
+  - note: Client A reconnects and rebases its pending tail over the confirmed remote write.
+
+  - reconnect: client-a
+
+expect:
+  participants: both
+  pending: resolved
+  eventlogs: converge
+  state:
+    todos:
+      converge: true
+      containsIds: [pending-001, 'pending-${pad(pending_count, 3)}', remote-confirmed]

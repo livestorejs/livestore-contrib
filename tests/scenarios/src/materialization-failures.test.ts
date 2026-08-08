@@ -32,8 +32,11 @@ Vitest.describe('materialization failure scenarios', () => {
       )
       expect(runtimeFailure).toEqual(expect.objectContaining({ clientId: 'client-a', sessionId: 'session-a' }))
 
+      const reconnectId = concurrentHotelBooking.instructions.find(
+        (instruction) => instruction._tag === 'reconnect',
+      )?.id
       const backendAtReconnect = artifact.trace.find(
-        (record) => record.payload._tag === 'backend.observed' && record.payload.reason === 'reconnect-client-a',
+        (record) => record.payload._tag === 'backend.observed' && record.payload.reason === reconnectId,
       )
       expect(backendAtReconnect?.payload).toEqual(
         expect.objectContaining({
@@ -56,7 +59,7 @@ Vitest.describe('materialization failure scenarios', () => {
         expect.objectContaining({
           _tag: 'run.failed',
           code: 'participant-runtime-failure',
-          instructionId: 'observe-materialization-failure',
+          instructionId: reconnectId,
         }),
       )
     }).pipe(Vitest.withTestCtx(test)),

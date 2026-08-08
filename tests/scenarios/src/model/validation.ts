@@ -1,6 +1,5 @@
 import { Schema } from '@livestore/utils/effect'
 
-import { expandScenarioAuthoring, scenarioAuthoring, type ScenarioDefinitionFactory } from './authoring.ts'
 import { type ClientDefinition, type ParallelOperationStep, type ParticipantRef, ScenarioAst } from './scenario.ts'
 
 export class ScenarioValidationError extends Error {
@@ -13,17 +12,10 @@ export class ScenarioValidationError extends Error {
 }
 
 /** Validates both the wire shape and the cross-reference invariants of a scenario. */
-export function defineScenario(input: ScenarioDefinitionFactory): ScenarioAst
-export function defineScenario(input: unknown): ScenarioAst
-export function defineScenario(input: unknown): ScenarioAst {
+export const defineScenario = (input: unknown): ScenarioAst => {
   let scenario: ScenarioAst
   try {
-    const authored = typeof input === 'function' ? (input as ScenarioDefinitionFactory)(scenarioAuthoring) : input
-    const expanded =
-      typeof input === 'function'
-        ? expandScenarioAuthoring(authored as ReturnType<ScenarioDefinitionFactory>)
-        : authored
-    scenario = Schema.decodeUnknownSync(ScenarioAst)(expanded)
+    scenario = Schema.decodeUnknownSync(ScenarioAst)(input)
   } catch (cause) {
     throw new ScenarioValidationError(`Invalid scenario AST: ${String(cause)}`)
   }

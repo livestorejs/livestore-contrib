@@ -1,0 +1,64 @@
+application: todo
+seed: 1446
+parameters:
+  history_count:
+    type: integer
+    default: 8
+about: A new Client starts from empty local state after history exists, writes, and converges.
+
+clients:
+  client-a:
+    sessions: [session-a]
+
+do:
+  - note: The initial Client commits and confirms history before the second Client exists.
+
+  - generate: todoSeries
+    with:
+      target: client-a/session-a
+      count: ${history_count}
+      idPrefix: history
+      textPrefix: Before the late Client
+
+  - settle: client-a/session-a
+
+  - note: Client B is created from empty local state and both Clients write before final stabilization.
+
+  - createClient:
+      id: client-b
+      sessions: [session-b]
+
+  - participants:
+      both: [client-a/session-a, client-b/session-b]
+
+  - concurrently:
+      - run: createTodo
+        as: client-a/session-a
+        with:
+          id: after-join-a
+          text: Written by the established Client
+
+      - run: createTodo
+        as: client-b/session-b
+        with:
+          id: after-join-b
+          text: Written by the late Client
+
+expect:
+  participants: both
+  pending: resolved
+  eventlogs: converge
+  state:
+    todos:
+      converge: true
+      containsIds:
+        - history-001
+        - history-002
+        - history-003
+        - history-004
+        - history-005
+        - history-006
+        - history-007
+        - history-008
+        - after-join-a
+        - after-join-b

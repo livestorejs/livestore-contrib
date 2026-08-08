@@ -1,5 +1,5 @@
-import { compileScenarioFileSync } from '../../dsl/file.ts'
 import type { ScenarioAst } from '../../model.ts'
+import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
 import { scenarioApplications } from '../applications/registry.ts'
 
 export interface RetainedScenarioEntry {
@@ -14,32 +14,32 @@ export interface RetainedScenarioCompileOptions {
 }
 
 const sources = [
-  { kind: 'example', file: new URL('./retained/examples/offline-writer-recovery.scenario', import.meta.url) },
-  { kind: 'example', file: new URL('./retained/examples/multi-session-recovery.scenario', import.meta.url) },
+  { kind: 'example', file: new URL('./retained/examples/offline-writer-recovery.scenario.yaml', import.meta.url) },
+  { kind: 'example', file: new URL('./retained/examples/multi-session-recovery.scenario.yaml', import.meta.url) },
   {
     kind: 'finding',
     findingId: 'SF-01',
-    file: new URL('./retained/findings/concurrent-hotel-booking.scenario', import.meta.url),
+    file: new URL('./retained/findings/concurrent-hotel-booking.scenario.yaml', import.meta.url),
   },
   {
     kind: 'finding',
     findingId: 'SF-02',
-    file: new URL('./retained/findings/pending-tail-recovery.scenario', import.meta.url),
+    file: new URL('./retained/findings/pending-tail-recovery.scenario.yaml', import.meta.url),
   },
   {
     kind: 'finding',
     findingId: 'SF-03',
-    file: new URL('./retained/findings/many-writer-convergence.scenario', import.meta.url),
+    file: new URL('./retained/findings/many-writer-convergence.scenario.yaml', import.meta.url),
   },
   {
     kind: 'finding',
     findingId: 'SF-04',
-    file: new URL('./retained/findings/large-payload-recovery.scenario', import.meta.url),
+    file: new URL('./retained/findings/large-payload-recovery.scenario.yaml', import.meta.url),
   },
 ] as const
 
 const compile = (file: URL, options: RetainedScenarioCompileOptions = {}): ScenarioAst =>
-  compileScenarioFileSync(file, { applications: scenarioApplications, ...options })
+  compileScenarioYamlFileSync(file, { applications: scenarioApplications, ...options })
 
 export const retainedScenarioCatalog: ReadonlyArray<RetainedScenarioEntry> = sources.map((source) => ({
   kind: source.kind,
@@ -54,7 +54,7 @@ const sourcesById = new Map(
     source.file.pathname
       .split('/')
       .at(-1)!
-      .replace(/\.scenario$/, ''),
+      .replace(/\.scenario\.yaml$/, ''),
     source,
   ]),
 )

@@ -1,6 +1,7 @@
 import { scenarioApplications } from '../../corpus/applications/registry.ts'
-import { compileScenarioFileSync } from '../../dsl/file.ts'
+import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
 
-export const lateClientCatchUp = compileScenarioFileSync(new URL('./late-client-catch-up.scenario', import.meta.url), {
-  applications: scenarioApplications,
-})
+export const lateClientCatchUp = compileScenarioYamlFileSync(
+  new URL('./late-client-catch-up.scenario.yaml', import.meta.url),
+  { applications: scenarioApplications },
+)

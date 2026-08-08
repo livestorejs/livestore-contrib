@@ -1,0 +1,34 @@
+application: todo
+seed: 3004
+parameters:
+  event_count:
+    type: integer
+    default: 426
+about: Two Clients distribute and converge ${event_count} uniquely identified Events.
+
+clients:
+  client-1:
+    sessions: [session-1]
+  client-2:
+    sessions: [session-2]
+
+participants:
+  writers: [client-1/session-1, client-2/session-2]
+
+do:
+  - note: Generate deterministic createTodo actions here and distribute them across all Clients.
+
+  - generate: distributedTodos
+    with:
+      participants: writers
+      count: ${event_count}
+      idPrefix: many-writer
+
+expect:
+  participants: writers
+  pending: resolved
+  eventlogs: converge
+  state:
+    todos:
+      converge: true
+      containsIds: [many-writer-001, 'many-writer-${pad(event_count, 3)}']
