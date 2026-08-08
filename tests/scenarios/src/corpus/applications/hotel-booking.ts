@@ -65,6 +65,5 @@ export const hotelBookingApplication = defineApplication({
       run: ({ store, input }) => Effect.sync(() => store.commit(hotelBookingEvents.roomBooked(input))),
     }),
   },
-  workloads: {},
   inspectors: {},
 })

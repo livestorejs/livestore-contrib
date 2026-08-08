@@ -108,7 +108,6 @@ const exerciseHostConformance = (profile: HostConformanceProfile) =>
           scenario: makeConformanceScenario(profile.capabilities),
           applicationId: todoApplication.id,
           host: fixture.host,
-          workloads: todoApplication.workloads,
           options: {
             runId: `host-conformance:${profile.capabilities.profile}`,
             sourceRevision: 'test',
@@ -197,7 +196,7 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
   const sessionB = { clientId: 'conformance-b', sessionId: 'session-b' } as const
 
   return defineScenario({
-    version: 1,
+    version: 2,
     id: `host-conformance-${capabilities.profile}`,
     description: 'Shared host contract scenario derived from advertised capabilities.',
     tags: ['host-conformance'],
@@ -230,14 +229,6 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
             _tag: 'create-client',
             id: 'create-b',
             client: { id: sessionB.clientId, sessions: [sessionB.sessionId], initiallyConnected: true },
-          },
-          {
-            _tag: 'workload',
-            id: 'seeded-workload',
-            workload: 'createTodoBurst',
-            input: { idPrefix: 'conformance-workload', textPrefix: 'Generated conformance task' },
-            targets: [sessionA, sessionB],
-            count: 2,
           },
           ...(supportsDynamicSessionAddition === true
             ? [
@@ -320,7 +311,7 @@ const makeFailureScenario = (args: { profile: HostCapabilities['profile']; suffi
   const clientId = `failure-${args.suffix}`
   const sessionId = `session-${args.suffix}`
   return defineScenario({
-    version: 1,
+    version: 2,
     id: `host-conformance-${args.profile}-${args.suffix}`,
     description: 'Exercises the portable host failure boundary.',
     tags: ['host-conformance', 'failure'],
@@ -353,7 +344,7 @@ const makeFailureScenario = (args: { profile: HostCapabilities['profile']; suffi
 const makeUnsupportedScenario = (capabilities: HostCapabilities): ScenarioAst => {
   const unsupported = capabilities.capabilities.includes('client-restart') === true ? 'event-lineage' : 'client-restart'
   return defineScenario({
-    version: 1,
+    version: 2,
     id: `host-conformance-${capabilities.profile}-unsupported`,
     description: 'Must fail preflight before participant creation.',
     tags: ['host-conformance', 'preflight'],
@@ -392,8 +383,6 @@ const expectPassingHostContract = (artifact: ScenarioRunArtifact): void => {
     expect.arrayContaining([
       'client.created',
       'action.completed',
-      'workload.requested',
-      'workload.completed',
       'connectivity.disconnected',
       'connectivity.reconnected',
       'backend.observed',

@@ -84,7 +84,7 @@ Vitest.describe('offline writer recovery', () => {
     Effect.gen(function* () {
       const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
       const scenario = defineScenario({
-        version: 1,
+        version: 2,
         id: 'insufficient-prefix-evidence',
         description: 'Creates a participant but retains no later component observation.',
         tags: ['safety'],
@@ -182,8 +182,8 @@ Vitest.describe('offline writer recovery', () => {
         })
 
         expect(artifact.status).toBe('passed')
-        expect(artifact.artifactVersion).toBe(4)
-        expect(artifact.descriptor.traceVersion).toBe(3)
+        expect(artifact.artifactVersion).toBe(5)
+        expect(artifact.descriptor.traceVersion).toBe(4)
         expect(artifact.verdicts).toHaveLength(6)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
         expect(artifact.verdicts).toContainEqual(

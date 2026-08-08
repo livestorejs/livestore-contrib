@@ -13,7 +13,7 @@ const decodeReference = (file: string) => {
 }
 
 const offlineArtifact = decodeReference('reference-offline-writer-recovery-browser.json.gz')
-const denseArtifact = decodeReference('reference-shared-todo-workday-browser.json.gz')
+const denseArtifact = decodeReference('reference-seeded-todo-actions-browser.json.gz')
 const lifecycleArtifact = decodeReference('reference-browser-multi-session-recovery-browser.json.gz')
 const manyWriterArtifact = decodeReference('sf-03-many-writer-426.json.gz')
 
@@ -142,9 +142,9 @@ describe('deriveTimelineScene', () => {
     expect(scene.main.failureBoundaries).toHaveLength(0)
   })
 
-  test('collapses the SF-03 workload and gives settlement evidence the semantic flow space', () => {
+  test('collapses the SF-03 action sequence and gives settlement evidence the semantic flow space', () => {
     const moments = derivePlaybackMoments({ scenario: manyWriterArtifact.scenario, trace: manyWriterArtifact.trace })
-    const workloadMoments = moments.filter((moment) => moment.kind === 'workload')
+    const actionSequenceMoments = moments.filter((moment) => moment.kind === 'action-sequence')
     const actionMoments = moments.filter((moment) => moment.kind === 'action')
     const scene = deriveTimelineScene({
       artifact: manyWriterArtifact,
@@ -154,11 +154,15 @@ describe('deriveTimelineScene', () => {
       traceVisibility: 'evidence',
       viewport: { start: 0, end: 1 },
     })
-    const lastWorkloadAction = manyWriterArtifact.trace.findLast(
+    const lastGeneratedAction = manyWriterArtifact.trace.findLast(
       (record) => record.payload._tag === 'action.requested',
     )!
-    const workloadRequest = manyWriterArtifact.trace.find((record) => record.payload._tag === 'workload.requested')!
-    const workloadCompletion = manyWriterArtifact.trace.find((record) => record.payload._tag === 'workload.completed')!
+    const sequenceRequest = manyWriterArtifact.trace.find(
+      (record) => record.payload._tag === 'action-sequence.requested',
+    )!
+    const sequenceCompletion = manyWriterArtifact.trace.find(
+      (record) => record.payload._tag === 'action-sequence.completed',
+    )!
     const firstMaterialObservation = manyWriterArtifact.trace.find(
       (record) =>
         (record.payload._tag === 'leader.sync.observed' || record.payload._tag === 'session.sync.observed') &&
@@ -168,17 +172,17 @@ describe('deriveTimelineScene', () => {
       (record) => record.payload._tag === 'backend.observed' && record.payload.observation.events.length > 0,
     )!
 
-    expect(workloadMoments).toHaveLength(1)
+    expect(actionSequenceMoments).toHaveLength(1)
     expect(actionMoments).toHaveLength(0)
-    expect(workloadMoments[0]?.recordIndexes).toEqual([workloadRequest.index, workloadCompletion.index])
-    expect(workloadMoments[0]?.summary).toContain('426 actions')
-    expect(workloadMoments[0]?.summary).toContain('client-1/session-1: 226')
-    expect(workloadMoments[0]?.summary).toContain('client-2/session-2: 200')
-    expect(scene.normalizedRecordPositions[lastWorkloadAction.index]).toBe(
-      scene.normalizedRecordPositions[workloadCompletion.index],
+    expect(actionSequenceMoments[0]?.recordIndexes).toEqual([sequenceRequest.index, sequenceCompletion.index])
+    expect(actionSequenceMoments[0]?.summary).toContain('426 actions')
+    expect(actionSequenceMoments[0]?.summary).toContain('client-1/session-1: 207')
+    expect(actionSequenceMoments[0]?.summary).toContain('client-2/session-2: 219')
+    expect(scene.normalizedRecordPositions[lastGeneratedAction.index]).toBe(
+      scene.normalizedRecordPositions[sequenceCompletion.index],
     )
     expect(scene.normalizedRecordPositions[firstMaterialObservation.index]).toBeGreaterThan(
-      scene.normalizedRecordPositions[workloadCompletion.index]!,
+      scene.normalizedRecordPositions[sequenceCompletion.index]!,
     )
     expect(scene.normalizedRecordPositions[lastMaterialObservation.index]).toBeGreaterThan(
       scene.normalizedRecordPositions[firstMaterialObservation.index]!,

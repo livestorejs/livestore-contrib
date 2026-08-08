@@ -2,7 +2,7 @@ import type { LiveStoreSchema } from '@livestore/common/schema'
 import type { Store } from '@livestore/livestore'
 import { Effect, Schema } from '@livestore/utils/effect'
 
-import { ParticipantRef as ParticipantRefSchema, type ParticipantRef } from '../model.ts'
+import type { ParticipantRef } from '../model.ts'
 
 export type ScenarioOperationFailureOutcome = 'definite-failure' | 'indefinite'
 
@@ -26,17 +26,13 @@ export class ScenarioOperationError extends Error {
       | 'invalid-inspector-output'
       | 'invalid-observation-evidence'
       | 'invalid-scenario'
-      | 'invalid-workload-input'
-      | 'invalid-workload-output'
       | 'missing-client'
       | 'missing-participant'
       | 'operations-in-flight'
       | 'participant-runtime-failure'
       | 'settlement-timeout'
       | 'unknown-action'
-      | 'unknown-inspector'
-      | 'unknown-workload'
-      | 'workload-expansion-failure',
+      | 'unknown-inspector',
     message: string,
     /** Whether the controller knows that request handling failed or lost the response boundary. */
     readonly operationOutcome: ScenarioOperationFailureOutcome = 'definite-failure',
@@ -64,35 +60,11 @@ export interface ApplicationInspector<TSchema extends LiveStoreSchema> {
   readonly inspect: (store: Store<TSchema>) => Effect.Effect<Schema.Json, ScenarioOperationError>
 }
 
-export interface GeneratedWorkloadAction {
-  readonly target: ParticipantRef
-  readonly action: string
-  readonly input: Schema.Json
-}
-
-export interface WorkloadRandom {
-  readonly next: () => number
-  readonly integer: (maximumExclusive: number) => number
-  readonly pick: <T>(values: ReadonlyArray<T>) => T
-}
-
-export interface ApplicationWorkload {
-  readonly expand: (args: {
-    input: Schema.Json
-    targets: ReadonlyArray<ParticipantRef>
-    count: number
-    seed: number
-  }) => Effect.Effect<ReadonlyArray<GeneratedWorkloadAction>, ScenarioOperationError>
-}
-
-export type ApplicationWorkloadLibrary = Readonly<Record<string, ApplicationWorkload>>
-
 export interface ApplicationDefinition<TSchema extends LiveStoreSchema> {
   readonly id: string
   readonly schema: TSchema
   readonly actions: Readonly<Record<string, ApplicationAction<TSchema>>>
   readonly inspectors: Readonly<Record<string, ApplicationInspector<TSchema>>>
-  readonly workloads: ApplicationWorkloadLibrary
 }
 
 export const defineApplication = <TSchema extends LiveStoreSchema>(
@@ -115,49 +87,6 @@ export const defineAction = <
       ),
       Effect.flatMap((input) => args.run({ store, input })),
     ),
-})
-
-/** Defines a pure, seed-driven workload that emits exactly one action per iteration. */
-export const defineWorkload = <TInputSchema extends Schema.Codec<unknown, unknown, never, never>>(args: {
-  input: TInputSchema
-  generate: (args: {
-    input: TInputSchema['Type']
-    targets: ReadonlyArray<ParticipantRef>
-    iteration: number
-    random: WorkloadRandom
-  }) => GeneratedWorkloadAction
-}): ApplicationWorkload => ({
-  expand: ({ input: encodedInput, targets, count, seed }) =>
-    Effect.gen(function* () {
-      const input = yield* Schema.decodeUnknownEffect(args.input)(encodedInput).pipe(
-        Effect.mapError(
-          (cause) =>
-            new ScenarioOperationError(
-              'invalid-workload-input',
-              `Workload input failed schema validation: ${String(cause)}`,
-            ),
-        ),
-      )
-      const random = makeWorkloadRandom(seed)
-      const generated = yield* Effect.try({
-        try: () =>
-          Array.from({ length: count }, (_, iteration) => args.generate({ input, targets, iteration, random })),
-        catch: (cause) =>
-          new ScenarioOperationError(
-            'workload-expansion-failure',
-            `Workload expansion failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-          ),
-      })
-      return yield* Schema.decodeUnknownEffect(Schema.Array(GeneratedWorkloadActionSchema))(generated).pipe(
-        Effect.mapError(
-          (cause) =>
-            new ScenarioOperationError(
-              'invalid-workload-output',
-              `Generated workload action failed serialization validation: ${String(cause)}`,
-            ),
-        ),
-      )
-    }),
 })
 
 /** Encodes inspector output as JSON so a host never leaks its Store or SQLite values. */
@@ -216,34 +145,4 @@ export const inspectApplicationState = <TSchema extends LiveStoreSchema>(args: {
     )
   }
   return inspector.inspect(args.store)
-}
-
-const GeneratedWorkloadActionSchema = Schema.Struct({
-  target: ParticipantRefSchema,
-  action: Schema.String,
-  input: Schema.Json,
-})
-
-const makeWorkloadRandom = (seed: number): WorkloadRandom => {
-  let state = seed >>> 0
-  const next = (): number => {
-    state += 0x6d2b79f5
-    let value = state
-    value = Math.imul(value ^ (value >>> 15), value | 1)
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296
-  }
-  return {
-    next,
-    integer: (maximumExclusive) => {
-      if (Number.isInteger(maximumExclusive) === false || maximumExclusive <= 0) {
-        throw new Error(`Workload random integer bound must be a positive integer: ${maximumExclusive}`)
-      }
-      return Math.floor(next() * maximumExclusive)
-    },
-    pick: <T>(values: ReadonlyArray<T>): T => {
-      if (values.length === 0) throw new Error('Workload random choice requires at least one value')
-      return values[Math.floor(next() * values.length)]!
-    },
-  }
 }

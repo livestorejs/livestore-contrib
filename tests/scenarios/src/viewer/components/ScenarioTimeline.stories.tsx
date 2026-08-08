@@ -27,7 +27,7 @@ interface FixtureProps {
 }
 
 const TimelineFixture = ({
-  name = 'reference-offline-writer-recovery-browser-failure.json.gz',
+  name = 'reference-offline-writer-recovery-browser.json.gz',
   traceLimit,
   timelineMode = 'flow',
   timeScaleMode = 'fit',
@@ -110,7 +110,7 @@ const StatefulTimeline = ({
 export const SparseLabels: Story = { render: () => <TimelineFixture traceLimit={28} /> }
 export const MediumPoints: Story = { render: () => <TimelineFixture traceLimit={140} /> }
 export const DensePointsAndAggregates: Story = {
-  render: () => <TimelineFixture name="reference-shared-todo-workday-browser-failure.json.gz" />,
+  render: () => <TimelineFixture name="reference-seeded-todo-actions-browser.json.gz" />,
 }
 export const FittedTimeCompressedGaps: Story = {
   render: () => <TimelineFixture timelineMode="time" timeScaleMode="fit" />,
@@ -118,13 +118,13 @@ export const FittedTimeCompressedGaps: Story = {
 export const RawLinearTime: Story = { render: () => <TimelineFixture timelineMode="time" timeScaleMode="raw" /> }
 export const OfflineIntervalsAndFailure: Story = { render: () => <TimelineFixture cursor="end" /> }
 export const RuntimeAndTerminalFailure: Story = {
-  render: () => <TimelineFixture name="reference-shared-todo-workday-browser-failure.json.gz" cursor="end" />,
+  render: () => <TimelineFixture name="reference-seeded-todo-actions-browser.json.gz" cursor="end" />,
 }
 export const SessionAndClientLifecycle: Story = {
   render: () => <TimelineFixture name="reference-browser-multi-session-recovery-browser.json.gz" cursor="end" />,
 }
 export const ManyLanes: Story = {
-  render: () => <TimelineFixture name="reference-shared-todo-workday-browser-failure.json.gz" traceLimit={500} />,
+  render: () => <TimelineFixture name="reference-seeded-todo-actions-browser.json.gz" traceLimit={500} />,
 }
 export const RawTraceCarpet: Story = { render: () => <TimelineFixture traceVisibility="trace" /> }
 export const NarrowedRange: Story = { render: () => <TimelineFixture viewport={{ start: 0.2, end: 0.52 }} /> }

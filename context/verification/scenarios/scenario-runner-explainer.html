@@ -208,7 +208,7 @@
         white-space: nowrap;
       }
 
-      .toc a[aria-current="true"] {
+      .toc a[aria-current='true'] {
         color: var(--text);
       }
 
@@ -248,7 +248,10 @@
         max-width: 780px;
         margin: 0;
         color: var(--muted);
-        font: 16px/1.65 ui-sans-serif, system-ui, sans-serif;
+        font:
+          16px/1.65 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .section-body {
@@ -288,7 +291,10 @@
       .note {
         margin-bottom: 0;
         color: var(--muted);
-        font: 13px/1.58 ui-sans-serif, system-ui, sans-serif;
+        font:
+          13px/1.58 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .section-label {
@@ -340,7 +346,7 @@
       }
 
       .arch-arrow::after {
-        content: "";
+        content: '';
         position: absolute;
         right: 0;
         top: -3px;
@@ -365,7 +371,7 @@
       }
 
       .arch-branch > div::before {
-        content: "";
+        content: '';
         position: absolute;
         width: 1px;
         height: 24px;
@@ -402,7 +408,10 @@
       .annotation p {
         margin: 0;
         color: var(--muted);
-        font: 13px/1.6 ui-sans-serif, system-ui, sans-serif;
+        font:
+          13px/1.6 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .evidence-chain {
@@ -421,7 +430,10 @@
 
       .evidence-chain-heading span {
         color: var(--muted);
-        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+        font:
+          12px/1.55 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .evidence-source-groups {
@@ -455,7 +467,7 @@
       }
 
       .evidence-step:not(:last-child)::after {
-        content: "→";
+        content: '→';
         position: absolute;
         right: -23px;
         top: calc(50% - 10px);
@@ -478,7 +490,10 @@
       .evidence-step p {
         margin: 0;
         color: var(--muted);
-        font: 11px/1.55 ui-sans-serif, system-ui, sans-serif;
+        font:
+          11px/1.55 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .evidence-step .micro {
@@ -547,7 +562,10 @@
       .evidence-summary-box small {
         margin: 0;
         color: var(--muted);
-        font: 11px/1.55 ui-sans-serif, system-ui, sans-serif;
+        font:
+          11px/1.55 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .evidence-summary-box small {
@@ -650,7 +668,10 @@
 
       .ba-purpose span {
         color: var(--muted);
-        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+        font:
+          12px/1.55 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .ba-row {
@@ -708,7 +729,7 @@
       }
 
       .ba-node:not(:last-child)::after {
-        content: "→";
+        content: '→';
         position: absolute;
         right: -23px;
         top: calc(50% - 9px);
@@ -835,7 +856,7 @@
       }
 
       .marker::before {
-        content: "";
+        content: '';
         position: absolute;
         left: -9px;
         top: -9px;
@@ -976,14 +997,14 @@
         fill: none;
         stroke: var(--text);
         stroke-width: 1;
-        marker-end: url("#clock-arrow");
+        marker-end: url('#clock-arrow');
       }
 
       .clock-sequence .clock-projection {
         fill: none;
         stroke: var(--client-c);
         stroke-width: 1;
-        marker-end: url("#clock-arrow-purple");
+        marker-end: url('#clock-arrow-purple');
       }
 
       .clock-sequence .clock-controller-dot {
@@ -1023,7 +1044,10 @@
       .clock-notes p {
         margin: 0;
         color: var(--muted);
-        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+        font:
+          12px/1.55 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .settlement-flow {
@@ -1057,7 +1081,10 @@
       .settlement-after p {
         margin: 0;
         color: var(--muted);
-        font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+        font:
+          12px/1.55 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .settlement-fields {
@@ -1071,7 +1098,12 @@
         gap: 12px;
         padding: 9px 0;
         border-bottom: 1px solid var(--line);
-        font: 10px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font:
+          10px/1.45 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
       }
 
       .settlement-field span {
@@ -1097,11 +1129,14 @@
         padding: 9px 0 9px 20px;
         border-bottom: 1px solid var(--line);
         color: var(--ink);
-        font: 11px/1.5 ui-sans-serif, system-ui, sans-serif;
+        font:
+          11px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .settlement-checks li::before {
-        content: "—";
+        content: '—';
         position: absolute;
         left: 0;
         color: var(--muted);
@@ -1148,7 +1183,12 @@
       .settlement-transition {
         margin-bottom: 12px;
         color: var(--ink);
-        font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font:
+          11px/1.55 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
       }
 
       .settlement-after {
@@ -1223,11 +1263,14 @@
       .gate p {
         margin: 0;
         color: var(--muted);
-        font: 12px/1.58 ui-sans-serif, system-ui, sans-serif;
+        font:
+          12px/1.58 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .gate::after {
-        content: "";
+        content: '';
         position: absolute;
         bottom: -32px;
         left: 50%;
@@ -1283,7 +1326,10 @@
       .footer p {
         max-width: 760px;
         color: var(--muted);
-        font: 14px/1.65 ui-sans-serif, system-ui, sans-serif;
+        font:
+          14px/1.65 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .footer aside {
@@ -1789,14 +1835,23 @@
         padding: 13px 15px;
         border: 1px solid var(--line);
         color: var(--muted);
-        font: 10px/1.5 ui-sans-serif, system-ui, sans-serif;
+        font:
+          10px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
       }
 
       .architecture-feedback strong {
         display: block;
         margin-bottom: 4px;
         color: var(--text);
-        font: 720 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font:
+          720 10px/1.4 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
         letter-spacing: 0.08em;
         text-transform: uppercase;
       }
@@ -2038,7 +2093,7 @@
           </p>
           <p>
             <span class="section-label">versions</span><br />
-            Trace protocol v3 · run artifact v4
+            Trace protocol v4 · run artifact v5
           </p>
         </aside>
       </div>
@@ -2049,7 +2104,9 @@
         </div>
         <div class="principle">
           <strong>Real components</strong>
-          <span>Stores, processors, materializers, SQLite, SharedWorkers, OPFS, and sync-cf are exercised in place.</span>
+          <span
+            >Stores, processors, materializers, SQLite, SharedWorkers, OPFS, and sync-cf are exercised in place.</span
+          >
         </div>
         <div class="principle">
           <strong>Truthful projections</strong>
@@ -2187,7 +2244,10 @@
           <div class="evidence-chain" aria-label="How trace records separate intent, observed facts, and claims">
             <div class="evidence-chain-heading">
               <strong>Three things the trace keeps separate</strong>
-              <span>The runner distinguishes a handled request from an observed result, and an observed result from a claim.</span>
+              <span
+                >The runner distinguishes a handled request from an observed result, and an observed result from a
+                claim.</span
+              >
             </div>
             <div class="evidence-summary">
               <div class="evidence-summary-box">
@@ -2289,7 +2349,11 @@
             </div>
           </div>
 
-          <div class="browser-architecture" role="img" aria-label="Browser profile with local or cloud sync-cf architecture">
+          <div
+            class="browser-architecture"
+            role="img"
+            aria-label="Browser profile with local or cloud sync-cf architecture"
+          >
             <div class="ba-purpose">
               <strong>What this profile tests</strong>
               <span>
@@ -2395,7 +2459,6 @@
               clear their Durable Object storage on teardown. Ordinary local and CI runs never provision Cloudflare.
             </p>
           </div>
-
         </div>
       </section>
 
@@ -2405,8 +2468,8 @@
           <div>
             <h2>Causal flow and elapsed time</h2>
             <p class="section-intro">
-              The trace stores causal partial-order facts and calibrated elapsed-time evidence separately. The visualizer
-              projects both without treating timestamps as causality or flow-stage alignment as simultaneity.
+              The trace stores causal partial-order facts and calibrated elapsed-time evidence separately. The
+              visualizer projects both without treating timestamps as causality or flow-stage alignment as simultaneity.
             </p>
           </div>
         </div>
@@ -2416,8 +2479,8 @@
             <strong>Current implementation</strong>
             <p>
               The flow view aligns observation captures and shows explicit control causation. Exact receive/apply arrows
-              remain unavailable: DELTA-008 closed by accepting that Scenario evidence alone does not justify sync-engine
-              lineage instrumentation.
+              remain unavailable: DELTA-008 closed by accepting that Scenario evidence alone does not justify
+              sync-engine lineage instrumentation.
             </p>
           </div>
 
@@ -2516,7 +2579,15 @@
                 observation to an uncertainty interval on the shared presentation coordinate.
               </desc>
               <defs>
-                <marker id="clock-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <marker
+                  id="clock-arrow"
+                  viewBox="0 0 8 8"
+                  refX="7"
+                  refY="4"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto"
+                >
                   <path d="M 0 0 L 8 4 L 0 8 Z" fill="var(--text)"></path>
                 </marker>
                 <marker
@@ -2542,7 +2613,9 @@
               <text class="clock-secondary" x="180" y="89" text-anchor="end">read controller clock</text>
 
               <line class="clock-flow" x1="200" y1="112" x2="800" y2="112"></line>
-              <text class="clock-arrow-label" x="500" y="101" text-anchor="middle">scenario command / calibration request</text>
+              <text class="clock-arrow-label" x="500" y="101" text-anchor="middle">
+                scenario command / calibration request
+              </text>
 
               <circle class="clock-participant-dot" cx="800" cy="143" r="6"></circle>
               <text class="clock-primary" x="820" y="140">local occurrence</text>
@@ -2578,15 +2651,23 @@
           <div class="clock-notes">
             <div>
               <strong>Same process</strong>
-              <p>Participant and controller share a monotonic clock, so the transport uncertainty interval collapses.</p>
+              <p>
+                Participant and controller share a monotonic clock, so the transport uncertainty interval collapses.
+              </p>
             </div>
             <div>
               <strong>Process / browser</strong>
-              <p>The complete request round trip bounds the participant reading. Wider round trips produce wider uncertainty.</p>
+              <p>
+                The complete request round trip bounds the participant reading. Wider round trips produce wider
+                uncertainty.
+              </p>
             </div>
             <div>
               <strong>Contradiction</strong>
-              <p>If calibrated time violates an explicit causal edge beyond uncertainty, report instrumentation or calibration trouble.</p>
+              <p>
+                If calibrated time violates an explicit causal edge beyond uncertainty, report instrumentation or
+                calibration trouble.
+              </p>
             </div>
           </div>
 
@@ -2734,11 +2815,11 @@
           <div class="open-deltas">
             <div class="delta">
               <span class="delta-id">DELTA-005</span>
-              <h3>Scenario surface + reusable workloads</h3>
+              <h3>Scenario surface + generated action sequences</h3>
               <p class="delta-copy">
-                Seeded workload nodes and dynamic Client/session additions are implemented. Rematerialization and
-                advanced rates, stop conditions, generated parallelism, and nesting remain deferred until a concrete
-                Scenario requires them.
+                Scenario-owned seeded action sequences and dynamic Client/session additions are implemented.
+                Rematerialization and advanced rates, stop conditions, generated parallelism, and nesting remain
+                deferred until a concrete Scenario requires them.
               </p>
             </div>
             <div class="delta">
@@ -2754,8 +2835,8 @@
               <span class="delta-id">DELTA-011</span>
               <h3>Live visualizer control</h3>
               <p class="delta-copy">
-                Stream an active run, pause only at declared scheduling boundaries, issue capability-scoped controls, and
-                save the session as an ordinary replayable artifact.
+                Stream an active run, pause only at declared scheduling boundaries, issue capability-scoped controls,
+                and save the session as an ordinary replayable artifact.
               </p>
             </div>
           </div>
@@ -2765,22 +2846,30 @@
             <div>
               <span class="micro">DELTA-002</span>
               <h3>parallel operation history</h3>
-              <p class="short-copy">Child operations retain identities, outcomes, intervals, and real overlap evidence.</p>
+              <p class="short-copy">
+                Child operations retain identities, outcomes, intervals, and real overlap evidence.
+              </p>
             </div>
             <div>
               <span class="micro">DELTA-003</span>
               <h3>Recovery + quiescence</h3>
-              <p class="short-copy">Fault removal, progress, stable convergence, and settlement are explicit boundaries.</p>
+              <p class="short-copy">
+                Fault removal, progress, stable convergence, and settlement are explicit boundaries.
+              </p>
             </div>
             <div>
               <span class="micro">DELTA-004</span>
               <h3>host failure taxonomy</h3>
-              <p class="short-copy">Portable failure categories are now independent from definite or indefinite outcomes.</p>
+              <p class="short-copy">
+                Portable failure categories are now independent from definite or indefinite outcomes.
+              </p>
             </div>
             <div>
               <span class="micro">DELTA-008</span>
               <h3>exact transition lineage limit</h3>
-              <p class="short-copy">Sampled correlation remains explanatory; exact lineage awaits an independently justified product seam.</p>
+              <p class="short-copy">
+                Sampled correlation remains explanatory; exact lineage awaits an independently justified product seam.
+              </p>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
-import { defineScenario } from '../../model.ts'
-import { todoApplication } from '../applications/todo.ts'
+import { defineScenario } from '../../../../model.ts'
+import { todoApplication } from '../../../applications/todo.ts'
 
 const writer = { clientId: 'client-a', sessionId: 'session-a' } as const
 const observer = { clientId: 'client-b', sessionId: 'session-b' } as const
@@ -8,7 +8,7 @@ const settlementTimeoutMs = Number(process.env.SCENARIO_SETTLEMENT_TIMEOUT_MS ??
 
 /** Probes the smallest observed local sync-cf payload failure boundary. */
 export const largePayloadRecovery = defineScenario({
-  version: 1,
+  version: 2,
   id: 'large-payload-recovery',
   description: `An Event with a ${payloadBytes}-byte string crosses offline storage and backend synchronization.`,
   tags: ['sync', 'correctness', 'known-failure', 'large-payload', 'buffer-boundary', `${payloadBytes}-bytes`],

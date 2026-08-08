@@ -1,5 +1,5 @@
-import { defineScenario } from '../../model.ts'
-import { todoApplication } from '../applications/todo.ts'
+import { defineScenario } from '../../../../model.ts'
+import { todoApplication } from '../../../applications/todo.ts'
 
 const offlineWriter = { clientId: 'client-a', sessionId: 'session-a' } as const
 const onlineWriter = { clientId: 'client-b', sessionId: 'session-b' } as const
@@ -7,8 +7,8 @@ const pendingCount = Number(process.env.SCENARIO_PENDING_COUNT ?? 400)
 const settlementTimeoutMs = Number(process.env.SCENARIO_SETTLEMENT_TIMEOUT_MS ?? 60_000)
 
 /** Reconciles a pending tail over confirmed remote history at the smallest observed stall boundary. */
-export const pendingTailRecovery = defineScenario({
-  version: 1,
+export const pendingTailRecovery = defineScenario(({ repeatActions }) => ({
+  version: 2,
   id: 'pending-tail-recovery',
   description: `An offline Client rebases ${pendingCount} pending Events over one confirmed remote Event.`,
   tags: ['sync', 'correctness', 'known-failure', 'pending-tail', 'rebase', `${pendingCount}-events`],
@@ -28,14 +28,19 @@ export const pendingTailRecovery = defineScenario({
       description: 'Client A accumulates a large pending tail while Client B confirms independent history.',
       steps: [
         { _tag: 'disconnect', id: 'disconnect-offline-writer', clientId: offlineWriter.clientId },
-        {
-          _tag: 'workload',
+        repeatActions({
           id: 'offline-pending-tail',
-          workload: 'createTodoBurst',
-          input: { idPrefix: 'pending', textPrefix: 'Offline pending item' },
-          targets: [offlineWriter],
+          description: `Create ${pendingCount} pending todos on the offline Client`,
           count: pendingCount,
-        },
+          generate: ({ iteration, random }) => ({
+            target: offlineWriter,
+            action: 'createTodo',
+            input: {
+              id: `pending-${String(iteration + 1).padStart(3, '0')}`,
+              text: `Offline pending item ${iteration + 1} · variant ${random.integer('text-variant', 1_000)}`,
+            },
+          }),
+        }),
         {
           _tag: 'action',
           id: 'confirmed-remote-write',
@@ -86,7 +91,7 @@ export const pendingTailRecovery = defineScenario({
       id: 'boundary-items-preserved',
       participants: [offlineWriter, onlineWriter],
       inspector: 'todos',
-      expectedIds: ['pending-001', `pending-${pendingCount}`, 'remote-confirmed'],
+      expectedIds: ['pending-001', `pending-${String(pendingCount).padStart(3, '0')}`, 'remote-confirmed'],
     },
   ],
-})
+}))

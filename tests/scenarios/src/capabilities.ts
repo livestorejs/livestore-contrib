@@ -22,8 +22,8 @@ export const deriveScenarioRequirements = (scenario: ScenarioAst): ReadonlyArray
       for (const operation of step.operations) addOperationRequirements(requirements, operation)
     } else if (step._tag === 'settle') {
       if (step.healDisconnectedClients.length > 0) requirements.add('disconnect-reconnect')
-    } else if (step._tag === 'workload') {
-      requirements.add('named-actions')
+    } else if (step._tag === 'action-sequence') {
+      for (const action of step.actions) addOperationRequirements(requirements, action)
     } else if (step._tag === 'create-client') {
       requirements.add('dynamic-client-creation')
     } else if (step._tag === 'add-session') {
@@ -57,7 +57,7 @@ const addOperationRequirements = (
   requirements: Set<HostCapability>,
   operation: Exclude<
     ScenarioStep,
-    { readonly _tag: 'parallel' | 'settle' | 'workload' | 'create-client' | 'add-session' }
+    { readonly _tag: 'parallel' | 'settle' | 'action-sequence' | 'create-client' | 'add-session' }
   >,
 ): void => {
   switch (operation._tag) {

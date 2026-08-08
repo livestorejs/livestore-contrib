@@ -1,12 +1,12 @@
+import { todoApplication } from '../../corpus/applications/todo.ts'
 import { defineScenario } from '../../model.ts'
-import { todoApplication } from '../applications/todo.ts'
 
 const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
 const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
 
 /** Exercises a shared upstream outage while both Clients remain locally writable. */
 export const backendOutageRecovery = defineScenario({
-  version: 1,
+  version: 2,
   id: 'backend-outage-recovery',
   description: 'Two Clients retain local writes while the backend route is unavailable, then recover and converge.',
   tags: ['sync', 'fault', 'backend-availability', 'recovery'],

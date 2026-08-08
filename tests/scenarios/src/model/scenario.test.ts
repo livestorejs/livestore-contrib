@@ -1,17 +1,13 @@
 import {
-  ScenarioRunArtifact,
-  Schema,
   Vitest,
   browserMultiSessionRecovery,
   defineScenario,
   deriveScenarioRequirements,
   deriveScenarioTopology,
   expect,
-  gunzipSync,
   offlineWriterRecovery,
-  readFileSync,
-  seededTodoWorkload,
-  sharedTodoWorkday,
+  makeSeededTodoActions,
+  seededTodoActions,
   todoApplication,
 } from '../test-support/scenario-test-kit.ts'
 
@@ -21,40 +17,67 @@ Vitest.describe('scenario model', () => {
     expect(defineScenario(encoded)).toEqual(offlineWriterRecovery)
   })
 
-  Vitest.it('retains a seeded workload as one compact serializable step', () => {
-    const encoded = JSON.parse(JSON.stringify(seededTodoWorkload))
-    const decoded = defineScenario(encoded)
-    const workloadSteps = decoded.phases.flatMap((phase) => phase.steps).filter((step) => step._tag === 'workload')
+  Vitest.it('accepts only the current Scenario format', () => {
+    expect(() => defineScenario({ ...offlineWriterRecovery, version: 1 })).toThrow('Invalid scenario AST')
+  })
 
-    expect(decoded).toEqual(seededTodoWorkload)
-    expect(workloadSteps).toEqual([
-      expect.objectContaining({ id: 'create-seeded-todos', workload: 'createTodoBurst', count: 12 }),
-    ])
+  Vitest.it('expands Scenario-owned repetition into one self-contained serializable action sequence', () => {
+    const encoded = JSON.parse(JSON.stringify(seededTodoActions))
+    const decoded = defineScenario(encoded)
+    const sequence = decoded.phases.flatMap((phase) => phase.steps).find((step) => step._tag === 'action-sequence')
+
+    expect(decoded).toEqual(seededTodoActions)
+    expect(sequence).toEqual(expect.objectContaining({ id: 'create-seeded-todos' }))
+    expect(sequence?._tag === 'action-sequence' ? sequence.actions : []).toHaveLength(40)
     expect(decoded.phases.flatMap((phase) => phase.steps).some((step) => step._tag === 'action')).toBe(false)
     expect(deriveScenarioRequirements(decoded)).toContain('named-actions')
   })
 
-  Vitest.it('rejects empty or unbounded workload counts', () => {
-    const workloadStep = seededTodoWorkload.phases[0]!.steps[0]!
+  Vitest.it('derives keyed actions deterministically while keeping IDs stable across seeds', () => {
+    const first = makeSeededTodoActions(1445).phases[0]!.steps[0]!
+    const same = makeSeededTodoActions(1445).phases[0]!.steps[0]!
+    const different = makeSeededTodoActions(1446).phases[0]!.steps[0]!
+    if (first._tag !== 'action-sequence' || same._tag !== 'action-sequence' || different._tag !== 'action-sequence') {
+      throw new Error('Expected generated action sequences')
+    }
+    expect(first.actions).toEqual(same.actions)
+    expect(first.actions.map(({ id }) => id)).toEqual(different.actions.map(({ id }) => id))
+    expect(first.actions).not.toEqual(different.actions)
+  })
+
+  Vitest.it('rejects empty or unbounded repeated action counts', () => {
     for (const count of [0, 10_001]) {
       expect(() =>
-        defineScenario({
-          ...seededTodoWorkload,
-          id: `invalid-workload-count-${count}`,
+        defineScenario(({ repeatActions }) => ({
+          ...seededTodoActions,
+          id: `invalid-action-count-${count}`,
           phases: [
             {
-              ...seededTodoWorkload.phases[0]!,
-              steps: [{ ...workloadStep, count }, seededTodoWorkload.phases[0]!.steps[1]!],
+              id: 'generated-work',
+              description: 'Invalid repeated action count.',
+              steps: [
+                repeatActions({
+                  id: 'invalid-actions',
+                  description: 'Invalid actions',
+                  count,
+                  generate: () => ({
+                    target: { clientId: 'client-a', sessionId: 'session-a' },
+                    action: 'createTodo',
+                    input: { id: 'invalid', text: 'Invalid' },
+                  }),
+                }),
+              ],
             },
           ],
-        }),
-      ).toThrow('Workload count must be between 1 and 10000')
+          oracles: [],
+        })),
+      ).toThrow('Repeated action count must be between 1 and 10000')
     }
   })
 
   Vitest.it('validates dynamic participant additions in plan order', () => {
     const scenario = defineScenario({
-      version: 1,
+      version: 2,
       id: 'dynamic-topology-model',
       description: 'Adds a Client and a session after startup.',
       tags: ['topology'],
@@ -110,7 +133,7 @@ Vitest.describe('scenario model', () => {
   Vitest.it('rejects participant use before its creation step', () => {
     expect(() =>
       defineScenario({
-        version: 1,
+        version: 2,
         id: 'dynamic-topology-use-before-create',
         description: 'Invalid ordering.',
         tags: ['topology'],
@@ -271,68 +294,5 @@ Vitest.describe('scenario model', () => {
         oracles: [{ ...prefixOracle, participants: [prefixOracle.participants[0]!, prefixOracle.participants[0]!] }],
       }),
     ).toThrow('selects participant more than once')
-  })
-
-  Vitest.it('expands the shared workday into exactly 100 mixed application actions', () => {
-    const steps = sharedTodoWorkday.phases.flatMap((phase) => phase.steps)
-    const actionSteps = steps.filter((step) => step._tag === 'action')
-
-    expect(actionSteps).toHaveLength(100)
-    expect(new Set(actionSteps.map((step) => step.action))).toEqual(
-      new Set(['createTodo', 'editTodo', 'setTodoCompleted', 'deleteTodo']),
-    )
-    expect(
-      Object.fromEntries(
-        [...Map.groupBy(actionSteps, (step) => step.action).entries()].map(([key, value]) => [key, value.length]),
-      ),
-    ).toEqual({
-      createTodo: 30,
-      editTodo: 28,
-      setTodoCompleted: 32,
-      deleteTodo: 10,
-    })
-    const completionInput = Schema.Struct({ id: Schema.String, completed: Schema.Boolean })
-    expect(
-      actionSteps
-        .filter((step) => step.action === 'setTodoCompleted')
-        .map((step) => Schema.decodeUnknownSync(completionInput)(step.input).completed)
-        .filter((completed) => completed === false),
-    ).toHaveLength(8)
-    expect(sharedTodoWorkday.topology.clients).toHaveLength(3)
-
-    const disconnectIndex = steps.findIndex((step) => step._tag === 'disconnect' && step.clientId === 'alice-phone')
-    const reconnectIndex = steps.findIndex((step) => step._tag === 'reconnect' && step.clientId === 'alice-phone')
-    const actionsBeforeDisconnect = steps.slice(0, disconnectIndex).filter((step) => step._tag === 'action')
-    const actionsWhileDisconnected = steps
-      .slice(disconnectIndex + 1, reconnectIndex)
-      .filter((step) => step._tag === 'action')
-    const actionsAfterReconnect = steps.slice(reconnectIndex + 1).filter((step) => step._tag === 'action')
-    const offlinePhoneActions = actionsWhileDisconnected.filter((step) => step.target.clientId === 'alice-phone')
-
-    expect([actionsBeforeDisconnect.length, actionsWhileDisconnected.length, actionsAfterReconnect.length]).toEqual([
-      33, 34, 33,
-    ])
-    expect(offlinePhoneActions).toHaveLength(6)
-    expect(new Set(offlinePhoneActions.map((step) => step.action))).toEqual(
-      new Set(['createTodo', 'editTodo', 'setTodoCompleted', 'deleteTodo']),
-    )
-    expect(
-      steps
-        .slice(disconnectIndex + 1, reconnectIndex)
-        .filter((step) => step._tag === 'settle')
-        .every((step) => step.participants.every((participant) => participant.clientId !== 'alice-phone')),
-    ).toBe(true)
-  })
-
-  Vitest.it('decodes the tracked version-3/version-4 reference artifacts without migration', () => {
-    for (const name of [
-      'reference-offline-writer-recovery-browser.json.gz',
-      'reference-shared-todo-workday-browser.json.gz',
-    ]) {
-      const json = gunzipSync(readFileSync(new URL(`../../artifacts/${name}`, import.meta.url))).toString('utf8')
-      const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(json)
-      expect(artifact.artifactVersion).toBe(4)
-      expect(artifact.descriptor.traceVersion).toBe(3)
-    }
   })
 })

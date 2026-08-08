@@ -25,7 +25,7 @@ Vitest.describe('in-process host conformance', () => {
       const host = yield* makeInProcessHost({ application: todoApplication, backend })
       let createClientCalls = 0
       const incompatibleScenario = defineScenario({
-        version: 1,
+        version: 2,
         id: 'preflight-incompatible-lifecycle',
         description: 'Requires a Client restart without declaring it manually.',
         tags: ['preflight'],
@@ -93,7 +93,7 @@ Vitest.describe('in-process host conformance', () => {
       const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
       const timeoutMs = 250
       const scenario = defineScenario({
-        version: 1,
+        version: 2,
         id: 'captured-settlement-failure',
         description: 'Exercises the failed-settlement artifact contract.',
         tags: ['failure-capture'],
@@ -207,7 +207,7 @@ Vitest.describe('in-process host conformance', () => {
   Vitest.live('retains an indefinite operation outcome when the host loses completion evidence', (test) =>
     Effect.gen(function* () {
       const scenario = defineScenario({
-        version: 1,
+        version: 2,
         id: 'indefinite-operation-outcome',
         description: 'Exercises ambiguous participant-host completion.',
         tags: ['failure-capture'],

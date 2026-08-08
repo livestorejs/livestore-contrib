@@ -1,7 +1,8 @@
 import { Schema } from '@livestore/utils/effect'
 
-export const scenarioTraceVersion = 3 as const
-export const scenarioArtifactVersion = 4 as const
+export const scenarioVersion = 2 as const
+export const scenarioTraceVersion = 4 as const
+export const scenarioArtifactVersion = 5 as const
 
 export const ParticipantProfile = Schema.Literals(['in-process', 'process', 'browser'])
 export type ParticipantProfile = typeof ParticipantProfile.Type
@@ -61,6 +62,7 @@ export const ActionStep = Schema.TaggedStruct('action', {
   action: Schema.String,
   input: Schema.Json,
 })
+export type ActionStep = typeof ActionStep.Type
 
 export const DisconnectStep = Schema.TaggedStruct('disconnect', {
   id: Schema.String,
@@ -107,15 +109,14 @@ export const BackendAvailableStep = Schema.TaggedStruct('backend-available', {
   id: Schema.String,
 })
 
-/** Invokes a named deterministic application workload through a compact plan node. */
-export const WorkloadStep = Schema.TaggedStruct('workload', {
+/** A self-contained, ordered group of concrete application actions. */
+export const ActionSequenceStep = Schema.TaggedStruct('action-sequence', {
   id: Schema.String,
-  workload: Schema.String,
-  input: Schema.Json,
-  targets: Schema.Array(ParticipantRef),
-  count: Schema.Int,
+  description: Schema.String,
+  seed: Schema.Finite,
+  actions: Schema.Array(ActionStep),
 })
-export type WorkloadStep = typeof WorkloadStep.Type
+export type ActionSequenceStep = typeof ActionSequenceStep.Type
 
 export const ParallelOperationStep = Schema.Union([
   ActionStep,
@@ -150,7 +151,7 @@ export const ScenarioStep = Schema.Union([
   RestartClientStep,
   BackendUnavailableStep,
   BackendAvailableStep,
-  WorkloadStep,
+  ActionSequenceStep,
   CreateClientStep,
   AddSessionStep,
   ParallelStep,
@@ -213,7 +214,7 @@ export const ScenarioOracle = Schema.Union([
 export type ScenarioOracle = typeof ScenarioOracle.Type
 
 export const ScenarioAst = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literal(scenarioVersion),
   id: Schema.String,
   description: Schema.String,
   tags: Schema.Array(Schema.String),

@@ -1,13 +1,13 @@
+import { todoApplication } from '../../corpus/applications/todo.ts'
 import { defineScenario } from '../../model.ts'
-import { todoApplication } from '../applications/todo.ts'
 
 const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
 const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
 const historyCount = 8
 
 /** Creates a Client only after the backend has history, then writes while its catch-up is still settling. */
-export const lateClientCatchUp = defineScenario({
-  version: 1,
+export const lateClientCatchUp = defineScenario(({ repeatActions }) => ({
+  version: 2,
   id: 'late-client-catch-up',
   description: 'A new Client starts from empty local state after history exists, writes, and converges.',
   tags: ['sync', 'topology', 'late-join', 'catch-up'],
@@ -23,14 +23,19 @@ export const lateClientCatchUp = defineScenario({
       id: 'establish-history',
       description: 'The initial Client commits and confirms history before the second Client exists.',
       steps: [
-        {
-          _tag: 'workload',
+        repeatActions({
           id: 'initial-history',
-          workload: 'createTodoBurst',
-          input: { idPrefix: 'history', textPrefix: 'Before the late Client' },
-          targets: [clientA],
+          description: 'Create the initial history before Client B exists',
           count: historyCount,
-        },
+          generate: ({ iteration, random }) => ({
+            target: clientA,
+            action: 'createTodo',
+            input: {
+              id: `history-${String(iteration + 1).padStart(3, '0')}`,
+              text: `Before the late Client ${iteration + 1} · variant ${random.integer('text-variant', 1_000)}`,
+            },
+          }),
+        }),
         {
           _tag: 'settle',
           id: 'settle-initial-history',
@@ -95,4 +100,4 @@ export const lateClientCatchUp = defineScenario({
       ],
     },
   ],
-})
+}))

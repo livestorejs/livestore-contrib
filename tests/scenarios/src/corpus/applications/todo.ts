@@ -1,7 +1,7 @@
 import { Events, makeSchema, State } from '@livestore/common/schema'
 import { Effect, Schema } from '@livestore/utils/effect'
 
-import { defineAction, defineApplication, defineInspector, defineWorkload } from '../../application/definition.ts'
+import { defineAction, defineApplication, defineInspector } from '../../application/definition.ts'
 
 export const todoEvents = {
   created: Events.synced({
@@ -50,7 +50,6 @@ const CreateTodoInput = Schema.Struct({ id: Schema.String, text: Schema.String }
 const EditTodoInput = Schema.Struct({ id: Schema.String, text: Schema.String })
 const SetTodoCompletedInput = Schema.Struct({ id: Schema.String, completed: Schema.Boolean })
 const DeleteTodoInput = Schema.Struct({ id: Schema.String })
-const CreateTodoBurstInput = Schema.Struct({ idPrefix: Schema.String, textPrefix: Schema.String })
 const TodoRows = Schema.Array(Schema.Struct({ id: Schema.String, text: Schema.String, completed: Schema.Boolean }))
 
 export const todoApplication = defineApplication({
@@ -72,19 +71,6 @@ export const todoApplication = defineApplication({
     deleteTodo: defineAction<typeof todoSchema, typeof DeleteTodoInput>({
       input: DeleteTodoInput,
       run: ({ store, input }) => Effect.sync(() => store.commit(todoEvents.deleted(input))),
-    }),
-  },
-  workloads: {
-    createTodoBurst: defineWorkload({
-      input: CreateTodoBurstInput,
-      generate: ({ input, targets, iteration, random }) => ({
-        target: random.pick(targets),
-        action: 'createTodo',
-        input: {
-          id: `${input.idPrefix}-${String(iteration + 1).padStart(3, '0')}`,
-          text: `${input.textPrefix} ${iteration + 1} · variant ${random.integer(1_000)}`,
-        },
-      }),
     }),
   },
   inspectors: {

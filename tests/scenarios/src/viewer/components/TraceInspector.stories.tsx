@@ -16,7 +16,7 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 const InspectorFixture = ({ multi, expanded }: { readonly multi: boolean; readonly expanded: boolean }) => (
-  <ReferenceFixture name="reference-offline-writer-recovery-browser-failure.json.gz">
+  <ReferenceFixture name="reference-offline-writer-recovery-browser.json.gz">
     {(artifact) => {
       const moments = derivePlaybackMoments({ scenario: artifact.scenario, trace: artifact.trace })
       const moment = multi === true ? moments.find((candidate) => candidate.recordIndexes.length > 1) : undefined

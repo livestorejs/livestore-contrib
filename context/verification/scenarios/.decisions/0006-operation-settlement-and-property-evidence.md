@@ -32,9 +32,8 @@ properties require terminal Settlement for their participants; history and
 sampled-prefix properties declare their own evidence boundaries.
 
 Once participant execution begins, any operation or Settlement failure retains
-the complete available trace prefix in a failed artifact. Validation or
-workload preflight before the run starts may fail without producing an
-artifact.
+the complete available trace prefix in a failed artifact. Scenario authoring or
+validation before the run starts may fail without producing an artifact.
 
 ## Consequences
 

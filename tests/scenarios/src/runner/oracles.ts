@@ -311,5 +311,3 @@ const evaluateOperationHistoryOracle = (
     `${operations.length} selected operations have terminal${oracle.allowIndefinite === true ? '' : ', non-indefinite'} outcomes${oracle.requireOverlap === true ? ' and overlapping invocation intervals' : ''}`,
   )
 }
-
-/** Resolves every named workload before creating participants and retains its deterministic expansion for the run. */

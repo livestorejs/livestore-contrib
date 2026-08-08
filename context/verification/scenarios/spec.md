@@ -22,22 +22,26 @@ published Scenario product package (LSC.VER.SCEN-R01).
 
 ## Scenario and Application Model
 
-Typed TypeScript constructors validate a version-1 serializable Scenario AST.
+Typed TypeScript constructors validate the version-2 serializable Scenario AST.
 It records stable Scenario/Application identity, seed, topology, phases,
-operations, faults, Workloads, Settlement steps, and selected oracles as data.
+operations, faults, ordered action sequences, Settlement steps, and selected
+oracles as data.
 Concrete Application definitions wrap the actual `LiveStoreSchema`; named
 actions decode JSON inputs before dispatch, State inspectors encode their
-output as JSON, and named Workloads expand to ordinary application actions.
-The Scenario never redeclares Events or materializers.
+output as JSON, and they contain no Scenario generation policy. The Scenario
+never redeclares Events or materializers.
 
 The topology separates the backend from stable Client identities and their
 sessions. Initial topology plus ordered Client/session additions defines the
 complete participant set. Lifecycle, connectivity, and backend-availability
-operations retain stable IDs, as do actions generated from a Workload's
-derived seed. Workload expansion and capability derivation happen before the
-first Client is created. A recorded seed reproduces generated inputs and
-requested choices; it does not claim to reproduce internal host or Sync
-delivery order (LSC.VER.SCEN-R03).
+operations retain stable IDs. Scenario-owned `repeatActions` authoring derives
+keyed choices from the Scenario seed plus stable phase, sequence, iteration,
+and choice identity, then expands immediately into a serializable
+`action-sequence` containing every concrete action. No authoring callback
+crosses into execution. Capability derivation sees the normalized plan before
+the first Client is created. A recorded seed reproduces generated inputs and
+requested choices from the same source revision; it does not claim to reproduce
+internal host or Sync delivery order (LSC.VER.SCEN-R03).
 
 ## Execution Profiles
 
@@ -78,7 +82,7 @@ advertised from sampled correlation (LSC.VER.SCEN-R03, R04).
 
 ## Evidence Semantics
 
-Trace protocol v3 is the authoritative evidence envelope. Each record has a
+Trace protocol v4 is the authoritative evidence envelope. Each record has a
 monotonic runner receipt index plus run, participant, phase, operation,
 emitter, and payload identity where applicable. The record's origin and
 evidence semantics distinguish an instruction, host acknowledgement, sampled
@@ -124,25 +128,25 @@ not proof of Eventlog contents or State equality. Oracles evaluate separate
 properties from retained evidence; snapshot-based oracles require a terminal
 Settlement covering their participants. Once execution begins, an operation
 or Settlement failure produces a failed artifact containing the available
-trace prefix. Scenario/application/capability/workload preflight can fail
+trace prefix. Scenario/application/capability preflight can fail
 before a run begins and therefore without an artifact. See
 [decision 0006](./.decisions/0006-operation-settlement-and-property-evidence.md)
 (LSC.VER.SCEN-R04, R05).
 
-## Corpus, Workloads, and Oracles
+## Corpus, Authoring, and Oracles
 
-The baseline corpus covers offline-writer recovery, backend outage/recovery,
-late catch-up, seeded mixed todo work, dynamic Client/session addition,
-multi-session browser recovery and Leader turnover, and a shared workday
-topology. It also includes the intentional `concurrent-hotel-booking`
-failure, which preserves a SQLite-enforced non-negative invariant violation
-during pending-Event reconciliation. Concrete Application definitions and
-portable Scenario definitions remain separate corpus registries under
-`src/corpus/applications` and `src/corpus/scenarios`; each Scenario references
-one registered Application by ID. The associated
+The retained corpus contains four promoted `SF-*` failure reproducers and two
+representative examples: offline writer recovery and browser multi-session
+recovery. Focused host-contract Scenarios remain committed test fixtures
+without becoming CLI corpus entries. Generated investigations, controls, and
+reductions begin under the Git-ignored `local/scenarios/` tier and run by file;
+promotion is the deliberate move of a reduced, focused source definition into
+`retained/findings/` or `retained/examples/` plus registry and regression
+evidence. Each Scenario references one registered Application by ID. The associated
 [red-team plan](../../../tests/scenarios/RED_TEAMING.md) defines the wider search,
-promotion, failure-signature, and reduction campaign. Workload v1 expands application-owned named workloads sequentially
-from a derived seed and retains the enclosing and child operation identities.
+promotion, failure-signature, and reduction campaign. Scenario-owned repetition
+retains both the enclosing action-sequence identity and every concrete child
+operation in the normalized artifact.
 
 The oracle catalogue checks terminal Eventlog equality, sampled confirmed
 Eventlog prefixes, pending resolution, State convergence, expected application
@@ -183,7 +187,7 @@ run shows its full commit and dirty-content identity in one provenance line.
 `deriveTimelineScene()` is DOM-free and feeds layered topology, causal-flow,
 elapsed-time, range, and raw-record projections over the immutable trace.
 The default sync-evidence flow spaces material captures and Scenario
-boundaries as semantic steps. A Workload is one summarized narrative boundary;
+boundaries as semantic steps. An action sequence is one summarized narrative boundary;
 its generated child action instructions and acknowledgements remain available
 in raw-trace navigation without consuming the default flow axis.
 

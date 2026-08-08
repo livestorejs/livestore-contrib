@@ -105,11 +105,11 @@ debugging in this order:
 
 1. Remove whole phases, then contiguous step ranges, then individual steps.
 2. Remove Clients and sessions, preserving references and required settlement.
-3. Remove generated actions and Events; shrink workload count with binary search.
+3. Remove generated actions and Events; shrink action-sequence count with binary search.
 4. Simplify parallel groups to sequential pairs and remove unrelated faults.
 5. Shrink payloads, strings, identifiers, numeric values, and timeout/fault
    durations toward canonical minima.
-6. Replace workloads with their surviving explicit actions.
+6. Replace generated sequences with their surviving explicit actions when that improves the reduced explanation.
 7. Normalize names and seed while retaining the failure signature.
 
 A deterministic result is minimal when no remaining phase, participant,
@@ -149,7 +149,7 @@ Scenarios are discarded rather than counted as successful reductions.
 - Implement stable failure signatures and an `expected-failure` assertion so a
   known reproducer remains green without treating the product failure as a pass.
 - Implement dependency-aware `ddmin` over normalized Scenario ASTs and expanded
-  workloads (LSC.VER.SCEN-DQ1).
+  generated action sequences (LSC.VER.SCEN-DQ1).
 - Carry Store shutdown/runtime failure evidence through process and browser hosts;
   in-process capture is now available.
 - Add barrier-addressable fault points. Sleeps alone cannot prove which protocol

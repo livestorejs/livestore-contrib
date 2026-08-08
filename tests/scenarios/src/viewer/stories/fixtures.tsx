@@ -6,8 +6,8 @@ import { decodeArtifactJson, fetchArtifactJson } from '../artifact-io.ts'
 
 export type ReferenceArtifactName =
   | 'reference-browser-multi-session-recovery-browser.json.gz'
-  | 'reference-offline-writer-recovery-browser-failure.json.gz'
-  | 'reference-shared-todo-workday-browser-failure.json.gz'
+  | 'reference-offline-writer-recovery-browser.json.gz'
+  | 'reference-seeded-todo-actions-browser.json.gz'
 
 const cache = new Map<ReferenceArtifactName, Promise<ScenarioRunArtifact>>()
 

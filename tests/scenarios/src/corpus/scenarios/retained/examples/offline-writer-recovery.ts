@@ -1,11 +1,11 @@
-import { defineScenario } from '../../model.ts'
-import { todoApplication } from '../applications/todo.ts'
+import { defineScenario } from '../../../../model.ts'
+import { todoApplication } from '../../../applications/todo.ts'
 
 const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
 const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
 
 export const offlineWriterRecovery = defineScenario({
-  version: 1,
+  version: 2,
   id: 'offline-writer-recovery',
   description: 'An offline Client and an online Client both write before reconnecting and converging.',
   tags: ['sync', 'offline', 'rebase'],

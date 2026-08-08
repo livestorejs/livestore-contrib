@@ -13,6 +13,7 @@ import {
   ScenarioAst,
   scenarioArtifactVersion,
   scenarioTraceVersion,
+  scenarioVersion,
 } from './scenario.ts'
 
 export const ScenarioTracePayload = Schema.Union([
@@ -45,15 +46,13 @@ export const ScenarioTracePayload = Schema.Union([
     action: Schema.String,
     status: Schema.Literal('acknowledged'),
   }),
-  Schema.TaggedStruct('workload.requested', {
-    workload: Schema.String,
-    input: Schema.Json,
+  Schema.TaggedStruct('action-sequence.requested', {
+    description: Schema.String,
     targets: Schema.Array(Schema.String),
     count: Schema.Int,
     seed: Schema.Finite,
   }),
-  Schema.TaggedStruct('workload.completed', {
-    workload: Schema.String,
+  Schema.TaggedStruct('action-sequence.completed', {
     actionIds: Schema.Array(Schema.String),
     status: Schema.Literal('acknowledged'),
   }),
@@ -198,8 +197,8 @@ export const ScenarioRunArtifact = Schema.Struct({
   descriptor: Schema.Struct({
     runId: Schema.String,
     scenarioId: Schema.String,
-    scenarioVersion: Schema.Finite,
-    traceVersion: Schema.Finite,
+    scenarioVersion: Schema.Literal(scenarioVersion),
+    traceVersion: Schema.Literal(scenarioTraceVersion),
     applicationId: Schema.String,
     sourceRevision: Schema.String,
     seed: Schema.Finite,

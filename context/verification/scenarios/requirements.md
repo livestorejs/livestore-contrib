@@ -37,10 +37,12 @@ choices, and gaps for the private
   evidence it actually supplies.
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
-  versioned Scenario ASTs, named actions, seeded Workloads,
+  versioned Scenario ASTs, named actions, Scenario-owned seeded authoring,
   topology/lifecycle/fault plans, and preflight capability derivation are
-  shared without profile-specific Scenario rewrites. Generated actions retain
-  stable operation identity and deterministic seed derivation; a seed
+  shared without profile-specific Scenario rewrites. Authoring-time repetition
+  expands into self-contained ordered action sequences before execution;
+  Application definitions contain no Scenario generation policy. Generated
+  actions retain stable operation identity and deterministic keyed seed derivation; a seed
   reproduces generated inputs and requested choices, not internal delivery
   order.
 - **LSC.VER.SCEN-R04 Shared host conformance and bounded settlement:** Every
@@ -73,7 +75,7 @@ choices, and gaps for the private
   failure explicitly. This is derived reconstruction from one sampled Leader
   observation, never the Client's actual historical database, a session State,
   or an atomic distributed snapshot. Its
-  default sync-evidence projection aggregates Workload child actions and spaces
+  default sync-evidence projection aggregates action-sequence child actions and spaces
   material captures plus Scenario boundaries as semantic flow steps; the raw
   trace remains available without determining that projection's geometry.
   Individual Event presentations use the recorded producer Client's timeline
@@ -86,11 +88,18 @@ choices, and gaps for the private
   provides runner, viewer, Storybook, build, and parity tasks with pinned
   browser support; CI has a dedicated required Scenario job covering the
   runner suites and both viewer builds/parity.
+- **LSC.VER.SCEN-R08 Explicit Scenario promotion lifecycle:** Generated cases,
+  investigation controls, and reductions begin in a Git-ignored local source
+  tier and run explicitly by file. The registered retained corpus contains only
+  minimized findings and representative examples with a stated durable purpose
+  and focused evidence. Narrow host-contract fixtures may remain committed
+  beside their tests without becoming CLI corpus entries. Promoting Scenario
+  source never implicitly promotes a run artifact.
 
 ## Open Design Questions
 
 - **LSC.VER.SCEN-DQ1 Failure minimization realization.** The current CLI
-  preserves failures but does not shrink a generated workload or fault
+  preserves failures but does not shrink a generated action sequence or fault
   schedule. The dependency-aware
   reduction approach and first campaign are specified in
   [`tests/scenarios/RED_TEAMING.md`](../../../tests/scenarios/RED_TEAMING.md).

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
@@ -9,8 +10,8 @@ import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
 import type { CloudSyncCfScenarioBackendOptions } from './backends.ts'
 import { ensureCloudSyncCf } from './cloud-sync-cf.ts'
 import { getScenarioApplication } from './corpus/applications/registry.ts'
-import { getScenario, scenarioCorpus } from './corpus/scenarios/registry.ts'
-import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
+import { getScenario, retainedScenarioCatalog } from './corpus/scenarios/registry.ts'
+import { defineScenario, type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
   type RunScenarioOptions,
   runBrowserCloudSyncCfScenario,
@@ -62,13 +63,11 @@ const runSelectedScenario = (
         ? runProcessLocalSyncCfScenario({
             scenario: options.scenario,
             applicationId: application.id,
-            workloads: application.workloads,
             options: runOptions,
           })
         : runProcessCloudSyncCfScenario({
             scenario: options.scenario,
             applicationId: application.id,
-            workloads: application.workloads,
             cloud: requireCloud(cloud),
             options: runOptions,
           })
@@ -77,13 +76,11 @@ const runSelectedScenario = (
         ? runBrowserLocalSyncCfScenario({
             scenario: options.scenario,
             applicationId: application.id,
-            workloads: application.workloads,
             options: runOptions,
           })
         : runBrowserCloudSyncCfScenario({
             scenario: options.scenario,
             applicationId: application.id,
-            workloads: application.workloads,
             cloud: requireCloud(cloud),
             options: runOptions,
           })
@@ -95,7 +92,7 @@ const requireCloud = (cloud: CloudSyncCfScenarioBackendOptions | undefined): Clo
   return cloud
 }
 
-const parseCliOptions = (args: ReadonlyArray<string>): CliOptions => {
+const parseCliOptions = async (args: ReadonlyArray<string>): Promise<CliOptions> => {
   if (args.includes('--help') === true || args.includes('-h') === true) {
     console.log(`Usage: pnpm scenario:run [options]
 
@@ -104,11 +101,14 @@ Options:
   --core-path <path>                          Run against an installed local LiveStore worktree
   --profile <in-process|process|browser>       Participant placement (default: in-process)
   --backend <mock|local-sync-cf|cloud-sync-cf> Sync backend (defaults by profile)
-  --scenario <scenario-id>                    Scenario (default: offline-writer-recovery)
+  --scenario <scenario-id>                    Retained Scenario (default: offline-writer-recovery)
+  --scenario-file <path>                      Local TypeScript Scenario module
   --output <path>                             Artifact output path
 
 Scenarios:
-  ${scenarioCorpus.map(({ id }) => id).join('\n  ')}`)
+  ${retainedScenarioCatalog
+    .map(({ findingId, kind, scenario }) => [findingId ?? kind, scenario.id, scenario.description].join(' · '))
+    .join('\n  ')}`)
     process.exit(0)
   }
 
@@ -120,13 +120,29 @@ Scenarios:
     throw new Error(`${profile} requires a sync-cf backend`)
   }
 
-  const scenarioId = readOption(args, '--scenario') ?? 'offline-writer-recovery'
-  const scenario = getScenario(scenarioId)
+  const scenarioId = readOption(args, '--scenario')
+  const scenarioFile = readOption(args, '--scenario-file')
+  if (scenarioId !== undefined && scenarioFile !== undefined) {
+    throw new Error('Choose either --scenario or --scenario-file, not both')
+  }
+  const scenario =
+    scenarioFile === undefined
+      ? getScenario(scenarioId ?? 'offline-writer-recovery')
+      : await loadScenarioFile(path.resolve(scenarioFile))
 
   const positionalOutput = args[0]?.startsWith('-') === false ? args[0] : undefined
   const output = readOption(args, '--output') ?? positionalOutput ?? `artifacts/${scenario.id}.json`
 
   return { profile, backend, scenario, outputPath: path.resolve(output) }
+}
+
+const loadScenarioFile = async (file: string): Promise<ScenarioAst> => {
+  const module = (await import(pathToFileURL(file).href)) as Record<string, unknown>
+  const candidate = module.default ?? module.scenario
+  if (candidate === undefined) {
+    throw new Error(`Scenario file must export the Scenario as default or as 'scenario': ${file}`)
+  }
+  return defineScenario(candidate)
 }
 
 const readChoice = <const TChoices extends ReadonlyArray<string>>(
@@ -148,7 +164,7 @@ const readOption = (args: ReadonlyArray<string>, name: string): string | undefin
   return value
 }
 
-const cli = parseCliOptions(process.argv.slice(2))
+const cli = await parseCliOptions(process.argv.slice(2))
 
 const program = Effect.gen(function* () {
   const runOptions = {

@@ -154,7 +154,7 @@ export const expectBackendOutageRecovery = (artifact: ScenarioRunArtifact): void
   expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
 }
 
-export const workloadActionSignature = (artifact: ScenarioRunArtifact): ReadonlyArray<unknown> =>
+export const generatedActionSignature = (artifact: ScenarioRunArtifact): ReadonlyArray<unknown> =>
   artifact.trace.flatMap((record) =>
     record.payload._tag === 'action.requested' && record.causationId === 'create-seeded-todos'
       ? [

@@ -1,6 +1,6 @@
 # 0004 — Keep sampled State and Event correlation within their evidence limits
 
-Status: accepted (trace protocol v3, all-profile capability contract, and
+Status: accepted (all-profile capability contract and
 projection/oracle tests in `tests/scenarios`, 2026-08-01)
 
 ## Context

@@ -25,7 +25,7 @@ describe('fetchArtifactJson', () => {
   })
 })
 
-const artifactJson = '{"artifactVersion":4}'
+const artifactJson = '{"artifactVersion":5}'
 
 const gzip = async (input: string): Promise<ArrayBuffer> => {
   const stream = new Blob([input]).stream().pipeThrough(new CompressionStream('gzip'))

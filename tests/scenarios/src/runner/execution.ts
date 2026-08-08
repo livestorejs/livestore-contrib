@@ -1,13 +1,14 @@
 import { Deferred, Effect, Exit, type OtelTracer, type Scope } from '@livestore/utils/effect'
 
-import { type GeneratedWorkloadAction, ScenarioOperationError } from '../application/definition.ts'
+import { ScenarioOperationError } from '../application/definition.ts'
 import {
+  type ActionStep,
+  type ActionSequenceStep,
   type ClientDefinition,
   type ParallelOperationStep,
   participantKey,
   type ScenarioStep,
   type ScenarioTraceRecord,
-  type WorkloadStep,
 } from '../model.ts'
 import type { HostError, ParticipantHost } from '../profiles/contract.ts'
 import { syncObservationPayload } from './eventlog.ts'
@@ -15,24 +16,12 @@ import { type ScenarioFaultState, recordOperationFailure } from './faults.ts'
 import { awaitSettlement } from './observations.ts'
 import type { TraceRecorder } from './trace-recorder.ts'
 
-export interface PreparedWorkloadAction extends GeneratedWorkloadAction {
-  readonly id: string
-}
-
-export interface PreparedWorkloadExpansion {
-  readonly seed: number
-  readonly actions: ReadonlyArray<PreparedWorkloadAction>
-}
-
-export type PreparedWorkloadExpansions = ReadonlyMap<string, PreparedWorkloadExpansion>
-
 export const executeParallelStep = (args: {
   host: ParticipantHost
   storeId: string
   phaseId: string
   record: TraceRecorder
   operations: ReadonlyArray<ParallelOperationStep>
-  workloadExpansions: PreparedWorkloadExpansions
   faultState: ScenarioFaultState
   onFailure: (operationId: string) => void
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
@@ -77,7 +66,6 @@ export const executeStep = (args: {
   phaseId: string
   record: TraceRecorder
   step: Exclude<ScenarioStep, { readonly _tag: 'parallel' }>
-  workloadExpansions: PreparedWorkloadExpansions
   faultState: ScenarioFaultState
   onInvoked?: () => Effect.Effect<void>
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> => {
@@ -116,13 +104,12 @@ export const executeStep = (args: {
     case 'action': {
       return executeAction({ ...args, action: args.step }).pipe(Effect.asVoid)
     }
-    case 'workload':
-      return executeWorkload({
+    case 'action-sequence':
+      return executeActionSequence({
         host: args.host,
         phaseId: args.phaseId,
         record: args.record,
         step: args.step,
-        workloadExpansions: args.workloadExpansions,
       })
     case 'disconnect':
     case 'reconnect': {
@@ -302,7 +289,7 @@ const executeAction = (args: {
   host: ParticipantHost
   phaseId: string
   record: TraceRecorder
-  action: PreparedWorkloadAction
+  action: ActionStep
   causationId?: string
   causedBy?: ReadonlyArray<number>
   onInvoked?: () => Effect.Effect<void>
@@ -336,35 +323,27 @@ const executeAction = (args: {
     })
   })
 
-const executeWorkload = (args: {
+const executeActionSequence = (args: {
   host: ParticipantHost
   phaseId: string
   record: TraceRecorder
-  step: WorkloadStep
-  workloadExpansions: PreparedWorkloadExpansions
+  step: ActionSequenceStep
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
-    const expansion = args.workloadExpansions.get(args.step.id)
-    if (expansion === undefined) {
-      return yield* Effect.fail(
-        new ScenarioOperationError('invalid-scenario', `Workload ${args.step.id} was not prepared before execution`),
-      )
-    }
     const instruction = args.record({
       origin: 'instruction',
       correlationId: args.step.id,
       phaseId: args.phaseId,
       payload: {
-        _tag: 'workload.requested',
-        workload: args.step.workload,
-        input: args.step.input,
-        targets: args.step.targets.map(participantKey),
-        count: args.step.count,
-        seed: expansion.seed,
+        _tag: 'action-sequence.requested',
+        description: args.step.description,
+        targets: [...new Set(args.step.actions.map((action) => participantKey(action.target)))],
+        count: args.step.actions.length,
+        seed: args.step.seed,
       },
     })
     const acknowledgements: ScenarioTraceRecord[] = []
-    for (const action of expansion.actions) {
+    for (const action of args.step.actions) {
       const acknowledgement = yield* executeAction({
         host: args.host,
         phaseId: args.phaseId,
@@ -386,9 +365,8 @@ const executeWorkload = (args: {
       phaseId: args.phaseId,
       causedBy: [instruction.index, ...acknowledgements.map((record) => record.index)],
       payload: {
-        _tag: 'workload.completed',
-        workload: args.step.workload,
-        actionIds: expansion.actions.map((action) => action.id),
+        _tag: 'action-sequence.completed',
+        actionIds: args.step.actions.map((action) => action.id),
         status: 'acknowledged',
       },
     })

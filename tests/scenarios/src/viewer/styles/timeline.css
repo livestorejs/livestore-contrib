@@ -363,27 +363,27 @@
   stroke-width: 1;
 }
 
-.timeline .trace-workload {
+.timeline .trace-action-sequence {
   cursor: pointer;
 }
 
-.timeline .trace-workload rect {
+.timeline .trace-action-sequence rect {
   fill: var(--background);
   stroke: var(--text);
   stroke-width: 1.5;
 }
 
-.timeline .trace-workload text {
+.timeline .trace-action-sequence text {
   fill: var(--text);
   font-size: 7px;
   pointer-events: none;
 }
 
-.timeline .trace-workload.selected rect {
+.timeline .trace-action-sequence.selected rect {
   fill: var(--text);
 }
 
-.timeline .trace-workload.selected text {
+.timeline .trace-action-sequence.selected text {
   fill: var(--background);
 }
 

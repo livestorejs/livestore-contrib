@@ -1,5 +1,5 @@
-import { defineScenario } from '../../model.ts'
-import { todoApplication } from '../applications/todo.ts'
+import { defineScenario } from '../../../../model.ts'
+import { todoApplication } from '../../../applications/todo.ts'
 
 const sessionA1 = { clientId: 'client-a', sessionId: 'session-a1' } as const
 const sessionA2 = { clientId: 'client-a', sessionId: 'session-a2' } as const
@@ -9,7 +9,7 @@ const sessionA2 = { clientId: 'client-a', sessionId: 'session-a2' } as const
  * The fixture starts A1 before adding A2, so blocking Web Lock election makes A1 the initial Leader holder.
  */
 export const browserMultiSessionRecovery = defineScenario({
-  version: 1,
+  version: 2,
   id: 'browser-multi-session-recovery',
   description: 'A later browser session joins one Client leader and both recover through session and Client restarts.',
   tags: ['sync', 'browser', 'multi-session', 'opfs', 'lifecycle'],

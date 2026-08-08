@@ -1,6 +1,6 @@
 # 0005 — Separate causal flow from calibrated elapsed time
 
-Status: accepted (trace protocol v3 and causal/time viewer projections in
+Status: accepted (causal/time viewer projections in
 `tests/scenarios`, 2026-08-01)
 
 ## Context

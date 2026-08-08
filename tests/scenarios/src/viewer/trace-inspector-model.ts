@@ -49,18 +49,16 @@ export const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<Rec
         { label: 'Action', value: payload.action },
         { label: 'Input', value: jsonValueSummary(payload.input) },
       ]
-    case 'workload.requested':
+    case 'action-sequence.requested':
       return [
-        { label: 'Workload', value: payload.workload },
+        { label: 'Action sequence', value: payload.description },
         { label: 'Count', value: String(payload.count) },
         { label: 'Derived seed', value: String(payload.seed) },
         { label: 'Targets', value: payload.targets.join(', ') },
-        { label: 'Input', value: jsonValueSummary(payload.input) },
       ]
-    case 'workload.completed':
+    case 'action-sequence.completed':
       return [
-        { label: 'Workload', value: payload.workload },
-        { label: 'Generated actions', value: String(payload.actionIds.length), tone: 'good' },
+        { label: 'Actions', value: String(payload.actionIds.length), tone: 'good' },
         { label: 'Status', value: payload.status, tone: 'good' },
       ]
     case 'connectivity.disconnect.requested':

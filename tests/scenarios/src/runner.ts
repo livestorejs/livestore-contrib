@@ -3,7 +3,7 @@ import type { WranglerDevServer } from '@livestore/utils-dev/wrangler'
 import { Effect, FetchHttpClient, Layer, type OtelTracer, type Scope } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
-import type { ApplicationDefinition, ApplicationWorkloadLibrary } from './application/definition.ts'
+import type { ApplicationDefinition } from './application/definition.ts'
 import {
   type CloudSyncCfScenarioBackendOptions,
   makeCloudSyncCfScenarioBackend,
@@ -26,7 +26,6 @@ import { captureSnapshots, recordSystemObservation } from './runner/observations
 import { evaluateOracles } from './runner/oracles.ts'
 import { describeHostError, makeScenarioArtifact, validateExecution } from './runner/support.ts'
 import { makeTraceRecorder } from './runner/trace-recorder.ts'
-import { prepareWorkloadExpansions } from './runner/workloads.ts'
 
 export interface RunScenarioOptions {
   readonly runId?: string
@@ -61,7 +60,6 @@ export const runInProcessScenario = <TSchema extends LiveStoreSchema>(args: {
       scenario: args.scenario,
       applicationId: args.application.id,
       host,
-      workloads: args.application.workloads,
       options: { ...args.options, execution: args.options?.execution ?? defaultInProcessExecution },
     })
   })
@@ -84,7 +82,6 @@ export const runInProcessLocalSyncCfScenario = <TSchema extends LiveStoreSchema>
       scenario: args.scenario,
       applicationId: args.application.id,
       host,
-      workloads: args.application.workloads,
       options: {
         ...args.options,
         execution: {
@@ -99,7 +96,6 @@ export const runInProcessLocalSyncCfScenario = <TSchema extends LiveStoreSchema>
 export const runProcessLocalSyncCfScenario = (args: {
   scenario: ScenarioAst
   applicationId: string
-  workloads?: ApplicationWorkloadLibrary
   options?: RunScenarioOptions
 }): Effect.Effect<
   ScenarioRunArtifact,
@@ -115,7 +111,6 @@ export const runProcessLocalSyncCfScenario = (args: {
       scenario: args.scenario,
       applicationId: args.applicationId,
       host,
-      workloads: args.workloads,
       options: {
         ...args.options,
         execution: {
@@ -130,7 +125,6 @@ export const runProcessLocalSyncCfScenario = (args: {
 export const runBrowserLocalSyncCfScenario = (args: {
   scenario: ScenarioAst
   applicationId: string
-  workloads?: ApplicationWorkloadLibrary
   options?: RunScenarioOptions
 }): Effect.Effect<
   ScenarioRunArtifact,
@@ -146,7 +140,6 @@ export const runBrowserLocalSyncCfScenario = (args: {
       scenario: args.scenario,
       applicationId: args.applicationId,
       host,
-      workloads: args.workloads,
       options: {
         ...args.options,
         execution: {
@@ -173,7 +166,6 @@ export const runInProcessCloudSyncCfScenario = <TSchema extends LiveStoreSchema>
       scenario: args.scenario,
       applicationId: args.application.id,
       host,
-      workloads: args.application.workloads,
       options: {
         ...args.options,
         execution: { participantProfile: 'in-process', syncBackend: 'cloud-sync-cf', stateProfile: 'sqlite' },
@@ -184,7 +176,6 @@ export const runInProcessCloudSyncCfScenario = <TSchema extends LiveStoreSchema>
 export const runProcessCloudSyncCfScenario = (args: {
   scenario: ScenarioAst
   applicationId: string
-  workloads?: ApplicationWorkloadLibrary
   cloud: CloudSyncCfScenarioBackendOptions
   options?: RunScenarioOptions
 }): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
@@ -197,7 +188,6 @@ export const runProcessCloudSyncCfScenario = (args: {
       scenario: args.scenario,
       applicationId: args.applicationId,
       host,
-      workloads: args.workloads,
       options: {
         ...args.options,
         execution: { participantProfile: 'process', syncBackend: 'cloud-sync-cf', stateProfile: 'sqlite' },
@@ -208,7 +198,6 @@ export const runProcessCloudSyncCfScenario = (args: {
 export const runBrowserCloudSyncCfScenario = (args: {
   scenario: ScenarioAst
   applicationId: string
-  workloads?: ApplicationWorkloadLibrary
   cloud: CloudSyncCfScenarioBackendOptions
   options?: RunScenarioOptions
 }): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
@@ -221,7 +210,6 @@ export const runBrowserCloudSyncCfScenario = (args: {
       scenario: args.scenario,
       applicationId: args.applicationId,
       host,
-      workloads: args.workloads,
       options: {
         ...args.options,
         execution: { participantProfile: 'browser', syncBackend: 'cloud-sync-cf', stateProfile: 'opfs' },
@@ -234,17 +222,11 @@ export const runScenario = (args: {
   scenario: ScenarioAst
   applicationId: string
   host: ParticipantHost
-  workloads?: ApplicationWorkloadLibrary
   options?: RunScenarioOptions
 }): Effect.Effect<ScenarioRunArtifact, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
     const execution = args.options?.execution ?? defaultInProcessExecution
     yield* validateExecution({ ...args, execution })
-    const workloadExpansions = yield* prepareWorkloadExpansions({
-      scenario: args.scenario,
-      workloads: args.workloads ?? {},
-    })
-
     const runId = args.options?.runId ?? `${args.scenario.id}:${args.scenario.seed}:${Date.now()}`
     const trace: ScenarioTraceRecord[] = []
     let logicalTime = 0
@@ -309,7 +291,6 @@ export const runScenario = (args: {
               phaseId: phase.id,
               record,
               operations: step.operations,
-              workloadExpansions,
               faultState,
               onFailure: (operationId) => {
                 activeStepId = operationId
@@ -322,7 +303,6 @@ export const runScenario = (args: {
               phaseId: phase.id,
               record,
               step,
-              workloadExpansions,
               faultState,
             })
           }

@@ -1,5 +1,5 @@
-import { defineScenario, type ParticipantRef } from '../../model.ts'
-import { todoApplication } from '../applications/todo.ts'
+import { defineScenario, type ParticipantRef } from '../../../../model.ts'
+import { todoApplication } from '../../../applications/todo.ts'
 
 const writerCount = Number(process.env.SCENARIO_WRITER_COUNT ?? 2)
 const eventCount = Number(process.env.SCENARIO_EVENT_COUNT ?? 426)
@@ -9,8 +9,8 @@ const writers: ReadonlyArray<ParticipantRef> = Array.from({ length: writerCount 
 }))
 
 /** Distributes hundreds of Events across many independently synchronizing Clients. */
-export const manyWriterConvergence = defineScenario({
-  version: 1,
+export const manyWriterConvergence = defineScenario(({ repeatActions }) => ({
+  version: 2,
   id: 'many-writer-convergence',
   description: `${writerCount} Clients distribute and converge ${eventCount} uniquely identified Events.`,
   tags: ['sync', 'correctness', 'known-failure', 'topology', 'many-writers', `${eventCount}-events`],
@@ -28,16 +28,21 @@ export const manyWriterConvergence = defineScenario({
   phases: [
     {
       id: 'distribute-writes',
-      description: 'Use a deterministic seeded workload to distribute unique writes across all Clients.',
+      description: 'Generate deterministic createTodo actions here and distribute them across all Clients.',
       steps: [
-        {
-          _tag: 'workload',
-          id: 'many-writer-workload',
-          workload: 'createTodoBurst',
-          input: { idPrefix: 'many-writer', textPrefix: 'Distributed write' },
-          targets: writers,
+        repeatActions({
+          id: 'many-writer-actions',
+          description: `Distribute ${eventCount} unique writes across ${writerCount} Clients`,
           count: eventCount,
-        },
+          generate: ({ iteration, random }) => ({
+            target: random.pick('target', writers),
+            action: 'createTodo',
+            input: {
+              id: `many-writer-${String(iteration + 1).padStart(3, '0')}`,
+              text: `Distributed write ${iteration + 1} · variant ${random.integer('text-variant', 1_000)}`,
+            },
+          }),
+        }),
         {
           _tag: 'settle',
           id: 'settle-many-writers',
@@ -61,4 +66,4 @@ export const manyWriterConvergence = defineScenario({
       expectedIds: ['many-writer-001', `many-writer-${String(eventCount).padStart(3, '0')}`],
     },
   ],
-})
+}))

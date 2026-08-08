@@ -515,11 +515,13 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
               class: `evidence-moment moment-${moment.kind} ${record.evidence} ${moment.recordIndexes.includes(cursorIndex) === true ? 'selected' : ''}`,
               'data-record-index': moment.recordIndex,
             }
-            const workloadCount =
-              representedRecord.payload._tag === 'workload.requested' ? representedRecord.payload.count : undefined
+            const groupedActionCount =
+              representedRecord.payload._tag === 'action-sequence.requested'
+                ? representedRecord.payload.count
+                : undefined
             return withTooltip(
               `moment ${moment.momentIndex + 1} · ${moment.label} · ${moment.summary} · record ${moment.recordIndex + 1}`,
-              workloadCount === undefined
+              groupedActionCount === undefined
                 ? node('circle', {
                     ...commonAttrs,
                     class: `trace-dot ${commonAttrs.class}`,
@@ -527,7 +529,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
                     cy: carpetTop + 15,
                     r: radius,
                   })
-                : node('g', { ...commonAttrs, class: `trace-workload ${commonAttrs.class}` }, [
+                : node('g', { ...commonAttrs, class: `trace-action-sequence ${commonAttrs.class}` }, [
                     node('rect', {
                       x: xForCarpetRecord(moment.recordIndex) - 29,
                       y: carpetTop + 8,
@@ -539,7 +541,7 @@ export const deriveTimelineScene = (args: DeriveTimelineSceneArgs): TimelineScen
                       'text',
                       { x: xForCarpetRecord(moment.recordIndex), y: carpetTop + 18, 'text-anchor': 'middle' },
                       undefined,
-                      `${workloadCount} actions`,
+                      `${groupedActionCount} actions`,
                     ),
                   ]),
             )

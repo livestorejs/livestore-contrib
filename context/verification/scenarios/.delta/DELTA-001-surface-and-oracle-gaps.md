@@ -2,8 +2,9 @@
 
 Status: open
 
-The current AST does not retain rematerialization operations. Workloads do not
-yet express rates, stop conditions, generated parallel scheduling, or nesting.
+The current AST does not retain rematerialization operations. Scenario-owned
+action generation does not yet express rates, stop conditions, generated
+parallel scheduling, or nesting.
 The oracle catalogue does not provide portable rematerialization equivalence,
 resource-bound, or performance verdicts, and failure artifacts are preserved
 without automatic minimization.

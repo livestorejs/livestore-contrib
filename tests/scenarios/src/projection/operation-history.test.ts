@@ -22,7 +22,7 @@ Vitest.describe('scenario operation history', () => {
         const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
         const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
         const scenario = defineScenario({
-          version: 1,
+          version: 2,
           id: 'parallel-operation-history',
           description: 'Exercises overlapping application operations and history checking.',
           tags: ['operation-history', 'parallel'],
@@ -124,7 +124,7 @@ Vitest.describe('scenario operation history', () => {
       const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
       const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
       const scenario = defineScenario({
-        version: 1,
+        version: 2,
         id: 'parallel-operation-failure',
         description: 'Retains all child outcomes when a parallel operation fails.',
         tags: ['operation-history', 'parallel', 'failure'],

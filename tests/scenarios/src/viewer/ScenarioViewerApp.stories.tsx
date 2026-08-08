@@ -16,9 +16,9 @@ type Story = StoryObj<typeof meta>
 
 export const Unloaded: Story = { args: { hidePicker: true } }
 
-export const OfflineWriterFailure: Story = {
+export const OfflineWriter: Story = {
   render: () => (
-    <ReferenceFixture name="reference-offline-writer-recovery-browser-failure.json.gz">
+    <ReferenceFixture name="reference-offline-writer-recovery-browser.json.gz">
       {(artifact) => <ScenarioViewerApp initialArtifact={artifact} hidePicker />}
     </ReferenceFixture>
   ),
@@ -34,7 +34,7 @@ export const BrowserMultiSessionSuccess: Story = {
 
 export const OfflineWriterMidCursor: Story = {
   render: () => (
-    <ReferenceFixture name="reference-offline-writer-recovery-browser-failure.json.gz">
+    <ReferenceFixture name="reference-offline-writer-recovery-browser.json.gz">
       {(artifact) => (
         <ScenarioViewerApp
           initialArtifact={artifact}
@@ -46,9 +46,9 @@ export const OfflineWriterMidCursor: Story = {
   ),
 }
 
-export const DenseSharedTodoFailure: Story = {
+export const DenseSeededActions: Story = {
   render: () => (
-    <ReferenceFixture name="reference-shared-todo-workday-browser-failure.json.gz">
+    <ReferenceFixture name="reference-seeded-todo-actions-browser.json.gz">
       {(artifact) => <ScenarioViewerApp initialArtifact={artifact} hidePicker />}
     </ReferenceFixture>
   ),
@@ -56,7 +56,7 @@ export const DenseSharedTodoFailure: Story = {
 
 export const ReconstructedLeaderState: Story = {
   render: () => (
-    <ReferenceFixture name="reference-offline-writer-recovery-browser-failure.json.gz">
+    <ReferenceFixture name="reference-offline-writer-recovery-browser.json.gz">
       {(artifact) => (
         <ScenarioViewerApp
           initialArtifact={artifact}
@@ -71,7 +71,7 @@ export const ReconstructedLeaderState: Story = {
 export const NarrowViewport: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   render: () => (
-    <ReferenceFixture name="reference-offline-writer-recovery-browser-failure.json.gz">
+    <ReferenceFixture name="reference-offline-writer-recovery-browser.json.gz">
       {(artifact) => <ScenarioViewerApp initialArtifact={artifact} hidePicker />}
     </ReferenceFixture>
   ),
@@ -79,7 +79,7 @@ export const NarrowViewport: Story = {
 
 export const InteractionWorkbench: Story = {
   render: () => (
-    <ReferenceFixture name="reference-offline-writer-recovery-browser-failure.json.gz">
+    <ReferenceFixture name="reference-offline-writer-recovery-browser.json.gz">
       {(artifact) => <ScenarioViewerApp initialArtifact={artifact} hidePicker />}
     </ReferenceFixture>
   ),

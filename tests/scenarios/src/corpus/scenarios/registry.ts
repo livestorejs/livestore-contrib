@@ -1,31 +1,27 @@
 import type { ScenarioAst } from '../../model.ts'
-import { backendOutageRecovery } from './backend-outage-recovery.ts'
-import { browserMultiSessionRecovery } from './browser-multi-session-recovery.ts'
-import { concurrentHotelBooking } from './concurrent-hotel-booking.ts'
-import { largePayloadRecovery } from './large-payload-recovery.ts'
-import { lateClientCatchUp } from './late-client-catch-up.ts'
-import { manyWriterConvergence } from './many-writer-convergence.ts'
-import { offlineWriterRecovery } from './offline-writer-recovery.ts'
-import { pendingPushBoundary } from './pending-push-boundary.ts'
-import { pendingTailRecovery } from './pending-tail-recovery.ts'
-import { reconnectFlapping } from './reconnect-flapping.ts'
-import { seededTodoWorkload } from './seeded-todo-workload.ts'
-import { sharedTodoWorkday } from './shared-todo-workday.ts'
+import { browserMultiSessionRecovery } from './retained/examples/browser-multi-session-recovery.ts'
+import { offlineWriterRecovery } from './retained/examples/offline-writer-recovery.ts'
+import { concurrentHotelBooking } from './retained/findings/concurrent-hotel-booking.ts'
+import { largePayloadRecovery } from './retained/findings/large-payload-recovery.ts'
+import { manyWriterConvergence } from './retained/findings/many-writer-convergence.ts'
+import { pendingTailRecovery } from './retained/findings/pending-tail-recovery.ts'
 
-export const scenarioCorpus: ReadonlyArray<ScenarioAst> = [
-  backendOutageRecovery,
-  browserMultiSessionRecovery,
-  concurrentHotelBooking,
-  largePayloadRecovery,
-  lateClientCatchUp,
-  manyWriterConvergence,
-  offlineWriterRecovery,
-  pendingPushBoundary,
-  pendingTailRecovery,
-  reconnectFlapping,
-  seededTodoWorkload,
-  sharedTodoWorkday,
+export interface RetainedScenarioEntry {
+  readonly kind: 'example' | 'finding'
+  readonly findingId?: 'SF-01' | 'SF-02' | 'SF-03' | 'SF-04'
+  readonly scenario: ScenarioAst
+}
+
+export const retainedScenarioCatalog: ReadonlyArray<RetainedScenarioEntry> = [
+  { kind: 'example', scenario: offlineWriterRecovery },
+  { kind: 'example', scenario: browserMultiSessionRecovery },
+  { kind: 'finding', findingId: 'SF-01', scenario: concurrentHotelBooking },
+  { kind: 'finding', findingId: 'SF-02', scenario: pendingTailRecovery },
+  { kind: 'finding', findingId: 'SF-03', scenario: manyWriterConvergence },
+  { kind: 'finding', findingId: 'SF-04', scenario: largePayloadRecovery },
 ]
+
+export const scenarioCorpus: ReadonlyArray<ScenarioAst> = retainedScenarioCatalog.map(({ scenario }) => scenario)
 
 const scenariosById: ReadonlyMap<string, ScenarioAst> = new Map(
   scenarioCorpus.map((scenario) => [scenario.id, scenario]),

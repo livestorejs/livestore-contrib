@@ -1,0 +1,49 @@
+# 0010 — Keep generation and promotion in the Scenario layer
+
+Status: accepted (Scenario authoring and corpus lifecycle refactor, 2026-08-07)
+
+## Context
+
+Application definitions should describe the real LiveStore schema, actions,
+materializers, and inspectors without also owning Scenario data generation. A
+reader should not have to leave a Scenario to understand what its phases will
+execute. The committed CLI registry must also distinguish promoted evidence
+from focused test fixtures and temporary investigation controls.
+
+## Decision
+
+Keep Application definitions confined to the example Application's actual
+LiveStore behavior. Put repetition, target selection, and generated inputs next
+to the phase that owns them through Scenario authoring helpers. Derive random
+values by stable keys from Scenario, phase, action-sequence, iteration, and
+choice identity. Expand authoring immediately into a serializable ordered
+action sequence containing every concrete action and stable child ID. The
+runner and participant hosts receive only that normalized data; no generator
+callback crosses the execution seam.
+
+Keep the registered retained corpus intentionally small: promoted minimized
+findings under `retained/findings/` and representative examples under
+`retained/examples/`. Keep narrow host-contract Scenarios with their tests but
+outside the corpus registry. Create generated investigations and reduction
+controls under Git-ignored `local/scenarios/`, run them explicitly by file, and
+promote one only by moving its readable source into the retained tree, adding
+focused evidence, and registering it. Scenario-source promotion and artifact
+retention remain independent decisions.
+
+Scenario version 2, trace version 4, and artifact version 5 are the only
+supported formats. There is no compatibility interface for superseded Scenario
+or trace shapes.
+
+## Consequences
+
+A Scenario source now explains both its intent and generated activity locally,
+while artifacts remain exact and self-contained after expansion. Application
+definitions have a smaller interface and stronger locality around real domain
+behavior. Keyed randomness is stable when an unrelated choice is inserted.
+Sequential action sequences preserve a compact progress, observation, and
+viewer boundary without hiding their concrete child actions.
+
+Exploratory files cannot silently become repository contract. Promotion is a
+reviewable source change with a stated purpose and regression evidence. A
+single current format keeps the Scenario model, runner, projections, and viewer
+free of compatibility branches.

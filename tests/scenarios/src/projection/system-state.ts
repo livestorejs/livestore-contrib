@@ -196,7 +196,7 @@ export const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentK
     case 'runtime.failure.observed':
       return 'failure'
     case 'action.requested':
-    case 'workload.requested':
+    case 'action-sequence.requested':
       return 'action'
     case 'client.created':
       return 'topology'
@@ -246,10 +246,10 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return scoped(`requested ${record.payload.action}`)
     case 'action.completed':
       return scoped(`${record.payload.action} control acknowledged`)
-    case 'workload.requested':
-      return `Requested workload ${record.payload.workload} · ${record.payload.count} actions · seed ${record.payload.seed}`
-    case 'workload.completed':
-      return `Workload ${record.payload.workload} completed · ${record.payload.actionIds.length} actions`
+    case 'action-sequence.requested':
+      return `Requested action sequence ${record.payload.description} · ${record.payload.count} actions · seed ${record.payload.seed}`
+    case 'action-sequence.completed':
+      return `Action sequence completed · ${record.payload.actionIds.length} actions`
     case 'client.created':
       return scoped('created')
     case 'connectivity.disconnect.requested':
@@ -492,8 +492,8 @@ export const operationFamily = (payload: ScenarioTracePayload): ScenarioOperatio
       return 'client-create'
     case 'action.requested':
       return 'application-action'
-    case 'workload.requested':
-      return 'workload'
+    case 'action-sequence.requested':
+      return 'action-sequence'
     case 'connectivity.disconnect.requested':
     case 'connectivity.reconnect.requested':
       return 'connectivity'

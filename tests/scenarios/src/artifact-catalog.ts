@@ -86,14 +86,22 @@ const makeArtifactLabel = ({
       else operations.push(step)
     }
   }
-  const workloadCounts = operations.flatMap((step) => (step._tag === 'workload' ? [step.count] : []))
+  const actionSequenceCounts = operations.flatMap((step) =>
+    step._tag === 'action-sequence' ? [step.actions.length] : [],
+  )
   const largestPayloadBytes = Math.max(
     0,
-    ...operations.flatMap((step) => (step._tag === 'action' ? [largestStringLength(step.input)] : [])),
+    ...operations.flatMap((step) =>
+      step._tag === 'action'
+        ? [largestStringLength(step.input)]
+        : step._tag === 'action-sequence'
+          ? step.actions.map((action) => largestStringLength(action.input))
+          : [],
+    ),
   )
   const dimensions = [
     ...(largestPayloadBytes >= 1_024 ? [`${largestPayloadBytes}-bytes`] : []),
-    ...workloadCounts.map((count) => `${count}-workload`),
+    ...actionSequenceCounts.map((count) => `${count}-actions`),
   ]
   return [artifact.descriptor.scenarioId, profile, backend, ...dimensions, reference === true ? 'reference' : undefined]
     .filter((part): part is string => part !== undefined)

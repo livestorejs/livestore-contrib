@@ -13,13 +13,9 @@ pnpm --dir tests/scenarios scenario:run --profile in-process --backend local-syn
 pnpm --dir tests/scenarios scenario:run --profile process
 pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile process --backend cloud-sync-cf
-pnpm --dir tests/scenarios scenario:run --profile process --scenario backend-outage-recovery
-pnpm --dir tests/scenarios scenario:run --profile process --scenario seeded-todo-workload
-pnpm --dir tests/scenarios scenario:run --profile process --scenario late-client-catch-up
 pnpm --dir tests/scenarios scenario:run --scenario concurrent-hotel-booking
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario browser-multi-session-recovery
-pnpm --dir tests/scenarios scenario:run --profile process --scenario shared-todo-workday --output artifacts/shared-todo-workday-process.json
-pnpm --dir tests/scenarios scenario:run --profile browser --scenario shared-todo-workday --output artifacts/shared-todo-workday-browser.json
+pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.ts
 ```
 
 The default command runs directly against the materialized core source at
@@ -85,21 +81,29 @@ command-replay RFC's invalid-rebase class. Its CLI process exits non-zero after
 writing an inspectable artifact. See [RED_TEAMING.md](./RED_TEAMING.md) for the
 broader campaign and failure-reduction plan.
 
-## Add a scenario
+## Author and promote a scenario
 
-Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications)
-and portable Scenario definitions live in [`src/corpus/scenarios`](./src/corpus/scenarios).
-To add a Scenario against an existing Application:
+Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications).
+They contain only the real LiveStore schema, materializers, normal application
+actions, and State inspectors. Scenario scheduling and generated activity never
+enter an Application definition.
 
-1. Add the Scenario file and reference the Application through
-   `applicationId: application.id`.
-2. Add the Scenario to `src/corpus/scenarios/registry.ts`.
+Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
+by Git. Copy `scenario.template.ts`, define the behavior next to its phases, and
+run it with `--scenario-file`. This tier is for generated cases, parameter
+sweeps, reductions, and hypotheses whose durable purpose is not established.
 
-Only add and register a new Application definition when the Scenario needs a
-different schema, action, inspector, or workload surface. No per-Application
-test is required: `src/corpus/registry.test.ts` checks unique IDs, registry
-lookup, and every Scenario-to-Application reference. Add a focused test only
-for Application behavior that is not adequately exercised by its Scenarios.
+Promote only a reduced Scenario with a clear regression or representative
+purpose. Move it to `src/corpus/scenarios/retained/findings/` or
+`src/corpus/scenarios/retained/examples/`, add focused evidence, and register it
+in `src/corpus/scenarios/registry.ts`. The retained CLI corpus intentionally has
+six cases: SF-01 through SF-04 plus `offline-writer-recovery` and
+`browser-multi-session-recovery`. Narrow host-contract fixtures live under
+`src/test-support/scenarios` and are not presented as corpus cases.
+
+Only register another Application when a Scenario genuinely needs a different
+schema, action, materializer, or inspector surface. `src/corpus/registry.test.ts`
+checks retained IDs and Application references.
 
 ## Inspect a scenario run
 
@@ -118,9 +122,10 @@ opened, the header shows the full commit and dirty-content identity without
 persisting the selected worktree's local path.
 
 Only the four minimized sync failures carry identifiers: `SF-01` through
-`SF-04`. The ID names the product-level finding and its one canonical viewer
-artifact; ordinary runs and the earlier reference artifacts do not receive an
-ID. The complete findings and reduction evidence are recorded in
+`SF-04`. The ID names the product-level finding and retained Scenario source;
+an artifact is retained only when the current run still demonstrates that
+finding. Ordinary and representative runs do not receive finding IDs. The
+complete findings and reduction evidence are recorded in
 [`SYNC_CORRECTNESS_FINDINGS.md`](./SYNC_CORRECTNESS_FINDINGS.md).
 
 Storybook is the component and state workbench:
@@ -150,15 +155,15 @@ main-timeline/range-navigator organization.
 
 The default timeline shows sync evidence: material observation captures and
 Scenario boundaries receive semantic flow space, while generated child actions
-are summarized by their enclosing Workload. Switch to raw trace and record
+are summarized by their enclosing action sequence. Switch to raw trace and record
 playback when individual controller instructions and acknowledgements are
 needed; those records remain intact but do not stretch the default flow axis.
 
-Tracked `.json.gz` reference artifacts are also included in the saved-run
+Tracked current-format `.json.gz` artifacts are also included in the saved-run
 catalog without adding the full uncompressed traces to the repository. The set
-includes passed `browser-multi-session-recovery`, `offline-writer-recovery`,
-and dense `shared-todo-workday` browser runs. The canonical `SF-*` artifacts
-provide the retained failure states.
+includes passed browser runs for `browser-multi-session-recovery` and
+`offline-writer-recovery`, a dense seeded-action browser fixture, and current
+SF-03 failure evidence.
 
 Host acknowledgements mean only that the participant host completed handling
 the controller request at its advertised boundary. They do not confirm backend
@@ -175,16 +180,18 @@ each child outcome, and joins the group before the next step. The
 `operation-history` oracle can require named operations to have terminal,
 non-indefinite outcomes and overlapping intervals.
 
-A `workload` step keeps a repeated application pattern compact by naming an
-application-owned workload, its serializable input, allowed targets, and a
-bounded action count. The runner resolves and expands the workload before it
-creates any Client, using a workload-specific seed derived from the Scenario
-seed and stable phase/step identity. The callback remains in the application
-definition rather than the AST. Every generated action receives a stable child
-operation ID and ordinary action instruction/acknowledgement records; the
-workload retains its own enclosing instruction/outcome boundary. Workload v1
-dispatches generated actions sequentially and allows between 1 and 10,000
-actions.
+`defineScenario(({ repeatActions }) => ...)` keeps repetition directly beside
+the phase that owns it. The callback names ordinary application actions and
+their inputs; keyed deterministic random choices derive from the Scenario seed,
+phase ID, sequence ID, iteration, and choice key. Inserting an unrelated random
+choice therefore does not shift later choices.
+
+Authoring expands immediately into a serializable `action-sequence` containing
+every concrete action and stable child operation ID. No callback or generator
+crosses into the runner, participant hosts, or artifact. The runner dispatches
+the embedded actions sequentially under one enclosing instruction/outcome
+boundary, and raw trace retains every child action. An action sequence contains
+between 1 and 10,000 actions.
 
 The initial topology contains only participants that exist before the first
 phase. A sequential `create-client` step can create a new Client with its first

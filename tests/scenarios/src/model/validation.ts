@@ -1,5 +1,6 @@
 import { Schema } from '@livestore/utils/effect'
 
+import { expandScenarioAuthoring, scenarioAuthoring, type ScenarioDefinitionFactory } from './authoring.ts'
 import {
   type ClientDefinition,
   type ParallelOperationStep,
@@ -18,10 +19,17 @@ export class ScenarioValidationError extends Error {
 }
 
 /** Validates both the wire shape and the cross-reference invariants of a scenario. */
-export const defineScenario = (input: unknown): ScenarioAst => {
+export function defineScenario(input: ScenarioDefinitionFactory): ScenarioAst
+export function defineScenario(input: unknown): ScenarioAst
+export function defineScenario(input: unknown): ScenarioAst {
   let scenario: ScenarioAst
   try {
-    scenario = Schema.decodeUnknownSync(ScenarioAst)(input)
+    const authored = typeof input === 'function' ? (input as ScenarioDefinitionFactory)(scenarioAuthoring) : input
+    const expanded =
+      typeof input === 'function'
+        ? expandScenarioAuthoring(authored as ReturnType<ScenarioDefinitionFactory>)
+        : authored
+    scenario = Schema.decodeUnknownSync(ScenarioAst)(expanded)
   } catch (cause) {
     throw new ScenarioValidationError(`Invalid scenario AST: ${String(cause)}`)
   }
@@ -99,14 +107,11 @@ export const defineScenario = (input: unknown): ScenarioAst => {
           case 'action':
             assertParticipant(step.target)
             break
-          case 'workload':
-            if (step.targets.length === 0) {
-              throw new ScenarioValidationError(`Workload must select at least one target: ${step.id}`)
+          case 'action-sequence':
+            if (step.actions.length === 0 || step.actions.length > 10_000) {
+              throw new ScenarioValidationError(`Action sequence must contain between 1 and 10000 actions: ${step.id}`)
             }
-            if (step.count <= 0 || step.count > 10_000) {
-              throw new ScenarioValidationError(`Workload count must be between 1 and 10000: ${step.id}`)
-            }
-            step.targets.forEach(assertParticipant)
+            for (const action of step.actions) validateOperation(action)
             break
           case 'stop-session':
           case 'restart-session':

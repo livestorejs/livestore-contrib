@@ -82,7 +82,7 @@ export interface RuntimeFailureInterval {
 export type PlaybackMomentKind =
   | 'run'
   | 'action'
-  | 'workload'
+  | 'action-sequence'
   | 'topology'
   | 'connectivity'
   | 'lifecycle'
@@ -117,7 +117,7 @@ export interface ScenarioOperationHistoryEntry {
 export type ScenarioOperationHistoryFamily =
   | 'client-create'
   | 'application-action'
-  | 'workload'
+  | 'action-sequence'
   | 'connectivity'
   | 'backend-availability'
   | 'session-lifecycle'
@@ -144,7 +144,7 @@ export const scenarioOperationHistoryCoverage: ScenarioOperationHistoryCoverage 
   includedFamilies: [
     'client-create',
     'application-action',
-    'workload',
+    'action-sequence',
     'connectivity',
     'backend-availability',
     'session-lifecycle',

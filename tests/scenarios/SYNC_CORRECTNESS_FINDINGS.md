@@ -100,7 +100,7 @@ browsers.
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/scenarios/concurrent-hotel-booking.ts`
+`tests/scenarios/src/corpus/scenarios/retained/findings/concurrent-hotel-booking.ts`
 
 The reproducer is reduced to two Clients, one session each, three application
 events (initial inventory plus two bookings), one disconnection, one reconnect,
@@ -109,11 +109,11 @@ Removing either Client, either booking, the disconnection, or the ordering
 settlement removes the failure. Payloads are canonical identifiers and the
 smallest failing numeric state (`1 -> 0 -> -1`).
 
-### Canonical artifact
+### Current artifact
 
-- `tests/scenarios/artifacts/sf-01-concurrent-hotel-booking.json.gz`
-
-This is the minimized in-process artifact carrying the SQLite failure cause.
+No SF-01 artifact is retained. The current pinned core stalls at an earlier
+Settlement, so a newly generated run would not be evidence of this finding.
+The retained Scenario source remains the canonical reproducer.
 
 ### Remaining uncertainty
 
@@ -187,7 +187,7 @@ LiveStore revision:
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/scenarios/pending-tail-recovery.ts`
+`tests/scenarios/src/corpus/scenarios/retained/findings/pending-tail-recovery.ts`
 
 Current reduction evidence:
 
@@ -200,13 +200,12 @@ Current reduction evidence:
 - Payloads are small unique todo identifiers and strings. The failure depends
   on Event count and ordering, not payload size.
 
-### Canonical artifact
+### Current artifact
 
-- `tests/scenarios/artifacts/sf-02-pending-tail-400.json.gz`
-
-This is the minimized 400-Event in-process failure. The passing 399-Event and
-single-Client controls remain recorded above as reduction results rather than
-additional viewer entries.
+No SF-02 artifact is retained. The current pinned core stalls at an earlier
+Settlement, so a newly generated run would not be evidence of the reduced
+400-Event finding. The retained Scenario source remains the canonical
+reproducer.
 
 ### Remaining uncertainty
 
@@ -225,10 +224,10 @@ additional viewer entries.
 
 ### Failure summary
 
-Two connected Clients receive a deterministic 426-Event workload. Every
+Two connected Clients receive a deterministic 426-Event action sequence. Every
 application action has a globally unique todo ID, but Client 2 shuts down while
 pulling because SQLite reports `UNIQUE constraint failed: todos.id`. Backend
-artifacts also contain only unique IDs, ruling out duplicate workload output or
+artifacts also contain only unique IDs, ruling out duplicate generated output or
 duplicate backend rows as the direct cause.
 
 Classification: **LiveStore sync-engine materialization/correctness failure**.
@@ -280,7 +279,7 @@ LiveStore revision:
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/scenarios/many-writer-convergence.ts`
+`tests/scenarios/src/corpus/scenarios/retained/findings/many-writer-convergence.ts`
 
 Current reduction evidence:
 
@@ -289,7 +288,7 @@ Current reduction evidence:
 - Two Clients with 425 Events passes; 426 fails.
 - All 426 application IDs and all backend IDs observed before failure are
   unique, so the generator is not producing conflicting inserts.
-- The Scenario has one workload step and one settlement. It has no faults,
+- The Scenario has one generated action sequence and one settlement. It has no faults,
   disconnects, restarts, sleeps, or explicit parallel group.
 
 ### Canonical artifact
@@ -304,13 +303,13 @@ and passing-boundary probes remain reduction results rather than viewer entries.
 - The artifact identifies the failing Store and materialization operation but
   does not include the exact Event ID being inserted twice. Core tracing or an
   inspector captured immediately before shutdown is needed to identify it.
-- The 426 boundary is seed/workload-distribution specific. Other seeds may move
+- The 426 boundary is seed/distribution specific. Other seeds may move
   the boundary by changing which Client originates each sequential action.
-- Process promotion shuts the Store down during the workload, but the host
+- Process promotion shuts the Store down during the action sequence, but the host
   protocol reports only
   `host-request-rejected`/`UnknownError` and loses the nested SQLite cause. This
   corroborates a real-backend failure without proving an identical signature.
-  Browser promotion likewise observes Store shutdown during the workload as a
+  Browser promotion likewise observes Store shutdown during the action sequence as a
   `host-transport-failure`, without the SQLite cause.
 
 ## SF-04: a 899,643-byte payload crosses the local sync-cf transport boundary
@@ -370,7 +369,7 @@ LiveStore revision:
 
 ### Minimized scenario
 
-`tests/scenarios/src/corpus/scenarios/large-payload-recovery.ts`
+`tests/scenarios/src/corpus/scenarios/retained/findings/large-payload-recovery.ts`
 
 Current reduction evidence:
 
@@ -382,12 +381,12 @@ Current reduction evidence:
 - The mock profile passes a one-MiB payload, isolating the boundary to the real
   provider/transport path rather than SQLite or materialization.
 
-### Canonical artifact
+### Current artifact
 
-- `tests/scenarios/artifacts/sf-04-payload-899643b.json.gz`
-
-This is the minimized process/local-sync-cf artifact at the first failing byte
-count. The passing one-byte-below probe remains a recorded boundary result.
+No artifact is retained for SF-04. The current runner reaches an invalid-string
+length failure before it can encode the artifact, so retaining the superseded
+envelope would misrepresent the current evidence protocol. The Scenario source
+remains the canonical reproducer.
 
 ### Remaining uncertainty
 

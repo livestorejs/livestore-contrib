@@ -6,15 +6,15 @@ import { gunzipSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const failureArtifact = path.join(packageRoot, 'artifacts/sf-01-concurrent-hotel-booking.json.gz')
+const failureArtifact = path.join(packageRoot, 'artifacts/sf-03-many-writer-426.json.gz')
 const manyWriterArtifact = path.join(packageRoot, 'artifacts/sf-03-many-writer-426.json.gz')
 const offlineArtifact = path.join(packageRoot, 'artifacts/reference-offline-writer-recovery-browser.json.gz')
 const lifecycleArtifact = path.join(packageRoot, 'artifacts/reference-browser-multi-session-recovery-browser.json.gz')
-const denseArtifact = path.join(packageRoot, 'artifacts/reference-shared-todo-workday-browser.json.gz')
+const denseArtifact = path.join(packageRoot, 'artifacts/reference-seeded-todo-actions-browser.json.gz')
 const viewerUrl = 'http://127.0.0.1:4173'
 
 test('canonical viewer matches the approved failure and interaction baselines', async ({ page }) => {
-  await openArtifact(page, viewerUrl, failureArtifact, 'concurrent-hotel-booking')
+  await openArtifact(page, viewerUrl, failureArtifact, 'many-writer-convergence')
   await expect(
     page.getByLabel('Saved scenario run').locator('option').filter({ hasText: 'core working tree' }).first(),
   ).toBeAttached()
@@ -33,11 +33,11 @@ test('canonical viewer matches the approved passed lifecycle baseline', async ({
   await expect(page).toHaveScreenshot('loaded-success.png', { fullPage: true })
 })
 
-test('SF-03 keeps workload control traffic out of the sync-evidence geometry', async ({ page }) => {
+test('SF-03 keeps generated action traffic out of the sync-evidence geometry', async ({ page }) => {
   await openArtifact(page, viewerUrl, manyWriterArtifact, 'many-writer-convergence')
   const timeline = page.getByRole('region', { name: 'Timeline', exact: true })
-  await expect(timeline.locator('.evidence-moment')).toHaveCount(19)
-  await expect(timeline.locator('.moment-workload')).toContainText('426 actions')
+  await expect(timeline.locator('.evidence-moment')).toHaveCount(18)
+  await expect(timeline.locator('.moment-action-sequence')).toContainText('426 actions')
 })
 
 test('Event color follows its producer through rebase and propagation', async ({ page }) => {
@@ -98,10 +98,10 @@ test('opens reconstructed Client Leader State with source-record provenance', as
 })
 
 test('keeps dense reconstructed table rows scrollable inside the drawer', async ({ page }) => {
-  await openArtifact(page, viewerUrl, denseArtifact, 'shared-todo-workday')
+  await openArtifact(page, viewerUrl, denseArtifact, 'seeded-todo-actions')
   await page.getByRole('button', { name: 'open reconstructed State' }).first().click()
 
-  const inspector = page.getByRole('article', { name: /alice-laptop reconstructed Leader State/i })
+  const inspector = page.getByRole('article', { name: /client-a reconstructed Leader State/i })
   await expect(inspector.getByLabel('Reconstructed table', { exact: true })).toHaveValue('todos')
   const rows = inspector.getByRole('region', { name: 'Reconstructed table todos' }).locator('tbody tr')
   expect(await rows.count()).toBeGreaterThan(20)
@@ -211,7 +211,7 @@ test('malformed artifact loads do not lose the runnable shell', async ({ page })
 })
 
 test('event logs preserve manual scroll and follow new tail evidence', async ({ page }) => {
-  await openArtifact(page, viewerUrl, denseArtifact, 'shared-todo-workday')
+  await openArtifact(page, viewerUrl, denseArtifact, 'seeded-todo-actions')
   const overflowIndex = await page
     .locator('.eventlog')
     .evaluateAll((elements) => elements.findIndex((element) => element.scrollWidth > element.clientWidth))

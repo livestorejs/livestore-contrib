@@ -1,5 +1,5 @@
-import { defineScenario } from '../../model.ts'
-import { hotelBookingApplication } from '../applications/hotel-booking.ts'
+import { defineScenario } from '../../../../model.ts'
+import { hotelBookingApplication } from '../../../applications/hotel-booking.ts'
 
 const offlineWriter = { clientId: 'client-a', sessionId: 'session-a' } as const
 const onlineWriter = { clientId: 'client-b', sessionId: 'session-b' } as const
@@ -12,7 +12,7 @@ const participants = [offlineWriter, onlineWriter]
  * attempts to materialize negative inventory.
  */
 export const concurrentHotelBooking = defineScenario({
-  version: 1,
+  version: 2,
   id: 'concurrent-hotel-booking',
   description: 'Rebase two locally valid hotel bookings into a SQLite-enforced inventory violation.',
   tags: ['red-team', 'known-failure', 'rebase', 'materialization', 'sqlite-constraint'],
