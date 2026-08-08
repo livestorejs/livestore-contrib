@@ -12,7 +12,7 @@ const participants = [offlineWriter, onlineWriter]
  * attempts to materialize negative inventory.
  */
 export const concurrentHotelBooking = defineScenario({
-  version: 2,
+  version: 3,
   id: 'concurrent-hotel-booking',
   description: 'Rebase two locally valid hotel bookings into a SQLite-enforced inventory violation.',
   tags: ['red-team', 'known-failure', 'rebase', 'materialization', 'sqlite-constraint'],
@@ -26,68 +26,65 @@ export const concurrentHotelBooking = defineScenario({
       { id: onlineWriter.clientId, sessions: [onlineWriter.sessionId], initiallyConnected: true },
     ],
   },
-  phases: [
+  instructions: [
     {
+      _tag: 'annotation',
       id: 'establish-shared-base',
-      description: 'Both Clients confirm that one standard hotel room remains available.',
-      steps: [
-        {
-          _tag: 'action',
-          id: 'initialize-one-hotel-room',
-          target: onlineWriter,
-          action: 'initializeHotelRoomInventory',
-          input: { roomType: 'standard', available: 1 },
-        },
-        {
-          _tag: 'settle',
-          id: 'confirm-shared-base',
-          participants,
-          healDisconnectedClients: [],
-          timeoutMs: 10_000,
-        },
-      ],
+      text: 'Both Clients confirm that one standard hotel room remains available.',
     },
     {
+      _tag: 'action',
+      id: 'initialize-one-hotel-room',
+      target: onlineWriter,
+      action: 'initializeHotelRoomInventory',
+      input: { roomType: 'standard', available: 1 },
+    },
+    {
+      _tag: 'settle',
+      id: 'confirm-shared-base',
+      participants,
+      healDisconnectedClients: [],
+      timeoutMs: 10_000,
+    },
+    {
+      _tag: 'annotation',
       id: 'create-concurrent-decrements',
-      description: 'Each Client independently books the locally available final room.',
-      steps: [
-        { _tag: 'disconnect', id: 'isolate-client-a', clientId: offlineWriter.clientId },
-        {
-          _tag: 'action',
-          id: 'client-a-books-offline',
-          target: offlineWriter,
-          action: 'bookHotelRoom',
-          input: { roomType: 'standard' },
-        },
-        {
-          _tag: 'action',
-          id: 'client-b-books-online',
-          target: onlineWriter,
-          action: 'bookHotelRoom',
-          input: { roomType: 'standard' },
-        },
-        {
-          _tag: 'settle',
-          id: 'confirm-client-b-booking',
-          participants: [onlineWriter],
-          healDisconnectedClients: [],
-          timeoutMs: 10_000,
-        },
-      ],
+      text: 'Each Client independently books the locally available final room.',
+    },
+    { _tag: 'disconnect', id: 'isolate-client-a', clientId: offlineWriter.clientId },
+    {
+      _tag: 'action',
+      id: 'client-a-books-offline',
+      target: offlineWriter,
+      action: 'bookHotelRoom',
+      input: { roomType: 'standard' },
     },
     {
+      _tag: 'action',
+      id: 'client-b-books-online',
+      target: onlineWriter,
+      action: 'bookHotelRoom',
+      input: { roomType: 'standard' },
+    },
+    {
+      _tag: 'settle',
+      id: 'confirm-client-b-booking',
+      participants: [onlineWriter],
+      healDisconnectedClients: [],
+      timeoutMs: 10_000,
+    },
+    {
+      _tag: 'annotation',
       id: 'rebase-invalid-pending-event',
-      description: 'Client A rebases its booking over Client B and attempts to materialize negative inventory.',
-      steps: [
-        { _tag: 'reconnect', id: 'reconnect-client-a', clientId: offlineWriter.clientId },
-        {
-          _tag: 'settle',
-          id: 'observe-materialization-failure',
-          participants,
-          healDisconnectedClients: [],
-          timeoutMs: 10_000,
-        },
-      ],
+      text: 'Client A rebases its booking over Client B and attempts to materialize negative inventory.',
+    },
+    { _tag: 'reconnect', id: 'reconnect-client-a', clientId: offlineWriter.clientId },
+    {
+      _tag: 'settle',
+      id: 'observe-materialization-failure',
+      participants,
+      healDisconnectedClients: [],
+      timeoutMs: 10_000,
     },
   ],
   oracles: [],

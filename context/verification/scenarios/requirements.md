@@ -38,6 +38,7 @@ choices, and gaps for the private
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
   versioned Scenario ASTs, named actions, Scenario-owned seeded authoring,
+  one ordered instruction stream, optional zero-effect annotations,
   topology/lifecycle/fault plans, and preflight capability derivation are
   shared without profile-specific Scenario rewrites. Authoring-time repetition
   expands into self-contained ordered action sequences before execution;
@@ -76,7 +77,7 @@ choices, and gaps for the private
   observation, never the Client's actual historical database, a session State,
   or an atomic distributed snapshot. Its
   default sync-evidence projection aggregates action-sequence child actions and spaces
-  material captures plus Scenario boundaries as semantic flow steps; the raw
+  material captures plus reached annotations as semantic flow steps; the raw
   trace remains available without determining that projection's geometry.
   Individual Event presentations use the recorded producer Client's timeline
   track color across observing components and Event position changes, while

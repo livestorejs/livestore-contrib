@@ -22,10 +22,10 @@ published Scenario product package (LSC.VER.SCEN-R01).
 
 ## Scenario and Application Model
 
-Typed TypeScript constructors validate the version-2 serializable Scenario AST.
-It records stable Scenario/Application identity, seed, topology, phases,
-operations, faults, ordered action sequences, Settlement steps, and selected
-oracles as data.
+Typed TypeScript constructors validate the version-3 serializable Scenario AST.
+It records stable Scenario/Application identity, seed, topology, one ordered
+instruction stream, operations, faults, annotations, action sequences,
+Settlement instructions, and selected oracles as data.
 Concrete Application definitions wrap the actual `LiveStoreSchema`; named
 actions decode JSON inputs before dispatch, State inspectors encode their
 output as JSON, and they contain no Scenario generation policy. The Scenario
@@ -34,9 +34,10 @@ never redeclares Events or materializers.
 The topology separates the backend from stable Client identities and their
 sessions. Initial topology plus ordered Client/session additions defines the
 complete participant set. Lifecycle, connectivity, and backend-availability
-operations retain stable IDs. Scenario-owned `repeatActions` authoring derives
-keyed choices from the Scenario seed plus stable phase, sequence, iteration,
-and choice identity, then expands immediately into a serializable
+operations retain stable IDs. An annotation is a zero-effect instruction that
+emits a reached marker without creating an operation or execution boundary.
+Scenario-owned `repeatActions` authoring derives keyed choices from the
+Scenario seed plus stable sequence, iteration, and choice identity, then expands immediately into a serializable
 `action-sequence` containing every concrete action. No authoring callback
 crosses into execution. Capability derivation sees the normalized plan before
 the first Client is created. A recorded seed reproduces generated inputs and
@@ -82,8 +83,8 @@ advertised from sampled correlation (LSC.VER.SCEN-R03, R04).
 
 ## Evidence Semantics
 
-Trace protocol v4 is the authoritative evidence envelope. Each record has a
-monotonic runner receipt index plus run, participant, phase, operation,
+Trace protocol v5 is the authoritative evidence envelope. Each record has a
+monotonic runner receipt index plus run, participant, instruction, operation,
 emitter, and payload identity where applicable. The record's origin and
 evidence semantics distinguish an instruction, host acknowledgement, sampled
 observation, controller event, and oracle verdict. Acknowledgement means that
@@ -93,7 +94,7 @@ backend acceptance, propagation, or the requested product state.
 Receipt index, participant-local sequence, logical time, wall time, local
 monotonic time, calibrated elapsed-time interval, correlation, explicit
 `causedBy` edges, and observation-capture membership remain distinct facts.
-Logical time orders runner-owned phases and steps; wall time is retained for
+Logical time orders runner-owned instructions; wall time is retained for
 externally comparable elapsed evidence. Same-process calibrated intervals
 collapse to one controller-clock point, while process/browser readings retain
 the full controller round trip as uncertainty. Timestamp order, correlation,
@@ -186,8 +187,8 @@ Saved-run choices include a compact LiveStore source revision, while an open
 run shows its full commit and dirty-content identity in one provenance line.
 `deriveTimelineScene()` is DOM-free and feeds layered topology, causal-flow,
 elapsed-time, range, and raw-record projections over the immutable trace.
-The default sync-evidence flow spaces material captures and Scenario
-boundaries as semantic steps. An action sequence is one summarized narrative boundary;
+The default sync-evidence flow spaces material captures and reached Scenario
+annotations as semantic steps. An action sequence is one summarized narrative boundary;
 its generated child action instructions and acknowledgements remain available
 in raw-trace navigation without consuming the default flow axis.
 

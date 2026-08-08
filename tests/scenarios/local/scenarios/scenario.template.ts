@@ -4,7 +4,7 @@ import { defineScenario } from '../../src/model.ts'
 const client = { clientId: 'client-a', sessionId: 'session-a' } as const
 
 export default defineScenario({
-  version: 2,
+  version: 3,
   id: 'replace-me',
   description: 'Describe the behavior or hypothesis this Scenario exercises.',
   tags: ['local'],
@@ -15,6 +15,6 @@ export default defineScenario({
     storeId: 'scenario-replace-me',
     clients: [{ id: client.clientId, sessions: [client.sessionId], initiallyConnected: true }],
   },
-  phases: [],
+  instructions: [],
   oracles: [],
 })

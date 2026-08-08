@@ -45,7 +45,7 @@ const makeArtifact = (scenarioId: string) =>
       sourceRevision: 'livestore@0123456789abcdef0123456789abcdef01234567',
       execution: { participantProfile: 'in-process', syncBackend: 'mock' },
     },
-    scenario: { topology: { clients: [] }, phases: [] },
+    scenario: { topology: { clients: [] }, instructions: [] },
     trace: [{ payload: { _tag: 'run.completed', status: 'passed' } }],
     status: 'passed',
   }) as unknown as ScenarioRunArtifact

@@ -22,7 +22,7 @@ Vitest.describe('scenario operation history', () => {
         const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
         const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
         const scenario = defineScenario({
-          version: 2,
+          version: 3,
           id: 'parallel-operation-history',
           description: 'Exercises overlapping application operations and history checking.',
           tags: ['operation-history', 'parallel'],
@@ -36,39 +36,38 @@ Vitest.describe('scenario operation history', () => {
               { id: clientB.clientId, sessions: [clientB.sessionId], initiallyConnected: true },
             ],
           },
-          phases: [
+          instructions: [
             {
+              _tag: 'annotation',
               id: 'overlap',
-              description: 'Release both writes only after both host requests have started.',
-              steps: [
+              text: 'Release both writes only after both host requests have started.',
+            },
+            {
+              _tag: 'parallel',
+              id: 'parallel-writes',
+              operations: [
                 {
-                  _tag: 'parallel',
-                  id: 'parallel-writes',
-                  operations: [
-                    {
-                      _tag: 'action',
-                      id: 'write-a',
-                      target: clientA,
-                      action: 'createTodo',
-                      input: { id: 'parallel-a', text: 'Written by Client A' },
-                    },
-                    {
-                      _tag: 'action',
-                      id: 'write-b',
-                      target: clientB,
-                      action: 'createTodo',
-                      input: { id: 'parallel-b', text: 'Written by Client B' },
-                    },
-                  ],
+                  _tag: 'action',
+                  id: 'write-a',
+                  target: clientA,
+                  action: 'createTodo',
+                  input: { id: 'parallel-a', text: 'Written by Client A' },
                 },
                 {
-                  _tag: 'settle',
-                  id: 'settle-parallel-writes',
-                  participants: [clientA, clientB],
-                  healDisconnectedClients: [],
-                  timeoutMs: 3_000,
+                  _tag: 'action',
+                  id: 'write-b',
+                  target: clientB,
+                  action: 'createTodo',
+                  input: { id: 'parallel-b', text: 'Written by Client B' },
                 },
               ],
+            },
+            {
+              _tag: 'settle',
+              id: 'settle-parallel-writes',
+              participants: [clientA, clientB],
+              healDisconnectedClients: [],
+              timeoutMs: 3_000,
             },
           ],
           oracles: [
@@ -124,7 +123,7 @@ Vitest.describe('scenario operation history', () => {
       const clientA = { clientId: 'client-a', sessionId: 'session-a' } as const
       const clientB = { clientId: 'client-b', sessionId: 'session-b' } as const
       const scenario = defineScenario({
-        version: 2,
+        version: 3,
         id: 'parallel-operation-failure',
         description: 'Retains all child outcomes when a parallel operation fails.',
         tags: ['operation-history', 'parallel', 'failure'],
@@ -138,30 +137,29 @@ Vitest.describe('scenario operation history', () => {
             { id: clientB.clientId, sessions: [clientB.sessionId], initiallyConnected: true },
           ],
         },
-        phases: [
+        instructions: [
           {
+            _tag: 'annotation',
             id: 'failure',
-            description: 'One child succeeds while its sibling is rejected.',
-            steps: [
+            text: 'One child succeeds while its sibling is rejected.',
+          },
+          {
+            _tag: 'parallel',
+            id: 'parallel-writes',
+            operations: [
               {
-                _tag: 'parallel',
-                id: 'parallel-writes',
-                operations: [
-                  {
-                    _tag: 'action',
-                    id: 'write-succeeds',
-                    target: clientA,
-                    action: 'createTodo',
-                    input: { id: 'parallel-success', text: 'Retained success' },
-                  },
-                  {
-                    _tag: 'action',
-                    id: 'write-fails',
-                    target: clientB,
-                    action: 'createTodo',
-                    input: { id: 'parallel-failure', text: 'Rejected write' },
-                  },
-                ],
+                _tag: 'action',
+                id: 'write-succeeds',
+                target: clientA,
+                action: 'createTodo',
+                input: { id: 'parallel-success', text: 'Retained success' },
+              },
+              {
+                _tag: 'action',
+                id: 'write-fails',
+                target: clientB,
+                action: 'createTodo',
+                input: { id: 'parallel-failure', text: 'Rejected write' },
               },
             ],
           },
@@ -198,7 +196,7 @@ Vitest.describe('scenario operation history', () => {
         expect.objectContaining({ operationId: 'write-fails', status: 'definite-failure' }),
       ])
       expect(artifact.trace.at(-1)?.payload).toEqual(
-        expect.objectContaining({ _tag: 'run.failed', stepId: 'write-fails' }),
+        expect.objectContaining({ _tag: 'run.failed', instructionId: 'write-fails' }),
       )
     }).pipe(Vitest.withTestCtx(test)),
   )

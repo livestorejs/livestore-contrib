@@ -1,4 +1,4 @@
-import type { ParallelOperationStep, ScenarioRunArtifact, ScenarioStep } from './model.ts'
+import type { ParallelOperationStep, ScenarioInstruction, ScenarioRunArtifact } from './model.ts'
 
 type ParticipantProfile = 'in-process' | 'process' | 'browser'
 type SyncBackend = 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
@@ -79,12 +79,10 @@ const makeArtifactLabel = ({
   readonly backend: SyncBackend
   readonly reference: boolean
 }): string => {
-  const operations: Array<ScenarioStep | ParallelOperationStep> = []
-  for (const { steps } of artifact.scenario.phases) {
-    for (const step of steps) {
-      if (step._tag === 'parallel') operations.push(...step.operations)
-      else operations.push(step)
-    }
+  const operations: Array<ScenarioInstruction | ParallelOperationStep> = []
+  for (const instruction of artifact.scenario.instructions) {
+    if (instruction._tag === 'parallel') operations.push(...instruction.operations)
+    else operations.push(instruction)
   }
   const actionSequenceCounts = operations.flatMap((step) =>
     step._tag === 'action-sequence' ? [step.actions.length] : [],

@@ -10,7 +10,7 @@ const writers: ReadonlyArray<ParticipantRef> = Array.from({ length: writerCount 
 
 /** Distributes hundreds of Events across many independently synchronizing Clients. */
 export const manyWriterConvergence = defineScenario(({ repeatActions }) => ({
-  version: 2,
+  version: 3,
   id: 'many-writer-convergence',
   description: `${writerCount} Clients distribute and converge ${eventCount} uniquely identified Events.`,
   tags: ['sync', 'correctness', 'known-failure', 'topology', 'many-writers', `${eventCount}-events`],
@@ -25,32 +25,31 @@ export const manyWriterConvergence = defineScenario(({ repeatActions }) => ({
       initiallyConnected: true,
     })),
   },
-  phases: [
+  instructions: [
     {
+      _tag: 'annotation',
       id: 'distribute-writes',
-      description: 'Generate deterministic createTodo actions here and distribute them across all Clients.',
-      steps: [
-        repeatActions({
-          id: 'many-writer-actions',
-          description: `Distribute ${eventCount} unique writes across ${writerCount} Clients`,
-          count: eventCount,
-          generate: ({ iteration, random }) => ({
-            target: random.pick('target', writers),
-            action: 'createTodo',
-            input: {
-              id: `many-writer-${String(iteration + 1).padStart(3, '0')}`,
-              text: `Distributed write ${iteration + 1} · variant ${random.integer('text-variant', 1_000)}`,
-            },
-          }),
-        }),
-        {
-          _tag: 'settle',
-          id: 'settle-many-writers',
-          participants: writers,
-          healDisconnectedClients: [],
-          timeoutMs: 60_000,
+      text: 'Generate deterministic createTodo actions here and distribute them across all Clients.',
+    },
+    repeatActions({
+      id: 'many-writer-actions',
+      description: `Distribute ${eventCount} unique writes across ${writerCount} Clients`,
+      count: eventCount,
+      generate: ({ iteration, random }) => ({
+        target: random.pick('target', writers),
+        action: 'createTodo',
+        input: {
+          id: `many-writer-${String(iteration + 1).padStart(3, '0')}`,
+          text: `Distributed write ${iteration + 1} · variant ${random.integer('text-variant', 1_000)}`,
         },
-      ],
+      }),
+    }),
+    {
+      _tag: 'settle',
+      id: 'settle-many-writers',
+      participants: writers,
+      healDisconnectedClients: [],
+      timeoutMs: 60_000,
     },
   ],
   oracles: [

@@ -8,7 +8,7 @@ const settlementTimeoutMs = Number(process.env.SCENARIO_SETTLEMENT_TIMEOUT_MS ??
 
 /** Probes the smallest observed local sync-cf payload failure boundary. */
 export const largePayloadRecovery = defineScenario({
-  version: 2,
+  version: 3,
   id: 'large-payload-recovery',
   description: `An Event with a ${payloadBytes}-byte string crosses offline storage and backend synchronization.`,
   tags: ['sync', 'correctness', 'known-failure', 'large-payload', 'buffer-boundary', `${payloadBytes}-bytes`],
@@ -22,28 +22,27 @@ export const largePayloadRecovery = defineScenario({
       { id: observer.clientId, sessions: [observer.sessionId], initiallyConnected: true },
     ],
   },
-  phases: [
+  instructions: [
     {
+      _tag: 'annotation',
       id: 'commit-large-payload-offline',
-      description: 'Commit the payload while Client A cannot reach the backend.',
-      steps: [
-        { _tag: 'disconnect', id: 'disconnect-writer', clientId: writer.clientId },
-        {
-          _tag: 'action',
-          id: 'commit-one-mib-payload',
-          target: writer,
-          action: 'createTodo',
-          input: { id: 'large-payload', text: 'x'.repeat(payloadBytes) },
-        },
-        { _tag: 'reconnect', id: 'reconnect-writer', clientId: writer.clientId },
-        {
-          _tag: 'settle',
-          id: 'settle-large-payload',
-          participants: [writer, observer],
-          healDisconnectedClients: [],
-          timeoutMs: settlementTimeoutMs,
-        },
-      ],
+      text: 'Commit the payload while Client A cannot reach the backend.',
+    },
+    { _tag: 'disconnect', id: 'disconnect-writer', clientId: writer.clientId },
+    {
+      _tag: 'action',
+      id: 'commit-one-mib-payload',
+      target: writer,
+      action: 'createTodo',
+      input: { id: 'large-payload', text: 'x'.repeat(payloadBytes) },
+    },
+    { _tag: 'reconnect', id: 'reconnect-writer', clientId: writer.clientId },
+    {
+      _tag: 'settle',
+      id: 'settle-large-payload',
+      participants: [writer, observer],
+      healDisconnectedClients: [],
+      timeoutMs: settlementTimeoutMs,
     },
   ],
   oracles: [

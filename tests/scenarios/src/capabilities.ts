@@ -1,4 +1,4 @@
-import { deriveScenarioTopology, type HostCapability, type ScenarioAst, type ScenarioStep } from './model.ts'
+import { deriveScenarioTopology, type HostCapability, type ScenarioAst, type ScenarioInstruction } from './model.ts'
 
 /**
  * Derives host behavior from the executable Scenario shape so capability
@@ -17,19 +17,21 @@ export const deriveScenarioRequirements = (scenario: ScenarioAst): ReadonlyArray
   if (declaredTopology.length > 1) requirements.add('multiple-clients')
   if (declaredTopology.some((client) => client.sessions.length > 1) === true) requirements.add('multiple-sessions')
 
-  for (const step of scenario.phases.flatMap((phase) => phase.steps)) {
-    if (step._tag === 'parallel') {
-      for (const operation of step.operations) addOperationRequirements(requirements, operation)
-    } else if (step._tag === 'settle') {
-      if (step.healDisconnectedClients.length > 0) requirements.add('disconnect-reconnect')
-    } else if (step._tag === 'action-sequence') {
-      for (const action of step.actions) addOperationRequirements(requirements, action)
-    } else if (step._tag === 'create-client') {
+  for (const instruction of scenario.instructions) {
+    if (instruction._tag === 'annotation') {
+      continue
+    } else if (instruction._tag === 'parallel') {
+      for (const operation of instruction.operations) addOperationRequirements(requirements, operation)
+    } else if (instruction._tag === 'settle') {
+      if (instruction.healDisconnectedClients.length > 0) requirements.add('disconnect-reconnect')
+    } else if (instruction._tag === 'action-sequence') {
+      for (const action of instruction.actions) addOperationRequirements(requirements, action)
+    } else if (instruction._tag === 'create-client') {
       requirements.add('dynamic-client-creation')
-    } else if (step._tag === 'add-session') {
+    } else if (instruction._tag === 'add-session') {
       requirements.add('dynamic-session-addition')
     } else {
-      addOperationRequirements(requirements, step)
+      addOperationRequirements(requirements, instruction)
     }
   }
 
@@ -56,8 +58,8 @@ export const sessionsBeyondHostLimit = (args: {
 const addOperationRequirements = (
   requirements: Set<HostCapability>,
   operation: Exclude<
-    ScenarioStep,
-    { readonly _tag: 'parallel' | 'settle' | 'action-sequence' | 'create-client' | 'add-session' }
+    ScenarioInstruction,
+    { readonly _tag: 'annotation' | 'parallel' | 'settle' | 'action-sequence' | 'create-client' | 'add-session' }
   >,
 ): void => {
   switch (operation._tag) {

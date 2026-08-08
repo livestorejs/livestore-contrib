@@ -25,8 +25,7 @@ export const ScenarioTracePayload = Schema.Union([
   Schema.TaggedStruct('run.failed', {
     code: Schema.String,
     message: Schema.String,
-    phaseId: Schema.NullOr(Schema.String),
-    stepId: Schema.NullOr(Schema.String),
+    instructionId: Schema.NullOr(Schema.String),
   }),
   Schema.TaggedStruct('run.completed', { status: Schema.Literals(['passed', 'failed']) }),
   Schema.TaggedStruct('operation.outcome', {
@@ -39,8 +38,7 @@ export const ScenarioTracePayload = Schema.Union([
     initiallyConnected: Schema.Boolean,
   }),
   Schema.TaggedStruct('client.created', { status: Schema.Literal('acknowledged') }),
-  Schema.TaggedStruct('phase.started', { description: Schema.String }),
-  Schema.TaggedStruct('phase.completed', {}),
+  Schema.TaggedStruct('annotation.reached', { text: Schema.String }),
   Schema.TaggedStruct('action.requested', { action: Schema.String, input: Schema.Json }),
   Schema.TaggedStruct('action.completed', {
     action: Schema.String,
@@ -161,7 +159,6 @@ export const ScenarioTraceRecord = Schema.Struct({
   causationId: Schema.NullOr(Schema.String),
   clientId: Schema.NullOr(Schema.String),
   sessionId: Schema.NullOr(Schema.String),
-  phaseId: Schema.NullOr(Schema.String),
   logicalTime: Schema.Finite,
   wallTimeMs: Schema.Finite,
   captureId: Schema.NullOr(Schema.String),

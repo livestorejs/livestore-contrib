@@ -24,19 +24,23 @@ Vitest.describe('scenario model', () => {
   Vitest.it('expands Scenario-owned repetition into one self-contained serializable action sequence', () => {
     const encoded = JSON.parse(JSON.stringify(seededTodoActions))
     const decoded = defineScenario(encoded)
-    const sequence = decoded.phases.flatMap((phase) => phase.steps).find((step) => step._tag === 'action-sequence')
+    const sequence = decoded.instructions.find((instruction) => instruction._tag === 'action-sequence')
 
     expect(decoded).toEqual(seededTodoActions)
     expect(sequence).toEqual(expect.objectContaining({ id: 'create-seeded-todos' }))
     expect(sequence?._tag === 'action-sequence' ? sequence.actions : []).toHaveLength(40)
-    expect(decoded.phases.flatMap((phase) => phase.steps).some((step) => step._tag === 'action')).toBe(false)
+    expect(decoded.instructions.some((instruction) => instruction._tag === 'action')).toBe(false)
     expect(deriveScenarioRequirements(decoded)).toContain('named-actions')
   })
 
   Vitest.it('derives keyed actions deterministically while keeping IDs stable across seeds', () => {
-    const first = makeSeededTodoActions(1445).phases[0]!.steps[0]!
-    const same = makeSeededTodoActions(1445).phases[0]!.steps[0]!
-    const different = makeSeededTodoActions(1446).phases[0]!.steps[0]!
+    const first = makeSeededTodoActions(1445).instructions.find(
+      (instruction) => instruction._tag === 'action-sequence',
+    )!
+    const same = makeSeededTodoActions(1445).instructions.find((instruction) => instruction._tag === 'action-sequence')!
+    const different = makeSeededTodoActions(1446).instructions.find(
+      (instruction) => instruction._tag === 'action-sequence',
+    )!
     if (first._tag !== 'action-sequence' || same._tag !== 'action-sequence' || different._tag !== 'action-sequence') {
       throw new Error('Expected generated action sequences')
     }
@@ -51,23 +55,17 @@ Vitest.describe('scenario model', () => {
         defineScenario(({ repeatActions }) => ({
           ...seededTodoActions,
           id: `invalid-action-count-${count}`,
-          phases: [
-            {
-              id: 'generated-work',
-              description: 'Invalid repeated action count.',
-              steps: [
-                repeatActions({
-                  id: 'invalid-actions',
-                  description: 'Invalid actions',
-                  count,
-                  generate: () => ({
-                    target: { clientId: 'client-a', sessionId: 'session-a' },
-                    action: 'createTodo',
-                    input: { id: 'invalid', text: 'Invalid' },
-                  }),
-                }),
-              ],
-            },
+          instructions: [
+            repeatActions({
+              id: 'invalid-actions',
+              description: 'Invalid actions',
+              count,
+              generate: () => ({
+                target: { clientId: 'client-a', sessionId: 'session-a' },
+                action: 'createTodo',
+                input: { id: 'invalid', text: 'Invalid' },
+              }),
+            }),
           ],
           oracles: [],
         })),
@@ -77,7 +75,7 @@ Vitest.describe('scenario model', () => {
 
   Vitest.it('validates dynamic participant additions in plan order', () => {
     const scenario = defineScenario({
-      version: 2,
+      version: 3,
       id: 'dynamic-topology-model',
       description: 'Adds a Client and a session after startup.',
       tags: ['topology'],
@@ -88,29 +86,23 @@ Vitest.describe('scenario model', () => {
         storeId: 'dynamic-topology-model',
         clients: [{ id: 'client-a', sessions: ['session-a'], initiallyConnected: true }],
       },
-      phases: [
+      instructions: [
         {
-          id: 'join',
-          description: 'Create the late participants.',
-          steps: [
-            {
-              _tag: 'create-client',
-              id: 'create-b',
-              client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
-            },
-            {
-              _tag: 'add-session',
-              id: 'add-a2',
-              target: { clientId: 'client-a', sessionId: 'session-a2' },
-            },
-            {
-              _tag: 'action',
-              id: 'write-b',
-              target: { clientId: 'client-b', sessionId: 'session-b' },
-              action: 'createTodo',
-              input: { id: 'late', text: 'Late participant write' },
-            },
-          ],
+          _tag: 'create-client',
+          id: 'create-b',
+          client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
+        },
+        {
+          _tag: 'add-session',
+          id: 'add-a2',
+          target: { clientId: 'client-a', sessionId: 'session-a2' },
+        },
+        {
+          _tag: 'action',
+          id: 'write-b',
+          target: { clientId: 'client-b', sessionId: 'session-b' },
+          action: 'createTodo',
+          input: { id: 'late', text: 'Late participant write' },
         },
       ],
       oracles: [],
@@ -133,7 +125,7 @@ Vitest.describe('scenario model', () => {
   Vitest.it('rejects participant use before its creation step', () => {
     expect(() =>
       defineScenario({
-        version: 2,
+        version: 3,
         id: 'dynamic-topology-use-before-create',
         description: 'Invalid ordering.',
         tags: ['topology'],
@@ -141,24 +133,18 @@ Vitest.describe('scenario model', () => {
         applicationId: todoApplication.id,
         requires: [],
         topology: { storeId: 'dynamic-topology-invalid', clients: [] },
-        phases: [
+        instructions: [
           {
-            id: 'join',
-            description: 'Uses the Client too early.',
-            steps: [
-              {
-                _tag: 'action',
-                id: 'write-b-too-early',
-                target: { clientId: 'client-b', sessionId: 'session-b' },
-                action: 'createTodo',
-                input: { id: 'late', text: 'Too early' },
-              },
-              {
-                _tag: 'create-client',
-                id: 'create-b',
-                client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
-              },
-            ],
+            _tag: 'action',
+            id: 'write-b-too-early',
+            target: { clientId: 'client-b', sessionId: 'session-b' },
+            action: 'createTodo',
+            input: { id: 'late', text: 'Too early' },
+          },
+          {
+            _tag: 'create-client',
+            id: 'create-b',
+            client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
           },
         ],
         oracles: [],
@@ -191,60 +177,52 @@ Vitest.describe('scenario model', () => {
       defineScenario({
         ...offlineWriterRecovery,
         id: 'missing-terminal-settlement',
-        phases: offlineWriterRecovery.phases.map((phase) => ({
-          ...phase,
-          steps: phase.steps.filter((step) => step._tag !== 'settle'),
-        })),
+        instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
       }),
     ).toThrow('Snapshot-based oracles require a terminal Settlement')
   })
 
-  Vitest.it('rejects a modifying operation after the Settlement used by snapshot-based oracles', () => {
-    const lastPhaseIndex = offlineWriterRecovery.phases.length - 1
+  Vitest.it('allows annotations after the terminal executable Settlement', () => {
+    const scenario = defineScenario({
+      ...offlineWriterRecovery,
+      id: 'annotation-after-terminal-settlement',
+      instructions: [
+        ...offlineWriterRecovery.instructions,
+        { _tag: 'annotation', id: 'finished', text: 'The executable instructions are complete.' },
+      ],
+    })
 
+    expect(scenario.instructions.at(-1)).toEqual(expect.objectContaining({ _tag: 'annotation', id: 'finished' }))
+  })
+
+  Vitest.it('rejects a modifying operation after the Settlement used by snapshot-based oracles', () => {
     expect(() =>
       defineScenario({
         ...offlineWriterRecovery,
         id: 'stale-terminal-settlement',
-        phases: offlineWriterRecovery.phases.map((phase, index) =>
-          index === lastPhaseIndex
-            ? {
-                ...phase,
-                steps: [
-                  ...phase.steps,
-                  {
-                    _tag: 'action' as const,
-                    id: 'write-after-settlement',
-                    target: { clientId: 'client-a', sessionId: 'session-a' },
-                    action: 'createTodo',
-                    input: { id: 'too-late', text: 'This invalidates the Settlement evidence' },
-                  },
-                ],
-              }
-            : phase,
-        ),
+        instructions: [
+          ...offlineWriterRecovery.instructions,
+          {
+            _tag: 'action' as const,
+            id: 'write-after-settlement',
+            target: { clientId: 'client-a', sessionId: 'session-a' },
+            action: 'createTodo',
+            input: { id: 'too-late', text: 'This invalidates the Settlement evidence' },
+          },
+        ],
       }),
     ).toThrow('Snapshot-based oracles require a terminal Settlement')
   })
 
   Vitest.it('requires the terminal Settlement to cover every snapshot-oracle participant', () => {
-    const lastPhaseIndex = offlineWriterRecovery.phases.length - 1
-
     expect(() =>
       defineScenario({
         ...offlineWriterRecovery,
         id: 'incomplete-terminal-settlement',
-        phases: offlineWriterRecovery.phases.map((phase, index) =>
-          index === lastPhaseIndex
-            ? {
-                ...phase,
-                steps: phase.steps.map((step) =>
-                  step._tag === 'settle'
-                    ? { ...step, participants: [{ clientId: 'client-a', sessionId: 'session-a' }] }
-                    : step,
-                ),
-              }
-            : phase,
+        instructions: offlineWriterRecovery.instructions.map((instruction) =>
+          instruction._tag === 'settle'
+            ? { ...instruction, participants: [{ clientId: 'client-a', sessionId: 'session-a' }] }
+            : instruction,
         ),
       }),
     ).toThrow('Terminal Settlement is missing snapshot-oracle participants: client-b/session-b')
@@ -254,28 +232,22 @@ Vitest.describe('scenario model', () => {
     const scenario = defineScenario({
       ...offlineWriterRecovery,
       id: 'history-without-settlement',
-      phases: offlineWriterRecovery.phases.map((phase) => ({
-        ...phase,
-        steps: phase.steps.filter((step) => step._tag !== 'settle'),
-      })),
+      instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
       oracles: offlineWriterRecovery.oracles.filter((oracle) => oracle._tag === 'operation-history'),
     })
 
-    expect(scenario.phases.flatMap((phase) => phase.steps).every((step) => step._tag !== 'settle')).toBe(true)
+    expect(scenario.instructions.every((instruction) => instruction._tag !== 'settle')).toBe(true)
   })
 
   Vitest.it('allows a confirmed Eventlog prefix oracle without Settlement', () => {
     const scenario = defineScenario({
       ...offlineWriterRecovery,
       id: 'prefix-history-without-settlement',
-      phases: offlineWriterRecovery.phases.map((phase) => ({
-        ...phase,
-        steps: phase.steps.filter((step) => step._tag !== 'settle'),
-      })),
+      instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
       oracles: offlineWriterRecovery.oracles.filter((oracle) => oracle._tag === 'confirmed-eventlog-prefix'),
     })
 
-    expect(scenario.phases.flatMap((phase) => phase.steps).every((step) => step._tag !== 'settle')).toBe(true)
+    expect(scenario.instructions.every((instruction) => instruction._tag !== 'settle')).toBe(true)
   })
 
   Vitest.it('requires a non-empty, unique participant selection for confirmed Eventlog prefix evidence', () => {

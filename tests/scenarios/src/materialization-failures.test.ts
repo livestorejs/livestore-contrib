@@ -56,7 +56,7 @@ Vitest.describe('materialization failure scenarios', () => {
         expect.objectContaining({
           _tag: 'run.failed',
           code: 'participant-runtime-failure',
-          phaseId: 'rebase-invalid-pending-event',
+          instructionId: 'observe-materialization-failure',
         }),
       )
     }).pipe(Vitest.withTestCtx(test)),

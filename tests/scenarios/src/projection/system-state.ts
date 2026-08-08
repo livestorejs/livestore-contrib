@@ -22,15 +22,12 @@ export const sessionComponentKey = (clientId: string, sessionId: string): string
 /** Keeps Client creation sessions distinct from sessions attached by later plan steps. */
 export const scenarioClientCreationDefinitions = (scenario: ScenarioAst) => [
   ...scenario.topology.clients,
-  ...scenario.phases.flatMap((phase) =>
-    phase.steps.flatMap((step) => (step._tag === 'create-client' ? [step.client] : [])),
-  ),
+  ...scenario.instructions.flatMap((instruction) => (instruction._tag === 'create-client' ? [instruction.client] : [])),
 ]
 
 export const initialObservedSystemState = (scenario: ScenarioAst, cursorIndex: number): ObservedSystemState => ({
   cursorIndex,
   runStatus: 'not-started',
-  activePhaseId: null,
   backend: null,
   clients: deriveScenarioTopology(scenario).map((client) => ({
     clientId: client.id,
@@ -61,10 +58,6 @@ export const applyTraceRecord = (
       return { ...state, runStatus: 'failed' }
     case 'run.completed':
       return { ...state, runStatus: payload.status }
-    case 'phase.started':
-      return { ...state, activePhaseId: record.phaseId }
-    case 'phase.completed':
-      return { ...state, activePhaseId: null }
     case 'client.created':
       if (record.clientId === null) return state
       return updateClient(state, record.clientId, (client) => {
@@ -198,6 +191,8 @@ export const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentK
     case 'action.requested':
     case 'action-sequence.requested':
       return 'action'
+    case 'annotation.reached':
+      return 'annotation'
     case 'client.created':
       return 'topology'
     case 'connectivity.disconnected':
@@ -236,10 +231,8 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return `Run failed: ${summarizeFailureMessage(record.payload.message)}`
     case 'operation.outcome':
       return `Operation ${record.correlationId ?? 'unknown'} ${record.payload.status}: ${summarizeFailureMessage(record.payload.message)}`
-    case 'phase.started':
-      return `Phase ${record.phaseId ?? 'unknown'} started: ${record.payload.description}`
-    case 'phase.completed':
-      return `Phase ${record.phaseId ?? 'unknown'} completed`
+    case 'annotation.reached':
+      return record.payload.text
     case 'client.create.requested':
       return scoped(`create requested with ${record.payload.sessions.length} sessions`)
     case 'action.requested':

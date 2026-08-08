@@ -1,6 +1,6 @@
 # 0010 — Keep generation and promotion in the Scenario layer
 
-Status: accepted (Scenario authoring and corpus lifecycle refactor, 2026-08-07)
+Status: accepted; authoring placement, seed derivation, and format versions superseded by decision 0011
 
 ## Context
 
@@ -30,9 +30,9 @@ promote one only by moving its readable source into the retained tree, adding
 focused evidence, and registering it. Scenario-source promotion and artifact
 retention remain independent decisions.
 
-Scenario version 2, trace version 4, and artifact version 5 are the only
-supported formats. There is no compatibility interface for superseded Scenario
-or trace shapes.
+At the time of this decision, Scenario version 2, trace version 4, and artifact
+version 5 were the only supported formats. Decision 0011 replaces their phase
+nesting and advances all three formats without a compatibility interface.
 
 ## Consequences
 

@@ -16,7 +16,11 @@ const viewerUrl = 'http://127.0.0.1:4173'
 test('canonical viewer matches the approved failure and interaction baselines', async ({ page }) => {
   await openArtifact(page, viewerUrl, failureArtifact, 'many-writer-convergence')
   await expect(
-    page.getByLabel('Saved scenario run').locator('option').filter({ hasText: 'core working tree' }).first(),
+    page
+      .getByLabel('Saved scenario run')
+      .locator('option')
+      .filter({ hasText: /core [0-9a-f]{8}/ })
+      .first(),
   ).toBeAttached()
   await expect(page).toHaveScreenshot('loaded-failure.png', { fullPage: true })
 
@@ -71,7 +75,7 @@ test('opens reconstructed Client Leader State with source-record provenance', as
       .evaluate((element) => element.getBoundingClientRect().width),
   ).toBeGreaterThan(60)
   await expect(inspector.getByLabel('Reconstructed table', { exact: true })).toHaveValue('todos')
-  await expect(inspector.getByText('replayed record #104')).toBeVisible()
+  await expect(inspector.getByText('replayed record #103')).toBeVisible()
   await expect(inspector.getByText(/capture offline-writer-recovery-browser-/)).toBeAttached()
   await expect(inspector.getByText('2 events')).toBeAttached()
   await expect(inspector.getByRole('region', { name: 'Reconstructed table todos' })).toBeVisible()

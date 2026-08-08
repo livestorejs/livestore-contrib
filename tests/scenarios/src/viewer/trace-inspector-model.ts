@@ -20,7 +20,7 @@ export const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<Rec
     case 'run.failed':
       return [
         { label: 'Code', value: payload.code, tone: 'bad' },
-        { label: 'Step', value: payload.stepId ?? 'unknown' },
+        { label: 'Instruction', value: payload.instructionId ?? 'unknown' },
         { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
       ]
     case 'operation.outcome':
@@ -30,8 +30,8 @@ export const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<Rec
         { label: 'Boundary', value: payload.status === 'indefinite' ? 'completion not observed' : 'failure reported' },
         { label: 'Message', value: conciseText(payload.message), tone: 'bad' },
       ]
-    case 'phase.started':
-      return [{ label: 'Description', value: payload.description }]
+    case 'annotation.reached':
+      return [{ label: 'Annotation', value: payload.text }]
     case 'client.create.requested':
       return [
         { label: 'Sessions', value: payload.sessions.join(', ') || 'none' },

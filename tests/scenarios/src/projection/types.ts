@@ -29,7 +29,6 @@ export type ProjectedClient = typeof ProjectedClient.Type
 export const ObservedSystemState = Schema.Struct({
   cursorIndex: Schema.Finite,
   runStatus: Schema.Literals(['not-started', 'running', 'passed', 'failed']),
-  activePhaseId: Schema.NullOr(Schema.String),
   backend: Schema.NullOr(BackendObservation),
   clients: Schema.Array(ProjectedClient),
   verdicts: Schema.Array(OracleVerdict),
@@ -81,6 +80,7 @@ export interface RuntimeFailureInterval {
 
 export type PlaybackMomentKind =
   | 'run'
+  | 'annotation'
   | 'action'
   | 'action-sequence'
   | 'topology'

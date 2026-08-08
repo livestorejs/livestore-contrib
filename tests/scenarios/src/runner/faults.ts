@@ -62,7 +62,6 @@ export const recordObservedFaultTransition = (args: {
   connectivityRecord: ScenarioTraceRecord
   faultState: ScenarioFaultState
   record: TraceRecorder
-  phaseId?: string
   captureId: string
   occurrence: HostObservationOccurrence
 }): void => {
@@ -74,7 +73,6 @@ export const recordObservedFaultTransition = (args: {
     origin: 'observation' as const,
     correlationId: pending.operationId,
     clientId: args.clientId,
-    phaseId: args.phaseId,
     captureId: args.captureId,
     evidence: 'first-observed' as const,
     occurrence: args.occurrence,
@@ -106,7 +104,6 @@ export const recordObservedBackendFaultTransition = (args: {
   backendRecord: ScenarioTraceRecord
   faultState: ScenarioFaultState
   record: TraceRecorder
-  phaseId?: string
   captureId: string
   occurrence: HostObservationOccurrence
 }): void => {
@@ -117,7 +114,6 @@ export const recordObservedBackendFaultTransition = (args: {
   const input = {
     origin: 'observation' as const,
     correlationId: pending.operationId,
-    phaseId: args.phaseId,
     captureId: args.captureId,
     evidence: 'first-observed' as const,
     occurrence: args.occurrence,
@@ -160,13 +156,11 @@ export const selectedRecoveryFaults = (
 export const recordOperationFailure = (args: {
   record: TraceRecorder
   operationId: string
-  phaseId?: string
   error: HostError
 }): ScenarioTraceRecord =>
   args.record({
     origin: 'observation',
     correlationId: args.operationId,
-    phaseId: args.phaseId,
     causedBy: args.record.instructionIndex(args.operationId),
     payload: {
       _tag: 'operation.outcome',

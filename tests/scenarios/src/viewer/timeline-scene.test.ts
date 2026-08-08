@@ -176,8 +176,8 @@ describe('deriveTimelineScene', () => {
     expect(actionMoments).toHaveLength(0)
     expect(actionSequenceMoments[0]?.recordIndexes).toEqual([sequenceRequest.index, sequenceCompletion.index])
     expect(actionSequenceMoments[0]?.summary).toContain('426 actions')
-    expect(actionSequenceMoments[0]?.summary).toContain('client-1/session-1: 207')
-    expect(actionSequenceMoments[0]?.summary).toContain('client-2/session-2: 219')
+    expect(actionSequenceMoments[0]?.summary).toContain('client-1/session-1: 220')
+    expect(actionSequenceMoments[0]?.summary).toContain('client-2/session-2: 206')
     expect(scene.normalizedRecordPositions[lastGeneratedAction.index]).toBe(
       scene.normalizedRecordPositions[sequenceCompletion.index],
     )

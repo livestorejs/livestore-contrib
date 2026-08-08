@@ -1,6 +1,6 @@
 import type { Schema } from '@livestore/utils/effect'
 
-import type { ParticipantRef, ScenarioAst, ScenarioPhase } from './scenario.ts'
+import type { ParticipantRef, ScenarioAst, ScenarioInstruction } from './scenario.ts'
 
 const repeatActionsMarker = Symbol('repeat-actions')
 
@@ -28,12 +28,8 @@ export interface RepeatActionsDraft {
   readonly [repeatActionsMarker]: RepeatActionsDefinition
 }
 
-type AuthoredScenarioPhase = Omit<ScenarioPhase, 'steps'> & {
-  readonly steps: ReadonlyArray<ScenarioPhase['steps'][number] | RepeatActionsDraft>
-}
-
-export type AuthoredScenario = Omit<ScenarioAst, 'phases'> & {
-  readonly phases: ReadonlyArray<AuthoredScenarioPhase>
+export type AuthoredScenario = Omit<ScenarioAst, 'instructions'> & {
+  readonly instructions: ReadonlyArray<ScenarioInstruction | RepeatActionsDraft>
 }
 
 export interface ScenarioAuthoring {
@@ -62,18 +58,14 @@ export const scenarioAuthoring: ScenarioAuthoring = {
 /** Expands non-serializable authoring helpers into the portable Scenario AST. */
 export const expandScenarioAuthoring = (authored: AuthoredScenario): unknown => ({
   ...authored,
-  phases: authored.phases.map((phase) => ({
-    ...phase,
-    steps: phase.steps.map((step) =>
-      isRepeatActionsDraft(step) === true
-        ? expandRepeatedActions({
-            scenarioSeed: authored.seed,
-            phaseId: phase.id,
-            definition: step[repeatActionsMarker],
-          })
-        : step,
-    ),
-  })),
+  instructions: authored.instructions.map((instruction) =>
+    isRepeatActionsDraft(instruction) === true
+      ? expandRepeatedActions({
+          scenarioSeed: authored.seed,
+          definition: instruction[repeatActionsMarker],
+        })
+      : instruction,
+  ),
 })
 
 const isRepeatActionsDraft = (input: unknown): input is RepeatActionsDraft =>
@@ -81,14 +73,13 @@ const isRepeatActionsDraft = (input: unknown): input is RepeatActionsDraft =>
 
 const expandRepeatedActions = (args: {
   readonly scenarioSeed: number
-  readonly phaseId: string
   readonly definition: RepeatActionsDefinition
 }) => {
   const { definition } = args
   if (Number.isInteger(definition.count) === false || definition.count <= 0 || definition.count > 10_000) {
     throw new ScenarioAuthoringError(`Repeated action count must be between 1 and 10000: ${definition.id}`)
   }
-  const seed = hashString(`${args.scenarioSeed}\u0000${args.phaseId}\u0000${definition.id}`)
+  const seed = hashString(`${args.scenarioSeed}\u0000${definition.id}`)
   return {
     _tag: 'action-sequence' as const,
     id: definition.id,

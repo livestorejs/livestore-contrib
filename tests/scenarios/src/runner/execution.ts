@@ -7,7 +7,7 @@ import {
   type ClientDefinition,
   type ParallelOperationStep,
   participantKey,
-  type ScenarioStep,
+  type ScenarioInstruction,
   type ScenarioTraceRecord,
 } from '../model.ts'
 import type { HostError, ParticipantHost } from '../profiles/contract.ts'
@@ -16,10 +16,9 @@ import { type ScenarioFaultState, recordOperationFailure } from './faults.ts'
 import { awaitSettlement } from './observations.ts'
 import type { TraceRecorder } from './trace-recorder.ts'
 
-export const executeParallelStep = (args: {
+export const executeParallelInstruction = (args: {
   host: ParticipantHost
   storeId: string
-  phaseId: string
   record: TraceRecorder
   operations: ReadonlyArray<ParallelOperationStep>
   faultState: ScenarioFaultState
@@ -37,13 +36,12 @@ export const executeParallelStep = (args: {
     const results = yield* Effect.forEach(
       args.operations,
       (operation) =>
-        executeStep({ ...args, step: operation, onInvoked }).pipe(
+        executeInstruction({ ...args, instruction: operation, onInvoked }).pipe(
           Effect.tapError((error) =>
             Effect.sync(() =>
               recordOperationFailure({
                 record: args.record,
                 operationId: operation.id,
-                phaseId: args.phaseId,
                 error,
               }),
             ),
@@ -60,66 +58,67 @@ export const executeParallelStep = (args: {
     }
   })
 
-export const executeStep = (args: {
+export const executeInstruction = (args: {
   host: ParticipantHost
   storeId: string
-  phaseId: string
   record: TraceRecorder
-  step: Exclude<ScenarioStep, { readonly _tag: 'parallel' }>
+  instruction: Exclude<ScenarioInstruction, { readonly _tag: 'parallel' }>
   faultState: ScenarioFaultState
   onInvoked?: () => Effect.Effect<void>
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> => {
-  switch (args.step._tag) {
+  switch (args.instruction._tag) {
+    case 'annotation':
+      args.record({
+        origin: 'observation',
+        correlationId: args.instruction.id,
+        payload: { _tag: 'annotation.reached', text: args.instruction.text },
+      })
+      return Effect.void
     case 'create-client':
       return executeClientCreation({
         host: args.host,
         record: args.record,
-        operationId: args.step.id,
+        operationId: args.instruction.id,
         storeId: args.storeId,
-        client: args.step.client,
-        phaseId: args.phaseId,
+        client: args.instruction.client,
       })
     case 'add-session': {
-      const step = args.step
+      const instruction = args.instruction
       return Effect.gen(function* () {
         args.record({
           origin: 'instruction',
-          correlationId: step.id,
-          clientId: step.target.clientId,
-          sessionId: step.target.sessionId,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
+          clientId: instruction.target.clientId,
+          sessionId: instruction.target.sessionId,
           payload: { _tag: 'lifecycle.session-add.requested' },
         })
-        yield* args.host.addSession({ operationId: step.id, target: step.target })
+        yield* args.host.addSession({ operationId: instruction.id, target: instruction.target })
         args.record({
           origin: 'acknowledgement',
-          correlationId: step.id,
-          clientId: step.target.clientId,
-          sessionId: step.target.sessionId,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
+          clientId: instruction.target.clientId,
+          sessionId: instruction.target.sessionId,
           payload: { _tag: 'lifecycle.session-added' },
         })
       })
     }
     case 'action': {
-      return executeAction({ ...args, action: args.step }).pipe(Effect.asVoid)
+      return executeAction({ ...args, action: args.instruction }).pipe(Effect.asVoid)
     }
     case 'action-sequence':
       return executeActionSequence({
         host: args.host,
-        phaseId: args.phaseId,
         record: args.record,
-        step: args.step,
+        instruction: args.instruction,
       })
     case 'disconnect':
     case 'reconnect': {
-      const connected = args.step._tag === 'reconnect'
+      const connected = args.instruction._tag === 'reconnect'
       return setConnectivity({
         host: args.host,
-        phaseId: args.phaseId,
         record: args.record,
-        clientId: args.step.clientId,
-        operationId: args.step.id,
+        clientId: args.instruction.clientId,
+        operationId: args.instruction.id,
         connected,
         faultState: args.faultState,
         onInvoked: args.onInvoked,
@@ -129,84 +128,77 @@ export const executeStep = (args: {
     case 'backend-available':
       return setBackendAvailability({
         host: args.host,
-        phaseId: args.phaseId,
         record: args.record,
-        operationId: args.step.id,
-        available: args.step._tag === 'backend-available',
+        operationId: args.instruction.id,
+        available: args.instruction._tag === 'backend-available',
         faultState: args.faultState,
         onInvoked: args.onInvoked,
       })
     case 'stop-session':
     case 'restart-session': {
-      const step = args.step
-      const restarting = step._tag === 'restart-session'
+      const instruction = args.instruction
+      const restarting = instruction._tag === 'restart-session'
       return Effect.gen(function* () {
         args.record({
           origin: 'instruction',
-          correlationId: step.id,
-          clientId: step.target.clientId,
-          sessionId: step.target.sessionId,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
+          clientId: instruction.target.clientId,
+          sessionId: instruction.target.sessionId,
           payload:
             restarting === true
               ? { _tag: 'lifecycle.session-restart.requested' }
               : { _tag: 'lifecycle.session-stop.requested' },
         })
         if (args.onInvoked !== undefined) yield* args.onInvoked()
-        const command = { operationId: step.id, target: step.target }
+        const command = { operationId: instruction.id, target: instruction.target }
         if (restarting === true) yield* args.host.restartSession(command)
         else yield* args.host.stopSession(command)
         args.record({
           origin: 'acknowledgement',
-          correlationId: step.id,
-          clientId: step.target.clientId,
-          sessionId: step.target.sessionId,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
+          clientId: instruction.target.clientId,
+          sessionId: instruction.target.sessionId,
           payload:
             restarting === true ? { _tag: 'lifecycle.session-restarted' } : { _tag: 'lifecycle.session-stopped' },
         })
       })
     }
     case 'restart-client': {
-      const step = args.step
+      const instruction = args.instruction
       return Effect.gen(function* () {
         args.record({
           origin: 'instruction',
-          correlationId: step.id,
-          clientId: step.clientId,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
+          clientId: instruction.clientId,
           payload: { _tag: 'lifecycle.client-restart.requested' },
         })
         if (args.onInvoked !== undefined) yield* args.onInvoked()
-        yield* args.host.restartClient({ operationId: step.id, clientId: step.clientId })
+        yield* args.host.restartClient({ operationId: instruction.id, clientId: instruction.clientId })
         args.record({
           origin: 'acknowledgement',
-          correlationId: step.id,
-          clientId: step.clientId,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
+          clientId: instruction.clientId,
           payload: { _tag: 'lifecycle.client-restarted' },
         })
       })
     }
     case 'settle': {
-      const step = args.step
+      const instruction = args.instruction
       return Effect.gen(function* () {
         args.record({
           origin: 'instruction',
-          correlationId: step.id,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
           payload: {
             _tag: 'settlement.requested',
-            participants: step.participants.map(participantKey),
-            healDisconnectedClients: [...step.healDisconnectedClients],
-            timeoutMs: step.timeoutMs,
+            participants: instruction.participants.map(participantKey),
+            healDisconnectedClients: [...instruction.healDisconnectedClients],
+            timeoutMs: instruction.timeoutMs,
           },
         })
-        for (const clientId of step.healDisconnectedClients) {
-          const operationId = `${step.id}:heal:${clientId}`
+        for (const clientId of instruction.healDisconnectedClients) {
+          const operationId = `${instruction.id}:heal:${clientId}`
           yield* setConnectivity({
             host: args.host,
-            phaseId: args.phaseId,
             record: args.record,
             clientId,
             operationId,
@@ -214,40 +206,37 @@ export const executeStep = (args: {
             faultState: args.faultState,
           }).pipe(
             Effect.catch((error) => {
-              recordOperationFailure({ record: args.record, operationId, phaseId: args.phaseId, error })
+              recordOperationFailure({ record: args.record, operationId, error })
               return Effect.fail(error)
             }),
           )
         }
-        const inFlightOperationIds = args.record.pendingOperationIds([step.id])
+        const inFlightOperationIds = args.record.pendingOperationIds([instruction.id])
         if (inFlightOperationIds.length > 0) {
           return yield* Effect.fail(
             new ScenarioOperationError(
               'operations-in-flight',
-              `Settlement ${step.id} cannot establish quiescence with operations in flight: ${inFlightOperationIds.join(', ')}`,
+              `Settlement ${instruction.id} cannot establish quiescence with operations in flight: ${inFlightOperationIds.join(', ')}`,
             ),
           )
         }
         args.record({
           origin: 'observation',
-          correlationId: step.id,
-          phaseId: args.phaseId,
-          causedBy: args.record.instructionIndex(step.id),
+          correlationId: instruction.id,
+          causedBy: args.record.instructionIndex(instruction.id),
           payload: { _tag: 'quiescence.reached', inFlightOperationIds },
         })
         const settled = yield* awaitSettlement({
           host: args.host,
-          participants: step.participants,
-          timeoutMs: step.timeoutMs,
+          participants: instruction.participants,
+          timeoutMs: instruction.timeoutMs,
           record: args.record,
-          phaseId: args.phaseId,
-          correlationId: step.id,
+          correlationId: instruction.id,
           faultState: args.faultState,
         })
         args.record({
           origin: 'acknowledgement',
-          correlationId: step.id,
-          phaseId: args.phaseId,
+          correlationId: instruction.id,
           payload: { _tag: 'settlement.completed', observations: settled.map(syncObservationPayload) },
         })
       })
@@ -261,14 +250,12 @@ export const executeClientCreation = (args: {
   operationId: string
   storeId: string
   client: ClientDefinition
-  phaseId?: string
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
     args.record({
       origin: 'instruction',
       correlationId: args.operationId,
       clientId: args.client.id,
-      phaseId: args.phaseId,
       payload: {
         _tag: 'client.create.requested',
         sessions: [...args.client.sessions],
@@ -280,14 +267,12 @@ export const executeClientCreation = (args: {
       origin: 'acknowledgement',
       correlationId: args.operationId,
       clientId: args.client.id,
-      phaseId: args.phaseId,
       payload: { _tag: 'client.created', status: 'acknowledged' },
     })
   })
 
 const executeAction = (args: {
   host: ParticipantHost
-  phaseId: string
   record: TraceRecorder
   action: ActionStep
   causationId?: string
@@ -302,7 +287,6 @@ const executeAction = (args: {
       causedBy: args.causedBy,
       clientId: args.action.target.clientId,
       sessionId: args.action.target.sessionId,
-      phaseId: args.phaseId,
       payload: { _tag: 'action.requested', action: args.action.action, input: args.action.input },
     })
     if (args.onInvoked !== undefined) yield* args.onInvoked()
@@ -318,42 +302,38 @@ const executeAction = (args: {
       causationId: args.causationId,
       clientId: args.action.target.clientId,
       sessionId: args.action.target.sessionId,
-      phaseId: args.phaseId,
       payload: { _tag: 'action.completed', action: args.action.action, status: 'acknowledged' },
     })
   })
 
 const executeActionSequence = (args: {
   host: ParticipantHost
-  phaseId: string
   record: TraceRecorder
-  step: ActionSequenceStep
+  instruction: ActionSequenceStep
 }): Effect.Effect<void, HostError, Scope.Scope | OtelTracer.OtelTracer> =>
   Effect.gen(function* () {
     const instruction = args.record({
       origin: 'instruction',
-      correlationId: args.step.id,
-      phaseId: args.phaseId,
+      correlationId: args.instruction.id,
       payload: {
         _tag: 'action-sequence.requested',
-        description: args.step.description,
-        targets: [...new Set(args.step.actions.map((action) => participantKey(action.target)))],
-        count: args.step.actions.length,
-        seed: args.step.seed,
+        description: args.instruction.description,
+        targets: [...new Set(args.instruction.actions.map((action) => participantKey(action.target)))],
+        count: args.instruction.actions.length,
+        seed: args.instruction.seed,
       },
     })
     const acknowledgements: ScenarioTraceRecord[] = []
-    for (const action of args.step.actions) {
+    for (const action of args.instruction.actions) {
       const acknowledgement = yield* executeAction({
         host: args.host,
-        phaseId: args.phaseId,
         record: args.record,
         action,
-        causationId: args.step.id,
+        causationId: args.instruction.id,
         causedBy: [instruction.index],
       }).pipe(
         Effect.catch((error) => {
-          recordOperationFailure({ record: args.record, operationId: action.id, phaseId: args.phaseId, error })
+          recordOperationFailure({ record: args.record, operationId: action.id, error })
           return Effect.fail(error)
         }),
       )
@@ -361,12 +341,11 @@ const executeActionSequence = (args: {
     }
     args.record({
       origin: 'acknowledgement',
-      correlationId: args.step.id,
-      phaseId: args.phaseId,
+      correlationId: args.instruction.id,
       causedBy: [instruction.index, ...acknowledgements.map((record) => record.index)],
       payload: {
         _tag: 'action-sequence.completed',
-        actionIds: args.step.actions.map((action) => action.id),
+        actionIds: args.instruction.actions.map((action) => action.id),
         status: 'acknowledged',
       },
     })
@@ -374,7 +353,6 @@ const executeActionSequence = (args: {
 
 const setConnectivity = (args: {
   host: ParticipantHost
-  phaseId: string
   record: TraceRecorder
   clientId: string
   operationId: string
@@ -387,7 +365,6 @@ const setConnectivity = (args: {
       origin: 'instruction',
       correlationId: args.operationId,
       clientId: args.clientId,
-      phaseId: args.phaseId,
       payload:
         args.connected === true
           ? { _tag: 'connectivity.reconnect.requested', connected: true }
@@ -403,7 +380,6 @@ const setConnectivity = (args: {
       origin: 'acknowledgement',
       correlationId: args.operationId,
       clientId: args.clientId,
-      phaseId: args.phaseId,
       payload:
         args.connected === true
           ? { _tag: 'connectivity.reconnected', connected: true }
@@ -422,7 +398,6 @@ const setConnectivity = (args: {
 
 const setBackendAvailability = (args: {
   host: ParticipantHost
-  phaseId: string
   record: TraceRecorder
   operationId: string
   available: boolean
@@ -433,7 +408,6 @@ const setBackendAvailability = (args: {
     args.record({
       origin: 'instruction',
       correlationId: args.operationId,
-      phaseId: args.phaseId,
       payload: { _tag: 'backend.availability.requested', available: args.available },
     })
     if (args.onInvoked !== undefined) yield* args.onInvoked()
@@ -441,7 +415,6 @@ const setBackendAvailability = (args: {
     const acknowledgement = args.record({
       origin: 'acknowledgement',
       correlationId: args.operationId,
-      phaseId: args.phaseId,
       payload: { _tag: 'backend.availability.changed', available: args.available },
     })
     const faultId = args.available === false ? args.operationId : args.faultState.backend.active

@@ -20,7 +20,7 @@ import { makeBrowserHost } from './profiles/browser/host.ts'
 import type { HostError, ParticipantHost } from './profiles/contract.ts'
 import { makeInProcessHost } from './profiles/in-process/host.ts'
 import { makeProcessHost } from './profiles/process/host.ts'
-import { executeClientCreation, executeParallelStep, executeStep } from './runner/execution.ts'
+import { executeClientCreation, executeInstruction, executeParallelInstruction } from './runner/execution.ts'
 import { makeFaultState, recordOperationFailure } from './runner/faults.ts'
 import { captureSnapshots, recordSystemObservation } from './runner/observations.ts'
 import { evaluateOracles } from './runner/oracles.ts'
@@ -36,10 +36,9 @@ export interface RunScenarioOptions {
 
 export interface ScenarioRunProgress {
   readonly stage: 'started' | 'completed'
-  readonly phaseId: string
-  readonly stepId: string
-  readonly stepNumber: number
-  readonly totalSteps: number
+  readonly instructionId: string
+  readonly instructionNumber: number
+  readonly totalInstructions: number
 }
 
 export const defaultInProcessExecution: ExecutionConfiguration = {
@@ -230,8 +229,7 @@ export const runScenario = (args: {
     const runId = args.options?.runId ?? `${args.scenario.id}:${args.scenario.seed}:${Date.now()}`
     const trace: ScenarioTraceRecord[] = []
     let logicalTime = 0
-    let activePhaseId: string | undefined
-    let activeStepId: string | undefined
+    let activeInstructionId: string | undefined
     let activeOperationId: string | undefined
     const faultState = makeFaultState()
     const record = makeTraceRecorder({ runId, trace, readLogicalTime: () => logicalTime })
@@ -268,58 +266,57 @@ export const runScenario = (args: {
         })
       }
 
-      const totalSteps = args.scenario.phases.reduce((total, phase) => total + phase.steps.length, 0)
-      let stepNumber = 0
-      for (const phase of args.scenario.phases) {
-        activePhaseId = phase.id
-        logicalTime += 1
-        record({
-          origin: 'observation',
-          phaseId: phase.id,
-          payload: { _tag: 'phase.started', description: phase.description },
+      const totalInstructions = args.scenario.instructions.length
+      let instructionNumber = 0
+      for (const instruction of args.scenario.instructions) {
+        activeInstructionId = instruction.id
+        activeOperationId =
+          instruction._tag === 'parallel' || instruction._tag === 'annotation' ? undefined : instruction.id
+        instructionNumber += 1
+        args.options?.onProgress?.({
+          stage: 'started',
+          instructionId: instruction.id,
+          instructionNumber,
+          totalInstructions,
         })
-        for (const step of phase.steps) {
-          activeStepId = step.id
-          activeOperationId = step._tag === 'parallel' ? undefined : step.id
-          stepNumber += 1
-          args.options?.onProgress?.({ stage: 'started', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
-          logicalTime += 1
-          if (step._tag === 'parallel') {
-            yield* executeParallelStep({
-              host: args.host,
-              storeId: args.scenario.topology.storeId,
-              phaseId: phase.id,
-              record,
-              operations: step.operations,
-              faultState,
-              onFailure: (operationId) => {
-                activeStepId = operationId
-              },
-            })
-          } else {
-            yield* executeStep({
-              host: args.host,
-              storeId: args.scenario.topology.storeId,
-              phaseId: phase.id,
-              record,
-              step,
-              faultState,
-            })
-          }
-          activeOperationId = undefined
+        logicalTime += 1
+        if (instruction._tag === 'parallel') {
+          yield* executeParallelInstruction({
+            host: args.host,
+            storeId: args.scenario.topology.storeId,
+            record,
+            operations: instruction.operations,
+            faultState,
+            onFailure: (operationId) => {
+              activeInstructionId = operationId
+            },
+          })
+        } else {
+          yield* executeInstruction({
+            host: args.host,
+            storeId: args.scenario.topology.storeId,
+            record,
+            instruction,
+            faultState,
+          })
+        }
+        activeOperationId = undefined
+        if (instruction._tag !== 'annotation') {
           yield* recordSystemObservation({
             host: args.host,
             record,
-            reason: step.id,
-            correlationId: step.id,
-            phaseId: phase.id,
+            reason: instruction.id,
+            correlationId: instruction.id,
             faultState,
           })
-          args.options?.onProgress?.({ stage: 'completed', phaseId: phase.id, stepId: step.id, stepNumber, totalSteps })
-          activeStepId = undefined
         }
-        record({ origin: 'observation', phaseId: phase.id, payload: { _tag: 'phase.completed' } })
-        activePhaseId = undefined
+        args.options?.onProgress?.({
+          stage: 'completed',
+          instructionId: instruction.id,
+          instructionNumber,
+          totalInstructions,
+        })
+        activeInstructionId = undefined
       }
 
       const snapshotResult = yield* captureSnapshots({ host: args.host, scenario: args.scenario, record })
@@ -349,17 +346,15 @@ export const runScenario = (args: {
       Effect.catch((error) => {
         const failure = describeHostError(error)
         if (activeOperationId !== undefined) {
-          recordOperationFailure({ record, operationId: activeOperationId, phaseId: activePhaseId, error })
+          recordOperationFailure({ record, operationId: activeOperationId, error })
         }
         record({
           origin: 'observation',
-          correlationId: activeStepId,
-          phaseId: activePhaseId,
+          correlationId: activeInstructionId,
           payload: {
             _tag: 'run.failed',
             ...failure,
-            phaseId: activePhaseId ?? null,
-            stepId: activeStepId ?? null,
+            instructionId: activeInstructionId ?? null,
           },
         })
         return makeScenarioArtifact({

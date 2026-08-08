@@ -8,7 +8,7 @@ const settlementTimeoutMs = Number(process.env.SCENARIO_SETTLEMENT_TIMEOUT_MS ??
 
 /** Reconciles a pending tail over confirmed remote history at the smallest observed stall boundary. */
 export const pendingTailRecovery = defineScenario(({ repeatActions }) => ({
-  version: 2,
+  version: 3,
   id: 'pending-tail-recovery',
   description: `An offline Client rebases ${pendingCount} pending Events over one confirmed remote Event.`,
   tags: ['sync', 'correctness', 'known-failure', 'pending-tail', 'rebase', `${pendingCount}-events`],
@@ -22,54 +22,52 @@ export const pendingTailRecovery = defineScenario(({ repeatActions }) => ({
       { id: onlineWriter.clientId, sessions: [onlineWriter.sessionId], initiallyConnected: true },
     ],
   },
-  phases: [
+  instructions: [
     {
+      _tag: 'annotation',
       id: 'build-pending-tail',
-      description: 'Client A accumulates a large pending tail while Client B confirms independent history.',
-      steps: [
-        { _tag: 'disconnect', id: 'disconnect-offline-writer', clientId: offlineWriter.clientId },
-        repeatActions({
-          id: 'offline-pending-tail',
-          description: `Create ${pendingCount} pending todos on the offline Client`,
-          count: pendingCount,
-          generate: ({ iteration, random }) => ({
-            target: offlineWriter,
-            action: 'createTodo',
-            input: {
-              id: `pending-${String(iteration + 1).padStart(3, '0')}`,
-              text: `Offline pending item ${iteration + 1} · variant ${random.integer('text-variant', 1_000)}`,
-            },
-          }),
-        }),
-        {
-          _tag: 'action',
-          id: 'confirmed-remote-write',
-          target: onlineWriter,
-          action: 'createTodo',
-          input: { id: 'remote-confirmed', text: 'Confirmed ahead of the pending tail' },
+      text: 'Client A accumulates a large pending tail while Client B confirms independent history.',
+    },
+    { _tag: 'disconnect', id: 'disconnect-offline-writer', clientId: offlineWriter.clientId },
+    repeatActions({
+      id: 'offline-pending-tail',
+      description: `Create ${pendingCount} pending todos on the offline Client`,
+      count: pendingCount,
+      generate: ({ iteration, random }) => ({
+        target: offlineWriter,
+        action: 'createTodo',
+        input: {
+          id: `pending-${String(iteration + 1).padStart(3, '0')}`,
+          text: `Offline pending item ${iteration + 1} · variant ${random.integer('text-variant', 1_000)}`,
         },
-        {
-          _tag: 'settle',
-          id: 'confirm-remote-write',
-          participants: [onlineWriter],
-          healDisconnectedClients: [],
-          timeoutMs: 10_000,
-        },
-      ],
+      }),
+    }),
+    {
+      _tag: 'action',
+      id: 'confirmed-remote-write',
+      target: onlineWriter,
+      action: 'createTodo',
+      input: { id: 'remote-confirmed', text: 'Confirmed ahead of the pending tail' },
     },
     {
+      _tag: 'settle',
+      id: 'confirm-remote-write',
+      participants: [onlineWriter],
+      healDisconnectedClients: [],
+      timeoutMs: 10_000,
+    },
+    {
+      _tag: 'annotation',
       id: 'reconcile-pending-tail',
-      description: 'Client A reconnects and rebases its pending tail over the confirmed remote write.',
-      steps: [
-        { _tag: 'reconnect', id: 'reconnect-offline-writer', clientId: offlineWriter.clientId },
-        {
-          _tag: 'settle',
-          id: 'settle-pending-tail',
-          participants: [offlineWriter, onlineWriter],
-          healDisconnectedClients: [],
-          timeoutMs: settlementTimeoutMs,
-        },
-      ],
+      text: 'Client A reconnects and rebases its pending tail over the confirmed remote write.',
+    },
+    { _tag: 'reconnect', id: 'reconnect-offline-writer', clientId: offlineWriter.clientId },
+    {
+      _tag: 'settle',
+      id: 'settle-pending-tail',
+      participants: [offlineWriter, onlineWriter],
+      healDisconnectedClients: [],
+      timeoutMs: settlementTimeoutMs,
     },
   ],
   oracles: [

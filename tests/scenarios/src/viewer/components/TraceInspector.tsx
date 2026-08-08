@@ -153,11 +153,6 @@ export const SemanticRecord = ({
             scope <strong>{participant}</strong>
           </span>
         ) : null}
-        {record.phaseId !== null ? (
-          <span>
-            phase <strong>{record.phaseId}</strong>
-          </span>
-        ) : null}
         {record.captureId !== null ? (
           <span>
             capture <strong>{record.captureId}</strong>

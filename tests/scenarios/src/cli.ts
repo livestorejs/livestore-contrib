@@ -174,7 +174,7 @@ const program = Effect.gen(function* () {
       process.env.SCENARIO_PROGRESS === '1'
         ? (progress: Parameters<NonNullable<RunScenarioOptions['onProgress']>>[0]) => {
             console.log(
-              `${progress.stage === 'started' ? '→' : '✓'} ${progress.stepNumber}/${progress.totalSteps} ${progress.phaseId}/${progress.stepId}`,
+              `${progress.stage === 'started' ? '→' : '✓'} ${progress.instructionNumber}/${progress.totalInstructions} ${progress.instructionId}`,
             )
           }
         : undefined,

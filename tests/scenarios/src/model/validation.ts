@@ -6,7 +6,7 @@ import {
   type ParallelOperationStep,
   type ParticipantRef,
   ScenarioAst,
-  type ScenarioStep,
+  type ScenarioInstruction,
 } from './scenario.ts'
 
 export class ScenarioValidationError extends Error {
@@ -57,82 +57,94 @@ export function defineScenario(input: unknown): ScenarioAst {
     if (participants.has(key) === false) throw new ScenarioValidationError(`Unknown participant reference: ${key}`)
   }
 
-  const stepIds = new Set<string>()
+  const instructionIds = new Set<string>()
   const operationIds = new Set<string>()
-  const planSteps: ScenarioStep[] = []
-  const validateOperation = (step: ParallelOperationStep) => {
-    if (stepIds.has(step.id) === true) throw new ScenarioValidationError(`Duplicate step id: ${step.id}`)
-    stepIds.add(step.id)
-    operationIds.add(step.id)
-    if (step._tag === 'action') assertParticipant(step.target)
-    if (step._tag === 'stop-session' || step._tag === 'restart-session') assertParticipant(step.target)
-    if (step._tag === 'restart-client') assertClient(step.clientId)
-    if (step._tag === 'disconnect' || step._tag === 'reconnect') assertClient(step.clientId)
+  const executableInstructions: ScenarioInstruction[] = []
+  const validateOperation = (operation: ParallelOperationStep) => {
+    if (instructionIds.has(operation.id) === true) {
+      throw new ScenarioValidationError(`Duplicate instruction id: ${operation.id}`)
+    }
+    instructionIds.add(operation.id)
+    operationIds.add(operation.id)
+    if (operation._tag === 'action') assertParticipant(operation.target)
+    if (operation._tag === 'stop-session' || operation._tag === 'restart-session') {
+      assertParticipant(operation.target)
+    }
+    if (operation._tag === 'restart-client') assertClient(operation.clientId)
+    if (operation._tag === 'disconnect' || operation._tag === 'reconnect') assertClient(operation.clientId)
   }
-  for (const phase of scenario.phases) {
-    for (const step of phase.steps) {
-      planSteps.push(step)
-      if (stepIds.has(step.id) === true) throw new ScenarioValidationError(`Duplicate step id: ${step.id}`)
-      stepIds.add(step.id)
-      if (step._tag === 'parallel') {
-        if (step.operations.length < 2) {
-          throw new ScenarioValidationError(`Parallel step must contain at least two operations: ${step.id}`)
-        }
-        step.operations.forEach(validateOperation)
-      } else {
-        operationIds.add(step.id)
-        switch (step._tag) {
-          case 'create-client': {
-            if (clientIds.has(step.client.id) === true) {
-              throw new ScenarioValidationError(`Duplicate Client id: ${step.client.id}`)
-            }
-            if (step.client.sessions.length === 0) {
-              throw new ScenarioValidationError(`Client ${step.client.id} must declare at least one session`)
-            }
-            clientIds.add(step.client.id)
-            for (const sessionId of step.client.sessions) {
-              const key = participantKey({ clientId: step.client.id, sessionId })
-              if (participants.has(key) === true) throw new ScenarioValidationError(`Duplicate participant: ${key}`)
-              participants.add(key)
-            }
-            break
+  for (const instruction of scenario.instructions) {
+    if (instructionIds.has(instruction.id) === true) {
+      throw new ScenarioValidationError(`Duplicate instruction id: ${instruction.id}`)
+    }
+    instructionIds.add(instruction.id)
+    if (instruction._tag !== 'annotation') executableInstructions.push(instruction)
+    if (instruction._tag === 'parallel') {
+      if (instruction.operations.length < 2) {
+        throw new ScenarioValidationError(
+          `Parallel instruction must contain at least two operations: ${instruction.id}`,
+        )
+      }
+      instruction.operations.forEach(validateOperation)
+    } else {
+      if (instruction._tag !== 'annotation') operationIds.add(instruction.id)
+      switch (instruction._tag) {
+        case 'annotation':
+          break
+        case 'create-client': {
+          if (clientIds.has(instruction.client.id) === true) {
+            throw new ScenarioValidationError(`Duplicate Client id: ${instruction.client.id}`)
           }
-          case 'add-session': {
-            assertClient(step.target.clientId)
-            const key = participantKey(step.target)
+          if (instruction.client.sessions.length === 0) {
+            throw new ScenarioValidationError(`Client ${instruction.client.id} must declare at least one session`)
+          }
+          clientIds.add(instruction.client.id)
+          for (const sessionId of instruction.client.sessions) {
+            const key = participantKey({ clientId: instruction.client.id, sessionId })
             if (participants.has(key) === true) throw new ScenarioValidationError(`Duplicate participant: ${key}`)
             participants.add(key)
-            break
           }
-          case 'action':
-            assertParticipant(step.target)
-            break
-          case 'action-sequence':
-            if (step.actions.length === 0 || step.actions.length > 10_000) {
-              throw new ScenarioValidationError(`Action sequence must contain between 1 and 10000 actions: ${step.id}`)
-            }
-            for (const action of step.actions) validateOperation(action)
-            break
-          case 'stop-session':
-          case 'restart-session':
-            assertParticipant(step.target)
-            break
-          case 'restart-client':
-          case 'disconnect':
-          case 'reconnect':
-            assertClient(step.clientId)
-            break
-          case 'backend-unavailable':
-          case 'backend-available':
-          case 'settle':
-            break
+          break
         }
+        case 'add-session': {
+          assertClient(instruction.target.clientId)
+          const key = participantKey(instruction.target)
+          if (participants.has(key) === true) throw new ScenarioValidationError(`Duplicate participant: ${key}`)
+          participants.add(key)
+          break
+        }
+        case 'action':
+          assertParticipant(instruction.target)
+          break
+        case 'action-sequence':
+          if (instruction.actions.length === 0 || instruction.actions.length > 10_000) {
+            throw new ScenarioValidationError(
+              `Action sequence must contain between 1 and 10000 actions: ${instruction.id}`,
+            )
+          }
+          for (const action of instruction.actions) validateOperation(action)
+          break
+        case 'stop-session':
+        case 'restart-session':
+          assertParticipant(instruction.target)
+          break
+        case 'restart-client':
+        case 'disconnect':
+        case 'reconnect':
+          assertClient(instruction.clientId)
+          break
+        case 'backend-unavailable':
+        case 'backend-available':
+        case 'settle':
+          break
       }
-      if (step._tag === 'settle') {
-        if (step.timeoutMs <= 0) throw new ScenarioValidationError(`Settle timeout must be positive: ${step.id}`)
-        step.participants.forEach(assertParticipant)
-        step.healDisconnectedClients.forEach(assertClient)
+    }
+    if (instruction._tag === 'settle') {
+      if (instruction.timeoutMs <= 0) {
+        throw new ScenarioValidationError(`Settle timeout must be positive: ${instruction.id}`)
       }
+      instruction.participants.forEach(assertParticipant)
+      instruction.healDisconnectedClients.forEach(assertClient)
     }
   }
 
@@ -178,13 +190,13 @@ export function defineScenario(input: unknown): ScenarioAst {
   }
 
   if (snapshotOracleParticipants.size > 0) {
-    const terminalStep = planSteps.at(-1)
-    if (terminalStep?._tag !== 'settle') {
+    const terminalInstruction = executableInstructions.at(-1)
+    if (terminalInstruction?._tag !== 'settle') {
       throw new ScenarioValidationError(
-        'Snapshot-based oracles require a terminal Settlement as the final Scenario step',
+        'Snapshot-based oracles require a terminal Settlement as the final executable Scenario instruction',
       )
     }
-    const settledParticipants = new Set(terminalStep.participants.map(participantKey))
+    const settledParticipants = new Set(terminalInstruction.participants.map(participantKey))
     const missingParticipants = [...snapshotOracleParticipants].filter(
       (participant) => settledParticipants.has(participant) === false,
     )
@@ -198,18 +210,18 @@ export function defineScenario(input: unknown): ScenarioAst {
   return scenario
 }
 
-/** Returns the complete topology declared by startup definitions and ordered addition steps. */
+/** Returns the complete topology declared by startup definitions and ordered addition instructions. */
 export const deriveScenarioTopology = (scenario: ScenarioAst): ReadonlyArray<ClientDefinition> => {
   const clients = new Map(
     scenario.topology.clients.map((client) => [client.id, { ...client, sessions: [...client.sessions] }]),
   )
-  for (const step of scenario.phases.flatMap((phase) => phase.steps)) {
-    if (step._tag === 'create-client') {
-      clients.set(step.client.id, { ...step.client, sessions: [...step.client.sessions] })
-    } else if (step._tag === 'add-session') {
-      const client = clients.get(step.target.clientId)
+  for (const instruction of scenario.instructions) {
+    if (instruction._tag === 'create-client') {
+      clients.set(instruction.client.id, { ...instruction.client, sessions: [...instruction.client.sessions] })
+    } else if (instruction._tag === 'add-session') {
+      const client = clients.get(instruction.target.clientId)
       if (client !== undefined) {
-        clients.set(client.id, { ...client, sessions: [...client.sessions, step.target.sessionId] })
+        clients.set(client.id, { ...client, sessions: [...client.sessions, instruction.target.sessionId] })
       }
     }
   }

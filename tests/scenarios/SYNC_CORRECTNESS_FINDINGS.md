@@ -53,8 +53,8 @@ The minimized in-process signature reproduced in **5/5** consecutive runs:
 ```text
 terminal=participant-runtime-failure
 participant=client-a/session-a
-phase=rebase-invalid-pending-event
-step=reconnect-client-a
+annotation=rebase-invalid-pending-event
+instruction=reconnect-client-a
 cause=CHECK constraint failed: hotel_room_inventory.available_nonnegative
 trace-records=139
 ```
@@ -72,8 +72,8 @@ The browser-profile manifestation reproduced in **3/3** runs:
 
 ```text
 terminal=host-transport-failure
-phase=rebase-invalid-pending-event
-step=reconnect-client-a
+annotation=rebase-invalid-pending-event
+instruction=reconnect-client-a
 cause=All fibers interrupted without error
 trace-records=122
 ```
@@ -156,8 +156,8 @@ The 60-second signature reproduced in **3/3** consecutive runs:
 
 ```text
 terminal=settlement-timeout
-phase=reconcile-pending-tail
-step=settle-pending-tail
+annotation=reconcile-pending-tail
+instruction=settle-pending-tail
 client-a=local e401r2, upstream e302, pending 99
 client-b=local e302, upstream e302, pending 0
 backend=e302, events 302
@@ -249,15 +249,15 @@ The minimized signature reproduced in **3/3** consecutive runs:
 ```text
 terminal=participant-runtime-failure
 participant=client-2/session-2
-phase=distribute-writes
-step=settle-many-writers
+annotation=distribute-writes
+instruction=settle-many-writers
 cause=UNIQUE constraint failed: todos.id
 requested-action-ids=426 unique / 426 total
 ```
 
 Backend progress before shutdown varied with scheduling (346 or 366 Events),
 but every captured backend ID remained unique. The stable failure signature is
-therefore the participant, pull/materialization phase, and SQLite cause—not an
+therefore the participant, pull/materialization stage, and SQLite cause—not an
 incidental backend head or trace-record count.
 
 ### Exact reproduction
@@ -341,7 +341,7 @@ The exact boundary reproduced in **3/3** runs:
 
 ```text
 profile=process + local-sync-cf
-phase=commit-large-payload-offline
+annotation=commit-large-payload-offline
 terminal=UnknownError
 message=<empty>
 payload-bytes=899643

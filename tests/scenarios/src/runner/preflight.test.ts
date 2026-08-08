@@ -18,10 +18,7 @@ Vitest.describe('scenario runner preflight', () => {
       const bypassedScenario = {
         ...offlineWriterRecovery,
         id: 'preflight-missing-terminal-settlement',
-        phases: offlineWriterRecovery.phases.map((phase) => ({
-          ...phase,
-          steps: phase.steps.filter((step) => step._tag !== 'settle'),
-        })),
+        instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
       }
       const error = yield* runScenario({
         scenario: bypassedScenario,

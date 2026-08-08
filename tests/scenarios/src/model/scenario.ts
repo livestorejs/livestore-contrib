@@ -1,8 +1,8 @@
 import { Schema } from '@livestore/utils/effect'
 
-export const scenarioVersion = 2 as const
-export const scenarioTraceVersion = 4 as const
-export const scenarioArtifactVersion = 5 as const
+export const scenarioVersion = 3 as const
+export const scenarioTraceVersion = 5 as const
+export const scenarioArtifactVersion = 6 as const
 
 export const ParticipantProfile = Schema.Literals(['in-process', 'process', 'browser'])
 export type ParticipantProfile = typeof ParticipantProfile.Type
@@ -63,6 +63,13 @@ export const ActionStep = Schema.TaggedStruct('action', {
   input: Schema.Json,
 })
 export type ActionStep = typeof ActionStep.Type
+
+/** A zero-effect narrative marker retained in the Scenario and trace. */
+export const AnnotationInstruction = Schema.TaggedStruct('annotation', {
+  id: Schema.String,
+  text: Schema.String,
+})
+export type AnnotationInstruction = typeof AnnotationInstruction.Type
 
 export const DisconnectStep = Schema.TaggedStruct('disconnect', {
   id: Schema.String,
@@ -142,7 +149,8 @@ export const SettleStep = Schema.TaggedStruct('settle', {
   timeoutMs: Schema.Finite,
 })
 
-export const ScenarioStep = Schema.Union([
+export const ScenarioInstruction = Schema.Union([
+  AnnotationInstruction,
   ActionStep,
   DisconnectStep,
   ReconnectStep,
@@ -157,14 +165,7 @@ export const ScenarioStep = Schema.Union([
   ParallelStep,
   SettleStep,
 ])
-export type ScenarioStep = typeof ScenarioStep.Type
-
-export const ScenarioPhase = Schema.Struct({
-  id: Schema.String,
-  description: Schema.String,
-  steps: Schema.Array(ScenarioStep),
-})
-export type ScenarioPhase = typeof ScenarioPhase.Type
+export type ScenarioInstruction = typeof ScenarioInstruction.Type
 
 export const PendingResolutionOracle = Schema.TaggedStruct('pending-resolution', {
   id: Schema.String,
@@ -225,7 +226,7 @@ export const ScenarioAst = Schema.Struct({
     storeId: Schema.String,
     clients: Schema.Array(ClientDefinition),
   }),
-  phases: Schema.Array(ScenarioPhase),
+  instructions: Schema.Array(ScenarioInstruction),
   oracles: Schema.Array(ScenarioOracle),
 })
 export type ScenarioAst = typeof ScenarioAst.Type

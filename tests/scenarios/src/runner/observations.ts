@@ -30,7 +30,6 @@ export const recordSystemObservation = (args: {
   record: TraceRecorder
   reason: string
   correlationId?: string
-  phaseId?: string
   observation?: HostSystemObservation
   faultState: ScenarioFaultState
 }): Effect.Effect<void, HostError, Scope.Scope> =>
@@ -40,7 +39,6 @@ export const recordSystemObservation = (args: {
     const backendRecord = args.record({
       origin: 'observation',
       correlationId: args.correlationId,
-      phaseId: args.phaseId,
       captureId,
       evidence: 'first-observed',
       occurrence: observation.occurrences.backend,
@@ -51,7 +49,6 @@ export const recordSystemObservation = (args: {
       backendRecord,
       faultState: args.faultState,
       record: args.record,
-      phaseId: args.phaseId,
       captureId,
       occurrence: observation.occurrences.backend,
     })
@@ -69,7 +66,6 @@ export const recordSystemObservation = (args: {
         origin: 'observation',
         correlationId: args.correlationId,
         clientId: client.clientId,
-        phaseId: args.phaseId,
         captureId,
         evidence: 'first-observed',
         occurrence: clientOccurrences.connectivity,
@@ -81,7 +77,6 @@ export const recordSystemObservation = (args: {
         connectivityRecord,
         faultState: args.faultState,
         record: args.record,
-        phaseId: args.phaseId,
         captureId,
         occurrence: clientOccurrences.connectivity,
       })
@@ -89,7 +84,6 @@ export const recordSystemObservation = (args: {
         origin: 'observation',
         correlationId: args.correlationId,
         clientId: client.clientId,
-        phaseId: args.phaseId,
         captureId,
         evidence: 'first-observed',
         occurrence: clientOccurrences.leader,
@@ -110,7 +104,6 @@ export const recordSystemObservation = (args: {
           correlationId: args.correlationId,
           clientId: client.clientId,
           sessionId: session.sessionId,
-          phaseId: args.phaseId,
           captureId,
           evidence: 'first-observed',
           occurrence: sessionOccurrence.occurrence,
@@ -126,7 +119,6 @@ export const recordSystemObservation = (args: {
         correlationId: args.correlationId,
         clientId: failure.clientId,
         sessionId: failure.sessionId ?? undefined,
-        phaseId: args.phaseId,
         captureId,
         evidence: 'first-observed',
         payload: {
@@ -153,7 +145,6 @@ export const awaitSettlement = (args: {
   participants: ReadonlyArray<ParticipantRef>
   timeoutMs: number
   record: TraceRecorder
-  phaseId: string
   correlationId: string
   faultState: ScenarioFaultState
 }): Effect.Effect<ReadonlyArray<SyncObservation>, HostError, Scope.Scope> => {
@@ -198,7 +189,6 @@ export const awaitSettlement = (args: {
       const progress = args.record({
         origin: 'observation',
         correlationId: args.correlationId,
-        phaseId: args.phaseId,
         payload: {
           _tag: 'settlement.progress',
           settled: isStable,
@@ -210,7 +200,6 @@ export const awaitSettlement = (args: {
         record: args.record,
         reason: 'settlement-poll',
         correlationId: args.correlationId,
-        phaseId: args.phaseId,
         observation: systemObservation,
         faultState: args.faultState,
       }).pipe(
@@ -233,7 +222,6 @@ export const awaitSettlement = (args: {
           : args.record({
               origin: 'observation',
               correlationId: args.correlationId,
-              phaseId: args.phaseId,
               causedBy: [...recoveryFaults.map((fault) => fault.removalRecordIndex), progress.index],
               payload: {
                 _tag: 'recovery.observed',
@@ -248,7 +236,6 @@ export const awaitSettlement = (args: {
           args.record({
             origin: 'observation',
             correlationId: args.correlationId,
-            phaseId: args.phaseId,
             causedBy: [recoveryObservation.index],
             payload: {
               _tag: 'recovery.completed',
@@ -278,7 +265,6 @@ export const awaitSettlement = (args: {
       args.record({
         origin: 'observation',
         correlationId: args.correlationId,
-        phaseId: args.phaseId,
         payload: {
           _tag: 'settlement.failed',
           ...failure,

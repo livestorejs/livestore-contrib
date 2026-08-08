@@ -89,7 +89,7 @@ actions, and State inspectors. Scenario scheduling and generated activity never
 enter an Application definition.
 
 Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
-by Git. Copy `scenario.template.ts`, define the behavior next to its phases, and
+by Git. Copy `scenario.template.ts`, define its ordered instructions, and
 run it with `--scenario-file`. This tier is for generated cases, parameter
 sweeps, reductions, and hypotheses whose durable purpose is not established.
 
@@ -154,7 +154,7 @@ the layered SVG renderer consumes its semantic layers and preserves the two-SVG
 main-timeline/range-navigator organization.
 
 The default timeline shows sync evidence: material observation captures and
-Scenario boundaries receive semantic flow space, while generated child actions
+reached annotations receive semantic flow space, while generated child actions
 are summarized by their enclosing action sequence. Switch to raw trace and record
 playback when individual controller instructions and acknowledgements are
 needed; those records remain intact but do not stretch the default flow axis.
@@ -174,16 +174,16 @@ retained Control acknowledgements or failure outcomes across
 instruction-to-outcome intervals. System/sync sampling and State inspection are
 explicitly outside that coverage.
 
-A `parallel` step schedules two or more ordinary non-settlement operations. It
+A `parallel` instruction schedules two or more ordinary non-settlement operations. It
 records every child invocation before releasing the host requests, preserves
-each child outcome, and joins the group before the next step. The
+each child outcome, and joins the group before the next instruction. The
 `operation-history` oracle can require named operations to have terminal,
 non-indefinite outcomes and overlapping intervals.
 
-`defineScenario(({ repeatActions }) => ...)` keeps repetition directly beside
-the phase that owns it. The callback names ordinary application actions and
-their inputs; keyed deterministic random choices derive from the Scenario seed,
-phase ID, sequence ID, iteration, and choice key. Inserting an unrelated random
+`defineScenario(({ repeatActions }) => ...)` keeps repetition directly in the
+instruction stream. The callback names ordinary application actions and their
+inputs; keyed deterministic random choices derive from the Scenario seed,
+sequence ID, iteration, and choice key. Inserting an unrelated random
 choice therefore does not shift later choices.
 
 Authoring expands immediately into a serializable `action-sequence` containing
@@ -194,14 +194,19 @@ boundary, and raw trace retains every child action. An action sequence contains
 between 1 and 10,000 actions.
 
 The initial topology contains only participants that exist before the first
-phase. A sequential `create-client` step can create a new Client with its first
+instruction. A sequential `create-client` instruction can create a new Client with its first
 sessions after history already exists; all profiles support that operation. A
-sequential `add-session` step attaches a new session to an existing Client;
+sequential `add-session` instruction attaches a new session to an existing Client;
 the browser profile realizes it by opening another page in the Client's
 persistent context. Creation acknowledgements prove only that the Store or
 page started. Settlement and oracles separately prove catch-up and convergence.
 Participant additions are rejected in `parallel` groups, and removal is not
 part of the current surface.
+
+An `annotation` is an optional zero-effect instruction. Reaching it emits an
+`annotation.reached` trace record so a failed artifact shows only narrative
+markers execution actually crossed. It is not an operation, grouping
+construct, lifecycle stage, or Settlement boundary.
 
 `browser-multi-session-recovery` also covers behavioral Leader turnover using
 ordinary session lifecycle: the fixture starts the first page through blocking

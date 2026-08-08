@@ -31,7 +31,6 @@ const sync = { localHead: 'e7', upstreamHead: 'e7', pendingCount: 0, events: con
 const topology: ObservedSystemState = {
   cursorIndex: 20,
   runStatus: 'running',
-  activePhaseId: 'recovery',
   verdicts: [],
   backend: { id: 'backend', connected: true, head: 'e7', events: confirmedEvents },
   clients: [

@@ -12,7 +12,6 @@ type TraceInput = {
   readonly causationId?: string
   readonly clientId?: string
   readonly sessionId?: string
-  readonly phaseId?: string
   readonly captureId?: string
   readonly evidence?: ScenarioTraceRecord['evidence']
   readonly causedBy?: ReadonlyArray<number>
@@ -54,7 +53,6 @@ export const makeTraceRecorder = (args: {
       causationId: input.causationId ?? null,
       clientId: input.clientId ?? null,
       sessionId: input.sessionId ?? null,
-      phaseId: input.phaseId ?? null,
       logicalTime: args.readLogicalTime(),
       wallTimeMs: Date.now(),
       captureId: input.captureId ?? null,

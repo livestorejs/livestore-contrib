@@ -196,7 +196,7 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
   const sessionB = { clientId: 'conformance-b', sessionId: 'session-b' } as const
 
   return defineScenario({
-    version: 2,
+    version: 3,
     id: `host-conformance-${capabilities.profile}`,
     description: 'Shared host contract scenario derived from advertised capabilities.',
     tags: ['host-conformance'],
@@ -213,82 +213,80 @@ const makeConformanceScenario = (capabilities: HostCapabilities): ScenarioAst =>
         },
       ],
     },
-    phases: [
+    instructions: [
       {
+        _tag: 'annotation',
         id: 'operations',
-        description: 'Exercise shared action and connectivity controls.',
-        steps: [
-          {
-            _tag: 'action',
-            id: 'write-a',
-            target: sessionA,
-            action: 'createTodo',
-            input: { id: 'conformance-a', text: 'Written by Client A' },
-          },
-          {
-            _tag: 'create-client',
-            id: 'create-b',
-            client: { id: sessionB.clientId, sessions: [sessionB.sessionId], initiallyConnected: true },
-          },
-          ...(supportsDynamicSessionAddition === true
-            ? [
-                { _tag: 'add-session' as const, id: 'add-a2', target: sessionA2 },
-                {
-                  _tag: 'action' as const,
-                  id: 'write-from-a2',
-                  target: sessionA2,
-                  action: 'createTodo',
-                  input: { id: 'conformance-a2', text: 'Written by a dynamically added session' },
-                },
-              ]
-            : []),
-          { _tag: 'disconnect', id: 'disconnect-b', clientId: sessionB.clientId },
-          {
-            _tag: 'action',
-            id: 'write-b-offline',
-            target: sessionB,
-            action: 'createTodo',
-            input: { id: 'conformance-b', text: 'Written by Client B while offline' },
-          },
-          { _tag: 'reconnect', id: 'reconnect-b', clientId: sessionB.clientId },
-          ...(supportsBackendAvailability === true
-            ? [
-                { _tag: 'backend-unavailable' as const, id: 'backend-unavailable' },
-                {
-                  _tag: 'action' as const,
-                  id: 'write-during-backend-outage',
-                  target: sessionA,
-                  action: 'createTodo',
-                  input: { id: 'conformance-backend-outage', text: 'Retained while the backend is unavailable' },
-                },
-                { _tag: 'backend-available' as const, id: 'backend-available' },
-              ]
-            : []),
-          ...(supportsSessionRestart === true
-            ? [
-                { _tag: 'stop-session' as const, id: 'stop-a2', target: sessionA2 },
-                {
-                  _tag: 'action' as const,
-                  id: 'write-while-a2-stopped',
-                  target: sessionA,
-                  action: 'createTodo',
-                  input: { id: 'conformance-lifecycle', text: 'Sibling session remains isolated' },
-                },
-                { _tag: 'restart-session' as const, id: 'restart-a2', target: sessionA2 },
-              ]
-            : []),
-          ...(supportsClientRestart === true
-            ? [{ _tag: 'restart-client' as const, id: 'restart-a', clientId: sessionA.clientId }]
-            : []),
-          {
-            _tag: 'settle',
-            id: 'settle-conformance',
-            participants:
-              supportsDynamicSessionAddition === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
-            healDisconnectedClients: [],
-            timeoutMs: 15_000,
-          },
-        ],
+        text: 'Exercise shared action and connectivity controls.',
+      },
+      {
+        _tag: 'action',
+        id: 'write-a',
+        target: sessionA,
+        action: 'createTodo',
+        input: { id: 'conformance-a', text: 'Written by Client A' },
+      },
+      {
+        _tag: 'create-client',
+        id: 'create-b',
+        client: { id: sessionB.clientId, sessions: [sessionB.sessionId], initiallyConnected: true },
+      },
+      ...(supportsDynamicSessionAddition === true
+        ? [
+            { _tag: 'add-session' as const, id: 'add-a2', target: sessionA2 },
+            {
+              _tag: 'action' as const,
+              id: 'write-from-a2',
+              target: sessionA2,
+              action: 'createTodo',
+              input: { id: 'conformance-a2', text: 'Written by a dynamically added session' },
+            },
+          ]
+        : []),
+      { _tag: 'disconnect', id: 'disconnect-b', clientId: sessionB.clientId },
+      {
+        _tag: 'action',
+        id: 'write-b-offline',
+        target: sessionB,
+        action: 'createTodo',
+        input: { id: 'conformance-b', text: 'Written by Client B while offline' },
+      },
+      { _tag: 'reconnect', id: 'reconnect-b', clientId: sessionB.clientId },
+      ...(supportsBackendAvailability === true
+        ? [
+            { _tag: 'backend-unavailable' as const, id: 'backend-unavailable' },
+            {
+              _tag: 'action' as const,
+              id: 'write-during-backend-outage',
+              target: sessionA,
+              action: 'createTodo',
+              input: { id: 'conformance-backend-outage', text: 'Retained while the backend is unavailable' },
+            },
+            { _tag: 'backend-available' as const, id: 'backend-available' },
+          ]
+        : []),
+      ...(supportsSessionRestart === true
+        ? [
+            { _tag: 'stop-session' as const, id: 'stop-a2', target: sessionA2 },
+            {
+              _tag: 'action' as const,
+              id: 'write-while-a2-stopped',
+              target: sessionA,
+              action: 'createTodo',
+              input: { id: 'conformance-lifecycle', text: 'Sibling session remains isolated' },
+            },
+            { _tag: 'restart-session' as const, id: 'restart-a2', target: sessionA2 },
+          ]
+        : []),
+      ...(supportsClientRestart === true
+        ? [{ _tag: 'restart-client' as const, id: 'restart-a', clientId: sessionA.clientId }]
+        : []),
+      {
+        _tag: 'settle',
+        id: 'settle-conformance',
+        participants: supportsDynamicSessionAddition === true ? [sessionA, sessionA2, sessionB] : [sessionA, sessionB],
+        healDisconnectedClients: [],
+        timeoutMs: 15_000,
       },
     ],
     oracles: [
@@ -311,7 +309,7 @@ const makeFailureScenario = (args: { profile: HostCapabilities['profile']; suffi
   const clientId = `failure-${args.suffix}`
   const sessionId = `session-${args.suffix}`
   return defineScenario({
-    version: 2,
+    version: 3,
     id: `host-conformance-${args.profile}-${args.suffix}`,
     description: 'Exercises the portable host failure boundary.',
     tags: ['host-conformance', 'failure'],
@@ -322,19 +320,18 @@ const makeFailureScenario = (args: { profile: HostCapabilities['profile']; suffi
       storeId: `host-conformance-${args.profile}`,
       clients: [{ id: clientId, sessions: [sessionId], initiallyConnected: true }],
     },
-    phases: [
+    instructions: [
       {
+        _tag: 'annotation',
         id: 'failure',
-        description: 'Dispatch an operation that the host rejects.',
-        steps: [
-          {
-            _tag: 'action',
-            id: `failing-action-${args.suffix}`,
-            target: { clientId, sessionId },
-            action: 'unknownConformanceAction',
-            input: {},
-          },
-        ],
+        text: 'Dispatch an operation that the host rejects.',
+      },
+      {
+        _tag: 'action',
+        id: `failing-action-${args.suffix}`,
+        target: { clientId, sessionId },
+        action: 'unknownConformanceAction',
+        input: {},
       },
     ],
     oracles: [],
@@ -344,7 +341,7 @@ const makeFailureScenario = (args: { profile: HostCapabilities['profile']; suffi
 const makeUnsupportedScenario = (capabilities: HostCapabilities): ScenarioAst => {
   const unsupported = capabilities.capabilities.includes('client-restart') === true ? 'event-lineage' : 'client-restart'
   return defineScenario({
-    version: 2,
+    version: 3,
     id: `host-conformance-${capabilities.profile}-unsupported`,
     description: 'Must fail preflight before participant creation.',
     tags: ['host-conformance', 'preflight'],
@@ -355,7 +352,7 @@ const makeUnsupportedScenario = (capabilities: HostCapabilities): ScenarioAst =>
       storeId: `host-conformance-${capabilities.profile}`,
       clients: [{ id: 'unsupported-client', sessions: ['unsupported-session'], initiallyConnected: true }],
     },
-    phases: [],
+    instructions: [],
     oracles: [],
   })
 }
@@ -382,6 +379,7 @@ const expectPassingHostContract = (artifact: ScenarioRunArtifact): void => {
   expect(tags).toEqual(
     expect.arrayContaining([
       'client.created',
+      'annotation.reached',
       'action.completed',
       'connectivity.disconnected',
       'connectivity.reconnected',

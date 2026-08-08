@@ -103,7 +103,7 @@ not wall-clock sleeps, should decide promotion.
 Reduction is part of discovery, not later cleanup. Use hierarchical delta
 debugging in this order:
 
-1. Remove whole phases, then contiguous step ranges, then individual steps.
+1. Remove contiguous instruction ranges, then individual instructions.
 2. Remove Clients and sessions, preserving references and required settlement.
 3. Remove generated actions and Events; shrink action-sequence count with binary search.
 4. Simplify parallel groups to sequential pairs and remove unrelated faults.
@@ -112,7 +112,7 @@ debugging in this order:
 6. Replace generated sequences with their surviving explicit actions when that improves the reduced explanation.
 7. Normalize names and seed while retaining the failure signature.
 
-A deterministic result is minimal when no remaining phase, participant,
+A deterministic result is minimal when no remaining instruction, participant,
 operation, fault, or input field can be removed or simplified while reproducing
 the signature in five consecutive runs. A schedule-sensitive result records its
 reproduction rate and is minimized against a fixed attempt budget; it is not

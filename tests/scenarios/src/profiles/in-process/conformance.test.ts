@@ -25,7 +25,7 @@ Vitest.describe('in-process host conformance', () => {
       const host = yield* makeInProcessHost({ application: todoApplication, backend })
       let createClientCalls = 0
       const incompatibleScenario = defineScenario({
-        version: 2,
+        version: 3,
         id: 'preflight-incompatible-lifecycle',
         description: 'Requires a Client restart without declaring it manually.',
         tags: ['preflight'],
@@ -36,12 +36,13 @@ Vitest.describe('in-process host conformance', () => {
           storeId: 'preflight-incompatible-lifecycle',
           clients: [{ id: 'client-a', sessions: ['session-a1'], initiallyConnected: true }],
         },
-        phases: [
+        instructions: [
           {
+            _tag: 'annotation',
             id: 'lifecycle',
-            description: 'Restart the Client.',
-            steps: [{ _tag: 'restart-client', id: 'restart-client-a', clientId: 'client-a' }],
+            text: 'Restart the Client.',
           },
+          { _tag: 'restart-client', id: 'restart-client-a', clientId: 'client-a' },
         ],
         oracles: [],
       })
@@ -70,7 +71,7 @@ Vitest.describe('in-process host conformance', () => {
             storeId: 'preflight-oversized-client',
             clients: [{ id: 'client-a', sessions: ['session-a1', 'session-a2'], initiallyConnected: true }],
           },
-          phases: [],
+          instructions: [],
         }),
         applicationId: todoApplication.id,
         host: {
@@ -93,7 +94,7 @@ Vitest.describe('in-process host conformance', () => {
       const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
       const timeoutMs = 250
       const scenario = defineScenario({
-        version: 2,
+        version: 3,
         id: 'captured-settlement-failure',
         description: 'Exercises the failed-settlement artifact contract.',
         tags: ['failure-capture'],
@@ -104,27 +105,26 @@ Vitest.describe('in-process host conformance', () => {
           storeId: 'captured-settlement-failure',
           clients: [{ id: participant.clientId, sessions: [participant.sessionId], initiallyConnected: true }],
         },
-        phases: [
+        instructions: [
           {
+            _tag: 'annotation',
             id: 'failure',
-            description: 'Fault removal is acknowledged but the participant does not recover before the deadline.',
-            steps: [
-              { _tag: 'disconnect', id: 'disconnect-client-a', clientId: participant.clientId },
-              {
-                _tag: 'action',
-                id: 'offline-write-that-cannot-recover',
-                target: participant,
-                action: 'createTodo',
-                input: { id: 'stuck-offline', text: 'Recovery remains pending' },
-              },
-              {
-                _tag: 'settle',
-                id: 'must-time-out',
-                participants: [participant],
-                healDisconnectedClients: [participant.clientId],
-                timeoutMs,
-              },
-            ],
+            text: 'Fault removal is acknowledged but the participant does not recover before the deadline.',
+          },
+          { _tag: 'disconnect', id: 'disconnect-client-a', clientId: participant.clientId },
+          {
+            _tag: 'action',
+            id: 'offline-write-that-cannot-recover',
+            target: participant,
+            action: 'createTodo',
+            input: { id: 'stuck-offline', text: 'Recovery remains pending' },
+          },
+          {
+            _tag: 'settle',
+            id: 'must-time-out',
+            participants: [participant],
+            healDisconnectedClients: [participant.clientId],
+            timeoutMs,
           },
         ],
         oracles: [],
@@ -178,8 +178,7 @@ Vitest.describe('in-process host conformance', () => {
         expect.objectContaining({
           _tag: 'run.failed',
           code: 'settlement-timeout',
-          phaseId: 'failure',
-          stepId: 'must-time-out',
+          instructionId: 'must-time-out',
         }),
       )
       const operationHistory = deriveScenarioOperationHistory(artifact.trace)
@@ -207,7 +206,7 @@ Vitest.describe('in-process host conformance', () => {
   Vitest.live('retains an indefinite operation outcome when the host loses completion evidence', (test) =>
     Effect.gen(function* () {
       const scenario = defineScenario({
-        version: 2,
+        version: 3,
         id: 'indefinite-operation-outcome',
         description: 'Exercises ambiguous participant-host completion.',
         tags: ['failure-capture'],
@@ -218,19 +217,18 @@ Vitest.describe('in-process host conformance', () => {
           storeId: 'indefinite-operation-outcome',
           clients: [{ id: 'client-a', sessions: ['session-a'], initiallyConnected: true }],
         },
-        phases: [
+        instructions: [
           {
+            _tag: 'annotation',
             id: 'operation',
-            description: 'Lose the host completion response.',
-            steps: [
-              {
-                _tag: 'action',
-                id: 'ambiguous-action',
-                target: { clientId: 'client-a', sessionId: 'session-a' },
-                action: 'createTodo',
-                input: { id: 'ambiguous', text: 'possibly committed' },
-              },
-            ],
+            text: 'Lose the host completion response.',
+          },
+          {
+            _tag: 'action',
+            id: 'ambiguous-action',
+            target: { clientId: 'client-a', sessionId: 'session-a' },
+            action: 'createTodo',
+            input: { id: 'ambiguous', text: 'possibly committed' },
           },
         ],
         oracles: [],
@@ -305,7 +303,7 @@ Vitest.describe('in-process host conformance', () => {
       )
       expect(deriveInFlightScenarioOperationIds(artifact.trace)).toEqual([])
       expect(artifact.trace.at(-1)?.payload).toEqual(
-        expect.objectContaining({ _tag: 'run.failed', stepId: 'settle-after-reconnect' }),
+        expect.objectContaining({ _tag: 'run.failed', instructionId: 'settle-after-reconnect' }),
       )
     }).pipe(Vitest.withTestCtx(test)),
   )

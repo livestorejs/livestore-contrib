@@ -84,7 +84,7 @@ Vitest.describe('offline writer recovery', () => {
     Effect.gen(function* () {
       const participant = { clientId: 'client-a', sessionId: 'session-a' } as const
       const scenario = defineScenario({
-        version: 2,
+        version: 3,
         id: 'insufficient-prefix-evidence',
         description: 'Creates a participant but retains no later component observation.',
         tags: ['safety'],
@@ -95,7 +95,7 @@ Vitest.describe('offline writer recovery', () => {
           storeId: 'insufficient-prefix-evidence',
           clients: [{ id: participant.clientId, sessions: [participant.sessionId], initiallyConnected: true }],
         },
-        phases: [],
+        instructions: [],
         oracles: [
           { _tag: 'confirmed-eventlog-prefix', id: 'confirmed-eventlogs-append-only', participants: [participant] },
         ],
@@ -182,8 +182,8 @@ Vitest.describe('offline writer recovery', () => {
         })
 
         expect(artifact.status).toBe('passed')
-        expect(artifact.artifactVersion).toBe(5)
-        expect(artifact.descriptor.traceVersion).toBe(4)
+        expect(artifact.artifactVersion).toBe(6)
+        expect(artifact.descriptor.traceVersion).toBe(5)
         expect(artifact.verdicts).toHaveLength(6)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
         expect(artifact.verdicts).toContainEqual(
@@ -401,8 +401,7 @@ Vitest.describe('offline writer recovery', () => {
             _tag: 'run.failed',
             code: 'participant-runtime-failure',
             message: 'client-a/session-a reported a runtime failure',
-            phaseId: terminalRecord.phaseId,
-            stepId: null,
+            instructionId: null,
           },
         }
         const failedTrace = [...traceBeforeCompletion, runtimeFailure, repeatedRuntimeFailure, runFailure]
