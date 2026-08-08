@@ -22,27 +22,36 @@ published Scenario product package (LSC.VER.SCEN-R01).
 
 ## Scenario and Application Model
 
-Typed TypeScript constructors validate the version-3 serializable Scenario AST.
-It records stable Scenario/Application identity, seed, topology, one ordered
-instruction stream, operations, faults, annotations, action sequences,
-Settlement instructions, and selected oracles as data.
+Committed and local cases are deterministic `.scenario` instruction files. A
+compiler validates complete source and produces the current serializable
+Scenario plan before execution. The filename stem supplies Scenario identity;
+source selects one registered Application, declares explicit Client/session
+topology, and contains one ordered body of operations, faults, annotations,
+action sequences, intermediate Settlement instructions, and optional final
+expectations. Profile/backend selection, Store identity, capabilities, tags,
+format versions, and runner-owned instruction/oracle IDs are not authored.
+
 Concrete Application definitions wrap the actual `LiveStoreSchema`; named
-actions decode JSON inputs before dispatch, State inspectors encode their
-output as JSON, and they contain no Scenario generation policy. The Scenario
-never redeclares Events or materializers.
+actions expose strict input validation before dispatch, State inspectors encode
+their output as JSON, and they contain no Scenario generation policy. The
+Scenario never redeclares Events or materializers. The normalized plan remains
+the runner and artifact boundary; the runner does not interpret source text.
 
 The topology separates the backend from stable Client identities and their
-sessions. Initial topology plus ordered Client/session additions defines the
-complete participant set. Lifecycle, connectivity, and backend-availability
-operations retain stable IDs. An annotation is a zero-effect instruction that
+explicitly named sessions. Initial topology plus ordered Client/session
+additions defines the complete participant set. Participant references are
+fully qualified; Clients start connected unless declared disconnected; and
+compile-time aliases resolve only participants that exist at their source
+position. Lifecycle, connectivity, and backend-availability operations receive
+stable compiler-owned IDs. An annotation is a zero-effect instruction that
 emits a reached marker without creating an operation or execution boundary.
-Scenario-owned `repeatActions` authoring derives keyed choices from the
-Scenario seed plus stable sequence, iteration, and choice identity, then expands immediately into a serializable
-`action-sequence` containing every concrete action. No authoring callback
-crosses into execution. Capability derivation sees the normalized plan before
-the first Client is created. A recorded seed reproduces generated inputs and
-requested choices from the same source revision; it does not claim to reproduce
-internal host or Sync delivery order (LSC.VER.SCEN-R03).
+Scenario-owned repetition derives keyed choices from the Scenario seed plus
+stable sequence, iteration, and choice identity, then expands immediately into
+a serializable `action-sequence` containing every concrete action. No authoring
+callback crosses into execution. Capability derivation sees the normalized plan
+before the first Client is created. A recorded seed reproduces generated inputs
+and requested choices from the same source revision; it does not claim to
+reproduce internal host or Sync delivery order (LSC.VER.SCEN-R03).
 
 ## Execution Profiles
 
@@ -120,18 +129,25 @@ and oracle verdicts are separate records. In particular, `fault.removed` is
 emitted only after a later system sample observes restored connectivity or
 availability; removal does not establish Recovery.
 
-A Settlement names its participants, timeout, and any disconnected Clients to
+An explicit Settlement names its participants and any disconnected Clients to
 heal. It rejects other in-flight Scenario operations, records Quiescence, and
 requires two consecutive identical observations in which every selected
 participant is synced, has no pending Events, has reached the backend global
-position, and agrees on that position. This is a bounded convergence barrier,
-not proof of Eventlog contents or State equality. Oracles evaluate separate
-properties from retained evidence; snapshot-based oracles require a terminal
-Settlement covering their participants. Once execution begins, an operation
-or Settlement failure produces a failed artifact containing the available
-trace prefix. Scenario/application/capability preflight can fail
-before a run begins and therefore without an artifact. See
+position, and agrees on that position. It is an intermediate convergence
+barrier used only when later instructions depend on a stable point, not proof
+of Eventlog contents or State equality.
+
+Final snapshot oracles establish the same terminal stable observation boundary
+for their participants without an authored terminal Settlement. Run
+configuration bounds intermediate and terminal stabilization; that safety
+policy is not a Scenario performance assertion. Oracles evaluate separate
+properties from retained evidence. Once execution begins, an operation or
+stabilization failure produces a failed artifact containing the available trace
+prefix. Scenario/Application/source/capability preflight can fail before a run
+begins and therefore without an artifact. See
 [decision 0006](./.decisions/0006-operation-settlement-and-property-evidence.md)
+and
+[decision 0012](./.decisions/0012-deterministic-scenario-language.md)
 (LSC.VER.SCEN-R04, R05).
 
 ## Corpus, Authoring, and Oracles
@@ -141,19 +157,23 @@ representative examples: offline writer recovery and browser multi-session
 recovery. Focused host-contract Scenarios remain committed test fixtures
 without becoming CLI corpus entries. Generated investigations, controls, and
 reductions begin under the Git-ignored `local/scenarios/` tier and run by file;
-promotion is the deliberate move of a reduced, focused source definition into
+promotion is the deliberate move of a reduced, focused `.scenario` source into
 `retained/findings/` or `retained/examples/` plus registry and regression
-evidence. Each Scenario references one registered Application by ID. The associated
+evidence. Each Scenario selects one registered Application. The associated
 [red-team plan](../../../tests/scenarios/RED_TEAMING.md) defines the wider search,
 promotion, failure-signature, and reduction campaign. Scenario-owned repetition
 retains both the enclosing action-sequence identity and every concrete child
 operation in the normalized artifact.
 
-The oracle catalogue checks terminal Eventlog equality, sampled confirmed
-Eventlog prefixes, pending resolution, State convergence, expected application
-effects, operation histories, and bounded recovery/Settlement. It does not yet
-claim rematerialization equivalence, resource bounds, or performance thresholds;
-see [DELTA-001](./.delta/DELTA-001-surface-and-oracle-gaps.md).
+Source without final expectations defaults to pending resolution and exact
+ordered Eventlog convergence for every session still running at the end. One or
+more explicit final participant-scoped expectation blocks replace both defaults
+for the entire Scenario. The oracle catalogue also supports explicit State
+convergence, expected application effects, and local operation histories;
+specialized internal evidence may continue to check sampled confirmed-history
+immutability without exposing it as DSL syntax. It does not yet claim
+rematerialization equivalence, resource bounds, or performance thresholds; see
+[DELTA-001](./.delta/DELTA-001-surface-and-oracle-gaps.md).
 
 Artifacts preserve failed as well as successful runs. Three compressed tracked
 browser references back Storybook and parity coverage while ignored generated

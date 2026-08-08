@@ -88,6 +88,11 @@ They contain only the real LiveStore schema, materializers, normal application
 actions, and State inspectors. Scenario scheduling and generated activity never
 enter an Application definition.
 
+The human-readable Scenario DSL has an accepted design but is not yet an
+implemented authoring path. See [DSL_PROPOSAL.md](./DSL_PROPOSAL.md) for the
+syntax, complete construct reference, examples, and implementation slices.
+TypeScript definitions remain authoritative until those slices land.
+
 Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
 by Git. Copy `scenario.template.ts`, define its ordered instructions, and
 run it with `--scenario-file`. This tier is for generated cases, parameter

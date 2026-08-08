@@ -7,11 +7,12 @@ observable and why the artifact and viewer are useful_
 
 ## Turn a sync story into evidence
 
-A Scenario describes a distributed sync story—clients write, disconnect,
-reconnect, join late, or lose access to a backend—and runs it through real
-LiveStore participants. The runner records one semantic trace instead of
-leaving the result spread across process logs, browser consoles, and database
-snapshots.
+A `.scenario` file reads as a distributed sync story—Clients write,
+disconnect, reconnect, join late, or lose access to a backend—and a
+deterministic compiler turns those instructions into the exact portable plan
+run through real LiveStore participants. The runner records one semantic trace
+instead of leaving the result spread across process logs, browser consoles, and
+database snapshots.
 
 That trace makes several questions answerable from one place:
 
@@ -26,6 +27,14 @@ That trace makes several questions answerable from one place:
 Acknowledgement, observation, recovery, Settlement, correlation, and explicit
 causation remain separate facts. The visualization must not turn temporal
 proximity or sampled state into stronger evidence than the runner recorded.
+
+Most stories do not end with authored synchronization machinery. Final
+expectations establish the stable observation point they need, while a Scenario
+without explicit expectations defaults to pending resolution and exact ordered
+Eventlog convergence for every session still running. An explicit `settle`
+appears only when a later instruction depends on an intermediate stable point.
+How long the runner waits is selected with the execution configuration, not
+embedded in the portable story.
 
 ## One Scenario, different execution boundaries
 

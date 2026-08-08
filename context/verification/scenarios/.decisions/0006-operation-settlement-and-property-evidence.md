@@ -1,7 +1,8 @@
 # 0006 — Preserve Operation, Settlement, and property evidence boundaries
 
 Status: accepted (operation-history, fault/recovery, Settlement, oracle, and
-failed-artifact tests in `tests/scenarios`, 2026-08-01)
+failed-artifact tests in `tests/scenarios`, 2026-08-01); authored terminal
+Settlement and timeout placement superseded by decision 0012
 
 ## Context
 

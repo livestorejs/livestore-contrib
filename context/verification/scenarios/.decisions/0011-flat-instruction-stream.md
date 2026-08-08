@@ -1,6 +1,7 @@
 # 0011 — Use one flat Scenario instruction stream
 
-Status: accepted (phase-removal refactor, 2026-08-08)
+Status: accepted (phase-removal refactor, 2026-08-08); terminal stabilization
+consequence refined by decision 0012
 
 ## Context
 

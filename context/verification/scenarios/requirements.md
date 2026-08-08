@@ -37,20 +37,25 @@ choices, and gaps for the private
   evidence it actually supplies.
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
-  versioned Scenario ASTs, named actions, Scenario-owned seeded authoring,
-  one ordered instruction stream, optional zero-effect annotations,
-  topology/lifecycle/fault plans, and preflight capability derivation are
-  shared without profile-specific Scenario rewrites. Authoring-time repetition
-  expands into self-contained ordered action sequences before execution;
+  versioned Scenario plans, named actions, one deterministic `.scenario`
+  language, Scenario-owned seeded authoring, one ordered instruction stream,
+  optional zero-effect annotations, topology/lifecycle/fault plans, default or
+  explicit oracle contracts, and preflight capability derivation are shared
+  without profile-specific Scenario rewrites. The compiler derives normalized
+  identity and capability bookkeeping, expands repetition into self-contained
+  ordered action sequences, and rejects invalid source before execution;
   Application definitions contain no Scenario generation policy. Generated
-  actions retain stable operation identity and deterministic keyed seed derivation; a seed
-  reproduces generated inputs and requested choices, not internal delivery
-  order.
-- **LSC.VER.SCEN-R04 Shared host conformance and bounded settlement:** Every
-  implemented profile runs the same capability-parameterized host suite.
-  Control acknowledgements, failure category, outcome certainty, sampled
-  observations, recovery evidence, and terminal Settlement remain distinct;
-  snapshot oracles require a terminal Settlement covering their participants.
+  actions retain stable operation identity and deterministic keyed seed
+  derivation; a seed reproduces generated inputs and requested choices, not
+  internal delivery order.
+- **LSC.VER.SCEN-R04 Shared host conformance and policy-bounded
+  stabilization:** Every implemented profile runs the same
+  capability-parameterized host suite. Control acknowledgements, failure
+  category, outcome certainty, sampled observations, recovery evidence,
+  intermediate Settlement, terminal stabilization, and oracle verdicts remain
+  distinct. Snapshot oracles establish terminal stabilization for their
+  participants; explicit Settlement is only an intermediate barrier. Run
+  configuration, not Scenario source, bounds both waits.
 - **LSC.VER.SCEN-R05 Truth-bounded evidence and replayable artifacts:** Runs
   retain normalized input, source/execution identity, seed, a versioned
   receipt-ordered semantic trace, explicit causal edges, participant-local and
