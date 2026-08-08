@@ -53,6 +53,17 @@ before the first Client is created. A recorded seed reproduces generated inputs
 and requested choices from the same source revision; it does not claim to
 reproduce internal host or Sync delivery order (LSC.VER.SCEN-R03).
 
+An explicit `wait <duration>` is one ordered instruction requesting that the
+controller delay the next instruction by at least that positive duration.
+`repeat ... with <duration> between:` applies fixed-delay pacing after each
+acknowledged child action except the last. It does not delay the first action,
+compress later gaps when an action runs slowly, or create concurrent work. Both
+forms normalize durations to milliseconds and retain requested plus actual
+controller-monotonic elapsed evidence. They do not establish Quiescence,
+Settlement, synchronization, State equality, an exact schedule, or a timing
+oracle. Logical time continues to express plan order rather than milliseconds
+(LSC.VER.SCEN-R09).
+
 ## Execution Profiles
 
 The same normalized Scenario and host contract are composed through:
@@ -149,6 +160,14 @@ begins and therefore without an artifact. See
 and
 [decision 0012](./.decisions/0012-deterministic-scenario-language.md)
 (LSC.VER.SCEN-R04, R05).
+
+Elapsed delays use the same controller monotonic clock already carried by the
+trace. A completed wait records its actual elapsed duration; an interrupted or
+failed run retains only the evidence reached before interruption. Fixed-delay
+repeat pacing records each requested gap separately so the viewer can
+distinguish intentional idle time from application-operation latency. Neither
+delay form changes causal edges or LiveStore ordering. See
+[decision 0013](./.decisions/0013-explicit-elapsed-time-instructions.md).
 
 ## Corpus, Authoring, and Oracles
 

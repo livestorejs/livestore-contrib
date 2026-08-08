@@ -101,6 +101,13 @@ choices, and gaps for the private
   and focused evidence. Narrow host-contract fixtures may remain committed
   beside their tests without becoming CLI corpus entries. Promoting Scenario
   source never implicitly promotes a run artifact.
+- **LSC.VER.SCEN-R09 Explicit elapsed-time instructions:** Scenario source can
+  request a positive minimum controller delay with `wait`, and can apply the
+  same fixed delay between completed actions in one repeated sequence. The
+  first repeated action has no initial delay and the last has no trailing
+  delay. Requested and observed controller-monotonic elapsed time are retained
+  as trace evidence. Delay does not imply an exact schedule, Quiescence,
+  Settlement, synchronization, or a performance verdict.
 
 ## Open Design Questions
 

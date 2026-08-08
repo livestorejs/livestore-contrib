@@ -1,6 +1,6 @@
 # 0012 — Author deterministic Scenarios as instructions
 
-Status: accepted (design interview, 2026-08-08); implementation pending
+Status: accepted (design interview, 2026-08-08); implemented
 
 ## Context
 

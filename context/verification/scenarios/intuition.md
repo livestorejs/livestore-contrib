@@ -36,6 +36,13 @@ appears only when a later instruction depends on an intermediate stable point.
 How long the runner waits is selected with the execution configuration, not
 embedded in the portable story.
 
+Elapsed time is explicit when it is part of the story. `wait 2s` means that the
+controller intentionally leaves at least that gap before continuing; a repeat
+can likewise request a fixed gap between acknowledged actions. Those delays do
+not claim that the system settled or met a deadline. The trace records what was
+requested and how much controller-monotonic time actually elapsed, so the
+viewer can separate intentional idle time from slow work.
+
 ## One Scenario, different execution boundaries
 
 The portable model is shared across in-process, isolated Node process, and
