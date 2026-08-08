@@ -65,6 +65,7 @@ interface RepeatDraft {
   readonly line: SourceLine
   readonly countExpression: string
   readonly variable: string
+  readonly delayBetweenActionsMs: number | null
   readonly lets: ReadonlyArray<{ readonly name: string; readonly expression: string; readonly line: SourceLine }>
   readonly action: ActionDraft
   readonly expectation?: {
@@ -75,7 +76,7 @@ interface RepeatDraft {
 }
 
 const identifierPattern = '[A-Za-z][A-Za-z0-9_-]*'
-const participantPattern = `${identifierPattern}\/${identifierPattern}`
+const participantPattern = `${identifierPattern}/${identifierPattern}`
 
 export const compileScenarioSource = (options: ScenarioCompileOptions): ScenarioAst =>
   new ScenarioCompiler(options).compile()
@@ -397,6 +398,15 @@ class ScenarioCompiler {
       this.#compileSettlement(line)
       return
     }
+    if (line.text.startsWith('wait ')) {
+      this.#instructions.push({
+        _tag: 'wait',
+        id: this.#nextId('wait'),
+        durationMs: this.#parseDuration(line.text.slice('wait '.length), line),
+      })
+      this.#index += 1
+      return
+    }
     if (line.text === 'concurrently:') {
       this.#compileConcurrent(line)
       return
@@ -523,6 +533,7 @@ class ScenarioCompiler {
       id: repeatId,
       description: `Repeat ${draft.action.action} ${count} times`,
       seed: repeatSeed,
+      delayBetweenActionsMs: draft.delayBetweenActionsMs,
       actions,
     })
     if (draft.expectation !== undefined) {
@@ -547,8 +558,10 @@ class ScenarioCompiler {
   }
 
   #parseRepeat(line: SourceLine): RepeatDraft {
-    const match = new RegExp(`^repeat (.+) times as (${identifierPattern}):$`).exec(line.text)
-    if (match === null) this.#fail(line, 'Expected repeat <count> times as <name>:')
+    const match = new RegExp(
+      `^repeat (.+?) times as (${identifierPattern})(?: with ([1-9][0-9]*(?:ms|s|m)) between)?:$`,
+    ).exec(line.text)
+    if (match === null) this.#fail(line, 'Expected repeat <count> times as <name> [with <duration> between]:')
     const lets: Array<{ name: string; expression: string; line: SourceLine }> = []
     let action: ActionDraft | undefined
     let expectation: RepeatDraft['expectation']
@@ -587,7 +600,15 @@ class ScenarioCompiler {
       action = parsed
     }
     if (action === undefined) this.#fail(line, 'Repeat block must contain one Application action')
-    return { line, countExpression: match[1]!, variable: match[2]!, lets, action, expectation }
+    return {
+      line,
+      countExpression: match[1]!,
+      variable: match[2]!,
+      delayBetweenActionsMs: match[3] === undefined ? null : this.#parseDuration(match[3], line),
+      lets,
+      action,
+      expectation,
+    }
   }
 
   #parseAction(line: SourceLine): ActionDraft | undefined {
@@ -718,7 +739,7 @@ class ScenarioCompiler {
   }
 
   #resolveParticipant(source: string, line: SourceLine, allowStopped: boolean): ParticipantRef {
-    const match = new RegExp(`^(${identifierPattern})\/(${identifierPattern})$`).exec(source.trim())
+    const match = new RegExp(`^(${identifierPattern})/(${identifierPattern})$`).exec(source.trim())
     if (match === null) this.#fail(line, `Expected fully qualified participant, received '${source}'`)
     const client = this.#clients.get(match[1]!)
     const state = client?.sessions.get(match[2]!)
@@ -815,6 +836,15 @@ class ScenarioCompiler {
     } catch (cause) {
       this.#fail(line, `Invalid quoted string: ${cause instanceof Error ? cause.message : String(cause)}`)
     }
+  }
+
+  #parseDuration(source: string, line: SourceLine): number {
+    const match = /^([1-9][0-9]*)(ms|s|m)$/.exec(source.trim())
+    if (match === null) this.#fail(line, `Expected a positive duration in ms, s, or m; received '${source}'`)
+    const multiplier = match[2] === 'ms' ? 1 : match[2] === 's' ? 1_000 : 60_000
+    const durationMs = Number(match[1]) * multiplier
+    if (Number.isSafeInteger(durationMs) === false) this.#fail(line, `Duration is too large: '${source}'`)
+    return durationMs
   }
 
   #nextId(kind: string): string {

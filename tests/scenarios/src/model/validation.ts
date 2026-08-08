@@ -135,6 +135,16 @@ export function defineScenario(input: unknown): ScenarioAst {
       instruction.participants.forEach(assertParticipant)
       instruction.healDisconnectedClients.forEach(assertClient)
     }
+    if (instruction._tag === 'wait' && instruction.durationMs <= 0) {
+      throw new ScenarioValidationError(`Wait duration must be positive: ${instruction.id}`)
+    }
+    if (
+      instruction._tag === 'action-sequence' &&
+      instruction.delayBetweenActionsMs !== null &&
+      instruction.delayBetweenActionsMs <= 0
+    ) {
+      throw new ScenarioValidationError(`Action-sequence delay must be positive: ${instruction.id}`)
+    }
   }
 
   for (const oracle of scenario.oracles) {

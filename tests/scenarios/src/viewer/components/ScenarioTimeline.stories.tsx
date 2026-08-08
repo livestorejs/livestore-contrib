@@ -121,7 +121,7 @@ export const RuntimeAndTerminalFailure: Story = {
   render: () => <TimelineFixture name="reference-seeded-todo-actions-browser.json.gz" cursor="end" />,
 }
 export const SessionAndClientLifecycle: Story = {
-  render: () => <TimelineFixture name="reference-browser-multi-session-recovery-browser.json.gz" cursor="end" />,
+  render: () => <TimelineFixture name="reference-multi-session-recovery-browser.json.gz" cursor="end" />,
 }
 export const ManyLanes: Story = {
   render: () => <TimelineFixture name="reference-seeded-todo-actions-browser.json.gz" traceLimit={500} />,

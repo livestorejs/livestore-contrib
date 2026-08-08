@@ -26,7 +26,7 @@ export const OfflineWriter: Story = {
 
 export const BrowserMultiSessionSuccess: Story = {
   render: () => (
-    <ReferenceFixture name="reference-browser-multi-session-recovery-browser.json.gz">
+    <ReferenceFixture name="reference-multi-session-recovery-browser.json.gz">
       {(artifact) => <ScenarioViewerApp initialArtifact={artifact} hidePicker />}
     </ReferenceFixture>
   ),

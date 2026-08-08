@@ -14,7 +14,7 @@ const decodeReference = (file: string) => {
 
 const offlineArtifact = decodeReference('reference-offline-writer-recovery-browser.json.gz')
 const denseArtifact = decodeReference('reference-seeded-todo-actions-browser.json.gz')
-const lifecycleArtifact = decodeReference('reference-browser-multi-session-recovery-browser.json.gz')
+const lifecycleArtifact = decodeReference('reference-multi-session-recovery-browser.json.gz')
 const manyWriterArtifact = decodeReference('sf-03-many-writer-426.json.gz')
 
 describe('deriveTimelineScene', () => {
@@ -142,7 +142,7 @@ describe('deriveTimelineScene', () => {
     expect(scene.main.failureBoundaries).toHaveLength(0)
   })
 
-  test('collapses the SF-03 action sequence and gives settlement evidence the semantic flow space', () => {
+  test('keeps an incomplete SF-03 action sequence visible beside its failure evidence', () => {
     const moments = derivePlaybackMoments({ scenario: manyWriterArtifact.scenario, trace: manyWriterArtifact.trace })
     const actionSequenceMoments = moments.filter((moment) => moment.kind === 'action-sequence')
     const actionMoments = moments.filter((moment) => moment.kind === 'action')
@@ -162,30 +162,17 @@ describe('deriveTimelineScene', () => {
     )!
     const sequenceCompletion = manyWriterArtifact.trace.find(
       (record) => record.payload._tag === 'action-sequence.completed',
-    )!
-    const firstMaterialObservation = manyWriterArtifact.trace.find(
-      (record) =>
-        (record.payload._tag === 'leader.sync.observed' || record.payload._tag === 'session.sync.observed') &&
-        record.payload.observation.events.length > 0,
-    )!
-    const lastMaterialObservation = manyWriterArtifact.trace.findLast(
-      (record) => record.payload._tag === 'backend.observed' && record.payload.observation.events.length > 0,
-    )!
+    )
 
-    expect(actionSequenceMoments).toHaveLength(1)
-    expect(actionMoments).toHaveLength(0)
-    expect(actionSequenceMoments[0]?.recordIndexes).toEqual([sequenceRequest.index, sequenceCompletion.index])
-    expect(actionSequenceMoments[0]?.summary).toContain('426 actions')
-    expect(actionSequenceMoments[0]?.summary).toContain('client-1/session-1: 220')
-    expect(actionSequenceMoments[0]?.summary).toContain('client-2/session-2: 206')
-    expect(scene.normalizedRecordPositions[lastGeneratedAction.index]).toBe(
-      scene.normalizedRecordPositions[sequenceCompletion.index],
-    )
-    expect(scene.normalizedRecordPositions[firstMaterialObservation.index]).toBeGreaterThan(
-      scene.normalizedRecordPositions[sequenceCompletion.index]!,
-    )
-    expect(scene.normalizedRecordPositions[lastMaterialObservation.index]).toBeGreaterThan(
-      scene.normalizedRecordPositions[firstMaterialObservation.index]!,
+    expect(manyWriterArtifact.status).toBe('failed')
+    expect(sequenceCompletion).toBeUndefined()
+    expect(actionSequenceMoments).toHaveLength(0)
+    expect(actionMoments).toHaveLength(1)
+    expect(actionMoments[0]?.recordIndexes).toEqual([sequenceRequest.index])
+    expect(actionMoments[0]?.summary).toContain('426 actions')
+    expect(scene.main.failureBoundaries.length).toBeGreaterThan(0)
+    expect(scene.normalizedRecordPositions[lastGeneratedAction.index]).toBeLessThan(
+      scene.normalizedRecordPositions[manyWriterArtifact.trace.length - 1]!,
     )
     expect(scene.main.traceCarpet.filter((item) => String(item.attrs?.class).includes('evidence-moment')).length).toBe(
       moments.length,

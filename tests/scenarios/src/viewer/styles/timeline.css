@@ -363,6 +363,10 @@
   stroke-width: 1;
 }
 
+.timeline .trace-dot.moment-wait {
+  fill: #7c63c9;
+}
+
 .timeline .trace-action-sequence {
   cursor: pointer;
 }

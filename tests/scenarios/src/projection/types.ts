@@ -88,6 +88,7 @@ export type PlaybackMomentKind =
   | 'lifecycle'
   | 'capture'
   | 'settlement'
+  | 'wait'
   | 'failure'
 
 export interface PlaybackMoment {
@@ -123,6 +124,7 @@ export type ScenarioOperationHistoryFamily =
   | 'session-lifecycle'
   | 'client-lifecycle'
   | 'settlement'
+  | 'wait'
 
 export interface ScenarioOperationHistoryCoverage {
   readonly includedFamilies: ReadonlyArray<ScenarioOperationHistoryFamily>
@@ -150,6 +152,7 @@ export const scenarioOperationHistoryCoverage: ScenarioOperationHistoryCoverage 
     'session-lifecycle',
     'client-lifecycle',
     'settlement',
+    'wait',
   ],
   excludedInteractions: ['system-observation', 'sync-observation', 'state-inspection'],
   concurrencyBoundary: 'instruction-to-control-outcome',

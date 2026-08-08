@@ -126,7 +126,11 @@ const summarizeActionSequence = (
   request: ActionSequenceRequestRecord,
 ): string => {
   const participantCounts = actionDistribution(trace, request)
-  return `Actions ${request.payload.description} · ${request.payload.count} actions${participantCounts.length === 0 ? '' : ` · ${participantCounts}`}`
+  const pacing =
+    request.payload.delayBetweenActionsMs === null
+      ? ''
+      : ` · ${request.payload.delayBetweenActionsMs} ms between actions`
+  return `Actions ${request.payload.description} · ${request.payload.count} actions${pacing}${participantCounts.length === 0 ? '' : ` · ${participantCounts}`}`
 }
 
 const actionDistribution = (trace: ReadonlyArray<ScenarioTraceRecord>, request: ScenarioTraceRecord): string => {

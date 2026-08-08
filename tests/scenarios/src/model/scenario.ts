@@ -1,8 +1,8 @@
 import { Schema } from '@livestore/utils/effect'
 
-export const scenarioVersion = 4 as const
-export const scenarioTraceVersion = 6 as const
-export const scenarioArtifactVersion = 7 as const
+export const scenarioVersion = 5 as const
+export const scenarioTraceVersion = 7 as const
+export const scenarioArtifactVersion = 8 as const
 
 export const ParticipantProfile = Schema.Literals(['in-process', 'process', 'browser'])
 export type ParticipantProfile = typeof ParticipantProfile.Type
@@ -72,6 +72,12 @@ export const AnnotationInstruction = Schema.TaggedStruct('annotation', {
 })
 export type AnnotationInstruction = typeof AnnotationInstruction.Type
 
+export const WaitStep = Schema.TaggedStruct('wait', {
+  id: Schema.String,
+  durationMs: Schema.Int,
+})
+export type WaitStep = typeof WaitStep.Type
+
 export const DisconnectStep = Schema.TaggedStruct('disconnect', {
   id: Schema.String,
   clientId: Schema.String,
@@ -122,6 +128,7 @@ export const ActionSequenceStep = Schema.TaggedStruct('action-sequence', {
   id: Schema.String,
   description: Schema.String,
   seed: Schema.Finite,
+  delayBetweenActionsMs: Schema.NullOr(Schema.Int),
   actions: Schema.Array(ActionStep),
 })
 export type ActionSequenceStep = typeof ActionSequenceStep.Type
@@ -151,6 +158,7 @@ export const SettleStep = Schema.TaggedStruct('settle', {
 
 export const ScenarioInstruction = Schema.Union([
   AnnotationInstruction,
+  WaitStep,
   ActionStep,
   DisconnectStep,
   ReconnectStep,

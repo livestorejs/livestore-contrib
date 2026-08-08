@@ -85,6 +85,7 @@ const expandRepeatedActions = (args: {
     id: definition.id,
     description: definition.description,
     seed,
+    delayBetweenActionsMs: null,
     actions: Array.from({ length: definition.count }, (_, iteration) => ({
       _tag: 'action' as const,
       id: `${definition.id}:${String(iteration + 1).padStart(4, '0')}`,

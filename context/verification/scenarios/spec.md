@@ -103,7 +103,7 @@ advertised from sampled correlation (LSC.VER.SCEN-R03, R04).
 
 ## Evidence Semantics
 
-Trace protocol v5 is the authoritative evidence envelope. Each record has a
+Trace protocol v7 is the authoritative evidence envelope. Each record has a
 monotonic runner receipt index plus run, participant, instruction, operation,
 emitter, and payload identity where applicable. The record's origin and
 evidence semantics distinguish an instruction, host acknowledgement, sampled
@@ -172,7 +172,7 @@ delay form changes causal edges or LiveStore ordering. See
 ## Corpus, Authoring, and Oracles
 
 The retained corpus contains four promoted `SF-*` failure reproducers and two
-representative examples: offline writer recovery and browser multi-session
+representative examples: offline writer recovery and multi-session
 recovery. Focused host-contract Scenarios remain committed test fixtures
 without becoming CLI corpus entries. Generated investigations, controls, and
 reductions begin under the Git-ignored `local/scenarios/` tier and run by file;

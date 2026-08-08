@@ -90,6 +90,21 @@ repeat count times as item:
     )
   })
 
+  it('normalizes explicit waits and fixed-delay repeat pacing', () => {
+    const scenario = compile(`
+application todo
+client client-a with main
+wait 250ms
+repeat 2 times as item with 3s between:
+  client-a/main runs createTodo with
+    id: "todo-${'${item}'}"
+    text: "Timed"
+`)
+
+    expect(scenario.instructions[0]).toEqual({ _tag: 'wait', id: 'wait-0001', durationMs: 250 })
+    expect(scenario.instructions[1]).toEqual(expect.objectContaining({ delayBetweenActionsMs: 3_000 }))
+  })
+
   it('reports source locations for semantic and application-input errors', () => {
     expect(() =>
       compile(`
@@ -127,5 +142,8 @@ client-a/main runs createTodo with
     expect(() =>
       compile('application todo\nclient client-a with main\nexpect client-a/main:\n  pending resolved\nnote "late"\n'),
     ).toThrow('Instructions cannot follow final expectations')
+    expect(() => compile('application todo\nclient client-a with main\nwait 0ms\n')).toThrow(
+      "Expected a positive duration in ms, s, or m; received '0ms'",
+    )
   })
 })

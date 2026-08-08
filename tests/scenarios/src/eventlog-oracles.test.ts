@@ -205,8 +205,8 @@ Vitest.describe('offline writer recovery', () => {
         })
 
         expect(artifact.status).toBe('passed')
-        expect(artifact.artifactVersion).toBe(7)
-        expect(artifact.descriptor.traceVersion).toBe(6)
+        expect(artifact.artifactVersion).toBe(8)
+        expect(artifact.descriptor.traceVersion).toBe(7)
         expect(artifact.verdicts).toHaveLength(6)
         expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
         expect(artifact.verdicts).toContainEqual(

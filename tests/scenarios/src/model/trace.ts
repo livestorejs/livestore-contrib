@@ -39,6 +39,11 @@ export const ScenarioTracePayload = Schema.Union([
   }),
   Schema.TaggedStruct('client.created', { status: Schema.Literal('acknowledged') }),
   Schema.TaggedStruct('annotation.reached', { text: Schema.String }),
+  Schema.TaggedStruct('wait.requested', { durationMs: Schema.Int }),
+  Schema.TaggedStruct('wait.completed', {
+    requestedDurationMs: Schema.Int,
+    actualDurationMs: Schema.Finite,
+  }),
   Schema.TaggedStruct('action.requested', { action: Schema.String, input: Schema.Json }),
   Schema.TaggedStruct('action.completed', {
     action: Schema.String,
@@ -49,10 +54,22 @@ export const ScenarioTracePayload = Schema.Union([
     targets: Schema.Array(Schema.String),
     count: Schema.Int,
     seed: Schema.Finite,
+    delayBetweenActionsMs: Schema.NullOr(Schema.Int),
   }),
   Schema.TaggedStruct('action-sequence.completed', {
     actionIds: Schema.Array(Schema.String),
     status: Schema.Literal('acknowledged'),
+  }),
+  Schema.TaggedStruct('action-sequence.delay.requested', {
+    durationMs: Schema.Int,
+    afterActionId: Schema.String,
+    beforeActionId: Schema.String,
+  }),
+  Schema.TaggedStruct('action-sequence.delay.completed', {
+    requestedDurationMs: Schema.Int,
+    actualDurationMs: Schema.Finite,
+    afterActionId: Schema.String,
+    beforeActionId: Schema.String,
   }),
   Schema.TaggedStruct('connectivity.disconnect.requested', { connected: Schema.Literal(false) }),
   Schema.TaggedStruct('connectivity.reconnect.requested', { connected: Schema.Literal(true) }),

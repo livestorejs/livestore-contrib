@@ -148,12 +148,13 @@ const loadScenarioFile = (file: string, parameters: Readonly<Record<string, stri
 const readParameterOverrides = (args: ReadonlyArray<string>): Readonly<Record<string, string>> => {
   const parameters: Record<string, string> = {}
   for (let index = 0; index < args.length; index += 1) {
-    if (args[index] !== '--set') continue
-    const assignment = args[index + 1]
+    const inline = args[index]?.startsWith('--set=') === true ? args[index]!.slice('--set='.length) : undefined
+    if (args[index] !== '--set' && inline === undefined) continue
+    const assignment = inline ?? args[index + 1]
     const match = assignment === undefined ? null : /^([A-Za-z][A-Za-z0-9_-]*)=(.*)$/.exec(assignment)
     if (match === null) throw new Error('Expected --set name=value')
     parameters[match[1]!] = match[2]!
-    index += 1
+    if (inline === undefined) index += 1
   }
   return parameters
 }
@@ -179,6 +180,8 @@ const readChoice = <const TChoices extends ReadonlyArray<string>>(
 }
 
 const readOption = (args: ReadonlyArray<string>, name: string): string | undefined => {
+  const inline = args.find((arg) => arg.startsWith(`${name}=`))
+  if (inline !== undefined) return inline.slice(name.length + 1)
   const index = args.indexOf(name)
   if (index === -1) return undefined
   const value = args[index + 1]

@@ -9,7 +9,7 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const failureArtifact = path.join(packageRoot, 'artifacts/sf-03-many-writer-426.json.gz')
 const manyWriterArtifact = path.join(packageRoot, 'artifacts/sf-03-many-writer-426.json.gz')
 const offlineArtifact = path.join(packageRoot, 'artifacts/reference-offline-writer-recovery-browser.json.gz')
-const lifecycleArtifact = path.join(packageRoot, 'artifacts/reference-browser-multi-session-recovery-browser.json.gz')
+const lifecycleArtifact = path.join(packageRoot, 'artifacts/reference-multi-session-recovery-browser.json.gz')
 const denseArtifact = path.join(packageRoot, 'artifacts/reference-seeded-todo-actions-browser.json.gz')
 const viewerUrl = 'http://127.0.0.1:4173'
 
@@ -32,7 +32,7 @@ test('canonical viewer matches the approved failure and interaction baselines', 
 })
 
 test('canonical viewer matches the approved passed lifecycle baseline', async ({ page }) => {
-  await openArtifact(page, viewerUrl, lifecycleArtifact, 'browser-multi-session-recovery')
+  await openArtifact(page, viewerUrl, lifecycleArtifact, 'multi-session-recovery')
   await expect(page.getByLabel('System').locator('.section-heading .badge')).toHaveText('passed')
   await expect(page).toHaveScreenshot('loaded-success.png', { fullPage: true })
 })
@@ -40,8 +40,9 @@ test('canonical viewer matches the approved passed lifecycle baseline', async ({
 test('SF-03 keeps generated action traffic out of the sync-evidence geometry', async ({ page }) => {
   await openArtifact(page, viewerUrl, manyWriterArtifact, 'many-writer-convergence')
   const timeline = page.getByRole('region', { name: 'Timeline', exact: true })
-  await expect(timeline.locator('.evidence-moment')).toHaveCount(18)
-  await expect(timeline.locator('.moment-action-sequence')).toContainText('426 actions')
+  await expect(timeline.locator('.evidence-moment')).toHaveCount(11)
+  await expect(timeline.locator('.moment-action')).toContainText('426 actions')
+  await expect(timeline.locator('.moment-action-sequence')).toHaveCount(0)
 })
 
 test('Event color follows its producer through rebase and propagation', async ({ page }) => {
@@ -75,7 +76,7 @@ test('opens reconstructed Client Leader State with source-record provenance', as
       .evaluate((element) => element.getBoundingClientRect().width),
   ).toBeGreaterThan(60)
   await expect(inspector.getByLabel('Reconstructed table', { exact: true })).toHaveValue('todos')
-  await expect(inspector.getByText('replayed record #103')).toBeVisible()
+  await expect(inspector.getByText('replayed record #91')).toBeVisible()
   await expect(inspector.getByText(/capture offline-writer-recovery-browser-/)).toBeAttached()
   await expect(inspector.getByText('2 events')).toBeAttached()
   await expect(inspector.getByRole('region', { name: 'Reconstructed table todos' })).toBeVisible()

@@ -191,6 +191,9 @@ export const semanticMomentKind = (record: ScenarioTraceRecord): PlaybackMomentK
     case 'action.requested':
     case 'action-sequence.requested':
       return 'action'
+    case 'wait.completed':
+    case 'action-sequence.delay.completed':
+      return 'wait'
     case 'annotation.reached':
       return 'annotation'
     case 'client.created':
@@ -233,6 +236,10 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return `Operation ${record.correlationId ?? 'unknown'} ${record.payload.status}: ${summarizeFailureMessage(record.payload.message)}`
     case 'annotation.reached':
       return record.payload.text
+    case 'wait.requested':
+      return `Wait requested · ${formatDuration(record.payload.durationMs)}`
+    case 'wait.completed':
+      return `Wait completed · ${formatDuration(record.payload.actualDurationMs)} elapsed`
     case 'client.create.requested':
       return scoped(`create requested with ${record.payload.sessions.length} sessions`)
     case 'action.requested':
@@ -243,6 +250,10 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return `Requested action sequence ${record.payload.description} · ${record.payload.count} actions · seed ${record.payload.seed}`
     case 'action-sequence.completed':
       return `Action sequence completed · ${record.payload.actionIds.length} actions`
+    case 'action-sequence.delay.requested':
+      return `Action-sequence delay requested · ${formatDuration(record.payload.durationMs)}`
+    case 'action-sequence.delay.completed':
+      return `Action-sequence delay completed · ${formatDuration(record.payload.actualDurationMs)} elapsed`
     case 'client.created':
       return scoped('created')
     case 'connectivity.disconnect.requested':
@@ -508,7 +519,14 @@ export const operationFamily = (payload: ScenarioTracePayload): ScenarioOperatio
       return 'client-lifecycle'
     case 'settlement.requested':
       return 'settlement'
+    case 'wait.requested':
+      return 'wait'
     default:
       return undefined
   }
 }
+
+const formatDuration = (durationMs: number): string =>
+  durationMs >= 1_000
+    ? `${(durationMs / 1_000).toFixed(durationMs % 1_000 === 0 ? 0 : 3)} s`
+    : `${durationMs.toFixed(1)} ms`

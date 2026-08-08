@@ -76,6 +76,27 @@ export const executeInstruction = (args: {
         payload: { _tag: 'annotation.reached', text: args.instruction.text },
       })
       return Effect.void
+    case 'wait': {
+      const instruction = args.instruction
+      return Effect.gen(function* () {
+        const requested = args.record({
+          origin: 'instruction',
+          correlationId: instruction.id,
+          payload: { _tag: 'wait.requested', durationMs: instruction.durationMs },
+        })
+        const actualDurationMs = yield* waitAtLeast(instruction.durationMs)
+        args.record({
+          origin: 'acknowledgement',
+          correlationId: instruction.id,
+          causedBy: [requested.index],
+          payload: {
+            _tag: 'wait.completed',
+            requestedDurationMs: instruction.durationMs,
+            actualDurationMs,
+          },
+        })
+      })
+    }
     case 'create-client':
       return executeClientCreation({
         host: args.host,
@@ -324,16 +345,18 @@ const executeActionSequence = (args: {
         targets: [...new Set(args.instruction.actions.map((action) => participantKey(action.target)))],
         count: args.instruction.actions.length,
         seed: args.instruction.seed,
+        delayBetweenActionsMs: args.instruction.delayBetweenActionsMs,
       },
     })
     const acknowledgements: ScenarioTraceRecord[] = []
-    for (const action of args.instruction.actions) {
+    let precedingDelay: ScenarioTraceRecord | undefined
+    for (const [index, action] of args.instruction.actions.entries()) {
       const acknowledgement = yield* executeAction({
         host: args.host,
         record: args.record,
         action,
         causationId: args.instruction.id,
-        causedBy: [instruction.index],
+        causedBy: [instruction.index, ...(precedingDelay === undefined ? [] : [precedingDelay.index])],
       }).pipe(
         Effect.catch((error) => {
           recordOperationFailure({ record: args.record, operationId: action.id, error })
@@ -341,6 +364,36 @@ const executeActionSequence = (args: {
         }),
       )
       acknowledgements.push(acknowledgement)
+      const nextAction = args.instruction.actions[index + 1]
+      if (args.instruction.delayBetweenActionsMs !== null && nextAction !== undefined) {
+        const correlationId = `${args.instruction.id}:delay-${String(index + 1).padStart(4, '0')}`
+        const requested = args.record({
+          origin: 'observation',
+          correlationId,
+          causationId: args.instruction.id,
+          causedBy: [acknowledgement.index],
+          payload: {
+            _tag: 'action-sequence.delay.requested',
+            durationMs: args.instruction.delayBetweenActionsMs,
+            afterActionId: action.id,
+            beforeActionId: nextAction.id,
+          },
+        })
+        const actualDurationMs = yield* waitAtLeast(args.instruction.delayBetweenActionsMs)
+        precedingDelay = args.record({
+          origin: 'observation',
+          correlationId,
+          causationId: args.instruction.id,
+          causedBy: [requested.index],
+          payload: {
+            _tag: 'action-sequence.delay.completed',
+            requestedDurationMs: args.instruction.delayBetweenActionsMs,
+            actualDurationMs,
+            afterActionId: action.id,
+            beforeActionId: nextAction.id,
+          },
+        })
+      }
     }
     args.record({
       origin: 'acknowledgement',
@@ -353,6 +406,16 @@ const executeActionSequence = (args: {
       },
     })
   })
+
+const waitAtLeast = (durationMs: number): Effect.Effect<number> => {
+  const startedAt = performance.now()
+  const loop: Effect.Effect<number> = Effect.suspend(() => {
+    const elapsed = performance.now() - startedAt
+    const remaining = durationMs - elapsed
+    return remaining <= 0 ? Effect.succeed(elapsed) : Effect.sleep(remaining).pipe(Effect.andThen(loop))
+  })
+  return loop
+}
 
 const setConnectivity = (args: {
   host: ParticipantHost

@@ -5,7 +5,7 @@ import type { ScenarioRunArtifact } from '../../model.ts'
 import { decodeArtifactJson, fetchArtifactJson } from '../artifact-io.ts'
 
 export type ReferenceArtifactName =
-  | 'reference-browser-multi-session-recovery-browser.json.gz'
+  | 'reference-multi-session-recovery-browser.json.gz'
   | 'reference-offline-writer-recovery-browser.json.gz'
   | 'reference-seeded-todo-actions-browser.json.gz'
 

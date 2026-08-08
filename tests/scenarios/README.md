@@ -95,6 +95,11 @@ reference, examples, and compilation semantics. The CLI compiles retained or
 local source before the runner starts; `--set name=value` overrides a declared
 parameter without coupling the source to environment variables.
 
+Use `wait 2s` when elapsed delay is part of the Scenario story. Repeated actions
+can use `repeat ... with 250ms between:` for fixed delay after each acknowledged
+action except the last. Both forms retain requested and actual controller-time
+evidence; neither implies Settlement or a timing assertion.
+
 Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
 by Git. Copy `scenario.template.scenario`, define its ordered instructions, and
 run it with `--scenario-file`. This tier is for generated cases, parameter

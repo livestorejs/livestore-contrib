@@ -221,9 +221,8 @@ oracle rather than by repurposing the runner's safety timeout.
 
 ### Normalized model impact
 
-The current normalized Scenario has no delay instruction, so implementing this
-proposal requires a model and protocol revision rather than a parser-only
-change:
+The normalized Scenario and trace protocols model delay rather than treating it
+as parser-only behavior:
 
 - a `wait` instruction carrying the requested minimum duration;
 - requested/completed wait trace evidence with actual controller elapsed time;
@@ -904,12 +903,11 @@ The first deterministic language does not include:
 - participant removal;
 - Event/materializer definitions, which remain Application-owned.
 
-## Proposed implementation slices
+## Implementation status
 
 ### Task 1: deterministic DSL and stabilization semantics
 
-Refactor Settlement timing out of Scenario behavior, then implement and
-validate the deterministic language:
+Implemented in the deterministic language and stabilization slice:
 
 - move Settlement and terminal-stabilization timeout bounds into run
   configuration;
@@ -922,18 +920,16 @@ validate the deterministic language:
 - compiler-owned identities and local operation-history expectations;
 - concurrency, lifecycle, faults, Settlement, and current oracle forms;
 - fixed-count deterministic repetition without elapsed pacing;
-- `check`, optional normalized-plan output, and direct run entrypoints;
-- plan-parity tests against existing TypeScript Scenario definitions;
+- direct retained-source and `--scenario-file` run entrypoints;
+- compiler, model, runner, and profile-focused tests;
 - migration of representative simple and complex examples.
 
-This task changes runner stabilization control and the normalized Settlement
-contract, but it does not add authored elapsed waits, pacing, timing oracles, or
-viewer timing. The elapsed-time keywords are reserved by the language design
-but are not accepted by the first compiler slice.
+This slice changed runner stabilization control and the normalized Settlement
+contract without adding timing oracles.
 
 ### Task 2: elapsed waits and repeat pacing
 
-Extend timed behavior end to end after the compiler boundary is stable:
+Implemented after the compiler boundary stabilized:
 
 1. add `wait` and fixed-delay action-sequence pacing to the normalized Scenario
    model;
@@ -944,6 +940,7 @@ Extend timed behavior end to end after the compiler boundary is stable:
 6. teach the DSL compiler to emit `wait` and `with <duration> between`;
 7. distinguish intentional waits from unexplained delay in viewer projections.
 
-The DSL syntax is agreed before Task 2, but Task 2 owns its execution semantics.
-The DSL should not be declared complete or stable until both slices are
-implemented and their composition is verified.
+Both accepted slices are implemented. Static editor integration, a dedicated
+`scenario check` command, normalized-plan printing, fixed cadence, absolute
+schedules, and timing oracles remain possible follow-ups rather than hidden
+parts of the language.

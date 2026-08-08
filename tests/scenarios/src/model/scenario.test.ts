@@ -75,6 +75,27 @@ Vitest.describe('scenario model', () => {
     }
   })
 
+  Vitest.it('rejects non-positive elapsed delays in normalized plans', () => {
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'invalid-wait-duration',
+        instructions: [{ _tag: 'wait', id: 'wait-invalid', durationMs: 0 }],
+        oracles: [],
+      }),
+    ).toThrow('Wait duration must be positive')
+    expect(() =>
+      defineScenario({
+        ...seededTodoActions,
+        id: 'invalid-sequence-delay',
+        instructions: seededTodoActions.instructions.map((instruction) =>
+          instruction._tag === 'action-sequence' ? { ...instruction, delayBetweenActionsMs: 0 } : instruction,
+        ),
+        oracles: [],
+      }),
+    ).toThrow('Action-sequence delay must be positive')
+  })
+
   Vitest.it('validates dynamic participant additions in plan order', () => {
     const scenario = defineScenario({
       version: scenarioVersion,

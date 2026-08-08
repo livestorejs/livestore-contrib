@@ -32,6 +32,13 @@ export const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<Rec
       ]
     case 'annotation.reached':
       return [{ label: 'Annotation', value: payload.text }]
+    case 'wait.requested':
+      return [{ label: 'Requested delay', value: `${payload.durationMs} ms` }]
+    case 'wait.completed':
+      return [
+        { label: 'Requested delay', value: `${payload.requestedDurationMs} ms` },
+        { label: 'Actual delay', value: `${payload.actualDurationMs.toFixed(1)} ms`, tone: 'good' },
+      ]
     case 'client.create.requested':
       return [
         { label: 'Sessions', value: payload.sessions.join(', ') || 'none' },
@@ -54,12 +61,29 @@ export const traceRecordFacts = (record: ScenarioTraceRecord): ReadonlyArray<Rec
         { label: 'Action sequence', value: payload.description },
         { label: 'Count', value: String(payload.count) },
         { label: 'Derived seed', value: String(payload.seed) },
+        {
+          label: 'Delay between actions',
+          value: payload.delayBetweenActionsMs === null ? 'none' : `${payload.delayBetweenActionsMs} ms`,
+        },
         { label: 'Targets', value: payload.targets.join(', ') },
       ]
     case 'action-sequence.completed':
       return [
         { label: 'Actions', value: String(payload.actionIds.length), tone: 'good' },
         { label: 'Status', value: payload.status, tone: 'good' },
+      ]
+    case 'action-sequence.delay.requested':
+      return [
+        { label: 'Requested delay', value: `${payload.durationMs} ms` },
+        { label: 'After action', value: payload.afterActionId },
+        { label: 'Before action', value: payload.beforeActionId },
+      ]
+    case 'action-sequence.delay.completed':
+      return [
+        { label: 'Requested delay', value: `${payload.requestedDurationMs} ms` },
+        { label: 'Actual delay', value: `${payload.actualDurationMs.toFixed(1)} ms`, tone: 'good' },
+        { label: 'After action', value: payload.afterActionId },
+        { label: 'Before action', value: payload.beforeActionId },
       ]
     case 'connectivity.disconnect.requested':
     case 'connectivity.reconnect.requested':
