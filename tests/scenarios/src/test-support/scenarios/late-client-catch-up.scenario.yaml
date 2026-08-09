@@ -13,12 +13,15 @@ clients:
 do:
   - note: The initial Client commits and confirms history before the second Client exists.
 
-  - generate: todoSeries
-    with:
-      target: client-a/session-a
-      count: ${history_count}
-      idPrefix: history
-      textPrefix: Before the late Client
+  - repeat:
+      times: ${history_count}
+      as: item
+      action:
+        run: createTodo
+        as: client-a/session-a
+        with:
+          id: history-${pad(item, 3)}
+          text: Before the late Client ${item}
 
   - settle: client-a/session-a
 

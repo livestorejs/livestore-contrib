@@ -3,10 +3,33 @@ import { describe, expect, it } from 'vitest'
 import { Schema } from '@livestore/utils/effect'
 
 import { scenarioApplications } from '../corpus/applications/registry.ts'
-import { sharedScenarioHelpers } from '../corpus/scenario-helpers/shared.ts'
-import { todoSeries } from '../corpus/scenario-helpers/todo.ts'
+import { sharedScenarioHelpers } from '../corpus/scenario-helpers.ts'
 import { compileScenarioYamlSource } from './compiler.ts'
-import { composeScenarioHelpers, defineScenarioHelper, defineScenarioHelpers, helperInstructions } from './helpers.ts'
+import {
+  composeScenarioHelpers,
+  defineScenarioHelper,
+  defineScenarioHelpers,
+  helperActions,
+  helperInstructions,
+} from './helpers.ts'
+
+const seededActions = defineScenarioHelper({
+  input: Schema.Struct({ target: Schema.String, count: Schema.Int }),
+  generate: ({ input, context }) =>
+    helperActions(
+      Array.from({ length: input.count }, (_, offset) => {
+        const item = offset + 1
+        return {
+          target: context.participant(input.target),
+          action: 'createTodo',
+          input: {
+            id: `generated-${String(item).padStart(3, '0')}`,
+            text: `Variant ${context.random.iteration(item).integer('text', 1_000)}`,
+          },
+        }
+      }),
+    ),
+})
 
 const waitThenCreate = defineScenarioHelper({
   input: Schema.Struct({ target: Schema.String, id: Schema.String }),
@@ -19,7 +42,7 @@ const waitThenCreate = defineScenarioHelper({
 
 const compilerHelpers = composeScenarioHelpers([
   { source: 'shared Scenario helper catalogue', helpers: sharedScenarioHelpers },
-  { source: 'compiler test helpers', helpers: defineScenarioHelpers({ todoSeries, waitThenCreate }) },
+  { source: 'compiler test helpers', helpers: defineScenarioHelpers({ seededActions, waitThenCreate }) },
 ])
 
 const compile = (
@@ -142,12 +165,10 @@ clients:
   client-a:
     sessions: [main]
 do:
-  - generate: todoSeries
+  - generate: seededActions
     with:
       target: client-a/main
       count: 3
-      idPrefix: generated
-      textPrefix: Generated item
     expect: all-finish
 `
     const first = compile(source)
@@ -175,14 +196,12 @@ clients:
   client-a:
     sessions: [main]
 do:
-  - generate: todoSeries
+  - generate: seededActions
     with:
       target: client-a/main
       count: 1
-      idPrefix: generated
-      textPrefix: Generated item
 `),
-    ).toThrow("Helper 'todoSeries' uses deterministic randomness and requires an explicit seed")
+    ).toThrow("Helper 'seededActions' uses deterministic randomness and requires an explicit seed")
   })
 
   it('uses an application-neutral shared helper with application validation after expansion', () => {
@@ -240,10 +259,10 @@ do:
   it('rejects helper name collisions rather than applying precedence', () => {
     expect(() =>
       composeScenarioHelpers([
-        { source: 'shared', helpers: defineScenarioHelpers({ todoSeries }) },
-        { source: 'companion', helpers: defineScenarioHelpers({ todoSeries }) },
+        { source: 'shared', helpers: defineScenarioHelpers({ waitThenCreate }) },
+        { source: 'companion', helpers: defineScenarioHelpers({ waitThenCreate }) },
       ]),
-    ).toThrow("Duplicate Scenario helper 'todoSeries' from shared and companion")
+    ).toThrow("Duplicate Scenario helper 'waitThenCreate' from shared and companion")
   })
 
   it('normalizes waits and fixed-delay pacing', () => {

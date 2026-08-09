@@ -33,9 +33,11 @@ format versions, and runner-owned instruction/oracle IDs are not authored.
 
 Concrete Application definitions wrap the actual `LiveStoreSchema`; named
 actions expose strict input validation before dispatch, State inspectors encode
-their output as JSON, and they contain no Scenario generation policy. Shared
-TypeScript helpers and optional `name.helpers.ts` companions belong to Scenario
-source loading instead. They expand Schema-validated input into finite
+their output as JSON, and they contain no Scenario generation policy. One
+Application-neutral shared TypeScript helper catalogue and optional
+`name.helpers.ts` companions belong to Scenario source loading instead. A
+companion exists only for actual one-off implementation and never forwards to
+shared code. Helpers expand Schema-validated input into finite
 declarative instruction fragments, which pass through the same compiler-owned
 identity, participant, capability, and Application-action validation as direct
 YAML. Duplicate shared/companion names are rejected. The Scenario never
@@ -59,8 +61,9 @@ before the first Client is created. A recorded seed reproduces generated inputs
 and requested choices from the same source revision; it does not claim to
 reproduce internal host or Sync delivery order (LSC.VER.SCEN-R03).
 
-Retained and committed test Scenario registries attach companion helpers with
-static TypeScript imports. The Node-only loader for an explicit local
+Retained and committed test Scenario registries attach a companion with a
+static TypeScript import only when that source owns a one-off implementation.
+The Node-only loader for an explicit local
 `--scenario-file` may discover the exact adjacent companion filename
 asynchronously. YAML never names an arbitrary module path. Helper computation
 is trusted repository or explicitly selected local code, remains synchronous

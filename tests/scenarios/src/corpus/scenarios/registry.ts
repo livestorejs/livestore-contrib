@@ -2,9 +2,8 @@ import type { ScenarioAst } from '../../model.ts'
 import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
 import { composeScenarioHelpers } from '../../yaml/helpers.ts'
 import { scenarioApplications } from '../applications/registry.ts'
-import { sharedScenarioHelpers } from '../scenario-helpers/shared.ts'
+import { sharedScenarioHelpers } from '../scenario-helpers.ts'
 import manyWriterHelpers from './retained/findings/many-writer-convergence.helpers.ts'
-import pendingTailHelpers from './retained/findings/pending-tail-recovery.helpers.ts'
 
 export interface RetainedScenarioEntry {
   readonly kind: 'example' | 'finding'
@@ -29,7 +28,6 @@ const sources = [
     kind: 'finding',
     findingId: 'SF-02',
     file: new URL('./retained/findings/pending-tail-recovery.scenario.yaml', import.meta.url),
-    helpers: pendingTailHelpers,
   },
   {
     kind: 'finding',

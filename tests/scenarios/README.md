@@ -87,8 +87,10 @@ broader campaign and failure-reduction plan.
 Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications).
 They contain the real LiveStore schema, materializers, normal application
 actions, and State inspectors. Reusable TypeScript helpers belong to Scenario
-authoring, not the Application runtime interface; optional one-off helpers live
-beside their YAML as `scenario-name.helpers.ts`.
+authoring, not the Application runtime interface. Application-neutral helpers
+live in one shared catalogue. A `scenario-name.helpers.ts` companion exists
+only when it contains the actual implementation of code unique to that
+Scenario; it is never a registration shim for shared code.
 
 Scenario source uses deterministic, human-readable `.scenario.yaml` documents.
 See [YAML_SCENARIOS.md](./YAML_SCENARIOS.md) for the schema, complete construct

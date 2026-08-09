@@ -20,12 +20,15 @@ do:
 
   - disconnect: client-a
 
-  - generate: todoSeries
-    with:
-      target: client-a/session-a
-      count: ${pending_count}
-      idPrefix: pending
-      textPrefix: Offline pending item
+  - repeat:
+      times: ${pending_count}
+      as: item
+      action:
+        run: createTodo
+        as: client-a/session-a
+        with:
+          id: pending-${pad(item, 3)}
+          text: Offline pending item ${item}
 
   - run: createTodo
     as: client-b/session-b

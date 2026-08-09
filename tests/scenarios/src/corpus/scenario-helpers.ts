@@ -1,6 +1,6 @@
 import { Schema } from '@livestore/utils/effect'
 
-import { defineScenarioHelper, defineScenarioHelpers, helperActions } from '../../yaml/helpers.ts'
+import { defineScenarioHelper, defineScenarioHelpers, helperActions } from '../yaml/helpers.ts'
 
 const DistributeActionsInput = Schema.Struct({
   action: Schema.String,
@@ -54,4 +54,5 @@ export const largeStringAction = defineScenarioHelper({
   },
 })
 
+/** Helpers whose interfaces and implementations contain no Application vocabulary. */
 export const sharedScenarioHelpers = defineScenarioHelpers({ distributeActions, largeStringAction })

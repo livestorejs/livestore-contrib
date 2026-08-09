@@ -273,15 +273,12 @@ language.
 
 ## TypeScript helpers
 
-A helper is registered under a stable name in the shared catalogue or in an
-optional same-directory companion. For example,
-`many-writer-convergence.scenario.yaml` may have
-`many-writer-convergence.helpers.ts`. The YAML instruction contains only the
-helper name and JSON-compatible input:
-
-```ts
-export default defineScenarioHelpers({ distributedTodos })
-```
+A helper is registered under a stable name. Application-neutral operations
+belong in the shared catalogue and are available without a companion file. Use
+an optional same-directory companion only for actual one-off implementation.
+For example, `many-writer-convergence.scenario.yaml` and
+`many-writer-convergence.helpers.ts` form one self-contained pair. The YAML
+instruction contains only the helper name and JSON-compatible input:
 
 ```yaml
 - generate: distributedTodos
@@ -292,10 +289,15 @@ export default defineScenarioHelpers({ distributedTodos })
   between: 250ms
 ```
 
-The helper uses ordinary TypeScript:
+The companion contains the ordinary TypeScript implementation and its export;
+it never re-exports an implementation from another catalogue:
 
 ```ts
-export const distributedTodos = defineScenarioHelper({
+import { Schema } from '@livestore/utils/effect'
+
+import { defineScenarioHelper, defineScenarioHelpers, helperActions } from '../../../../yaml/helpers.ts'
+
+const distributedTodos = defineScenarioHelper({
   input: Schema.Struct({
     participants: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
     count: Schema.Int,
@@ -320,6 +322,8 @@ export const distributedTodos = defineScenarioHelper({
     )
   },
 })
+
+export default defineScenarioHelpers({ distributedTodos })
 ```
 
 Helper rules:
@@ -339,11 +343,12 @@ Helper rules:
   module code avoids ambient APIs; registered helpers are trusted repository
   code and must be covered by determinism tests.
 
-The shared catalogue and companion helper set compose without precedence; a
-duplicate name fails loading. Retained and committed test sources attach
-companions with static imports. Explicit local `--scenario-file` loading may
-discover the exact adjacent companion asynchronously. Inline TypeScript blocks
-and arbitrary module paths in YAML remain unsupported.
+The shared catalogue and a real companion helper set compose without
+precedence; a duplicate name fails loading. Retained and committed test sources
+attach only companions that contain one-off implementations. Explicit local
+`--scenario-file` loading may discover the exact adjacent companion
+asynchronously. Inline TypeScript blocks, registration-only companions, and
+arbitrary module paths in YAML remain unsupported.
 
 ## Expectations and defaults
 

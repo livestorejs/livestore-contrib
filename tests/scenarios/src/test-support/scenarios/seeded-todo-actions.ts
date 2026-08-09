@@ -1,5 +1,5 @@
 import { scenarioApplications } from '../../corpus/applications/registry.ts'
-import { sharedScenarioHelpers } from '../../corpus/scenario-helpers/shared.ts'
+import { sharedScenarioHelpers } from '../../corpus/scenario-helpers.ts'
 import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
 import { composeScenarioHelpers } from '../../yaml/helpers.ts'
 import localHelpers from './seeded-todo-actions.helpers.ts'

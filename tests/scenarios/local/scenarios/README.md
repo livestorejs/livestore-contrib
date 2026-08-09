@@ -16,8 +16,9 @@ my-scenario.helpers.ts
 
 The explicit file loader discovers the companion automatically. It must
 default-export `defineScenarioHelpers({...})`; YAML references those helpers by
-their registered names. Both files remain ignored until the Scenario is
-deliberately promoted.
+their registered names. The companion contains the helper's implementation
+directly. Do not add one merely to import or re-export a shared helper. Both
+files remain ignored until the Scenario is deliberately promoted.
 
 When a scenario has a clear durable purpose,
 move it to `src/corpus/scenarios/retained/examples/` or

@@ -24,15 +24,19 @@ runner and participant hosts receive only the expanded, validated,
 serializable Scenario plan; no helper callback or module reference crosses the
 execution seam.
 
-Provide two helper sources:
+Provide two helper sources with distinct ownership:
 
-1. a shared helper catalogue available to every Scenario source; and
+1. one Application-neutral shared helper catalogue available to every Scenario
+   source; and
 2. an optional same-directory companion named from the Scenario stem, so
-   `example.scenario.yaml` uses `example.helpers.ts`.
+   `example.scenario.yaml` uses `example.helpers.ts`. The companion contains
+   the actual implementation unique to that Scenario; it is never an import or
+   registration shim for shared code.
 
-The retained corpus and committed test fixtures attach companion modules with
-static imports. Explicit local `--scenario-file` loading may discover the exact
-companion filename through an isolated asynchronous Node loader. YAML never
+The retained corpus and committed test fixtures attach a companion module with
+a static import only when that source owns one-off code. Explicit local
+`--scenario-file` loading may discover the exact companion filename through an
+isolated asynchronous Node loader. YAML never
 contains an arbitrary module path. Shared and companion helper names compose
 without precedence; a duplicate is an error.
 

@@ -43,11 +43,13 @@ not claim that the system settled or met a deadline. The trace records what was
 requested and how much controller-monotonic time actually elapsed, so the
 viewer can separate intentional idle time from slow work.
 
-YAML stays declarative even when a workload needs computation. Reusable trusted
-TypeScript helpers expand to ordinary Scenario instructions before execution;
-one-off helpers may sit beside their Scenario as `name.helpers.ts`. The runner
-never loads those modules. It receives the same complete serializable plan
-whether its instructions were written directly or expanded by a helper.
+YAML stays declarative even when a workload needs computation. Application-neutral
+trusted TypeScript helpers expand to ordinary Scenario instructions before
+execution. A one-off helper may sit beside its Scenario as `name.helpers.ts`,
+but that companion contains the implementation itself rather than forwarding
+to another catalogue. The runner never loads those modules. It receives the
+same complete serializable plan whether its instructions were written directly
+or expanded by a helper.
 
 ## One Scenario, different execution boundaries
 

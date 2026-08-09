@@ -41,10 +41,11 @@ realization choices, and gaps for the private
   without profile-specific Scenario rewrites. The compiler derives normalized
   identity and capability bookkeeping, expands repetition into self-contained
   ordered action sequences, and rejects invalid source before execution;
-  Application definitions contain no Scenario generation policy. Reusable
-  shared TypeScript helpers and optional same-name `.helpers.ts` companions
-  expand finite declarative instruction fragments at the source-loading seam;
-  no helper crosses into execution. Generated actions retain stable operation
+  Application definitions contain no Scenario generation policy. Reusable,
+  Application-neutral shared TypeScript helpers and optional same-name
+  `.helpers.ts` companions containing actual one-off implementations expand
+  finite declarative instruction fragments at the source-loading seam; no
+  registration-only companion and no helper crosses into execution. Generated actions retain stable operation
   identity and deterministic keyed seed derivation; a seed reproduces generated
   inputs and requested choices, not internal delivery order.
 - **LSC.VER.SCEN-R04 Shared host conformance and policy-bounded
