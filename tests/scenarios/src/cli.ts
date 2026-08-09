@@ -9,7 +9,9 @@ import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
 import type { CloudSyncCfScenarioBackendOptions } from './backends.ts'
 import { ensureCloudSyncCf } from './cloud-sync-cf.ts'
 import { getScenarioApplication, scenarioApplications } from './corpus/applications/registry.ts'
+import { sharedScenarioHelpers } from './corpus/scenario-helpers/shared.ts'
 import { getScenario, retainedScenarioCatalog } from './corpus/scenarios/registry.ts'
+import { parseScenarioDurationMs } from './duration.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
 import {
   type RunScenarioOptions,
@@ -21,7 +23,7 @@ import {
   runProcessCloudSyncCfScenario,
   runProcessLocalSyncCfScenario,
 } from './runner.ts'
-import { compileScenarioYamlFileSync } from './yaml/file.ts'
+import { compileScenarioYamlFile } from './yaml/file.ts'
 
 type ParticipantProfile = 'in-process' | 'process' | 'browser'
 type SyncBackend = 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
@@ -132,18 +134,22 @@ Scenarios:
   const scenario =
     scenarioFile === undefined
       ? getScenario(scenarioId ?? 'offline-writer-recovery', { parameters })
-      : loadScenarioFile(path.resolve(scenarioFile), parameters)
+      : await loadScenarioFile(path.resolve(scenarioFile), parameters)
 
   const positionalOutput = args[0]?.startsWith('-') === false ? args[0] : undefined
   const output = readOption(args, '--output') ?? positionalOutput ?? `artifacts/${scenario.id}.json`
 
-  const stabilizationTimeoutMs = parseDuration(readOption(args, '--stabilization-timeout') ?? '60s')
+  const stabilizationTimeoutMs = parseScenarioDurationMs(readOption(args, '--stabilization-timeout') ?? '60s')
 
   return { profile, backend, scenario, outputPath: path.resolve(output), stabilizationTimeoutMs }
 }
 
-const loadScenarioFile = (file: string, parameters: Readonly<Record<string, string>>): ScenarioAst =>
-  compileScenarioYamlFileSync(file, { applications: scenarioApplications, parameters })
+const loadScenarioFile = (file: string, parameters: Readonly<Record<string, string>>): Promise<ScenarioAst> =>
+  compileScenarioYamlFile(file, {
+    applications: scenarioApplications,
+    helpers: sharedScenarioHelpers,
+    parameters,
+  })
 
 const readParameterOverrides = (args: ReadonlyArray<string>): Readonly<Record<string, string>> => {
   const parameters: Record<string, string> = {}
@@ -157,15 +163,6 @@ const readParameterOverrides = (args: ReadonlyArray<string>): Readonly<Record<st
     if (inline === undefined) index += 1
   }
   return parameters
-}
-
-const parseDuration = (source: string): number => {
-  const match = /^(\d+)(ms|s|m)$/.exec(source)
-  if (match === null)
-    throw new Error(`Invalid duration '${source}'. Expected a positive integer followed by ms, s, or m`)
-  const value = Number(match[1]) * (match[2] === 'm' ? 60_000 : match[2] === 's' ? 1_000 : 1)
-  if (value <= 0) throw new Error(`Duration must be positive: ${source}`)
-  return value
 }
 
 const readChoice = <const TChoices extends ReadonlyArray<string>>(

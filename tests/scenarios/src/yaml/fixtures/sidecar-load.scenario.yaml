@@ -1,0 +1,10 @@
+application: todo
+clients:
+  client-a:
+    sessions: [main]
+do:
+  - generate: sidecarEcho
+    with:
+      target: client-a/main
+      id: sidecar-todo
+      text: Loaded from a same-name helper

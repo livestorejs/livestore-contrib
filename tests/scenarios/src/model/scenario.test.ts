@@ -23,7 +23,7 @@ Vitest.describe('scenario model', () => {
     expect(() => defineScenario({ ...offlineWriterRecovery, version: 1 })).toThrow('Invalid scenario AST')
   })
 
-  Vitest.it('retains generator expansion as one self-contained serializable action sequence', () => {
+  Vitest.it('retains helper expansion as one self-contained serializable action sequence', () => {
     const encoded = JSON.parse(JSON.stringify(seededTodoActions))
     const decoded = defineScenario(encoded)
     const sequence = decoded.instructions.find((instruction) => instruction._tag === 'action-sequence')

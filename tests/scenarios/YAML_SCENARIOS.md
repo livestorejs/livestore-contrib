@@ -279,6 +279,10 @@ optional same-directory companion. For example,
 `many-writer-convergence.helpers.ts`. The YAML instruction contains only the
 helper name and JSON-compatible input:
 
+```ts
+export default defineScenarioHelpers({ distributedTodos })
+```
+
 ```yaml
 - generate: distributedTodos
   with:
@@ -299,19 +303,21 @@ export const distributedTodos = defineScenarioHelper({
   }),
   generate: ({ input, context }) => {
     const participants = context.participants(input.participants)
-    return Array.from({ length: input.count }, (_, offset) => {
-      const event = offset + 1
-      const target = context.random.iteration(event).pick('target', participants)
+    return helperActions(
+      Array.from({ length: input.count }, (_, offset) => {
+        const event = offset + 1
+        const target = context.random.iteration(event).pick('target', participants)
 
-      return {
-        target,
-        action: 'createTodo',
-        input: {
-          id: `${input.idPrefix}-${String(event).padStart(3, '0')}`,
-          text: `Distributed write ${event}`,
-        },
-      }
-    })
+        return {
+          target,
+          action: 'createTodo',
+          input: {
+            id: `${input.idPrefix}-${String(event).padStart(3, '0')}`,
+            text: `Distributed write ${event}`,
+          },
+        }
+      }),
+    )
   },
 })
 ```
@@ -323,6 +329,8 @@ Helper rules:
 - helper input is schema-validated before invocation;
 - output is bounded, assigned compiler-owned IDs, checked against the selected
   Application's action schemas, and embedded in the normalized Scenario;
+- `between` and local `expect` apply when the helper returns `helperActions`;
+  `helperInstructions` instead expands ordinary `do` entries in place;
 - deterministic randomness is derived from the Scenario seed, helper
   instruction identity, iteration, and caller-supplied key;
 - helpers receive no clock, filesystem, network, environment, runner, or

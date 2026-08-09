@@ -1,6 +1,10 @@
 import type { ScenarioAst } from '../../model.ts'
 import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
+import { composeScenarioHelpers } from '../../yaml/helpers.ts'
 import { scenarioApplications } from '../applications/registry.ts'
+import { sharedScenarioHelpers } from '../scenario-helpers/shared.ts'
+import manyWriterHelpers from './retained/findings/many-writer-convergence.helpers.ts'
+import pendingTailHelpers from './retained/findings/pending-tail-recovery.helpers.ts'
 
 export interface RetainedScenarioEntry {
   readonly kind: 'example' | 'finding'
@@ -25,11 +29,13 @@ const sources = [
     kind: 'finding',
     findingId: 'SF-02',
     file: new URL('./retained/findings/pending-tail-recovery.scenario.yaml', import.meta.url),
+    helpers: pendingTailHelpers,
   },
   {
     kind: 'finding',
     findingId: 'SF-03',
     file: new URL('./retained/findings/many-writer-convergence.scenario.yaml', import.meta.url),
+    helpers: manyWriterHelpers,
   },
   {
     kind: 'finding',
@@ -38,13 +44,20 @@ const sources = [
   },
 ] as const
 
-const compile = (file: URL, options: RetainedScenarioCompileOptions = {}): ScenarioAst =>
-  compileScenarioYamlFileSync(file, { applications: scenarioApplications, ...options })
+const compile = (source: (typeof sources)[number], options: RetainedScenarioCompileOptions = {}): ScenarioAst =>
+  compileScenarioYamlFileSync(source.file, {
+    applications: scenarioApplications,
+    helpers: composeScenarioHelpers([
+      { source: 'shared Scenario helper catalogue', helpers: sharedScenarioHelpers },
+      { source: source.file.pathname, helpers: 'helpers' in source ? source.helpers : undefined },
+    ]),
+    ...options,
+  })
 
 export const retainedScenarioCatalog: ReadonlyArray<RetainedScenarioEntry> = sources.map((source) => ({
   kind: source.kind,
   ...('findingId' in source ? { findingId: source.findingId } : {}),
-  scenario: compile(source.file),
+  scenario: compile(source),
 }))
 
 export const scenarioCorpus: ReadonlyArray<ScenarioAst> = retainedScenarioCatalog.map(({ scenario }) => scenario)
@@ -66,7 +79,7 @@ export const getScenario = (scenarioId: string, options: RetainedScenarioCompile
   const source = sourcesById.get(scenarioId)
   if (source !== undefined) {
     if (options.parameters === undefined && options.seed === undefined) return scenariosById.get(scenarioId)!
-    return compile(source.file, options)
+    return compile(source, options)
   }
   throw new Error(`Unknown scenario '${scenarioId}'. Expected: ${[...sourcesById.keys()].join(', ')}`)
 }

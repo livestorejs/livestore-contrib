@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest'
 
+import { Schema } from '@livestore/utils/effect'
+
 import { scenarioApplications } from '../corpus/applications/registry.ts'
+import { sharedScenarioHelpers } from '../corpus/scenario-helpers/shared.ts'
+import { todoSeries } from '../corpus/scenario-helpers/todo.ts'
 import { compileScenarioYamlSource } from './compiler.ts'
+import { composeScenarioHelpers, defineScenarioHelper, defineScenarioHelpers, helperInstructions } from './helpers.ts'
+
+const waitThenCreate = defineScenarioHelper({
+  input: Schema.Struct({ target: Schema.String, id: Schema.String }),
+  generate: ({ input }) =>
+    helperInstructions([
+      { wait: '5ms' },
+      { run: 'createTodo', as: input.target, with: { id: input.id, text: 'Created after a helper wait' } },
+    ]),
+})
+
+const compilerHelpers = composeScenarioHelpers([
+  { source: 'shared Scenario helper catalogue', helpers: sharedScenarioHelpers },
+  { source: 'compiler test helpers', helpers: defineScenarioHelpers({ todoSeries, waitThenCreate }) },
+])
 
 const compile = (
   source: string,
@@ -15,6 +34,7 @@ const compile = (
     fileName: options.fileName ?? 'example.scenario.yaml',
     source,
     applications: scenarioApplications,
+    helpers: compilerHelpers,
     parameters: options.parameters,
     seed: options.seed,
   })
@@ -114,7 +134,7 @@ do:
     )
   })
 
-  it('expands registered TypeScript generators deterministically and validates their actions', () => {
+  it('expands registered TypeScript helpers deterministically and validates their actions', () => {
     const source = `
 application: todo
 seed: 12
@@ -147,7 +167,7 @@ do:
     )
   })
 
-  it('requires an explicit seed when a generator consumes deterministic randomness', () => {
+  it('requires an explicit seed when a helper consumes deterministic randomness', () => {
     expect(() =>
       compile(`
 application: todo
@@ -162,7 +182,68 @@ do:
       idPrefix: generated
       textPrefix: Generated item
 `),
-    ).toThrow("Generator 'todoSeries' uses deterministic randomness and requires an explicit seed")
+    ).toThrow("Helper 'todoSeries' uses deterministic randomness and requires an explicit seed")
+  })
+
+  it('uses an application-neutral shared helper with application validation after expansion', () => {
+    const scenario = compile(`
+application: todo
+clients:
+  client-a:
+    sessions: [main]
+  client-b:
+    sessions: [main]
+participants:
+  writers: [client-a/main, client-b/main]
+do:
+  - generate: distributeActions
+    with:
+      action: createTodo
+      participants: writers
+      strategy: round-robin
+      inputs:
+        - { id: todo-a, text: A }
+        - { id: todo-b, text: B }
+`)
+    const sequence = scenario.instructions[0]
+    expect(sequence).toEqual(expect.objectContaining({ _tag: 'action-sequence' }))
+    if (sequence?._tag !== 'action-sequence') return
+    expect(sequence.actions.map(({ target, input }) => [target.clientId, input])).toEqual([
+      ['client-a', { id: 'todo-a', text: 'A' }],
+      ['client-b', { id: 'todo-b', text: 'B' }],
+    ])
+  })
+
+  it('expands arbitrary declarative instructions without changing the runner vocabulary', () => {
+    const scenario = compile(`
+application: todo
+clients:
+  client-a:
+    sessions: [main]
+do:
+  - generate: waitThenCreate
+    with:
+      target: client-a/main
+      id: helper-created
+`)
+
+    expect(scenario.instructions).toEqual([
+      { _tag: 'wait', id: 'wait-0001', durationMs: 5 },
+      expect.objectContaining({
+        _tag: 'action',
+        id: 'action-0001',
+        input: { id: 'helper-created', text: 'Created after a helper wait' },
+      }),
+    ])
+  })
+
+  it('rejects helper name collisions rather than applying precedence', () => {
+    expect(() =>
+      composeScenarioHelpers([
+        { source: 'shared', helpers: defineScenarioHelpers({ todoSeries }) },
+        { source: 'companion', helpers: defineScenarioHelpers({ todoSeries }) },
+      ]),
+    ).toThrow("Duplicate Scenario helper 'todoSeries' from shared and companion")
   })
 
   it('normalizes waits and fixed-delay pacing', () => {

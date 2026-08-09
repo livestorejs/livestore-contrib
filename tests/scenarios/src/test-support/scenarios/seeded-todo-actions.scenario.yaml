@@ -1,6 +1,6 @@
 application: todo
 seed: 1445
-about: A seeded Scenario expands a readable generator call into concrete todo actions.
+about: A seeded Scenario expands a readable helper call into concrete todo actions.
 
 clients:
   client-a:

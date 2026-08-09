@@ -11,6 +11,7 @@ import {
   type ScenarioTraceRecord,
 } from '../model.ts'
 import type { HostError, ParticipantHost } from '../profiles/contract.ts'
+import { waitAtLeast } from './clock.ts'
 import { syncObservationPayload } from './eventlog.ts'
 import { type ScenarioFaultState, recordOperationFailure } from './faults.ts'
 import { awaitStabilization } from './observations.ts'
@@ -406,16 +407,6 @@ const executeActionSequence = (args: {
       },
     })
   })
-
-const waitAtLeast = (durationMs: number): Effect.Effect<number> => {
-  const startedAt = performance.now()
-  const loop: Effect.Effect<number> = Effect.suspend(() => {
-    const elapsed = performance.now() - startedAt
-    const remaining = durationMs - elapsed
-    return remaining <= 0 ? Effect.succeed(elapsed) : Effect.sleep(remaining).pipe(Effect.andThen(loop))
-  })
-  return loop
-}
 
 const setConnectivity = (args: {
   host: ParticipantHost

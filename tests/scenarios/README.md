@@ -194,14 +194,14 @@ each child outcome, and joins the group before the next instruction. The
 `operation-history` oracle can require named operations to have terminal,
 non-indefinite outcomes and overlapping intervals.
 
-`defineScenario(({ repeatActions }) => ...)` keeps repetition directly in the
-instruction stream. The callback names ordinary application actions and their
+YAML repetition and registered TypeScript helpers keep generated work directly
+in the instruction stream. Helpers name ordinary application actions and their
 inputs; keyed deterministic random choices derive from the Scenario seed,
-sequence ID, iteration, and choice key. Inserting an unrelated random
+helper identity, iteration, and choice key. Inserting an unrelated random
 choice therefore does not shift later choices.
 
 Authoring expands immediately into a serializable `action-sequence` containing
-every concrete action and stable child operation ID. No callback or generator
+every concrete action and stable child operation ID. No callback or helper
 crosses into the runner, participant hosts, or artifact. The runner dispatches
 the embedded actions sequentially under one enclosing instruction/outcome
 boundary, and raw trace retains every child action. An action sequence contains

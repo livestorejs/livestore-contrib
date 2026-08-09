@@ -19,11 +19,14 @@ do:
 
   - disconnect: client-a
 
-  - generate: largePayloadTodo
+  - generate: largeStringAction
     with:
       target: client-a/session-a
-      id: large-payload
-      payloadBytes: ${payload_bytes}
+      action: createTodo
+      input:
+        id: large-payload
+      field: text
+      bytes: ${payload_bytes}
 
   - reconnect: client-a
 

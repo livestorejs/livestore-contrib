@@ -2,12 +2,8 @@ import { LineCounter, parseAllDocuments } from 'yaml'
 
 import type { Schema } from '@livestore/utils/effect'
 
-import type {
-  GeneratedScenarioAction,
-  ScenarioGeneratorContext,
-  ScenarioGeneratorRandom,
-} from '../application/definition.ts'
 import type { RegisteredApplication } from '../corpus/applications/registry.ts'
+import { parseScenarioDurationMs, ScenarioDurationError } from '../duration.ts'
 import {
   defineScenario,
   type ParallelOperationStep,
@@ -17,11 +13,18 @@ import {
   type ScenarioInstruction,
   type ScenarioOracle,
 } from '../model.ts'
+import type {
+  GeneratedScenarioAction,
+  ScenarioHelperContext,
+  ScenarioHelperRandom,
+  ScenarioHelperRegistry,
+} from './helpers.ts'
 
 export interface ScenarioCompileOptions {
   readonly fileName: string
   readonly source: string
   readonly applications: ReadonlyArray<RegisteredApplication>
+  readonly helpers?: ScenarioHelperRegistry
   readonly parameters?: Readonly<Record<string, string | number | boolean>>
   readonly seed?: number
 }
@@ -247,7 +250,7 @@ class ScenarioYamlCompiler {
     }
   }
 
-  #compileInstruction(value: unknown, path: string): void {
+  #compileInstruction(value: unknown, path: string, allowHelper = true): void {
     const instruction = this.#record(value, path)
     if ('run' in instruction) {
       this.#assertKeys(instruction, ['run', 'as', 'with'], path)
@@ -350,7 +353,13 @@ class ScenarioYamlCompiler {
       return
     }
     if ('generate' in instruction) {
-      this.#compileGenerator(instruction, path)
+      if (allowHelper === false) {
+        this.#fail(
+          `${path}.generate`,
+          'A helper cannot invoke another helper; compose their TypeScript functions instead',
+        )
+      }
+      this.#compileHelper(instruction, path)
       return
     }
     this.#fail(
@@ -521,56 +530,82 @@ class ScenarioYamlCompiler {
     }
   }
 
-  #compileGenerator(instruction: Record<string, unknown>, path: string): void {
+  #compileHelper(instruction: Record<string, unknown>, path: string): void {
     this.#assertKeys(instruction, ['generate', 'with', 'between', 'expect'], path)
     const name = this.#string(instruction.generate, `${path}.generate`)
-    const generator = this.#application.scenarioGenerators?.[name]
-    if (generator === undefined) {
-      this.#fail(`${path}.generate`, `Unknown generator '${name}' for application '${this.#application.scenarioName}'`)
+    const helper = this.#options.helpers?.[name]
+    if (helper === undefined) {
+      this.#fail(`${path}.generate`, `Unknown Scenario helper '${name}'`)
     }
-    const generatorInput = this.#resolveValue(instruction.with ?? {}, `${path}.with`, this.#values)
-    if (isJson(generatorInput) === false) this.#fail(`${path}.with`, 'Generator input must resolve to JSON')
-    const sequenceId = this.#nextId('generate')
-    const sequenceSeed = hashString(`${this.#seed}\u0000${sequenceId}`)
+    const helperInput = this.#resolveValue(instruction.with ?? {}, `${path}.with`, this.#values)
+    if (isJson(helperInput) === false) this.#fail(`${path}.with`, 'Helper input must resolve to JSON')
+    const helperId = this.#nextId('generate')
+    const helperSeed = hashString(`${this.#seed}\u0000${helperId}`)
     const randomUsage = { used: false }
-    const context: ScenarioGeneratorContext = {
+    const context: ScenarioHelperContext = {
       random: {
         iteration: (iteration) => {
           randomUsage.used = true
           if (Number.isInteger(iteration) === false || iteration <= 0) {
-            this.#fail(`${path}.generate`, `Generator random iteration must be a positive integer: ${iteration}`)
+            this.#fail(`${path}.generate`, `Helper random iteration must be a positive integer: ${iteration}`)
           }
-          return makeScenarioRandom(sequenceSeed, iteration)
+          return makeScenarioRandom(helperSeed, iteration)
         },
       },
       participant: (reference) => this.#resolveParticipant(reference, `${path}.generate`, false),
       participants: (selection) => this.#resolveParticipantSelection(selection, `${path}.generate`, true),
     }
 
-    let generated: ReadonlyArray<GeneratedScenarioAction>
+    let expansion: ReturnType<(typeof helper)['expand']>
     try {
-      generated = generator.generate(generatorInput, context)
+      expansion = helper.expand(helperInput, context)
     } catch (cause) {
       if (cause instanceof ScenarioYamlError) throw cause
       this.#fail(
         `${path}.generate`,
-        `Generator '${name}' failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+        `Helper '${name}' failed: ${cause instanceof Error ? cause.message : String(cause)}`,
       )
     }
     if (randomUsage.used === true && this.#hasExplicitSeed === false) {
-      this.#fail(`${path}.generate`, `Generator '${name}' uses deterministic randomness and requires an explicit seed`)
+      this.#fail(`${path}.generate`, `Helper '${name}' uses deterministic randomness and requires an explicit seed`)
     }
-    if (Array.isArray(generated) === false || generated.length === 0 || generated.length > 10_000) {
-      this.#fail(`${path}.generate`, `Generator '${name}' must return between 1 and 10000 actions`)
+    if (typeof expansion !== 'object' || expansion === null || !('_tag' in expansion)) {
+      this.#fail(`${path}.generate`, `Helper '${name}' returned an invalid expansion`)
     }
-    const actions = generated.map((action, offset) =>
-      this.#compileGeneratedAction(action, `${sequenceId}:${pad(offset + 1, 4)}`, `${path}.generate[${offset}]`),
+    if (expansion._tag === 'instructions') {
+      if (instruction.between !== undefined || instruction.expect !== undefined) {
+        this.#fail(path, "'between' and 'expect' apply only when a helper expands to an action sequence")
+      }
+      if (
+        Array.isArray(expansion.instructions) === false ||
+        expansion.instructions.length === 0 ||
+        expansion.instructions.length > 10_000
+      ) {
+        this.#fail(`${path}.generate`, `Helper '${name}' must return between 1 and 10000 instructions`)
+      }
+      for (let index = 0; index < expansion.instructions.length; index += 1) {
+        this.#compileInstruction(expansion.instructions[index], `${path}.generate[${index}]`, false)
+      }
+      return
+    }
+    if (expansion._tag !== 'actions') {
+      this.#fail(`${path}.generate`, `Helper '${name}' returned an unknown expansion`)
+    }
+    if (
+      Array.isArray(expansion.actions) === false ||
+      expansion.actions.length === 0 ||
+      expansion.actions.length > 10_000
+    ) {
+      this.#fail(`${path}.generate`, `Helper '${name}' must return between 1 and 10000 actions`)
+    }
+    const actions = expansion.actions.map((action, offset) =>
+      this.#compileGeneratedAction(action, `${helperId}:${pad(offset + 1, 4)}`, `${path}.generate[${offset}]`),
     )
     this.#instructions.push({
       _tag: 'action-sequence',
-      id: sequenceId,
-      description: `Generate ${name} (${actions.length} actions)`,
-      seed: sequenceSeed,
+      id: helperId,
+      description: expansion.description ?? `Generate ${name} (${actions.length} actions)`,
+      seed: helperSeed,
       delayBetweenActionsMs:
         instruction.between === undefined ? null : this.#duration(instruction.between, `${path}.between`),
       actions,
@@ -818,12 +853,12 @@ class ScenarioYamlCompiler {
 
   #duration(value: unknown, path: string): number {
     const source = this.#string(value, path)
-    const match = /^([1-9][0-9]*)(ms|s|m)$/.exec(source)
-    if (match === null) this.#fail(path, `Expected a positive duration in ms, s, or m; received '${source}'`)
-    const multiplier = match[2] === 'ms' ? 1 : match[2] === 's' ? 1_000 : 60_000
-    const durationMs = Number(match[1]) * multiplier
-    if (Number.isSafeInteger(durationMs) === false) this.#fail(path, `Duration is too large: '${source}'`)
-    return durationMs
+    try {
+      return parseScenarioDurationMs(source)
+    } catch (cause) {
+      if (cause instanceof ScenarioDurationError) this.#fail(path, cause.message)
+      throw cause
+    }
   }
 
   #nextId(kind: string): string {
@@ -911,7 +946,7 @@ const parseYamlDocument = (fileName: string, source: string): Record<string, unk
   return value
 }
 
-const makeScenarioRandom = (seed: number, iteration: number): ScenarioGeneratorRandom => {
+const makeScenarioRandom = (seed: number, iteration: number): ScenarioHelperRandom => {
   const next = (key: string): number => hashString(`${seed}\u0000${iteration}\u0000${key}`) / 4_294_967_296
   return {
     next,
