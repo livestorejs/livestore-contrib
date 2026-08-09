@@ -22,7 +22,7 @@ published Scenario product package (LSC.VER.SCEN-R01).
 
 ## Scenario and Application Model
 
-Committed and local cases are deterministic `.scenario` instruction files. A
+Committed and local cases are deterministic `.scenario.yaml` instruction files. A
 compiler validates complete source and produces the current serializable
 Scenario plan before execution. The filename stem supplies Scenario identity;
 source selects one registered Application, declares explicit Client/session
@@ -33,9 +33,15 @@ format versions, and runner-owned instruction/oracle IDs are not authored.
 
 Concrete Application definitions wrap the actual `LiveStoreSchema`; named
 actions expose strict input validation before dispatch, State inspectors encode
-their output as JSON, and they contain no Scenario generation policy. The
-Scenario never redeclares Events or materializers. The normalized plan remains
-the runner and artifact boundary; the runner does not interpret source text.
+their output as JSON, and they contain no Scenario generation policy. Shared
+TypeScript helpers and optional `name.helpers.ts` companions belong to Scenario
+source loading instead. They expand Schema-validated input into finite
+declarative instruction fragments, which pass through the same compiler-owned
+identity, participant, capability, and Application-action validation as direct
+YAML. Duplicate shared/companion names are rejected. The Scenario never
+redeclares Events or materializers. The normalized plan remains the runner and
+artifact boundary; the runner does not interpret source text or load helper
+modules.
 
 The topology separates the backend from stable Client identities and their
 explicitly named sessions. Initial topology plus ordered Client/session
@@ -53,13 +59,22 @@ before the first Client is created. A recorded seed reproduces generated inputs
 and requested choices from the same source revision; it does not claim to
 reproduce internal host or Sync delivery order (LSC.VER.SCEN-R03).
 
+Retained and committed test Scenario registries attach companion helpers with
+static TypeScript imports. The Node-only loader for an explicit local
+`--scenario-file` may discover the exact adjacent companion filename
+asynchronously. YAML never names an arbitrary module path. Helper computation
+is trusted repository or explicitly selected local code, remains synchronous
+and deterministic over its inputs, and receives no ambient capability through
+its compiler context. See
+[decision 0014](./.decisions/0014-reusable-typescript-scenario-helpers.md).
+
 An explicit `wait <duration>` is one ordered instruction requesting that the
 controller delay the next instruction by at least that positive duration.
 `repeat ... with <duration> between:` applies fixed-delay pacing after each
 acknowledged child action except the last. It does not delay the first action,
 compress later gaps when an action runs slowly, or create concurrent work. Both
-forms normalize durations to milliseconds and retain requested plus actual
-controller-monotonic elapsed evidence. They do not establish Quiescence,
+forms normalize durations through Effect `Duration` to milliseconds and retain
+requested plus actual elapsed evidence from Effect `Clock`. They do not establish Quiescence,
 Settlement, synchronization, State equality, an exact schedule, or a timing
 oracle. Logical time continues to express plan order rather than milliseconds
 (LSC.VER.SCEN-R09).
@@ -176,7 +191,7 @@ representative examples: offline writer recovery and multi-session
 recovery. Focused host-contract Scenarios remain committed test fixtures
 without becoming CLI corpus entries. Generated investigations, controls, and
 reductions begin under the Git-ignored `local/scenarios/` tier and run by file;
-promotion is the deliberate move of a reduced, focused `.scenario` source into
+promotion is the deliberate move of a reduced, focused `.scenario.yaml` source into
 `retained/findings/` or `retained/examples/` plus registry and regression
 evidence. Each Scenario selects one registered Application. The associated
 [red-team plan](../../../tests/scenarios/RED_TEAMING.md) defines the wider search,

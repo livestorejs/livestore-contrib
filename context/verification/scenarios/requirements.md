@@ -7,15 +7,12 @@ hosts, backend profiles, corpus, evidence protocol, artifacts, and React viewer.
 ## Context
 
 Refines core
-[`LS.SYS.VER-R08`](https://github.com/livestorejs/livestore/blob/main/context/02-system/09-verification/requirements.md),
-which defines the required composed-system evidence boundary without
-prescribing a Scenario mechanism. Core may name this realization through a
-minimal discovery pointer under
-[core decision 0003](https://github.com/livestorejs/livestore/blob/main/context/.decisions/0003-contrib-referencing.md);
-this node still owns the concrete model, protocol, terminology, realization
-choices, and gaps for the private
+[`LS.SYS.VER.LANE-R01`](https://github.com/livestorejs/livestore/blob/main/context/02-system/09-verification/01-lanes/requirements.md),
+which defines the layered runnable verification surface. This node owns the
+additional contrib Scenario lane's concrete model, protocol, terminology,
+realization choices, and gaps for the private
 [`@local/tests-scenarios`](../../../tests/scenarios) workspace.
-`refines: LS.SYS.VER-R08`
+`refines: LS.SYS.VER.LANE-R01`
 
 ## Requirements
 
@@ -37,17 +34,19 @@ choices, and gaps for the private
   evidence it actually supplies.
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
-  versioned Scenario plans, named actions, one deterministic `.scenario`
+  versioned Scenario plans, named actions, one deterministic `.scenario.yaml`
   language, Scenario-owned seeded authoring, one ordered instruction stream,
   optional zero-effect annotations, topology/lifecycle/fault plans, default or
   explicit oracle contracts, and preflight capability derivation are shared
   without profile-specific Scenario rewrites. The compiler derives normalized
   identity and capability bookkeeping, expands repetition into self-contained
   ordered action sequences, and rejects invalid source before execution;
-  Application definitions contain no Scenario generation policy. Generated
-  actions retain stable operation identity and deterministic keyed seed
-  derivation; a seed reproduces generated inputs and requested choices, not
-  internal delivery order.
+  Application definitions contain no Scenario generation policy. Reusable
+  shared TypeScript helpers and optional same-name `.helpers.ts` companions
+  expand finite declarative instruction fragments at the source-loading seam;
+  no helper crosses into execution. Generated actions retain stable operation
+  identity and deterministic keyed seed derivation; a seed reproduces generated
+  inputs and requested choices, not internal delivery order.
 - **LSC.VER.SCEN-R04 Shared host conformance and policy-bounded
   stabilization:** Every implemented profile runs the same
   capability-parameterized host suite. Control acknowledgements, failure

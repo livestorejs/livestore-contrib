@@ -10,14 +10,15 @@ The Scenario package owns the schema and semantic validation that turn the
 document into the normalized `ScenarioAst` consumed by the runner.
 
 Some Scenario data is most clearly produced with ordinary TypeScript. YAML may
-therefore invoke named, application-registered generators. A generator expands
-one YAML instruction into a deterministic sequence of concrete application
-actions before the Scenario is validated and run.
+therefore invoke named helpers resolved by Scenario source loading. A helper
+expands one YAML instruction into finite declarative Scenario instructions
+before the Scenario is validated and run. Helpers do not belong to the selected
+Application and never cross into the runner.
 
 The authoring path is:
 
 ```text
-.scenario.yaml -> YAML parser -> parameter and generator expansion -> ScenarioAst validation -> runner
+.scenario.yaml -> YAML parser -> parameter and helper expansion -> ScenarioAst validation -> runner
 ```
 
 No compiled file needs to be persisted. Run artifacts retain the fully expanded
@@ -266,14 +267,17 @@ A simple declarative repeat expands one action:
 action has no trailing delay. It describes a fixed delay after one acknowledged
 action and before the next invocation, not a fixed cadence.
 
-Use a TypeScript generator when iteration needs branching, computed structured
+Use a TypeScript helper when iteration needs branching, computed structured
 values, seeded choice, or other logic that would expand the YAML expression
 language.
 
-## TypeScript generators
+## TypeScript helpers
 
-A generator is registered by the selected Application under a stable name. The
-YAML instruction contains only that name and JSON-compatible input:
+A helper is registered under a stable name in the shared catalogue or in an
+optional same-directory companion. For example,
+`many-writer-convergence.scenario.yaml` may have
+`many-writer-convergence.helpers.ts`. The YAML instruction contains only the
+helper name and JSON-compatible input:
 
 ```yaml
 - generate: distributedTodos
@@ -284,10 +288,10 @@ YAML instruction contains only that name and JSON-compatible input:
   between: 250ms
 ```
 
-The generator uses ordinary TypeScript:
+The helper uses ordinary TypeScript:
 
 ```ts
-export const distributedTodos = defineScenarioGenerator({
+export const distributedTodos = defineScenarioHelper({
   input: Schema.Struct({
     participants: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
     count: Schema.Int,
@@ -312,26 +316,26 @@ export const distributedTodos = defineScenarioGenerator({
 })
 ```
 
-Generator rules:
+Helper rules:
 
-- generators return concrete application actions, never arbitrary runner
-  instructions or oracles;
-- generator input is schema-validated before invocation;
+- helpers return finite declarative fragments from the existing Scenario
+  instruction vocabulary, never runner callbacks or oracles;
+- helper input is schema-validated before invocation;
 - output is bounded, assigned compiler-owned IDs, checked against the selected
   Application's action schemas, and embedded in the normalized Scenario;
-- deterministic randomness is derived from the Scenario seed, generator
+- deterministic randomness is derived from the Scenario seed, helper
   instruction identity, iteration, and caller-supplied key;
-- generators receive no clock, filesystem, network, environment, runner, or
+- helpers receive no clock, filesystem, network, environment, runner, or
   participant-host capability through their context;
 - the framework guarantees deterministic inputs but cannot prove that arbitrary
-  module code avoids ambient APIs; registered generators are trusted repository
+  module code avoids ambient APIs; registered helpers are trusted repository
   code and must be covered by determinism tests.
 
-Inline TypeScript blocks and module paths in YAML are intentionally unsupported.
-They would weaken editor support, make loading asynchronous and environment
-dependent, and turn Scenario files into executable-code entry points. Naming a
-registered generator keeps the readable source and executable extension point
-separate.
+The shared catalogue and companion helper set compose without precedence; a
+duplicate name fails loading. Retained and committed test sources attach
+companions with static imports. Explicit local `--scenario-file` loading may
+discover the exact adjacent companion asynchronously. Inline TypeScript blocks
+and arbitrary module paths in YAML remain unsupported.
 
 ## Expectations and defaults
 
@@ -377,10 +381,10 @@ Loading a Scenario performs all of the following before the runner starts:
 2. validate the authoring document shape and parameter overrides;
 3. resolve topology, participant groups, parameters, and interpolation in
    source order;
-4. expand repeats and registered generators with stable identities;
+4. expand repeats and registered helpers with stable identities;
 5. validate application action inputs and inspector names;
 6. validate the normalized `ScenarioAst` and all cross-references.
 
 Compiling the same source, parameter overrides, seed, Application registry, and
-generator implementations must produce the same normalized Scenario. Tests run
-generators more than once and compare their complete expanded output.
+helper implementations must produce the same normalized Scenario. Tests run
+helpers more than once and compare their complete expanded output.

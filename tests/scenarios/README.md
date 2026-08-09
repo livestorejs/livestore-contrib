@@ -86,13 +86,13 @@ broader campaign and failure-reduction plan.
 
 Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications).
 They contain the real LiveStore schema, materializers, normal application
-actions, State inspectors, and any named TypeScript generators needed by YAML
-Scenario source. Generators can produce concrete actions but cannot schedule
-arbitrary runner instructions or define oracles.
+actions, and State inspectors. Reusable TypeScript helpers belong to Scenario
+authoring, not the Application runtime interface; optional one-off helpers live
+beside their YAML as `scenario-name.helpers.ts`.
 
 Scenario source uses deterministic, human-readable `.scenario.yaml` documents.
 See [YAML_SCENARIOS.md](./YAML_SCENARIOS.md) for the schema, complete construct
-reference, generator boundary, examples, and compilation semantics. The CLI
+reference, helper boundary, examples, and compilation semantics. The CLI
 compiles retained or local source before the runner starts; `--set name=value`
 overrides a declared parameter without coupling the source to environment
 variables.
