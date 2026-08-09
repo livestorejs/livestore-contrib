@@ -42,7 +42,6 @@ do:
   - restartClient: client-a
 
 expect:
-  participants: [client-a/session-a1, client-a/session-a2]
   pending: resolved
   eventlogs: converge
   state:

@@ -56,11 +56,6 @@ clients:
   client-b:
     sessions: [main]
 
-participants:
-  both:
-    - client-a/main
-    - client-b/main
-
 do:
   - disconnect: client-a
 
@@ -73,14 +68,13 @@ do:
   - reconnect: client-a
 
 expect:
-  participants: both
   pending: resolved
   eventlogs: converge
 ```
 
 Only `application`, `clients`, and `do` are required. `do` may be empty when a
 Scenario exists solely to check initial behavior. `about`, `seed`, `parameters`,
-`participants`, and `expect` are optional.
+`aliases`, and `expect` are optional.
 
 `example-name.scenario.yaml` has Scenario ID `example-name`. Source does not
 declare an ID, tags, format version, or execution profile.
@@ -117,7 +111,7 @@ When an entire scalar is one interpolation, the resolved value keeps its type:
 a string. The initial expression surface contains parameter and repeat-variable
 lookups plus `pad(value, width)`; it is not general JavaScript.
 
-## Clients and participant groups
+## Clients and aliases
 
 ```yaml
 clients:
@@ -127,24 +121,28 @@ clients:
     sessions: [main]
     connected: false
 
-participants:
+aliases:
   writers:
     - client-a/main
     - client-b/main
 ```
 
-A participant is always a fully qualified `client/session`. A group is a named
-list, not an implicit topology query. Groups may also be declared later in `do`
-after dynamic Clients or sessions are created:
+A participant is always a fully qualified `client/session`. An alias is a
+top-level name for one participant or a list. Aliases are authoring shorthand
+and never become instructions. They may name dynamically created Clients or
+sessions, but using an alias before all of its participants exist is a compile
+error:
 
 ```yaml
+aliases:
+  both: [client-a/main, client-b/main]
+
 do:
   - createClient:
       id: client-b
       sessions: [main]
 
-  - participants:
-      both: [client-a/main, client-b/main]
+  - settle: both
 ```
 
 ## Ordered instructions
@@ -356,11 +354,11 @@ When `expect` is omitted, the compiler adds `pending: resolved` and
 `eventlogs: converge` for every running participant in the final declared
 topology.
 
-Any explicit `expect` replaces the defaults completely:
+Any explicit `expect` replaces the defaults completely. Without `for`, it also
+applies to every participant still running after `do`:
 
 ```yaml
 expect:
-  participants: writers
   pending: resolved
   eventlogs: converge
   state:
@@ -371,29 +369,31 @@ expect:
         - todo-020
 ```
 
-An array expresses separate participant selections:
+Use optional `for` only when an expectation intentionally targets a subset. It
+accepts one fully qualified participant, an explicit list, or a top-level
+alias. An array expresses different scopes:
 
 ```yaml
 expect:
-  - participants: client-a/main
+  - for: client-a/main
     pending: resolved
-  - participants: both
+  - for: both
     eventlogs: converge
 ```
 
-Expectation properties correspond to normalized oracles, but the YAML groups
-them by participant selection to make the intended outcome readable. Unknown
-inspectors and malformed expectation values fail before execution.
+Expectation properties correspond to normalized oracles. Unknown aliases,
+participants, inspectors, and malformed expectation values fail before
+execution.
 
 ## Validation and determinism
 
 Loading a Scenario performs all of the following before the runner starts:
 
-1. parse YAML and reject aliases, duplicate keys, multiple documents, and
-   unsupported tags;
+1. parse YAML and reject YAML anchors/alias nodes, duplicate keys, multiple
+   documents, and unsupported tags;
 2. validate the authoring document shape and parameter overrides;
-3. resolve topology, participant groups, parameters, and interpolation in
-   source order;
+3. resolve topology, top-level aliases, parameters, and interpolation; an alias
+   may only be used after all of its participants exist;
 4. expand repeats and registered helpers with stable identities;
 5. validate application action inputs and inspector names;
 6. validate the normalized `ScenarioAst` and all cross-references.

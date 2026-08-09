@@ -30,6 +30,9 @@ topology, and contains one ordered body of operations, faults, annotations,
 action sequences, intermediate Settlement instructions, and optional final
 expectations. Profile/backend selection, Store identity, capabilities, tags,
 format versions, and runner-owned instruction/oracle IDs are not authored.
+Optional top-level aliases give reusable names to explicit Client/session
+selections and never become instructions. An alias may name a dynamically
+created participant but cannot be used before that participant exists.
 
 Concrete Application definitions wrap the actual `LiveStoreSchema`; named
 actions expose strict input validation before dispatch, State inspectors encode
@@ -49,8 +52,8 @@ The topology separates the backend from stable Client identities and their
 explicitly named sessions. Initial topology plus ordered Client/session
 additions defines the complete participant set. Participant references are
 fully qualified; Clients start connected unless declared disconnected; and
-compile-time aliases resolve only participants that exist at their source
-position. Lifecycle, connectivity, and backend-availability operations receive
+top-level aliases resolve only when all of their participants exist at the
+point of use. Lifecycle, connectivity, and backend-availability operations receive
 stable compiler-owned IDs. An annotation is a zero-effect instruction that
 emits a reached marker without creating an operation or execution boundary.
 Scenario-owned repetition derives keyed choices from the Scenario seed plus
@@ -204,8 +207,9 @@ operation in the normalized artifact.
 
 Source without final expectations defaults to pending resolution and exact
 ordered Eventlog convergence for every session still running at the end. One or
-more explicit final participant-scoped expectation blocks replace both defaults
-for the entire Scenario. The oracle catalogue also supports explicit State
+more explicit final expectation blocks replace both defaults for the entire
+Scenario and use the same final running set unless optional `for` narrows a
+block to an explicit participant selection or alias. The oracle catalogue also supports explicit State
 convergence, expected application effects, and local operation histories;
 specialized internal evidence may continue to check sampled confirmed-history
 immutability without exposing it as DSL syntax. It does not yet claim

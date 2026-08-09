@@ -104,11 +104,8 @@ clients:
     sessions: [main]
   client-b:
     sessions: [main]
-participants:
-  both: [client-a/main, client-b/main]
 do: []
 expect:
-  participants: both
   state:
     todos:
       converge: true
@@ -117,6 +114,55 @@ expect:
 
     expect(scenario.oracles.map(({ _tag }) => _tag)).toEqual(['state-convergence', 'state-contains-ids'])
     expect(scenario.oracles.every((oracle) => 'participants' in oracle && oracle.participants.length === 2)).toBe(true)
+  })
+
+  it('keeps aliases top-level, resolves future Clients at use, and scopes expectations with for', () => {
+    const scenario = compile(`
+application: todo
+clients:
+  client-a:
+    sessions: [main]
+aliases:
+  both: [client-a/main, client-b/main]
+do:
+  - createClient:
+      id: client-b
+      sessions: [main]
+  - settle: both
+expect:
+  for: client-b/main
+  pending: resolved
+`)
+
+    expect(scenario.instructions[1]).toEqual(
+      expect.objectContaining({
+        _tag: 'settle',
+        participants: [
+          { clientId: 'client-a', sessionId: 'main' },
+          { clientId: 'client-b', sessionId: 'main' },
+        ],
+      }),
+    )
+    expect(scenario.oracles).toEqual([
+      expect.objectContaining({
+        _tag: 'pending-resolution',
+        participants: [{ clientId: 'client-b', sessionId: 'main' }],
+      }),
+    ])
+  })
+
+  it('rejects alias declarations inside do', () => {
+    expect(() =>
+      compile(`
+application: todo
+clients:
+  client-a:
+    sessions: [main]
+do:
+  - aliases:
+      one: client-a/main
+`),
+    ).toThrow('Unknown instruction')
   })
 
   it('expands simple parameterized repetition and interpolation', () => {
@@ -212,7 +258,7 @@ clients:
     sessions: [main]
   client-b:
     sessions: [main]
-participants:
+aliases:
   writers: [client-a/main, client-b/main]
 do:
   - generate: distributeActions

@@ -59,7 +59,7 @@ interface RepeatExpectation {
 
 const identifier = /^[A-Za-z][A-Za-z0-9_-]*$/
 const participant = /^([A-Za-z][A-Za-z0-9_-]*)\/([A-Za-z][A-Za-z0-9_-]*)$/
-const topLevelKeys = ['application', 'about', 'seed', 'parameters', 'clients', 'participants', 'do', 'expect']
+const topLevelKeys = ['application', 'about', 'seed', 'parameters', 'clients', 'aliases', 'do', 'expect']
 
 export const compileScenarioYamlSource = (options: ScenarioCompileOptions): ScenarioAst =>
   new ScenarioYamlCompiler(options).compile()
@@ -70,7 +70,7 @@ class ScenarioYamlCompiler {
   readonly #document: Record<string, unknown>
   readonly #parameters = new Map<string, ParameterDefinition>()
   readonly #values = new Map<string, unknown>()
-  readonly #aliases = new Map<string, ReadonlyArray<ParticipantRef>>()
+  readonly #aliases = new Map<string, ReadonlyArray<{ readonly reference: string; readonly path: string }>>()
   readonly #clients = new Map<string, ClientState>()
   readonly #initialClients: Array<{ id: string; sessions: string[]; initiallyConnected: boolean }> = []
   readonly #instructions: ScenarioInstruction[] = []
@@ -103,12 +103,13 @@ class ScenarioYamlCompiler {
 
   compile(): ScenarioAst {
     this.#compileInitialClients(this.#document.clients)
-    this.#compileAliases(this.#document.participants, '$.participants')
+    this.#compileAliases(this.#document.aliases)
 
     const instructions = this.#array(this.#document.do, '$.do')
     for (let index = 0; index < instructions.length; index += 1) {
       this.#compileInstruction(instructions[index], `$.do[${index}]`)
     }
+    this.#validateAliases()
 
     if (this.#document.expect === undefined) this.#addDefaultOracles()
     else this.#compileExpectations(this.#document.expect)
@@ -236,17 +237,28 @@ class ScenarioYamlCompiler {
     }
   }
 
-  #compileAliases(value: unknown, path: string): void {
+  #compileAliases(value: unknown): void {
     if (value === undefined) return
+    const path = '$.aliases'
     const aliases = this.#record(value, path)
     for (const [name, selection] of Object.entries(aliases)) {
       const aliasPath = `${path}.${name}`
       this.#assertIdentifier(name, aliasPath)
-      if (this.#aliases.has(name) === true) this.#fail(aliasPath, `Duplicate participant group '${name}'`)
-      const participants = this.#resolveParticipantSelection(selection, aliasPath, false)
-      if (participants.length === 0) this.#fail(aliasPath, 'Participant group cannot be empty')
-      this.#aliases.set(name, participants)
-      this.#values.set(name, participants)
+      const references = (typeof selection === 'string' ? [selection] : this.#stringArray(selection, aliasPath)).map(
+        (reference, index) => {
+          const referencePath = typeof selection === 'string' ? aliasPath : `${aliasPath}[${index}]`
+          this.#parseParticipantReference(reference, referencePath)
+          return { reference, path: referencePath }
+        },
+      )
+      if (references.length === 0) this.#fail(aliasPath, 'Alias cannot be empty')
+      this.#aliases.set(name, references)
+    }
+  }
+
+  #validateAliases(): void {
+    for (const references of this.#aliases.values()) {
+      for (const { reference, path } of references) this.#resolveParticipant(reference, path, true)
     }
   }
 
@@ -325,11 +337,6 @@ class ScenarioYamlCompiler {
       this.#instructions.push({ _tag: 'add-session', id: this.#nextId('add-session'), target })
       return
     }
-    if ('participants' in instruction) {
-      this.#assertKeys(instruction, ['participants'], path)
-      this.#compileAliases(instruction.participants, `${path}.participants`)
-      return
-    }
     if ('settle' in instruction) {
       this.#compileSettlement(instruction, path)
       return
@@ -364,7 +371,7 @@ class ScenarioYamlCompiler {
     }
     this.#fail(
       path,
-      `Unknown instruction. Expected one of: run, note, disconnect, reconnect, backend, stopSession, restartSession, restartClient, createClient, addSession, participants, settle, wait, concurrently, repeat, generate`,
+      `Unknown instruction. Expected one of: run, note, disconnect, reconnect, backend, stopSession, restartSession, restartClient, createClient, addSession, settle, wait, concurrently, repeat, generate`,
     )
   }
 
@@ -695,8 +702,12 @@ class ScenarioYamlCompiler {
     for (let index = 0; index < expectations.length; index += 1) {
       const path = Array.isArray(value) === true ? `$.expect[${index}]` : '$.expect'
       const expectation = this.#record(expectations[index], path)
-      this.#assertKeys(expectation, ['participants', 'pending', 'eventlogs', 'state'], path)
-      const participants = this.#resolveParticipantSelection(expectation.participants, `${path}.participants`, true)
+      this.#assertKeys(expectation, ['for', 'pending', 'eventlogs', 'state'], path)
+      const participants =
+        expectation.for === undefined
+          ? this.#runningParticipants()
+          : this.#resolveParticipantSelection(expectation.for, `${path}.for`, true)
+      if (participants.length === 0) this.#fail(path, 'Explicit expectations require at least one running session')
       let count = 0
       if (expectation.pending !== undefined) {
         if (expectation.pending !== 'resolved') this.#fail(`${path}.pending`, "Expected 'resolved'")
@@ -767,9 +778,10 @@ class ScenarioYamlCompiler {
   #resolveParticipantSelection(value: unknown, path: string, allowAlias: boolean): ReadonlyArray<ParticipantRef> {
     if (typeof value === 'string') {
       if (allowAlias === true) {
-        if (value === 'all') return this.#runningParticipants()
         const alias = this.#aliases.get(value)
-        if (alias !== undefined) return alias
+        if (alias !== undefined) {
+          return alias.map(({ reference }) => this.#resolveParticipant(reference, path, false))
+        }
       }
       return [this.#resolveParticipant(value, path, false)]
     }

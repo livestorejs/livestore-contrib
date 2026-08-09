@@ -12,9 +12,6 @@ clients:
   client-b:
     sessions: [session-b]
 
-participants:
-  both: [client-a/session-a, client-b/session-b]
-
 do:
   - note: Client A accumulates a large pending tail while Client B confirms independent history.
 
@@ -43,7 +40,6 @@ do:
   - reconnect: client-a
 
 expect:
-  participants: both
   pending: resolved
   eventlogs: converge
   state:

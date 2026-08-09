@@ -11,9 +11,6 @@ clients:
   client-b:
     sessions: [session-b]
 
-participants:
-  both: [client-a/session-a, client-b/session-b]
-
 do:
   - note: Commit the payload while Client A cannot reach the backend.
 
@@ -31,7 +28,6 @@ do:
   - reconnect: client-a
 
 expect:
-  participants: both
   pending: resolved
   eventlogs: converge
   state:

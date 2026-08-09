@@ -14,6 +14,5 @@ do:
       text: Replace this example action
 
 expect:
-  participants: client-a/main
   pending: resolved
   eventlogs: converge

@@ -7,9 +7,6 @@ clients:
   client-b:
     sessions: [session-b]
 
-participants:
-  both: [client-a/session-a, client-b/session-b]
-
 do:
   - note: Remove the shared backend route and retain local writes on both Clients.
 
@@ -31,7 +28,6 @@ do:
   - backend: available
 
 expect:
-  participants: both
   pending: resolved
   eventlogs: converge
   state:

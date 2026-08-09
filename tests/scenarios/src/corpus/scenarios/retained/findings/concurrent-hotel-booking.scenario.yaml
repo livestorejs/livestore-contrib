@@ -7,7 +7,7 @@ clients:
   client-b:
     sessions: [session-b]
 
-participants:
+aliases:
   both: [client-a/session-a, client-b/session-b]
 
 do:

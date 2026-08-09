@@ -16,11 +16,12 @@ semantics or application behavior into prose.
 Author committed and local cases as `.scenario` files. The filename stem is the
 Scenario ID. Source selects one registered Application explicitly, may add an
 optional description, declares every Client and session, and then gives one
-flat ordered body of instructions, compile-time participant aliases, and
-optional final expectations. Participant references are always fully qualified
-as `client/session`; Clients start connected unless explicitly declared
-disconnected. Aliases resolve top-to-bottom and cannot refer to future dynamic
-topology.
+set of top-level compile-time aliases, one flat ordered body of instructions,
+and optional final expectations. Participant references are always fully
+qualified as `client/session`; Clients start connected unless explicitly
+declared disconnected. Aliases never appear in the instruction stream. They
+may refer to future dynamic topology, but cannot be used before the referenced
+Client/session exists.
 
 The deterministic compiler parses and validates the complete source before a
 participant starts, expands repetition and keyed random choices, derives Store
@@ -33,9 +34,10 @@ typed boundaries. An annotation remains an explicit zero-effect `note`.
 
 When no final `expect` block is authored, compile pending-resolution and exact
 ordered Eventlog-convergence oracles for every session still running after the
-last instruction. One or more explicit final `expect <participants>:` blocks
-replace those defaults for the whole Scenario; each body line maps to one
-oracle, while Application-specific State expectations remain explicit. Local
+last instruction. One or more explicit final `expect` blocks replace those
+defaults for the whole Scenario and apply to the same final running set unless
+optional `for` narrows one block. Each expectation maps to one oracle, while
+Application-specific State expectations remain explicit. Local
 operation-history expectations stay inside their `concurrently` or repeated
 action block.
 

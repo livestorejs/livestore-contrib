@@ -36,8 +36,9 @@ realization choices, and gaps for the private
   Application definitions over real `LiveStoreSchema` values, declarative and
   versioned Scenario plans, named actions, one deterministic `.scenario.yaml`
   language, Scenario-owned seeded authoring, one ordered instruction stream,
-  optional zero-effect annotations, topology/lifecycle/fault plans, default or
-  explicit oracle contracts, and preflight capability derivation are shared
+  optional zero-effect annotations, topology/lifecycle/fault plans, top-level
+  participant aliases with no runtime instruction, default or explicitly
+  scoped oracle contracts, and preflight capability derivation are shared
   without profile-specific Scenario rewrites. The compiler derives normalized
   identity and capability bookkeeping, expands repetition into self-contained
   ordered action sequences, and rejects invalid source before execution;

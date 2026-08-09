@@ -7,9 +7,6 @@ clients:
   client-b:
     sessions: [session-b]
 
-participants:
-  both: [client-a/session-a, client-b/session-b]
-
 do:
   - note: Client A writes offline while Client B writes against the shared backend.
 
@@ -36,7 +33,6 @@ do:
   - reconnect: client-a
 
 expect:
-  participants: both
   pending: resolved
   eventlogs: converge
   state:

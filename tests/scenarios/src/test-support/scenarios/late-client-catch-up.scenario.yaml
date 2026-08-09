@@ -31,9 +31,6 @@ do:
       id: client-b
       sessions: [session-b]
 
-  - participants:
-      both: [client-a/session-a, client-b/session-b]
-
   - concurrently:
       - run: createTodo
         as: client-a/session-a
@@ -48,7 +45,6 @@ do:
           text: Written by the late Client
 
 expect:
-  participants: both
   pending: resolved
   eventlogs: converge
   state:

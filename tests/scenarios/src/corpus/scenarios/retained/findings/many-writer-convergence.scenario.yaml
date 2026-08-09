@@ -12,7 +12,7 @@ clients:
   client-2:
     sessions: [session-2]
 
-participants:
+aliases:
   writers: [client-1/session-1, client-2/session-2]
 
 do:
@@ -25,7 +25,6 @@ do:
       idPrefix: many-writer
 
 expect:
-  participants: writers
   pending: resolved
   eventlogs: converge
   state:
