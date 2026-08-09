@@ -1,10 +1,10 @@
 import { catalog, effectDevDeps, localPackageDefaults, packageJson, workspaceMember } from '../../genie/repo.ts'
-import adapterWebPkg from '../../packages/@livestore/adapter-web/package.json.genie.ts'
-import commonPkg from '../../packages/@livestore/common/package.json.genie.ts'
-import livestorePkg from '../../packages/@livestore/livestore/package.json.genie.ts'
-import syncCfPkg from '../../packages/@livestore/sync-cf/package.json.genie.ts'
-import utilsDevPkg from '../../packages/@livestore/utils-dev/package.json.genie.ts'
-import utilsPkg from '../../packages/@livestore/utils/package.json.genie.ts'
+import adapterWebPkg from '../../repos/livestore/packages/@livestore/adapter-web/package.json.genie.ts'
+import commonPkg from '../../repos/livestore/packages/@livestore/common/package.json.genie.ts'
+import livestorePkg from '../../repos/livestore/packages/@livestore/livestore/package.json.genie.ts'
+import syncCfPkg from '../../repos/livestore/packages/@livestore/sync-cf/package.json.genie.ts'
+import utilsDevPkg from '../../repos/livestore/packages/@livestore/utils-dev/package.json.genie.ts'
+import utilsPkg from '../../repos/livestore/packages/@livestore/utils/package.json.genie.ts'
 
 const runtimeDeps = catalog.compose({
   workspace: workspaceMember('tests/scenarios'),
@@ -20,7 +20,15 @@ const runtimeDeps = catalog.compose({
   devDependencies: {
     workspace: [utilsDevPkg],
     external: {
-      ...effectDevDeps('@types/node', '@types/react', '@types/react-dom', '@vitejs/plugin-react', 'vite', 'vitest'),
+      ...effectDevDeps(
+        '@types/node',
+        '@types/react',
+        '@types/react-dom',
+        '@vitejs/plugin-react',
+        'typescript',
+        'vite',
+        'vitest',
+      ),
       '@storybook/addon-a11y': '10.5.4',
       '@storybook/react-vite': '10.5.4',
       storybook: '10.5.4',

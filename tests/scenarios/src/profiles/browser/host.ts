@@ -64,13 +64,11 @@ export const makeBrowserHost = (args: {
   backend: Pick<ScenarioBackend, 'id' | 'observe' | 'setAvailability' | 'serializedConfig' | 'componentVersions'>
 }): Effect.Effect<BrowserParticipantHost, ScenarioOperationError, Scope.Scope> =>
   Effect.gen(function* () {
-    try {
-      getScenarioApplication(args.applicationId)
-    } catch {
-      return yield* Effect.fail(
+    yield* Effect.try({
+      try: () => getScenarioApplication(args.applicationId),
+      catch: () =>
         new ScenarioOperationError('application-mismatch', `Browser fixture does not provide ${args.applicationId}`),
-      )
-    }
+    })
     if (args.backend.serializedConfig._tag !== 'sync-cf-ws') {
       return yield* Effect.fail(
         new ScenarioOperationError('capability-unavailable', 'Browser profile requires a WebSocket sync-cf backend'),
@@ -672,6 +670,7 @@ const startFixtureServer = (args: {
     Effect.tryPromise({
       try: async () => {
         const server = await createServer({
+          cacheDir: path.join(import.meta.dirname, '../../../node_modules/.vite/browser-fixture'),
           root: path.join(import.meta.dirname, 'fixture'),
           logLevel: 'error',
           server: {

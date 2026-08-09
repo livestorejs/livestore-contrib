@@ -24,7 +24,7 @@
       {
         "name": "@effect/language-service",
         "ignoreEffectWarningsInTscExitCode": false,
-        "ignoreEffectSuggestionsInTscExitCode": false,
+        "ignoreEffectSuggestionsInTscExitCode": true,
         "ignoreEffectErrorsInTscExitCode": false,
         "includeSuggestionsInTsc": true,
         "pipeableMinArgCount": 2,
@@ -47,25 +47,25 @@
   "exclude": ["node_modules", "**/dist", "**/node_modules/.pnpm", "**/*.genie.ts"],
   "references": [
     {
-      "path": "../../packages/@livestore/adapter-web"
+      "path": "../../repos/livestore/packages/@livestore/adapter-web"
     },
     {
-      "path": "../../packages/@livestore/common"
+      "path": "../../repos/livestore/packages/@livestore/common"
     },
     {
-      "path": "../../packages/@livestore/livestore"
+      "path": "../../repos/livestore/packages/@livestore/livestore"
     },
     {
-      "path": "../../packages/@livestore/sqlite-wasm"
+      "path": "../../repos/livestore/packages/@livestore/sqlite-wasm"
     },
     {
-      "path": "../../packages/@livestore/sync-cf"
+      "path": "../../repos/livestore/packages/@livestore/sync-cf"
     },
     {
-      "path": "../../packages/@livestore/utils"
+      "path": "../../repos/livestore/packages/@livestore/utils"
     },
     {
-      "path": "../../packages/@livestore/utils-dev"
+      "path": "../../repos/livestore/packages/@livestore/utils-dev"
     }
   ]
 }

@@ -14,6 +14,7 @@ import {
   KeyValueStore,
   Layer,
   Option,
+  PubSub,
   type Schema,
   type Scope,
   Stream,
@@ -74,10 +75,43 @@ export const makeMockScenarioBackend: Effect.Effect<ScenarioBackend, UnknownErro
   function* () {
     const backend = yield* makeMockSyncBackend({ startConnected: true })
     const observer = yield* backend.makeSyncBackend
+    const confirmedBatches = yield* PubSub.unbounded<ReadonlyArray<LiveStoreEvent.Global.Encoded>>({ replay: 10_000 })
+
+    const makeBackend = Effect.gen(function* () {
+      const underlying = yield* backend.makeSyncBackend
+
+      return SyncBackend.of({
+        ...underlying,
+        pull: (cursor, options) => {
+          if (options?.live !== true) return underlying.pull(cursor, options)
+
+          const after = Option.match(cursor, {
+            onNone: () => 0,
+            onSome: (_) => _.eventSequenceNumber,
+          })
+
+          return Stream.concat(
+            Stream.make(SyncBackend.pullResItemEmpty()),
+            Stream.fromPubSub(confirmedBatches).pipe(
+              Stream.map((batch) => batch.filter((event) => event.seqNum > after)),
+              Stream.filter((batch) => batch.length > 0),
+              Stream.map(
+                (batch) =>
+                  ({
+                    batch: batch.map((eventEncoded) => ({ eventEncoded, metadata: Option.none() })),
+                    pageInfo: SyncBackend.pageInfoNoMore,
+                  }) satisfies SyncBackend.PullResItem,
+              ),
+            ),
+          )
+        },
+        push: (batch) => underlying.push(batch).pipe(Effect.tap(() => PubSub.publish(confirmedBatches, batch))),
+      })
+    })
 
     return {
       id: 'mock',
-      makeBackend: () => backend.makeSyncBackend,
+      makeBackend: () => makeBackend,
       observe: () =>
         Effect.all({
           connected: SubscriptionRef.get(observer.isConnected),
@@ -242,6 +276,7 @@ const cleanupCloudStores = (args: CloudSyncCfScenarioBackendOptions & { readonly
           'content-type': 'application/json',
           'x-scenario-sync-token': args.token,
         },
+        // @effect-diagnostics-next-line preferSchemaOverJson:off -- the Worker cleanup endpoint accepts this fixed, trusted request shape as JSON
         body: JSON.stringify({ storeIds: args.storeIds }),
       })
       if (response.ok === false) {

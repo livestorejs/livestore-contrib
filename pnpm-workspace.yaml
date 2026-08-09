@@ -41,6 +41,7 @@ packages:
   - repos/livestore/packages/@livestore/wa-sqlite
   - repos/livestore/packages/@livestore/webmesh
   - tests/integration
+  - tests/scenarios
   - tests/sync-provider
 
 overrides:

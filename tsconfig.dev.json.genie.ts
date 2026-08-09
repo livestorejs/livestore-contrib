@@ -16,6 +16,7 @@ export default tsconfigJson({
     // automatically; a hand-maintained copy here would silently leave it unchecked.
     ...contribPackageNames.map((name) => ({ path: `./packages/@livestore/${name}` })),
     { path: './tests/integration' },
+    { path: './tests/scenarios' },
     { path: './tests/sync-provider' },
   ],
 })

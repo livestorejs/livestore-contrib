@@ -35,6 +35,9 @@
       "path": "./tests/integration"
     },
     {
+      "path": "./tests/scenarios"
+    },
+    {
       "path": "./tests/sync-provider"
     }
   ]

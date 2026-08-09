@@ -1,4 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent as ReactChangeEvent,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 
 import type { ScenarioRunArtifact } from '../../model.ts'
 import { requestLeaderStateMaterialization } from '../leader-state-client.ts'
@@ -20,6 +30,7 @@ type ReconstructionStatus =
 const defaultDrawerHeight = 380
 const minimumDrawerHeight = 190
 const resizeStep = 24
+const maximumDrawerHeight = (): number => Math.max(minimumDrawerHeight, window.innerHeight - 24)
 
 export const LeaderStateInspector = ({
   artifact,
@@ -92,29 +103,46 @@ export const LeaderStateInspector = ({
       ? status
       : ({ _tag: 'idle' } as const)
 
-  const maximumDrawerHeight = (): number => Math.max(minimumDrawerHeight, window.innerHeight - 24)
-  const resizeDrawer = (height: number): void =>
-    setDrawerHeight(Math.max(minimumDrawerHeight, Math.min(maximumDrawerHeight(), height)))
-  const beginResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    resizeOrigin.current = { pointerY: event.clientY, height: drawerHeight }
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-  const continueResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (resizeOrigin.current === undefined) return
-    resizeDrawer(resizeOrigin.current.height + event.clientY - resizeOrigin.current.pointerY)
-  }
-  const endResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+  const resizeDrawer = useCallback(
+    (height: number): void => setDrawerHeight(Math.max(minimumDrawerHeight, Math.min(maximumDrawerHeight(), height))),
+    [],
+  )
+  const beginResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>): void => {
+      resizeOrigin.current = { pointerY: event.clientY, height: drawerHeight }
+      event.currentTarget.setPointerCapture(event.pointerId)
+    },
+    [drawerHeight],
+  )
+  const continueResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>): void => {
+      if (resizeOrigin.current === undefined) return
+      resizeDrawer(resizeOrigin.current.height + event.clientY - resizeOrigin.current.pointerY)
+    },
+    [resizeDrawer],
+  )
+  const endResize = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
     resizeOrigin.current = undefined
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
+    if (event.currentTarget.hasPointerCapture(event.pointerId) === true)
       event.currentTarget.releasePointerCapture(event.pointerId)
-  }
-  const requestClose = (): void => {
+  }, [])
+  const resizeWithKeyboard = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+      if (event.key === 'ArrowUp') resizeDrawer(drawerHeight - resizeStep)
+      if (event.key === 'ArrowDown') resizeDrawer(drawerHeight + resizeStep)
+    },
+    [drawerHeight, resizeDrawer],
+  )
+  const requestClose = useCallback((): void => {
     if (closing === true) return
     setClosing(true)
     closeTimer.current = window.setTimeout(onClose, 180)
-  }
+  }, [closing, onClose])
 
-  const style = { '--leader-state-drawer-height': `${drawerHeight}px` } as CSSProperties
+  const style = useMemo(
+    () => ({ '--leader-state-drawer-height': `${drawerHeight}px` }) as CSSProperties,
+    [drawerHeight],
+  )
   return (
     <article
       className={`leader-state-drawer${closing === true ? ' closing' : ''}`}
@@ -141,10 +169,7 @@ export const LeaderStateInspector = ({
         aria-valuemin={minimumDrawerHeight}
         aria-valuenow={drawerHeight}
         className="leader-state-resize-handle"
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowUp') resizeDrawer(drawerHeight - resizeStep)
-          if (event.key === 'ArrowDown') resizeDrawer(drawerHeight + resizeStep)
-        }}
+        onKeyDown={resizeWithKeyboard}
         onPointerCancel={endResize}
         onPointerDown={beginResize}
         onPointerMove={continueResize}
@@ -189,6 +214,9 @@ export const LeaderStateInspector = ({
 export const ReconstructedTables = ({ state }: { readonly state: ReconstructedLeaderState }) => {
   const [selectedTableName, setSelectedTableName] = useState(state.tables[0]?.name)
   const selectedTable = state.tables.find((table) => table.name === selectedTableName) ?? state.tables[0]
+  const selectTable = useCallback((event: ReactChangeEvent<HTMLSelectElement>): void => {
+    setSelectedTableName(event.currentTarget.value)
+  }, [])
 
   if (selectedTable === undefined) {
     return <p className="leader-state-message">The Application schema has no user tables.</p>
@@ -199,11 +227,7 @@ export const ReconstructedTables = ({ state }: { readonly state: ReconstructedLe
       <header className="reconstructed-table-toolbar">
         <label>
           <span>Table</span>
-          <select
-            aria-label="Reconstructed table"
-            value={selectedTable.name}
-            onChange={(event) => setSelectedTableName(event.currentTarget.value)}
-          >
+          <select aria-label="Reconstructed table" value={selectedTable.name} onChange={selectTable}>
             {state.tables.map((table) => (
               <option key={table.name} value={table.name}>
                 {table.name}

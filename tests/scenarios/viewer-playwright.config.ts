@@ -2,6 +2,8 @@ import path from 'node:path'
 
 import { defineConfig } from '@playwright/test'
 
+const viewerPort = process.env.SCENARIO_VIEWER_PORT ?? '4173'
+
 export default defineConfig({
   testDir: './src/viewer-e2e',
   outputDir: './test-results/viewer',
@@ -21,9 +23,9 @@ export default defineConfig({
     { name: 'narrow-light', use: { viewport: { width: 700, height: 900 }, colorScheme: 'light' } },
   ],
   webServer: {
-    command: 'pnpm viewer --host 127.0.0.1 --port 4173 --strictPort',
+    command: `pnpm viewer --host 127.0.0.1 --port ${viewerPort} --strictPort`,
     cwd: path.resolve(import.meta.dirname),
-    url: 'http://127.0.0.1:4173',
+    url: `http://127.0.0.1:${viewerPort}`,
     reuseExistingServer: false,
   },
 })

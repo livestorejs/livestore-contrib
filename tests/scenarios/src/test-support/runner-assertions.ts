@@ -51,6 +51,7 @@ const mutateSessionObservation = (
                   ...session,
                   sync: {
                     ...session.sync,
+                    pendingCount: session.sync.pendingCount + 1,
                     events: mutateConfirmedEvents(session.sync.events, mutation),
                   },
                 },

@@ -13,5 +13,6 @@ export const requiredCIJobs = [
   'pr/packages',
   'pr/examples-build',
   'pr/node',
+  'pr/scenarios',
   'release-surface',
 ] as const

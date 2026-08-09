@@ -50,7 +50,7 @@ export const ensureCloudSyncCf = async (args: {
     args.forceDeploy !== true &&
     cached?.workerName === workerName &&
     cached.backendRevision === deploymentRevision &&
-    (await healthMatches(cached.url, deploymentRevision, cached.token))
+    (await healthMatches(cached.url, deploymentRevision, cached.token)) === true
   ) {
     console.log(`Cloud sync-cf ready: ${cached.url} (${compactRevision(cached.backendRevision)})`)
     return cached
@@ -149,7 +149,7 @@ const healthMatches = async (url: string, expectedRevision: string, token: strin
 const waitForHealth = async (url: string, expectedRevision: string, token: string): Promise<void> => {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
-    if (await healthMatches(url, expectedRevision, token)) return
+    if ((await healthMatches(url, expectedRevision, token)) === true) return
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
   throw new Error(`Cloud sync-cf did not report revision ${expectedRevision} at ${url}`)

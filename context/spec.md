@@ -67,17 +67,11 @@ live under the parent's directory. IDs are sequential per namespace.
 
 - Core contracts constrain realizations here; a contrib node states
   deviations explicitly rather than silently diverging.
-- Core registries and discovery pointers may name contrib realizations and
-  link to their contrib intent homes, per core
-  [decision 0003](https://github.com/livestorejs/livestore/blob/main/context/.decisions/0003-contrib-referencing.md).
-  Product/plugin realizations of registered pluggable dimensions receive a row
-  in `context/02-system/<dimension>/realizations.md`. A contrib-owned
-  verification tool may receive an equivalent minimal pointer where core owns
-  only the evidence boundary; its detailed `LSC.*` intent and implementation
-  specs remain here and refine the relevant core requirement.
+- The core registries
+  (`context/02-system/<dimension>/realizations.md`) list every realization;
+  when a node is added here, the corresponding registry row links it.
 - Conformance suites live in core (`02-system/09-verification/`); a contrib
-  product/plugin realization's conformance status is tracked in its core
-  registry.
+  realization's conformance status is tracked in the core registry.
 
 ## Enforcement
 

@@ -9,6 +9,7 @@ const config: StorybookConfig = {
   staticDirs: [{ from: '../artifacts', to: '/' }],
   viteFinal: (viteConfig) => ({
     ...viteConfig,
+    cacheDir: path.resolve(import.meta.dirname, '../node_modules/.vite/storybook'),
     resolve: {
       ...viteConfig.resolve,
       alias: {

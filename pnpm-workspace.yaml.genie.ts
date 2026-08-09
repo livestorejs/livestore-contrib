@@ -121,6 +121,12 @@ const contribCatalogDuplicateExceptions = [
       'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
   },
   {
+    package: '@testing-library/jest-dom',
+    versions: ['6.10.0', '6.6.3'],
+    reason:
+      'The scenario Storybook and existing example tooling resolve different compatible versions of this test-only package.',
+  },
+  {
     package: '@livestore/utils',
     versions: ['0.4.0', '0.4.0-dev.25', contribCoreReleaseVersion],
     reason:

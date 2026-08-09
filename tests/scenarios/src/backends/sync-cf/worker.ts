@@ -4,8 +4,7 @@ import type { CfTypes } from '@livestore/sync-cf/cf-worker'
 import { makeDurableObject, makeWorker, type SyncBackendRpcInterface } from '@livestore/sync-cf/cf-worker'
 import { Schema } from '@livestore/utils/effect'
 
-const ScenarioSyncPayload = Schema.Struct({
-  _tag: Schema.Literal('scenario-cloud-auth'),
+const ScenarioSyncPayload = Schema.TaggedStruct('scenario-cloud-auth', {
   token: Schema.String,
 })
 type ScenarioSyncPayload = typeof ScenarioSyncPayload.Type
@@ -57,7 +56,7 @@ export default {
       const input = (await request.json()) as { storeIds?: unknown }
       if (
         Array.isArray(input.storeIds) === false ||
-        input.storeIds.some((storeId) => typeof storeId !== 'string' || storeId.length === 0)
+        input.storeIds.some((storeId) => typeof storeId !== 'string' || storeId.length === 0) === true
       ) {
         return new Response('Invalid storeIds', { status: 400 }) as unknown as CfTypes.Response
       }
