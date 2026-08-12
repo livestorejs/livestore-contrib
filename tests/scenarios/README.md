@@ -15,7 +15,7 @@ pnpm --dir tests/scenarios scenario:run --profile browser
 pnpm --dir tests/scenarios scenario:run --profile process --backend cloud-sync-cf
 pnpm --dir tests/scenarios scenario:run --scenario concurrent-hotel-booking
 pnpm --dir tests/scenarios scenario:run --profile browser --scenario multi-session-recovery
-pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.scenario.yaml
+pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.scenario.ts
 pnpm --dir tests/scenarios scenario:run --scenario many-writer-convergence --set event_count=100
 ```
 
@@ -87,25 +87,22 @@ broader campaign and failure-reduction plan.
 Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications).
 They contain the real LiveStore schema, materializers, normal application
 actions, and State inspectors. Reusable TypeScript helpers belong to Scenario
-authoring, not the Application runtime interface. Application-neutral helpers
-live in one shared catalogue. A `scenario-name.helpers.ts` companion exists
-only when it contains the actual implementation of code unique to that
-Scenario; it is never a registration shim for shared code.
+authoring, not the Application runtime interface.
 
-Scenario source uses deterministic, human-readable `.scenario.yaml` documents.
-See [YAML_SCENARIOS.md](./YAML_SCENARIOS.md) for the schema, complete construct
-reference, helper boundary, examples, and compilation semantics. The CLI
-compiles retained or local source before the runner starts; `--set name=value`
+Scenario source uses immutable `.scenario.ts` pipelines. See
+[SCENARIO_AS_CODE.md](./SCENARIO_AS_CODE.md) for the construct reference,
+examples, helper boundary, validation, and trust model. The CLI evaluates and
+normalizes retained or explicitly selected local source before the runner starts; `--set name=value`
 overrides a declared parameter without coupling the source to environment
 variables.
 
-Use `- wait: 2s` when elapsed delay is part of the Scenario story. Repeated or
-generated actions can set `between: 250ms` for fixed delay after each
+Use `wait('2s')` when elapsed delay is part of the Scenario story. Repeated or
+generated actions can set `{ between: '250ms' }` for a fixed delay after each
 acknowledged action except the last. Both forms retain requested and actual
 controller-time evidence; neither implies Settlement or a timing assertion.
 
 Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
-by Git. Copy `scenario.template.scenario.yaml`, define its ordered instructions, and
+by Git. Copy `scenario-template.scenario.ts`, define its ordered instructions, and
 run it with `--scenario-file`. This tier is for generated cases, parameter
 sweeps, reductions, and hypotheses whose durable purpose is not established.
 
@@ -196,11 +193,10 @@ each child outcome, and joins the group before the next instruction. The
 `operation-history` oracle can require named operations to have terminal,
 non-indefinite outcomes and overlapping intervals.
 
-YAML repetition and registered TypeScript helpers keep generated work directly
-in the instruction stream. Helpers name ordinary application actions and their
-inputs; keyed deterministic random choices derive from the Scenario seed,
-helper identity, iteration, and choice key. Inserting an unrelated random
-choice therefore does not shift later choices.
+TypeScript loops and ordinary helper functions keep generated work directly in
+the instruction stream. Keyed deterministic random choices derive from the
+Scenario seed, sequence identity, iteration, and choice key. Inserting an
+unrelated keyed choice therefore does not shift later choices.
 
 Authoring expands immediately into a serializable `action-sequence` containing
 every concrete action and stable child operation ID. No callback or helper

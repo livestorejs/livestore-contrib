@@ -1,4 +1,4 @@
 *
 !.gitignore
 !README.md
-!scenario.template.scenario.yaml
+!scenario-template.scenario.ts

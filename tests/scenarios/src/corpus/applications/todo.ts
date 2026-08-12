@@ -2,6 +2,7 @@ import { Events, makeSchema, State } from '@livestore/common/schema'
 import { Effect, Schema } from '@livestore/utils/effect'
 
 import { defineAction, defineApplication, defineInspector } from '../../application/definition.ts'
+import { scenarioApplication } from '../../scenario.ts'
 
 export const todoEvents = {
   created: Events.synced({
@@ -81,3 +82,6 @@ export const todoApplication = defineApplication({
     }),
   },
 })
+
+/** Typed Scenario-as-code action vocabulary for the Todo Application. */
+export const todo = scenarioApplication(todoApplication)

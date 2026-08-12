@@ -1,9 +1,11 @@
 import type { ScenarioAst } from '../../model.ts'
-import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
-import { composeScenarioHelpers } from '../../yaml/helpers.ts'
-import { scenarioApplications } from '../applications/registry.ts'
-import { sharedScenarioHelpers } from '../scenario-helpers.ts'
-import manyWriterHelpers from './retained/findings/many-writer-convergence.helpers.ts'
+import { normalizeScenario, scenarioIdFromFileName, type ScenarioSource } from '../../scenario.ts'
+import multiSessionRecoverySource from './retained/examples/multi-session-recovery.scenario.ts'
+import offlineWriterRecoverySource from './retained/examples/offline-writer-recovery.scenario.ts'
+import concurrentHotelBookingSource from './retained/findings/concurrent-hotel-booking.scenario.ts'
+import largePayloadRecoverySource from './retained/findings/large-payload-recovery.scenario.ts'
+import manyWriterConvergenceSource from './retained/findings/many-writer-convergence.scenario.ts'
+import pendingTailRecoverySource from './retained/findings/pending-tail-recovery.scenario.ts'
 
 export interface RetainedScenarioEntry {
   readonly kind: 'example' | 'finding'
@@ -17,38 +19,50 @@ export interface RetainedScenarioCompileOptions {
 }
 
 const sources = [
-  { kind: 'example', file: new URL('./retained/examples/offline-writer-recovery.scenario.yaml', import.meta.url) },
-  { kind: 'example', file: new URL('./retained/examples/multi-session-recovery.scenario.yaml', import.meta.url) },
+  {
+    kind: 'example',
+    file: new URL('./retained/examples/offline-writer-recovery.scenario.ts', import.meta.url),
+    source: offlineWriterRecoverySource,
+  },
+  {
+    kind: 'example',
+    file: new URL('./retained/examples/multi-session-recovery.scenario.ts', import.meta.url),
+    source: multiSessionRecoverySource,
+  },
   {
     kind: 'finding',
     findingId: 'SF-01',
-    file: new URL('./retained/findings/concurrent-hotel-booking.scenario.yaml', import.meta.url),
+    file: new URL('./retained/findings/concurrent-hotel-booking.scenario.ts', import.meta.url),
+    source: concurrentHotelBookingSource,
   },
   {
     kind: 'finding',
     findingId: 'SF-02',
-    file: new URL('./retained/findings/pending-tail-recovery.scenario.yaml', import.meta.url),
+    file: new URL('./retained/findings/pending-tail-recovery.scenario.ts', import.meta.url),
+    source: pendingTailRecoverySource,
   },
   {
     kind: 'finding',
     findingId: 'SF-03',
-    file: new URL('./retained/findings/many-writer-convergence.scenario.yaml', import.meta.url),
-    helpers: manyWriterHelpers,
+    file: new URL('./retained/findings/many-writer-convergence.scenario.ts', import.meta.url),
+    source: manyWriterConvergenceSource,
   },
   {
     kind: 'finding',
     findingId: 'SF-04',
-    file: new URL('./retained/findings/large-payload-recovery.scenario.yaml', import.meta.url),
+    file: new URL('./retained/findings/large-payload-recovery.scenario.ts', import.meta.url),
+    source: largePayloadRecoverySource,
   },
-] as const
+] as const satisfies ReadonlyArray<{
+  readonly kind: 'example' | 'finding'
+  readonly findingId?: RetainedScenarioEntry['findingId']
+  readonly file: URL
+  readonly source: ScenarioSource
+}>
 
 const compile = (source: (typeof sources)[number], options: RetainedScenarioCompileOptions = {}): ScenarioAst =>
-  compileScenarioYamlFileSync(source.file, {
-    applications: scenarioApplications,
-    helpers: composeScenarioHelpers([
-      { source: 'shared Scenario helper catalogue', helpers: sharedScenarioHelpers },
-      { source: source.file.pathname, helpers: 'helpers' in source ? source.helpers : undefined },
-    ]),
+  normalizeScenario(source.source, {
+    id: scenarioIdFromFileName(source.file.pathname),
     ...options,
   })
 
@@ -65,7 +79,7 @@ const sourcesById = new Map(
     source.file.pathname
       .split('/')
       .at(-1)!
-      .replace(/\.scenario\.yaml$/, ''),
+      .replace(/\.scenario\.ts$/, ''),
     source,
   ]),
 )

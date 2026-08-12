@@ -34,19 +34,18 @@ realization choices, and gaps for the private
   evidence it actually supplies.
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
-  versioned Scenario plans, named actions, one deterministic `.scenario.yaml`
-  language, Scenario-owned seeded authoring, one ordered instruction stream,
-  optional zero-effect annotations, topology/lifecycle/fault plans, top-level
+  versioned Scenario plans, named actions, one typed immutable `.scenario.ts`
+  pipeline API, Scenario-owned seeded authoring, one ordered instruction stream,
+  optional zero-effect annotations, topology/lifecycle/fault plans, lexical
   participant aliases with no runtime instruction, default or explicitly
   scoped oracle contracts, and preflight capability derivation are shared
-  without profile-specific Scenario rewrites. The compiler derives normalized
-  identity and capability bookkeeping, expands repetition into self-contained
-  ordered action sequences, and rejects invalid source before execution;
-  Application definitions contain no Scenario generation policy. Reusable,
-  Application-neutral shared TypeScript helpers and optional same-name
-  `.helpers.ts` companions containing actual one-off implementations expand
-  finite declarative instruction fragments at the source-loading seam; no
-  registration-only companion and no helper crosses into execution. Generated actions retain stable operation
+  without profile-specific Scenario rewrites. Source evaluation produces a
+  `ScenarioPlan`; normalization derives identity and capability bookkeeping,
+  expands repetition into self-contained ordered action sequences, and rejects
+  invalid plans before execution. Application definitions contain no Scenario
+  generation policy. Reusable generation and composition are ordinary typed
+  functions imported by Scenario source, with no helper registry or companion
+  convention; no authoring callback or module crosses into execution. Generated actions retain stable operation
   identity and deterministic keyed seed derivation; a seed reproduces generated
   inputs and requested choices, not internal delivery order.
 - **LSC.VER.SCEN-R04 Shared host conformance and policy-bounded

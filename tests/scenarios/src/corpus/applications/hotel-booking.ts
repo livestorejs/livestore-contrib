@@ -2,6 +2,7 @@ import { Events, makeSchema, State } from '@livestore/common/schema'
 import { Effect, Schema } from '@livestore/utils/effect'
 
 import { defineAction, defineApplication } from '../../application/definition.ts'
+import { scenarioApplication } from '../../scenario.ts'
 
 export const hotelBookingEvents = {
   inventoryInitialized: Events.synced({
@@ -68,3 +69,6 @@ export const hotelBookingApplication = defineApplication({
   },
   inspectors: {},
 })
+
+/** Typed Scenario-as-code action vocabulary for the hotel-booking Application. */
+export const hotelBooking = scenarioApplication(hotelBookingApplication)

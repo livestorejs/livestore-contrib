@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { OtelLiveDummy } from '@livestore/common'
 import { Effect, Schema } from '@livestore/utils/effect'
@@ -8,8 +9,7 @@ import { PlatformNode } from '@livestore/utils/node'
 import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
 import type { CloudSyncCfScenarioBackendOptions } from './backends.ts'
 import { ensureCloudSyncCf } from './cloud-sync-cf.ts'
-import { getScenarioApplication, scenarioApplications } from './corpus/applications/registry.ts'
-import { sharedScenarioHelpers } from './corpus/scenario-helpers.ts'
+import { getScenarioApplication } from './corpus/applications/registry.ts'
 import { getScenario, retainedScenarioCatalog } from './corpus/scenarios/registry.ts'
 import { parseScenarioDurationMs } from './duration.ts'
 import { type ScenarioAst, ScenarioRunArtifact } from './model.ts'
@@ -23,7 +23,7 @@ import {
   runProcessCloudSyncCfScenario,
   runProcessLocalSyncCfScenario,
 } from './runner.ts'
-import { compileScenarioYamlFile } from './yaml/file.ts'
+import { isScenarioSource, normalizeScenario, scenarioIdFromFileName } from './scenario.ts'
 
 type ParticipantProfile = 'in-process' | 'process' | 'browser'
 type SyncBackend = 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
@@ -105,7 +105,7 @@ Options:
   --profile <in-process|process|browser>       Participant placement (default: in-process)
   --backend <mock|local-sync-cf|cloud-sync-cf> Sync backend (defaults by profile)
   --scenario <scenario-id>                    Retained Scenario (default: offline-writer-recovery)
-  --scenario-file <path>                      Local .scenario.yaml source file
+  --scenario-file <path>                      Local .scenario.ts source file (trusted code)
   --set <name=value>                          Override a declared Scenario parameter (repeatable)
   --stabilization-timeout <duration>           Run-policy timeout for settle/stabilization (default: 60s)
   --output <path>                             Artifact output path
@@ -144,12 +144,17 @@ Scenarios:
   return { profile, backend, scenario, outputPath: path.resolve(output), stabilizationTimeoutMs }
 }
 
-const loadScenarioFile = (file: string, parameters: Readonly<Record<string, string>>): Promise<ScenarioAst> =>
-  compileScenarioYamlFile(file, {
-    applications: scenarioApplications,
-    helpers: sharedScenarioHelpers,
-    parameters,
-  })
+const loadScenarioFile = async (file: string, parameters: Readonly<Record<string, string>>): Promise<ScenarioAst> => {
+  const loaded: unknown = await import(pathToFileURL(file).href)
+  const source =
+    typeof loaded === 'object' && loaded !== null && 'default' in loaded
+      ? (loaded as { readonly default: unknown }).default
+      : undefined
+  if (isScenarioSource(source) === false) {
+    throw new Error(`Scenario module must default-export Scenario.start(...) or Scenario.parameterized(...): ${file}`)
+  }
+  return normalizeScenario(source, { id: scenarioIdFromFileName(file), parameters })
+}
 
 const readParameterOverrides = (args: ReadonlyArray<string>): Readonly<Record<string, string>> => {
   const parameters: Record<string, string> = {}

@@ -52,7 +52,9 @@ export const participantHostFailure = (args: {
   operationOutcome: ScenarioOperationFailureOutcome
 }): ScenarioOperationError => new ScenarioOperationError(args.code, args.message, args.operationOutcome)
 
-export interface ApplicationAction<TSchema extends LiveStoreSchema> {
+export interface ApplicationAction<TSchema extends LiveStoreSchema, TInput = Schema.Json> {
+  /** Type-only input carried into Scenario authoring. Runtime boundaries still use JSON. */
+  readonly _Input?: TInput
   readonly validateInput: (input: Schema.Json) => void
   readonly dispatch: (store: Store<TSchema>, input: Schema.Json) => Effect.Effect<void, ScenarioOperationError>
 }
@@ -61,17 +63,25 @@ export interface ApplicationInspector<TSchema extends LiveStoreSchema> {
   readonly inspect: (store: Store<TSchema>) => Effect.Effect<Schema.Json, ScenarioOperationError>
 }
 
-export interface ApplicationDefinition<TSchema extends LiveStoreSchema> {
+export interface ApplicationDefinition<
+  TSchema extends LiveStoreSchema,
+  TActions extends Readonly<Record<string, ApplicationAction<TSchema, unknown>>> = Readonly<
+    Record<string, ApplicationAction<TSchema, unknown>>
+  >,
+> {
   readonly id: string
   readonly scenarioName: string
   readonly schema: TSchema
-  readonly actions: Readonly<Record<string, ApplicationAction<TSchema>>>
+  readonly actions: TActions
   readonly inspectors: Readonly<Record<string, ApplicationInspector<TSchema>>>
 }
 
-export const defineApplication = <TSchema extends LiveStoreSchema>(
-  definition: ApplicationDefinition<TSchema>,
-): ApplicationDefinition<TSchema> => definition
+export const defineApplication = <
+  TSchema extends LiveStoreSchema,
+  const TActions extends Readonly<Record<string, ApplicationAction<TSchema, unknown>>>,
+>(
+  definition: ApplicationDefinition<TSchema, TActions>,
+): ApplicationDefinition<TSchema, TActions> => definition
 
 /** Binds schema decoding to an action before it crosses the participant-host boundary. */
 export const defineAction = <
@@ -80,7 +90,7 @@ export const defineAction = <
 >(args: {
   input: TInputSchema
   run: (args: { store: Store<TSchema>; input: TInputSchema['Type'] }) => Effect.Effect<void, never>
-}): ApplicationAction<TSchema> => ({
+}): ApplicationAction<TSchema, TInputSchema['Type']> => ({
   validateInput: (input) => {
     Schema.decodeUnknownSync(args.input)(input)
   },

@@ -7,10 +7,10 @@ observable and why the artifact and viewer are useful_
 
 ## Turn a sync story into evidence
 
-A `.scenario.yaml` file reads as a distributed sync story—Clients write,
-disconnect, reconnect, join late, or lose access to a backend—and a
-deterministic compiler turns those instructions into the exact portable plan
-run through real LiveStore participants. The runner records one semantic trace
+A `.scenario.ts` module reads as a distributed sync story—Clients write,
+disconnect, reconnect, join late, or lose access to a backend. Its immutable
+pipeline is normalized into the exact portable plan run through real LiveStore
+participants. The runner records one semantic trace
 instead of leaving the result spread across process logs, browser consoles, and
 database snapshots.
 
@@ -43,13 +43,12 @@ not claim that the system settled or met a deadline. The trace records what was
 requested and how much controller-monotonic time actually elapsed, so the
 viewer can separate intentional idle time from slow work.
 
-YAML stays declarative even when a workload needs computation. Application-neutral
-trusted TypeScript helpers expand to ordinary Scenario instructions before
-execution. A one-off helper may sit beside its Scenario as `name.helpers.ts`,
-but that companion contains the implementation itself rather than forwarding
-to another catalogue. The runner never loads those modules. It receives the
-same complete serializable plan whether its instructions were written directly
-or expanded by a helper.
+Scenario-as-code keeps the plan-shaped pipeline declarative while allowing
+ordinary typed TypeScript for loops, branches, and reusable functions. One-off
+logic stays in its Scenario module; shared helpers are normal imported modules,
+not registered runner vocabulary. Source is trusted authoring code, but the
+runner receives only the complete validated serializable plan—never a callback
+or module reference.
 
 ## One Scenario, different execution boundaries
 

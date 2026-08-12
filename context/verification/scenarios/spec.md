@@ -22,28 +22,33 @@ published Scenario product package (LSC.VER.SCEN-R01).
 
 ## Scenario and Application Model
 
-Committed and local cases are deterministic `.scenario.yaml` instruction files. A
-compiler validates complete source and produces the current serializable
-Scenario plan before execution. The filename stem supplies Scenario identity;
-source selects one registered Application, declares explicit Client/session
-topology, and contains one ordered body of operations, faults, annotations,
-action sequences, intermediate Settlement instructions, and optional final
-expectations. Profile/backend selection, Store identity, capabilities, tags,
-format versions, and runner-owned instruction/oracle IDs are not authored.
-Optional top-level aliases give reusable names to explicit Client/session
-selections and never become instructions. An alias may name a dynamically
-created participant but cannot be used before that participant exists.
+Committed and local cases are trusted `.scenario.ts` modules using an immutable
+pipeline API. Evaluating a module produces a `ScenarioPlan`; normalization
+validates the complete plan and produces the current serializable Scenario AST
+before execution. The filename stem supplies Scenario identity. Source selects
+one registered Application, declares explicit Client/session topology, and
+contains one ordered body of operations, faults, annotations, action sequences,
+intermediate Settlement instructions, and optional final expectations.
+Profile/backend selection, Store identity, capabilities, tags, format versions,
+and runner-owned instruction/oracle IDs are not authored. Lexical aliases give
+reusable names to explicit Client/session selections and never become source
+declarations or instructions. An alias may include a dynamically created
+participant but cannot be used before that participant exists.
+Each initial Client is one configured authoring handle: `withSessions` declares
+its initial session names, `session(name)` resolves handles used by actions and
+aliases, and `disconnected()` marks its initial connectivity. A session handle
+may be created before its ordered `addSession` instruction without placing that
+session in the initial topology.
 
 Concrete Application definitions wrap the actual `LiveStoreSchema`; named
 actions expose strict input validation before dispatch, State inspectors encode
-their output as JSON, and they contain no Scenario generation policy. One
-Application-neutral shared TypeScript helper catalogue and optional
-`name.helpers.ts` companions belong to Scenario source loading instead. A
-companion exists only for actual one-off implementation and never forwards to
-shared code. Helpers expand Schema-validated input into finite
-declarative instruction fragments, which pass through the same compiler-owned
-identity, participant, capability, and Application-action validation as direct
-YAML. Duplicate shared/companion names are rejected. The Scenario never
+their output as JSON, and they contain no Scenario generation policy. Loops,
+branches, and reusable authoring helpers are ordinary typed TypeScript. One-off
+logic stays in its Scenario module; genuinely shared helpers use normal module
+imports, with no registry or companion naming convention. Their finite
+instruction fragments pass through the same normalizer-owned identity,
+participant, capability, and Application-action validation as direct pipeline
+operations. The Scenario never
 redeclares Events or materializers. The normalized plan remains the runner and
 artifact boundary; the runner does not interpret source text or load helper
 modules.
@@ -54,9 +59,9 @@ additions defines the complete participant set. Participant references are
 fully qualified; Clients start connected unless declared disconnected; and
 top-level aliases resolve only when all of their participants exist at the
 point of use. Lifecycle, connectivity, and backend-availability operations receive
-stable compiler-owned IDs. An annotation is a zero-effect instruction that
+stable normalizer-owned IDs. An annotation is a zero-effect instruction that
 emits a reached marker without creating an operation or execution boundary.
-Scenario-owned repetition derives keyed choices from the Scenario seed plus
+Scenario-owned generation derives keyed choices from the Scenario seed plus
 stable sequence, iteration, and choice identity, then expands immediately into
 a serializable `action-sequence` containing every concrete action. No authoring
 callback crosses into execution. Capability derivation sees the normalized plan
@@ -64,15 +69,11 @@ before the first Client is created. A recorded seed reproduces generated inputs
 and requested choices from the same source revision; it does not claim to
 reproduce internal host or Sync delivery order (LSC.VER.SCEN-R03).
 
-Retained and committed test Scenario registries attach a companion with a
-static TypeScript import only when that source owns a one-off implementation.
-The Node-only loader for an explicit local
-`--scenario-file` may discover the exact adjacent companion filename
-asynchronously. YAML never names an arbitrary module path. Helper computation
-is trusted repository or explicitly selected local code, remains synchronous
-and deterministic over its inputs, and receives no ambient capability through
-its compiler context. See
-[decision 0014](./.decisions/0014-reusable-typescript-scenario-helpers.md).
+Retained registries statically import their Scenario modules. The Node-only
+loader dynamically imports an explicitly selected local `--scenario-file`.
+Both are trusted executable TypeScript; code review or explicit operator
+selection is the authoring trust boundary. Normalization still produces closed,
+validated data before the runner starts. See [decision 0012](./.decisions/0012-deterministic-scenario-language.md).
 
 An explicit `wait <duration>` is one ordered instruction requesting that the
 controller delay the next instruction by at least that positive duration.
@@ -197,7 +198,7 @@ representative examples: offline writer recovery and multi-session
 recovery. Focused host-contract Scenarios remain committed test fixtures
 without becoming CLI corpus entries. Generated investigations, controls, and
 reductions begin under the Git-ignored `local/scenarios/` tier and run by file;
-promotion is the deliberate move of a reduced, focused `.scenario.yaml` source into
+promotion is the deliberate move of a reduced, focused `.scenario.ts` source into
 `retained/findings/` or `retained/examples/` plus registry and regression
 evidence. Each Scenario selects one registered Application. The associated
 [red-team plan](../../../tests/scenarios/RED_TEAMING.md) defines the wider search,

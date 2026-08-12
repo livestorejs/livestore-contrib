@@ -1,11 +1,4 @@
-import { scenarioApplications } from '../../corpus/applications/registry.ts'
-import { sharedScenarioHelpers } from '../../corpus/scenario-helpers.ts'
-import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
+import { normalizeScenario } from '../../scenario.ts'
+import source from './late-client-catch-up.scenario.ts'
 
-export const lateClientCatchUp = compileScenarioYamlFileSync(
-  new URL('./late-client-catch-up.scenario.yaml', import.meta.url),
-  {
-    applications: scenarioApplications,
-    helpers: sharedScenarioHelpers,
-  },
-)
+export const lateClientCatchUp = normalizeScenario(source, { id: 'late-client-catch-up' })

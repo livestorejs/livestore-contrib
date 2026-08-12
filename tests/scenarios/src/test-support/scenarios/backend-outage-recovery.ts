@@ -1,7 +1,4 @@
-import { scenarioApplications } from '../../corpus/applications/registry.ts'
-import { compileScenarioYamlFileSync } from '../../yaml/file.ts'
+import { normalizeScenario } from '../../scenario.ts'
+import source from './backend-outage-recovery.scenario.ts'
 
-export const backendOutageRecovery = compileScenarioYamlFileSync(
-  new URL('./backend-outage-recovery.scenario.yaml', import.meta.url),
-  { applications: scenarioApplications },
-)
+export const backendOutageRecovery = normalizeScenario(source, { id: 'backend-outage-recovery' })

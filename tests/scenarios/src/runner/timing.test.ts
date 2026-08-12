@@ -1,4 +1,5 @@
-import { scenarioApplications } from '../corpus/applications/registry.ts'
+import { todo } from '../corpus/applications/todo.ts'
+import { client, normalizeScenario, repeat, Scenario, wait } from '../scenario.ts'
 import {
   Effect,
   Vitest,
@@ -9,33 +10,24 @@ import {
   runInProcessScenario,
   todoApplication,
 } from '../test-support/scenario-test-kit.ts'
-import { compileScenarioYamlSource } from '../yaml/compiler.ts'
 
 Vitest.describe('Scenario elapsed-time instructions', () => {
   Vitest.live('waits explicitly and leaves fixed delays only between repeated actions', (test) =>
     Effect.gen(function* () {
-      const compiled = compileScenarioYamlSource({
-        fileName: 'timed-actions.scenario.yaml',
-        applications: scenarioApplications,
-        source: `
-application: todo
-clients:
-  client-a:
-    sessions: [main]
-do:
-  - wait: 20ms
-  - repeat:
-      times: 3
-      as: item
-      between: 15ms
-      action:
-        run: createTodo
-        as: client-a/main
-        with:
-          id: timed-${'${item}'}
-          text: Timed action ${'${item}'}
-`,
-      })
+      const clientA = client('client-a').withSessions('main')
+      const main = clientA.session('main')
+      const compiled = normalizeScenario(
+        Scenario.start({ application: todo, clients: [clientA] }).pipe(
+          wait('20ms'),
+          repeat(
+            Array.from({ length: 3 }, (_, offset) =>
+              todo.createTodo({ id: `timed-${offset + 1}`, text: `Timed action ${offset + 1}` }).as(main),
+            ),
+            { between: '15ms' },
+          ),
+        ),
+        { id: 'timed-actions' },
+      )
       const scenario = defineScenario({ ...compiled, oracles: [] })
       const artifact = yield* runInProcessScenario({
         scenario,
