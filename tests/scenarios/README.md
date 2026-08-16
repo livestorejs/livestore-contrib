@@ -1,267 +1,161 @@
-# Sync scenarios
+# LiveStore scenario runner
 
-This private workspace runs declarative sync scenarios through real LiveStore
-components and writes replayable JSON artifacts for the scenario viewer.
+The scenario runner turns distributed sync stories into repeatable evidence. A
+scenario describes Clients, sessions, actions, failures, and the properties that
+should hold. The same scenario can run in-process, in isolated Node processes,
+or in real browser contexts and then be inspected in the artifact viewer.
 
-## Run a scenario
+## Quick start
 
-From the repository root:
+Prepare a fresh checkout from the repository root:
+
+```sh
+devenv shell
+mr apply
+devenv tasks run pnpm:install --mode before
+```
+
+Run the default scenario:
 
 ```sh
 pnpm --dir tests/scenarios scenario:run
-pnpm --dir tests/scenarios scenario:run --profile in-process --backend local-sync-cf
-pnpm --dir tests/scenarios scenario:run --profile process
-pnpm --dir tests/scenarios scenario:run --profile browser
-pnpm --dir tests/scenarios scenario:run --profile process --backend cloud-sync-cf
-pnpm --dir tests/scenarios scenario:run --scenario concurrent-hotel-booking
-pnpm --dir tests/scenarios scenario:run --profile browser --scenario multi-session-recovery
-pnpm --dir tests/scenarios scenario:run --scenario-file local/scenarios/my-investigation.scenario.ts
-pnpm --dir tests/scenarios scenario:run --scenario many-writer-convergence --set event_count=100
 ```
 
-The default command runs directly against the materialized core source at
-`repos/livestore`. Select another dependency-compatible Git branch, tag, or
-commit without publishing a snapshot:
-
-```sh
-pnpm --dir tests/scenarios scenario:run --core-ref feature/rebase-solution --profile browser
-```
-
-Select an existing local LiveStore checkout or worktree, including its dirty
-and untracked source changes, with a path resolved from the contrib root:
-
-```sh
-pnpm --dir tests/scenarios scenario:run --core-path ../livestore --profile browser
-```
-
-The local worktree must already have its pinned dependencies installed. A Git
-ref reuses the current composed dependency installation and is therefore
-accepted only while the Scenario-relevant core packages have the same runtime
-dependency declarations; when a branch changes those declarations, install it
-as an ordinary LiveStore worktree and use `--core-path` instead.
-
-Core packages expose TypeScript source to the development workspace. The
-launcher selects the source before loading the runner, so implementation-only
-changes need neither a LiveStore build nor an npm snapshot. It serializes the
-temporary `repos/livestore` projection, restores the original materialization
-after success, failure, or an interrupt, and repairs an abandoned projection on
-the next run. Artifacts record the selected core commit plus a content hash when
-the selected working tree is dirty; machine-local paths are printed only to the
-terminal.
-
-`in-process` defaults to the controlled mock backend. `process` and `browser`
-use the local real `sync-cf` Worker and SQLite Durable Object. The browser
-profile launches headless Chromium with one persistent browser context per
-Client, one page per session, OPFS, a SharedWorker, and Web Locks. Set
-`SCENARIO_BROWSER_HEADLESS=0` to watch it run.
-
-Select `--backend cloud-sync-cf` to deploy or reuse a dedicated Worker and run
-against a real Cloudflare SQLite Durable Object. Local interactive use falls
-back to `wrangler login`; automated use sets `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID`. Provisioning happens only when this backend is
-explicitly selected, caches its scoped sync credential under the ignored
-`.wrangler/` directory, and redeploys when the selected LiveStore source
-revision changes. Each run uses a unique physical Store ID and clears its DO
-storage during scope teardown. Override the managed Worker name with
-`SCENARIO_CLOUD_WORKER_NAME`.
-
-To attach to an already deployed compatible Worker without provisioning it,
-set both `SCENARIO_CLOUD_SYNC_URL` and `SCENARIO_CLOUD_SYNC_TOKEN`. Set
-`SCENARIO_CLOUD_FORCE_DEPLOY=1` to force a managed redeployment.
-
-Use `--output <path>` to choose the artifact path. By default it is written to
-`tests/scenarios/artifacts/<scenario-id>.json`.
-Set `SCENARIO_PROGRESS=1` to print step and settlement transitions for a long
-run.
-Set `SCENARIO_BROWSER_DB_SNAPSHOT_DIR=<directory>` to export the first session,
-leader, and eventlog databases immediately before each browser Client
-reconnects.
-
-`concurrent-hotel-booking` is an intentional failure reproducer for the
-command-replay RFC's invalid-rebase class. Its CLI process exits non-zero after
-writing an inspectable artifact. See [RED_TEAMING.md](./RED_TEAMING.md) for the
-broader campaign and failure-reduction plan.
-
-## Author and promote a scenario
-
-Concrete Application definitions live in [`src/corpus/applications`](./src/corpus/applications).
-They contain the real LiveStore schema, materializers, normal application
-actions, and State inspectors. Reusable TypeScript helpers belong to Scenario
-authoring, not the Application runtime interface.
-
-Scenario source uses immutable `.scenario.ts` pipelines. See
-[SCENARIO_AS_CODE.md](./SCENARIO_AS_CODE.md) for the construct reference,
-examples, helper boundary, validation, and trust model. The CLI evaluates and
-normalizes retained or explicitly selected local source before the runner starts; `--set name=value`
-overrides a declared parameter without coupling the source to environment
-variables.
-
-Use `wait('2s')` when elapsed delay is part of the Scenario story. Repeated or
-generated actions can set `{ between: '250ms' }` for a fixed delay after each
-acknowledged action except the last. Both forms retain requested and actual
-controller-time evidence; neither implies Settlement or a timing assertion.
-
-Start investigations in [`local/scenarios`](./local/scenarios), which is ignored
-by Git. Copy `scenario-template.scenario.ts`, define its ordered instructions, and
-run it with `--scenario-file`. This tier is for generated cases, parameter
-sweeps, reductions, and hypotheses whose durable purpose is not established.
-
-Promote only a reduced Scenario with a clear regression or representative
-purpose. Move it to `src/corpus/scenarios/retained/findings/` or
-`src/corpus/scenarios/retained/examples/`, add focused evidence, and register it
-in `src/corpus/scenarios/registry.ts`. The retained CLI corpus intentionally has
-six cases: SF-01 through SF-04 plus `offline-writer-recovery` and
-`multi-session-recovery`. Narrow host-contract fixtures live under
-`src/test-support/scenarios` and are not presented as corpus cases.
-
-Only register another Application when a Scenario genuinely needs a different
-schema, action, materializer, or inspector surface. `src/corpus/registry.test.ts`
-checks retained IDs and Application references.
-
-## Inspect a scenario run
-
-The scenario viewer is a React single-page application:
+The run writes a replayable artifact to
+`tests/scenarios/artifacts/<scenario-id>.json`. In another terminal, start the
+viewer:
 
 ```sh
 pnpm --dir tests/scenarios viewer
 ```
 
-Open the printed URL (normally `http://localhost:5173`) and choose a generated
-artifact from **saved runs**. The
-viewer startup and scenario CLI refresh this local catalog from `artifacts/`;
-the file picker can still open a `.json` or `.json.gz` artifact from elsewhere.
-Saved-run options show the compact LiveStore revision used for each run. Once
-opened, the header shows the full commit and dirty-content identity without
-persisting the selected worktree's local path.
+Open the printed URL, normally <http://localhost:5173>, and select the run from
+**Saved runs**.
 
-Only the four minimized sync failures carry identifiers: `SF-01` through
-`SF-04`. The ID names the product-level finding and retained Scenario source;
-an artifact is retained only when the current run still demonstrates that
-finding. Ordinary and representative runs do not receive finding IDs. The
-complete findings and reduction evidence are recorded in
-[`SYNC_CORRECTNESS_FINDINGS.md`](./SYNC_CORRECTNESS_FINDINGS.md).
+Use `pnpm --dir tests/scenarios scenario:run --help` to list every retained
+scenario and command-line option.
 
-Storybook is the component and state workbench:
+## The mental model
 
-```sh
-pnpm --dir tests/scenarios storybook
-pnpm --dir tests/scenarios storybook:build
+Three inputs define a run:
+
+- a **Scenario** describes topology, ordered instructions, faults, annotations,
+  and expected properties;
+- an **Application** supplies a real LiveStore schema, typed actions,
+  materializers, and State inspectors; and
+- the **execution configuration** chooses where participants run and which sync
+  backend they use.
+
+```mermaid
+flowchart TD
+  S["Scenario source<br/>.scenario.ts"] --> N["Validated, serializable<br/>Scenario AST"]
+  N --> R["Scenario runner"]
+  A["Application definition<br/>schema · actions · inspectors"] --> R
+  C["Execution configuration<br/>profile · backend · core source"] --> R
+  R --> H["Participant host<br/>in-process · process · browser"]
+  H --> L["Real LiveStore components<br/>Stores · leaders · SQLite · materializers"]
+  L <--> B["Sync backend<br/>mock · local sync-cf · cloud sync-cf"]
+  H --> T["Immutable trace<br/>control · observations · outcomes"]
+  B --> T
+  T --> O["Oracles and verdicts"]
+  T --> F["Run artifact"]
+  O --> F
+  F --> V["Artifact viewer"]
 ```
 
-It opens at `http://localhost:6006` and includes primitive, topology,
-inspector, sparse/dense timeline, lifecycle, failure, range, and complete-app
-stories backed by the tracked reference artifacts.
+The runner deliberately keeps three kinds of information separate:
 
-The automated viewer gate validates interactions and compares the canonical
-viewer with the approved migration baselines in desktop light, desktop dark,
-and narrow light projects:
+| Layer    | Question                     | Meaning                                                                                       |
+| -------- | ---------------------------- | --------------------------------------------------------------------------------------------- |
+| Control  | What did the runner ask for? | An acknowledgement means the host handled a request; it does not prove product state changed. |
+| Evidence | What was observed?           | Component observations, operation outcomes, recovery, and settlement are retained as facts.   |
+| Claim    | What can we conclude?        | Oracles evaluate retained evidence and emit explicit verdicts.                                |
 
-```sh
-pnpm --dir tests/scenarios viewer:parity
-```
+The artifact is authoritative. The viewer derives topology, history, flow, and
+time projections from that immutable artifact; it does not inspect a live run or
+change its verdict.
 
-The controller owns durable projection, playback, cursor, selection,
-viewport, and inspector state. Event-log scroll and pointer-drag bookkeeping
-remain local to the relevant components. `deriveTimelineScene()` is DOM-free;
-the layered SVG renderer consumes its semantic layers and preserves the two-SVG
-main-timeline/range-navigator organization.
+## Choose how to run
 
-The default timeline shows sync evidence: material observation captures and
-reached annotations receive semantic flow space, while generated child actions
-are summarized by their enclosing action sequence. Switch to raw trace and record
-playback when individual controller instructions and acknowledgements are
-needed; those records remain intact but do not stretch the default flow axis.
+The scenario source stays the same across compatible profiles. Changing the
+profile moves the participant boundary and changes what the run can prove.
 
-Tracked current-format `.json.gz` artifacts are also included in the saved-run
-catalog without adding the full uncompressed traces to the repository. The set
-includes passed browser runs for `multi-session-recovery` and
-`offline-writer-recovery`, a dense seeded-action browser fixture, and current
-SF-03 failure evidence.
+| Profile      | Participant placement                                              | Default backend | Best for                                                         |
+| ------------ | ------------------------------------------------------------------ | --------------- | ---------------------------------------------------------------- |
+| `in-process` | Real Stores and processors inside the controller process           | Controlled mock | Fast correctness checks, stress, and deterministic boundaries    |
+| `process`    | One isolated Node child process per Client                         | Local `sync-cf` | Process isolation, lifecycle, and the serialized host boundary   |
+| `browser`    | One persistent browser context per Client and one page per session | Local `sync-cf` | OPFS, SharedWorkers, Web Locks, persistence, and the web adapter |
 
-Host acknowledgements mean only that the participant host completed handling
-the controller request at its advertised boundary. They do not confirm backend
-acceptance or propagation. The viewer keeps correlation (related evidence)
-separate from explicit `causedBy` dependencies. The current operation-history
-projection declares its application/control families and projects their
-retained Control acknowledgements or failure outcomes across
-instruction-to-outcome intervals. System/sync sampling and State inspection are
-explicitly outside that coverage.
-
-A `parallel` instruction schedules two or more ordinary non-settlement operations. It
-records every child invocation before releasing the host requests, preserves
-each child outcome, and joins the group before the next instruction. The
-`operation-history` oracle can require named operations to have terminal,
-non-indefinite outcomes and overlapping intervals.
-
-TypeScript loops and ordinary helper functions keep generated work directly in
-the instruction stream. Keyed deterministic random choices derive from the
-Scenario seed, sequence identity, iteration, and choice key. Inserting an
-unrelated keyed choice therefore does not shift later choices.
-
-Authoring expands immediately into a serializable `action-sequence` containing
-every concrete action and stable child operation ID. No callback or helper
-crosses into the runner, participant hosts, or artifact. The runner dispatches
-the embedded actions sequentially under one enclosing instruction/outcome
-boundary, and raw trace retains every child action. An action sequence contains
-between 1 and 10,000 actions.
-
-The initial topology contains only participants that exist before the first
-instruction. A sequential `create-client` instruction can create a new Client with its first
-sessions after history already exists; all profiles support that operation. A
-sequential `add-session` instruction attaches a new session to an existing Client;
-the browser profile realizes it by opening another page in the Client's
-persistent context. Creation acknowledgements prove only that the Store or
-page started. Settlement and oracles separately prove catch-up and convergence.
-Participant additions are rejected in `parallel` groups, and removal is not
-part of the current surface.
-
-An `annotation` is an optional zero-effect instruction. Reaching it emits an
-`annotation.reached` trace record so a failed artifact shows only narrative
-markers execution actually crossed. It is not an operation, grouping
-construct, lifecycle stage, or Settlement boundary.
-
-`multi-session-recovery` also covers behavioral Leader turnover using
-ordinary session lifecycle: the fixture starts the first page through blocking
-Web Lock election, adds a sibling, closes the initial lock holder, writes
-through the sibling, and then converges after restart. The artifact proves that
-recovery path, but does not claim portable trace evidence naming the old and new
-Leader sessions.
-
-Participant-host failures carry a portable category for host infrastructure,
-request rejection, invalid response, response timeout, or transport failure.
-That category is independent from outcome certainty: a timeout or transport
-loss after dispatch remains indefinite, while a known rejection or transport
-failure before send is definite. Adapter-native details remain in the message.
-
-Disconnect and backend-availability faults are injected or removed only when a
-system observation confirms the state requested through the host. For local
-`sync-cf`, a Scenario-owned TCP proxy temporarily withholds traffic on existing
-participant sockets and rejects new connections; Wrangler, the Worker, and its
-Durable Object state remain running. The authoritative backend observer uses a
-direct route, so evidence remains readable during the participant-route outage.
-This models a transient network blackhole, not a Wrangler/DO restart or recovery
-after an established WebSocket is destroyed.
-
-Settlement records quiescence from the runner's in-flight operation projection,
-then retains recovery samples separately from the stable convergence barrier. A
-reconnect or backend-availability acknowledgement is therefore not presented as
-proof of recovery.
-
-## Test the profiles
+Common runs from the repository root:
 
 ```sh
-pnpm --dir tests/scenarios test
-pnpm --dir tests/scenarios exec vitest run src/profiles/browser/profile.test.ts
-pnpm --dir tests/scenarios exec tsc --noEmit -p tsconfig.json
+# Fast default: offline-writer-recovery, in-process, controlled mock backend
+pnpm --dir tests/scenarios scenario:run
+
+# Run a retained case by name
+pnpm --dir tests/scenarios scenario:run --scenario multi-session-recovery
+
+# Exercise the real local sync-cf stack in Chromium
+pnpm --dir tests/scenarios scenario:run --profile browser
+
+# Watch the browser run
+SCENARIO_BROWSER_HEADLESS=0 pnpm --dir tests/scenarios scenario:run --profile browser
+
+# Override a declared Scenario parameter
+pnpm --dir tests/scenarios scenario:run --scenario many-writer-convergence --set event_count=100
 ```
 
-The scenario AST does not select execution placement. The same portable
-scenario can therefore run through the in-process, isolated Node process, or
-browser host when its required capabilities are available. The runner derives
-requirements implied by topology, operations, observations, and oracles;
-`requires` is only needed for additional platform-specific guarantees. Run the
-shared profile contract directly with:
+For selecting another LiveStore checkout or Git revision, cloud execution,
+artifact controls, Storybook, and focused test commands, see
+[Running and inspecting scenarios](./RUNNING.md).
+
+## Author a scenario
+
+Start with the ignored local template so exploratory work does not enter Git:
 
 ```sh
-pnpm --dir tests/scenarios exec vitest run src/profiles/conformance.test.ts
+cp tests/scenarios/local/scenarios/scenario-template.scenario.ts \
+  tests/scenarios/local/scenarios/my-investigation.scenario.ts
+
+pnpm --dir tests/scenarios scenario:run \
+  --scenario-file local/scenarios/my-investigation.scenario.ts
 ```
+
+A Scenario is a trusted TypeScript module with an immutable pipeline:
+
+```ts
+export default Scenario.start({
+  application: todo,
+  about: 'Client A writes offline, reconnects, and converges.',
+  clients: [clientA, clientB],
+}).pipe(
+  disconnect(clientA),
+  todo.createTodo({ id: 'offline', text: 'Written offline' }).as(sessionA),
+  reconnect(clientA),
+  expect(pendingResolved(both), eventlogsConverge(both)),
+)
+```
+
+Normal TypeScript handles loops, branches, parameters, generated actions, and
+reusable helpers. Before execution, the source is evaluated and normalized into
+closed, validated data; no callback or module reference crosses into a
+participant host or artifact.
+
+Read [TypeScript Scenario authoring](./SCENARIO_AS_CODE.md) for the complete
+construct reference and [local/scenarios](./local/scenarios) for the investigation
+and promotion workflow.
+
+## Where to go next
+
+| Goal                                                            | Document                                                                                                                               |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Select core source, configure cloud sync, or run focused checks | [Running and inspecting scenarios](./RUNNING.md)                                                                                       |
+| Learn every Scenario authoring construct                        | [TypeScript Scenario authoring](./SCENARIO_AS_CODE.md)                                                                                 |
+| Understand why the evidence model is shaped this way            | [Scenario verification intuition](../../context/verification/scenarios/intuition.md)                                                   |
+| See the architecture and evidence model visually                | [Scenario runner visual explainer](../../context/verification/scenarios/scenario-runner-explainer.html)                                |
+| Read the normative realization contract                         | [Requirements](../../context/verification/scenarios/requirements.md) and [specification](../../context/verification/scenarios/spec.md) |
+| Run adversarial campaigns and reduce failures                   | [Red-team plan](./RED_TEAMING.md)                                                                                                      |
+| Review known sync failures and exact reproductions              | [Sync correctness findings](./SYNC_CORRECTNESS_FINDINGS.md)                                                                            |
+
+`tests/scenarios` is private contributor tooling. It may depend on LiveStore
+product packages, but product packages never depend on the runner.
