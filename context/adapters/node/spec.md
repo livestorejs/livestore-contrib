@@ -38,11 +38,11 @@ WASM SQLite (`@livestore/sqlite-wasm/node`) backs every database — no
 
 - **`fs`** — leader state and eventlog databases are files under
   `baseDirectory/storeId` (default `baseDirectory` = cwd)
-  (`src/leader-thread-shared.ts:87`): `state{schemaHashSuffix}@{formatVersion}.db`
-  (suffix `fixed` under manual migration, else the schema hash;
-  `src/leader-thread-shared.ts:69`, `:89`, `:129`) and
-  `eventlog@{formatVersion}.db` (`:89`). Opened with `foreignKeys: true`; WAL is
-  not yet enabled (`// TODO enable WAL for nodejs`, `:90`) — see
+  (`src/leader-thread-shared.ts:86`): `state{schemaHashSuffix}@{formatVersion}.db`
+  (suffix is the schema hash;
+  `src/leader-thread-shared.ts:69`, `:88`, `:129`) and
+  `eventlog@{formatVersion}.db` (`:88`). Opened with `foreignKeys: true`; WAL is
+  not yet enabled (`// TODO enable WAL for nodejs`, `:89`) — see
   LSC.ADAPT.NODE-DQ1.
 - **`in-memory`** — leader databases are in-memory; an optional `importSnapshot`
   is imported then migrated (single-threaded only)
