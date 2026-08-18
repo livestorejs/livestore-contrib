@@ -4,9 +4,9 @@
     "livestore": {
       "url": "https://github.com/livestorejs/livestore",
       "ref": "main",
-      "commit": "8dc44e65982082216a41e1cd1ed995177131ae76",
+      "commit": "9ede3aa85ef277f5276586a5addce4e068a1d361",
       "pinned": true,
-      "lockedAt": "2026-07-15T15:15:52.473Z"
+      "lockedAt": "2026-08-18T22:00:00.000Z"
     },
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",
