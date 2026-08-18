@@ -43,10 +43,10 @@ export const packageJson = contribPackageJson
 
 /**
  * Override core's `effectDevDeps` so contrib-owned packages resolve Effect
- * dev dependencies against contrib's catalog (`4.0.0-beta.98`) instead of core's
- * (`4.0.0-beta.97`). This explicit named export shadows the `export *` re-export
- * from core's repo helpers. `getUtilsPeerDeps` intentionally stays on core's
- * `^4.0.0-beta.97` peer ranges (which beta.98 satisfies).
+ * dev dependencies against contrib's catalog (`4.0.0-rc.109`) instead of a
+ * stale core helper default. This explicit named export shadows the `export *`
+ * re-export from core's repo helpers. `getUtilsPeerDeps` stays on core's
+ * `^4.0.0-rc.109` peer ranges, which this pin satisfies exactly.
  */
 export const effectDevDeps = (...additionalDeps: Parameters<typeof contribCatalog.pick>) =>
   contribCatalog.pick(...utilsEffectPeerDeps, ...additionalDeps)
