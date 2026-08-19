@@ -58,18 +58,21 @@ peerDependencyRules:
 
 allowBuilds:
   '@parcel/watcher': true
-  '@myobie/pty': true
-  esbuild: true
-  msgpackr-extract: true
-  node-pty: true
-  sharp: true
-  unix-dgram: true
+  '@myobie/pty': false
+  esbuild: false
+  fsevents: false
+  msgpackr-extract: false
+  node-pty: false
+  sharp: false
+  unix-dgram: false
   '@mixedbread/cli': true
   cbor-extract: true
   dtrace-provider: true
   protobufjs: true
   puppeteer: true
   workerd: true
+
+minimumReleaseAgeExclude: ['@effect/platform', '@types/node', effect]
 
 supportedArchitectures:
   os: [linux, darwin]
@@ -82,17 +85,15 @@ strictPeerDependencies: false
 
 injectWorkspacePackages: false
 
-enableGlobalVirtualStore: true
-
-storeDir: .devenv/pnpm-store-pure-v1
-
-packageImportMethod: clone-or-copy
+packageImportMethod: auto
 
 optimisticRepeatInstall: false
 
 verifyDepsBeforeRun: false
 
 linkWorkspacePackages: true
+
+ignoreScripts: true
 
 sideEffectsCache: false
 

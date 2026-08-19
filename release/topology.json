@@ -1,0 +1,13 @@
+{
+  "publishablePackageNames": [
+    "@livestore/adapter-expo",
+    "@livestore/adapter-node",
+    "@livestore/cli",
+    "@livestore/devtools-expo",
+    "@livestore/graphql",
+    "@livestore/solid",
+    "@livestore/svelte",
+    "@livestore/sync-electric",
+    "@livestore/sync-s2"
+  ]
+}

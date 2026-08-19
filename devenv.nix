@@ -5,11 +5,12 @@
   ...
 }:
 let
-  effectUtils =
-    if builtins.pathExists ./repos/effect-utils/flake.nix then
-      builtins.getFlake (toString ./repos/effect-utils)
-    else
-      inputs.effect-utils;
+  # Pinned input, not ./repos/effect-utils. The composed checkout is gitignored and can sit at a
+  # different revision than the lock records, and evaluating it made shell entry depend on that drift:
+  # a stale member declared a fixed-output hash that no longer matched, so the shell failed to build
+  # for a reason the committed locks did not describe. Evaluating the pin keeps local entry agreeing
+  # with CI, which composes members fresh at the locked revision.
+  effectUtils = inputs.effect-utils;
   effectUtilsPackages = effectUtils.packages.${pkgs.system};
   taskModules = effectUtils.devenvModules.tasks;
 
@@ -31,7 +32,6 @@ let
 in
 {
   imports = [
-    effectUtils.devenvModules.dt
     taskModules.genie
     (taskModules.megarepo {
       syncAll = false;
@@ -57,15 +57,6 @@ in
         "package.json.genie.ts"
         "pnpm-workspace.yaml.genie.ts"
         "tsconfig.dev.json.genie.ts"
-      ];
-      execIfModifiedPatterns = [
-        "*.ts"
-        "*.json"
-        "*.yaml"
-        "genie/**/*.ts"
-        ".github/**/*.ts"
-        ".github/**/*.yml"
-        ".github/**/*.yaml"
       ];
       geniePatterns = [ "**/*.genie.ts" ];
       genieCoverageDirs = [ "." ];
@@ -252,7 +243,7 @@ in
       release_version="''${LIVESTORE_RELEASE_VERSION:-0.0.0-snapshot-$git_sha}"
       core_release_version="''${LIVESTORE_CORE_RELEASE_VERSION:-0.0.0-snapshot-$core_sha}"
 
-      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
       node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --dry-run
     '';
   };
@@ -285,7 +276,7 @@ in
 
       release_version="0.0.0-snapshot-pr.$PR_NUMBER.$GIT_SHA"
 
-      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
       node release/simulate-publish.mjs \
         --version "$release_version" \
         --core-sha "$core_sha" \
@@ -314,7 +305,7 @@ in
         exit 1
       fi
 
-      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
       node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --verify-core --publish
     '';
   };
@@ -336,7 +327,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-misc/vitest.config.ts
+      WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-misc/vitest.config.ts
     '';
   };
   tasks."test:integration:node-sync" = {
@@ -346,7 +337,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-sync/vitest.config.ts
+      WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/integration exec vitest run --config src/tests/node-sync/vitest.config.ts
     '';
   };
   tasks."test:integration:node-sync:allow-flaky" = {
@@ -377,7 +368,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts";
   };
   tasks."test:packages:svelte" = {
     description = "Run @livestore/svelte unit tests";
@@ -386,7 +377,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      WORKSPACE_ROOT="$PWD" DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/svelte exec vitest run --config tests/vitest.config.ts
+      WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 pnpm --dir packages/@livestore/svelte exec vitest run --config tests/vitest.config.ts
     '';
   };
   tasks."test:packages:sync-s2" = {
@@ -395,7 +386,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 pnpm --dir packages/@livestore/sync-s2 exec vitest run --config vitest.config.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir packages/@livestore/sync-s2 exec vitest run --config vitest.config.ts";
   };
   tasks."test:examples:build" = {
     description = "Build contrib examples with build scripts";
@@ -404,7 +395,7 @@ in
       "pnpm:install"
     ];
     exec = ''
-      DT_PASSTHROUGH=1 pnpm \
+      DEVENV_TASK_PASSTHROUGH=1 pnpm \
         --filter "./examples/cf-chat" \
         --filter "./examples/cf-chat-solid" \
         --filter "./examples/web-*" \
@@ -417,7 +408,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=electric pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/electric-specific.test.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 TEST_SYNC_PROVIDER=electric pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/electric-specific.test.ts";
   };
   tasks."test:sync-provider:s2" = {
     description = "Run moved S2 sync-provider tests";
@@ -425,7 +416,7 @@ in
       "genie:run"
       "pnpm:install"
     ];
-    exec = "DT_PASSTHROUGH=1 TEST_SYNC_PROVIDER=s2 pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/s2-specific.test.ts";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 TEST_SYNC_PROVIDER=s2 pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/s2-specific.test.ts";
   };
   tasks."workspace:shape-check" = {
     description = "Validate the contrib workspace shape";

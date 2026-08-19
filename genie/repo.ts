@@ -9,6 +9,9 @@
  */
 
 import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
+// Imported straight from effect-utils rather than through core's re-export: contrib pins a core
+// revision that predates this step, so routing it through core would break generation here.
+import { prepareCiScriptsStep } from '../repos/effect-utils/genie/ci-workflow.ts'
 import {
   applyMegarepoLockStep,
   checkoutStep,
@@ -87,6 +90,10 @@ export const refs = {
 } as const
 
 export const livestoreContribSetupStepsAfterCheckout = [
+  // Copy CI helper scripts (e.g. the nix-gc-race retry wrapper) into the prepared scripts dir before
+  // any retry-wrapped command runs, and before an alternate checkout can replace the workspace.
+  // Required by the genie CI workflow validator.
+  prepareCiScriptsStep,
   installNixStep({
     extraConf:
       'extra-substituters = https://cache.nixos.org\nextra-trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=',
