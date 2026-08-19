@@ -1,3 +1,4 @@
+import { releaseTopologyPath } from '../../genie/pr-snapshot-paths.ts'
 import {
   bashShellDefaults,
   defaultActionlintConfig,
@@ -11,7 +12,6 @@ import {
   savePnpmStateStep,
 } from '../../genie/repo.ts'
 import { prSnapshotPackJob } from '../../repos/effect-utils/genie/ci-workflow.ts'
-import { releaseTopologyPath } from '../../genie/pr-snapshot-paths.ts'
 
 const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
   ...steps,

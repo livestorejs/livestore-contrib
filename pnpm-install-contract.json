@@ -1,0 +1,137 @@
+{
+  "contract": "livestore-contrib/pnpm-install-contract",
+  "dependencyGraphContract": {
+    "allowBuilds": {
+      "@mixedbread/cli": true,
+      "@myobie/pty": false,
+      "@parcel/watcher": true,
+      "cbor-extract": true,
+      "dtrace-provider": true,
+      "esbuild": false,
+      "fsevents": false,
+      "msgpackr-extract": false,
+      "node-pty": false,
+      "protobufjs": true,
+      "puppeteer": true,
+      "sharp": false,
+      "unix-dgram": false,
+      "workerd": true
+    },
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.8.0"
+    }
+  },
+  "dependencyMaterializationProfile": {
+    "identityInputs": [
+      "packageManager",
+      "dependencyGraphContract",
+      "installPolicy",
+      "storeContract",
+      "workspaceManifestContract"
+    ],
+    "schema": "dependency-materialization-profile/v0"
+  },
+  "installPolicy": {
+    "dedupePeerDependents": true,
+    "ignoreScripts": true,
+    "minimumReleaseAgeExclude": ["@effect/platform", "@types/node", "effect"],
+    "optimisticRepeatInstall": false,
+    "packageImportMethod": {
+      "live": {
+        "linuxSameDeviceRequired": true,
+        "method": "auto",
+        "owner": "pnpm"
+      },
+      "nixPreparedDependencies": {
+        "scope": "independent-builder-policy"
+      }
+    },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "ioredis": ">=5.6.1"
+      }
+    },
+    "pmOnFail": "ignore",
+    "sideEffectsCache": false,
+    "strictPeerDependencies": false,
+    "strictStorePkgContentCheck": true,
+    "supportedArchitectures": {
+      "cpu": ["x64", "arm64"],
+      "libc": ["glibc", "musl"],
+      "os": ["linux", "darwin"]
+    },
+    "verifyDepsBeforeRun": false,
+    "verifyStoreIntegrity": true
+  },
+  "packageManager": {
+    "name": "pnpm",
+    "version": "11.8.0"
+  },
+  "schemaVersion": 2,
+  "storeContract": {
+    "ci": {
+      "scope": "job"
+    },
+    "layoutVersion": "v11",
+    "localDevelopment": {
+      "contentAddressedFiles": "shared",
+      "defaultPath": "~/.local/share/pnpm/store-shared-v1",
+      "derivedIndex": "shared-pnpm-owned",
+      "pathOverrideEnvironmentVariable": "PNPM_SHARED_STORE_DIR",
+      "scope": "host-user",
+      "trustBoundary": "same-os-user"
+    },
+    "owner": "pnpm",
+    "virtualStore": {
+      "global": false,
+      "path": "node_modules/.pnpm",
+      "scope": "materialization-root"
+    }
+  },
+  "workspaceManifestContract": {
+    "injectWorkspacePackages": false,
+    "packages": [
+      "examples/cf-chat",
+      "examples/cf-chat-solid",
+      "examples/expo-linearlite",
+      "examples/expo-todomvc-sync-cf",
+      "examples/node-effect-cli",
+      "examples/node-todomvc-sync-cf",
+      "examples/web-multi-store",
+      "examples/web-todomvc-custom-elements",
+      "examples/web-todomvc-experimental",
+      "examples/web-todomvc-redwood",
+      "examples/web-todomvc-solid",
+      "examples/web-todomvc-svelte",
+      "examples/web-todomvc-sync-electric",
+      "examples/web-todomvc-sync-s2",
+      "packages/@livestore/adapter-expo",
+      "packages/@livestore/adapter-node",
+      "packages/@livestore/cli",
+      "packages/@livestore/devtools-expo",
+      "packages/@livestore/graphql",
+      "packages/@livestore/solid",
+      "packages/@livestore/svelte",
+      "packages/@livestore/sync-electric",
+      "packages/@livestore/sync-s2",
+      "repos/livestore/packages/@livestore/adapter-cloudflare",
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/effect-playwright",
+      "repos/livestore/packages/@livestore/framework-toolkit",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/peer-deps",
+      "repos/livestore/packages/@livestore/react",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/sync-cf",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh",
+      "tests/integration",
+      "tests/sync-provider"
+    ]
+  }
+}
