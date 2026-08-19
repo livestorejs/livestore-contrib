@@ -27,10 +27,13 @@ context/
   devtools/        realize core 02-system/07-devtools/ (surface contract)
     expo/
   cli/             standalone tool; realizes no core dimension
+  release/         realizes core 03-delivery/02-release/ (snapshot publishing)
 ```
 
 Every contrib package has a node. `cli` realizes no core dimension and lives at
-the top level. `graphql` is a query-surface (a new live-query kind), not a
+the top level. `release/` is not a package: it describes how contrib realizes
+the core delivery contract for snapshot publishing, which spans every
+publishable package rather than any one of them. `graphql` is a query-surface (a new live-query kind), not a
 framework binding, so it lives under `query-surfaces/` and refines the core
 reactivity contract rather than the integration contract (LSC-DQ1, resolved).
 
@@ -52,6 +55,7 @@ IDs with links (see below).
 | `LSC.QS.GQL-*` | `query-surfaces/graphql/` |
 | `LSC.DT.EXPO-*` | `devtools/expo/` |
 | `LSC.CLI-*` | `cli/` |
+| `LSC.REL-*` | `release/` |
 
 Realization sub-nodes (if any) extend their namespace with one more segment and
 live under the parent's directory. IDs are sequential per namespace.
