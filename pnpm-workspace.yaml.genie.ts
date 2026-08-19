@@ -39,6 +39,13 @@ const effectDedupeOverrides = catalog.pick(
 const contribPeerDependencyRules = {
   allowedVersions: {
     ioredis: '>=5.6.1',
+    /**
+     * The shared catalog moved to Vite 8 while two consumers still declare Vite 7 peer ranges:
+     * `@livestore/devtools-vite` at the pinned core snapshot, and `@sveltejs/vite-plugin-svelte`.
+     * Neither is resolvable from here — the first ships with core, the second is upstream — so the
+     * conflict is suppressed rather than fixed, and clears once both accept Vite 8.
+     */
+    vite: '>=7.3.1',
   },
 }
 
