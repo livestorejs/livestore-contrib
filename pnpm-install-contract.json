@@ -3,18 +3,17 @@
   "dependencyGraphContract": {
     "allowBuilds": {
       "@mixedbread/cli": true,
-      "@myobie/pty": false,
+      "@myobie/pty": true,
       "@parcel/watcher": true,
       "cbor-extract": true,
       "dtrace-provider": true,
-      "esbuild": false,
-      "fsevents": false,
-      "msgpackr-extract": false,
-      "node-pty": false,
+      "esbuild": true,
+      "msgpackr-extract": true,
+      "node-pty": true,
       "protobufjs": true,
       "puppeteer": true,
-      "sharp": false,
-      "unix-dgram": false,
+      "sharp": true,
+      "unix-dgram": true,
       "workerd": true
     },
     "packageManager": {
@@ -34,8 +33,6 @@
   },
   "installPolicy": {
     "dedupePeerDependents": true,
-    "ignoreScripts": true,
-    "minimumReleaseAgeExclude": ["@effect/platform", "@types/node", "effect"],
     "optimisticRepeatInstall": false,
     "packageImportMethod": {
       "live": {
