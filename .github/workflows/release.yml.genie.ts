@@ -8,12 +8,8 @@ import {
   runDevenvTasksBefore,
   savePnpmStateStep,
 } from '../../genie/repo.ts'
-import { prSnapshotReleaseJobs } from '../../repos/effect-utils/genie/ci-workflow.ts'
-import {
-  prSnapshotAttestationPredicateType,
-  prSnapshotValidatorPath,
-  releaseTopologyPath,
-} from '../../genie/pr-snapshot-paths.ts'
+import { prSnapshotForeignEventGuard, prSnapshotReleaseJobs } from '../../repos/effect-utils/genie/ci-workflow.ts'
+import { prSnapshotAttestationPredicateType, releaseTopologyPath } from '../../genie/pr-snapshot-paths.ts'
 
 const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
   ...steps,
@@ -23,7 +19,6 @@ const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
 
 const prSnapshot = prSnapshotReleaseJobs({
   topologyPath: releaseTopologyPath,
-  validatorScriptPath: prSnapshotValidatorPath,
   attestationPredicateType: prSnapshotAttestationPredicateType,
 })
 
@@ -44,10 +39,7 @@ export default githubWorkflow({
         },
       },
     },
-    workflow_run: {
-      workflows: ['ci'],
-      types: ['completed'],
-    },
+    workflow_run: prSnapshot.workflowRunTrigger,
     schedule: prSnapshot.scheduleTrigger,
     pull_request: {},
     push: {
@@ -70,6 +62,9 @@ export default githubWorkflow({
     ...prSnapshot.jobs,
 
     'release-surface': {
+      // The snapshot triggers widen this workflow to a cron and to every producer CI completion.
+      // Without this guard a full toolchain build would run every few minutes.
+      if: prSnapshotForeignEventGuard,
       'runs-on': namespaceRunner('${{ github.run_id }}'),
       defaults: bashShellDefaults,
       steps: withNixDiagnosticsOnFailure([

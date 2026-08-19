@@ -1,4 +1,8 @@
-import { baseOxfmtIgnorePatterns, baseOxfmtOptions, oxfmtConfig } from './genie/repo.ts'
+import { baseOxfmtOptions, oxfmtConfig } from './genie/repo.ts'
+// Imported straight from effect-utils, not through core's re-export. Core is composed here at a pinned
+// revision that resolves effect-utils through its own lock, so shared values reaching us that way are
+// whatever that older pin carried — silently stale.
+import { baseOxfmtIgnorePatterns } from './repos/effect-utils/genie/oxfmt-base.ts'
 
 export default oxfmtConfig({
   ...baseOxfmtOptions,
@@ -8,11 +12,6 @@ export default oxfmtConfig({
     internalPattern: ['@livestore/', '@local/'],
   },
   ignorePatterns: [
-    // Emitted verbatim from a shared source in effect-utils, which formats at a different print
-    // width. The file is generated, read-only and never hand-edited, so formatting it here would
-    // only make the two repos disagree about the bytes of a security-relevant validator.
-    '.github/scripts/pr-snapshot-artifact.mjs',
-    '.github/scripts/pr-snapshot-artifact.test.mjs',
     ...baseOxfmtIgnorePatterns,
     '**/node_modules/**',
     '**/.pnpm/**',

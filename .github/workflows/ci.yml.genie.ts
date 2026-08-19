@@ -11,11 +11,7 @@ import {
   savePnpmStateStep,
 } from '../../genie/repo.ts'
 import { prSnapshotPackJob } from '../../repos/effect-utils/genie/ci-workflow.ts'
-import {
-  prSnapshotValidatorPath,
-  prSnapshotValidatorTestPath,
-  releaseTopologyPath,
-} from '../../genie/pr-snapshot-paths.ts'
+import { releaseTopologyPath } from '../../genie/pr-snapshot-paths.ts'
 
 const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
   ...steps,
@@ -61,8 +57,6 @@ export default githubWorkflow({
     // composes core from source and would otherwise pay a cold Nix build on every pull request.
     ...prSnapshotPackJob({
       topologyPath: releaseTopologyPath,
-      validatorScriptPath: prSnapshotValidatorPath,
-      validatorTestPath: prSnapshotValidatorTestPath,
       setupStepsAfterCheckout: livestoreContribSetupStepsAfterCheckout,
       packTask: 'release:snapshot:pack:git-sha',
       runsOn: namespaceRunner('${{ github.run_id }}'),

@@ -27,6 +27,18 @@ import {
 } from '../repos/livestore/genie/repo.ts'
 import { catalog as contribCatalog, packageJson as contribPackageJson } from './external.ts'
 
+/**
+ * Re-exports core's helpers for convenience — but note the hazard before relying on it.
+ *
+ * Core is composed here at a pinned revision, and core resolves effect-utils through *its own* lock.
+ * So a symbol that reaches this repo via core carries whatever effect-utils revision core's pin
+ * happened to hold, not the one this repo pins. When core's pin is older, the value is silently stale:
+ * sometimes that fails loudly as a missing export, and sometimes it succeeds and produces subtly wrong
+ * generated output.
+ *
+ * Anything that must track this repo's own effect-utils pin should therefore be imported from
+ * `../repos/effect-utils/...` directly, as the PR snapshot factory and the oxfmt ignore patterns are.
+ */
 export * from '../repos/livestore/genie/repo.ts'
 
 export const CONTRIB_REPO_NAME = 'livestore-contrib'

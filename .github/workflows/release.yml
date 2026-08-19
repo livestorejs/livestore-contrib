@@ -572,6 +572,7 @@ jobs:
           - npm provenance: identifies this trusted default-branch promotion workflow; it does not claim that the PR CI job held npm publishing authority.
           EOF
   release-surface:
+    if: github.event_name != 'schedule' && github.event_name != 'workflow_run'
     runs-on: [namespace-profile-linux-x86-64, 'namespace-features:github.run-id=${{ github.run_id }}']
     defaults:
       run:
