@@ -1,9 +1,18 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
@@ -21,14 +30,53 @@ const hasArg = (name) => args.includes(name)
 const gitSha = readArg('--git-sha')
 const explicitVersion = readArg('--version')
 const explicitCoreVersion = readArg('--core-version') ?? process.env.LIVESTORE_CORE_RELEASE_VERSION
+const coreSha = readArg('--core-sha')
 const releaseVersion = explicitVersion ?? (gitSha === undefined ? undefined : `0.0.0-snapshot-${gitSha}`)
 const publish = hasArg('--publish')
 const dryRun = hasArg('--dry-run')
+const packOnly = hasArg('--pack-only')
+const outDir = readArg('--out-dir')
+const npmTag = readArg('--tag') ?? 'snapshot'
 const verifyCore = hasArg('--verify-core')
 
-if (publish === true && dryRun === true) {
-  console.error('--publish and --dry-run are mutually exclusive')
+const exclusiveModes = [publish, dryRun, packOnly].filter((mode) => mode === true)
+if (exclusiveModes.length > 1) {
+  console.error('--publish, --dry-run and --pack-only are mutually exclusive')
   process.exit(1)
+}
+if (packOnly === true && (outDir === undefined || outDir.length === 0)) {
+  console.error('--pack-only requires --out-dir')
+  process.exit(1)
+}
+if (explicitCoreVersion !== undefined && coreSha !== undefined) {
+  console.error('--core-version and --core-sha are mutually exclusive')
+  process.exit(1)
+}
+if (coreSha !== undefined && /^[0-9a-f]{40}$/.test(coreSha) === false) {
+  console.error(`--core-sha must be a full 40-character commit SHA, got ${coreSha}`)
+  process.exit(1)
+}
+
+/**
+ * Resolve the published core snapshot version for a pinned core commit.
+ *
+ * The core release version is not derivable from the SHA alone: a core commit on `main` publishes as
+ * `0.0.0-snapshot-<sha>`, while a core *pull request* head publishes as `0.0.0-snapshot-pr.<n>.<sha>`.
+ * Both end in the SHA, so the registry is the authority. Requiring exactly one match keeps this
+ * deterministic instead of guessing a prefix.
+ */
+const resolveCoreVersionForSha = (sha) => {
+  const raw = execFileSync('npm', ['view', '@livestore/common', 'versions', '--json'], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
+  const matches = JSON.parse(raw).filter((version) => version.endsWith(sha) === true)
+  if (matches.length !== 1) {
+    console.error(`Expected exactly one published @livestore/common version ending in ${sha}, found ${matches.length}`)
+    process.exit(1)
+  }
+  return matches[0]
 }
 
 const errors = []
@@ -38,7 +86,8 @@ const coreVersion = readJson('repos/livestore/release/version.json').version
 if (typeof coreVersion !== 'string' || coreVersion.length === 0) {
   addError('repos/livestore/release/version.json must contain a non-empty version string')
 }
-const coreReleaseVersion = explicitCoreVersion ?? coreVersion
+const coreReleaseVersion =
+  explicitCoreVersion ?? (coreSha === undefined ? coreVersion : resolveCoreVersionForSha(coreSha))
 
 const rootManifest = readJson('package.json')
 const coreOwnedPackageNames = rootManifest.$genie?.coreOwnedPackageNames
@@ -312,7 +361,7 @@ for (const pkg of plan.packages) {
   console.log(`- ${pkg.name}: ${pkg.rewrites.length} rewrites (${packagePath})`)
 }
 
-if (dryRun === true || publish === true) {
+if (dryRun === true || publish === true || packOnly === true) {
   verifyRequiredCorePackages()
 
   const packed = []
@@ -327,17 +376,31 @@ if (dryRun === true || publish === true) {
 
     smokeInstallPackedTarballs(packed)
 
-    for (const { pkg, tarballPath } of packed) {
-      const existing = npmViewExists(pkg.name, pkg.version)
-      if (existing === true && publish === true) {
-        console.log(`${pkg.name}@${pkg.version} already published, skipping`)
-        continue
+    // `--pack-only` is the untrusted producer half of PR snapshot publishing: it emits the exact
+    // tarballs a later trusted job will validate and publish, and must never touch the registry.
+    if (packOnly === true) {
+      const absoluteOutDir = isAbsolute(outDir) ? outDir : join(rootDir, outDir)
+      mkdirSync(absoluteOutDir, { recursive: true })
+      for (const { pkg, tarballPath } of packed) {
+        const destination = join(absoluteOutDir, basename(tarballPath))
+        copyFileSync(tarballPath, destination)
+        console.log(`Packed ${pkg.name}@${pkg.version} -> ${basename(tarballPath)}`)
       }
+    }
 
-      const publishArgs = ['publish', tarballPath, '--tag=snapshot', '--access=public', '--ignore-scripts']
-      if (dryRun === true) publishArgs.push('--dry-run')
-      run('npm', publishArgs)
-      console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
+    if (packOnly === false) {
+      for (const { pkg, tarballPath } of packed) {
+        const existing = npmViewExists(pkg.name, pkg.version)
+        if (existing === true && publish === true) {
+          console.log(`${pkg.name}@${pkg.version} already published, skipping`)
+          continue
+        }
+
+        const publishArgs = ['publish', tarballPath, `--tag=${npmTag}`, '--access=public', '--ignore-scripts']
+        if (dryRun === true) publishArgs.push('--dry-run')
+        run('npm', publishArgs)
+        console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
+      }
     }
 
     if (publish === true) {
