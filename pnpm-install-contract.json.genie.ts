@@ -1,7 +1,9 @@
-import { projectionArtifact } from './genie/repo.ts'
 import rootPackageJson from './package.json.genie.ts'
 import rootPnpmWorkspaceYaml from './pnpm-workspace.yaml.genie.ts'
-import { pnpmInstallStorageContractV2 as storage } from './repos/effect-utils/genie/external.ts'
+// Both imported straight from effect-utils rather than through core's re-export: core is composed
+// here at a pinned revision that predates `projectionArtifact`, so routing it through core resolves
+// against a newer local checkout while failing in CI, which composes the pin.
+import { pnpmInstallStorageContractV2 as storage, projectionArtifact } from './repos/effect-utils/genie/external.ts'
 
 /**
  * Root pnpm install contract consumed by the shared pnpm task module. It captures this repo's
