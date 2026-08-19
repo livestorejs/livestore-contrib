@@ -8,12 +8,24 @@ import {
   runDevenvTasksBefore,
   savePnpmStateStep,
 } from '../../genie/repo.ts'
+import { prSnapshotReleaseJobs } from '../../repos/effect-utils/genie/ci-workflow.ts'
+import {
+  prSnapshotAttestationPredicateType,
+  prSnapshotValidatorPath,
+  releaseTopologyPath,
+} from '../../genie/pr-snapshot-paths.ts'
 
 const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
   ...steps,
   savePnpmStateStep({ keyPrefix: 'livestore-contrib-pnpm-state-v1' }),
   nixDiagnosticsArtifactStep(),
 ]
+
+const prSnapshot = prSnapshotReleaseJobs({
+  topologyPath: releaseTopologyPath,
+  validatorScriptPath: prSnapshotValidatorPath,
+  attestationPredicateType: prSnapshotAttestationPredicateType,
+})
 
 export default githubWorkflow({
   name: 'Release',
@@ -22,20 +34,21 @@ export default githubWorkflow({
   on: {
     workflow_dispatch: {
       inputs: {
+        ...prSnapshot.dispatchInputs,
         mode: {
           description: 'Release workflow mode',
           required: true,
           default: 'validate-release-surface',
           type: 'choice',
-          options: ['validate-release-surface', 'publish-snapshot'],
+          options: ['validate-release-surface', 'publish-snapshot', prSnapshot.dispatchModeOption],
         },
       },
     },
     workflow_run: {
       workflows: ['ci'],
       types: ['completed'],
-      branches: ['main'],
     },
+    schedule: prSnapshot.scheduleTrigger,
     pull_request: {},
     push: {
       branches: ['main'],
@@ -54,6 +67,8 @@ export default githubWorkflow({
   },
 
   jobs: {
+    ...prSnapshot.jobs,
+
     'release-surface': {
       'runs-on': namespaceRunner('${{ github.run_id }}'),
       defaults: bashShellDefaults,

@@ -10,17 +10,17 @@
     },
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",
-      "ref": "main",
-      "commit": "b5e983b0be87c4ae5c06d64bbd6852c9518a77c3",
+      "ref": "schickling/2026-08-19-pr-snapshot-shared",
+      "commit": "dd968b6f9aecafaaf2473c1d87e9179af3905ed6",
       "pinned": true,
       "lockedAt": "2026-06-03T13:22:08.394Z"
     },
     "effect": {
       "url": "https://github.com/effect-ts/effect",
       "ref": "main",
-      "commit": "e5998a45f69960b38eb2b8cb67cbb07b9e6962c7",
+      "commit": "92922ee7de0a2d932121e37677f3e75ea38482f1",
       "pinned": false,
-      "lockedAt": "2026-06-03T09:20:09.577Z"
+      "lockedAt": "2026-08-19T09:35:14.041Z"
     }
   }
 }

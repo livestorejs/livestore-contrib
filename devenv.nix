@@ -256,6 +256,44 @@ in
       node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --dry-run
     '';
   };
+  tasks."release:snapshot:pack:git-sha" = {
+    description = "Pack an exact-SHA contrib snapshot without registry credentials";
+    after = [
+      "mr:check"
+      "pnpm:install"
+    ];
+    exec = ''
+      set -euo pipefail
+      cd "$DEVENV_ROOT"
+
+      : "''${GIT_SHA:?GIT_SHA is required}"
+      : "''${PR_NUMBER:?PR_NUMBER is required}"
+      : "''${SNAPSHOT_OUT_DIR:?SNAPSHOT_OUT_DIR is required}"
+
+      # The producer half runs on fork-authored code with no registry credentials, so it must never
+      # be able to publish. Refuse outright if a token is present rather than relying on --pack-only.
+      if [ -n "''${NODE_AUTH_TOKEN:-}" ] || [ -n "''${NPM_TOKEN:-}" ]; then
+        echo "The snapshot pack job must not run with registry credentials present." >&2
+        exit 1
+      fi
+
+      core_sha="$(jq -r '.members.livestore.commit' megarepo.lock)"
+      if [ -z "$core_sha" ] || [ "$core_sha" = "null" ]; then
+        echo "megarepo.lock is missing members.livestore.commit" >&2
+        exit 1
+      fi
+
+      release_version="0.0.0-snapshot-pr.$PR_NUMBER.$GIT_SHA"
+
+      DT_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      node release/simulate-publish.mjs \
+        --version "$release_version" \
+        --core-sha "$core_sha" \
+        --verify-core \
+        --pack-only \
+        --out-dir "$SNAPSHOT_OUT_DIR"
+    '';
+  };
   tasks."release:snapshot:git-sha" = {
     description = "Publish contrib snapshot packages for a git SHA";
     after = [

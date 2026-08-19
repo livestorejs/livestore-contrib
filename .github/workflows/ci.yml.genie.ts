@@ -3,12 +3,19 @@ import {
   defaultActionlintConfig,
   githubWorkflow,
   livestoreContribSetupSteps,
+  livestoreContribSetupStepsAfterCheckout,
   livestoreDefaultRefPolicyJob,
   namespaceRunner,
   nixDiagnosticsArtifactStep,
   runDevenvTasksBefore,
   savePnpmStateStep,
 } from '../../genie/repo.ts'
+import { prSnapshotPackJob } from '../../repos/effect-utils/genie/ci-workflow.ts'
+import {
+  prSnapshotValidatorPath,
+  prSnapshotValidatorTestPath,
+  releaseTopologyPath,
+} from '../../genie/pr-snapshot-paths.ts'
 
 const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
   ...steps,
@@ -48,6 +55,18 @@ export default githubWorkflow({
 
   jobs: {
     'source-policy': livestoreDefaultRefPolicyJob,
+
+    // Runs fork-authored code with no secrets and a read-only token; everything it uploads is treated
+    // as untrusted input by the release workflow. Kept on the shared runner because contrib's build
+    // composes core from source and would otherwise pay a cold Nix build on every pull request.
+    ...prSnapshotPackJob({
+      topologyPath: releaseTopologyPath,
+      validatorScriptPath: prSnapshotValidatorPath,
+      validatorTestPath: prSnapshotValidatorTestPath,
+      setupStepsAfterCheckout: livestoreContribSetupStepsAfterCheckout,
+      packTask: 'release:snapshot:pack:git-sha',
+      runsOn: namespaceRunner('${{ github.run_id }}'),
+    }),
 
     'pr-quality': standardCIJob({
       name: 'pr/quality',
