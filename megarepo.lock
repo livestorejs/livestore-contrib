@@ -11,7 +11,7 @@
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",
       "ref": "schickling/2026-08-19-pr-snapshot-shared",
-      "commit": "dd968b6f9aecafaaf2473c1d87e9179af3905ed6",
+      "commit": "0a7c9621230e7a3e798265f7c3b430fee7f35a6f",
       "pinned": true,
       "lockedAt": "2026-06-03T13:22:08.394Z"
     },

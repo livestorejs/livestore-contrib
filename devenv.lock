@@ -230,11 +230,11 @@
         "tsgo": "tsgo"
       },
       "locked": {
-        "lastModified": 1787131051,
-        "narHash": "sha256-FX22t22Pje8WQ5YMrTceX14R7KmJJw8vlJPA9jO6DHc=",
+        "lastModified": 1787132693,
+        "narHash": "sha256-f9wlkbycL7bl3KLvWfph4VMAJQfaZvXkG00tmEGs+t0=",
         "owner": "overengineeringstudio",
         "repo": "effect-utils",
-        "rev": "dd968b6f9aecafaaf2473c1d87e9179af3905ed6",
+        "rev": "0a7c9621230e7a3e798265f7c3b430fee7f35a6f",
         "type": "github"
       },
       "original": {
