@@ -208,7 +208,6 @@ const makeRouter = ({ electricPort, postgresPort }: { electricPort: number; post
           return yield* HttpServerResponse.json({ success: true })
         }),
       )
-
     }),
   )
 }

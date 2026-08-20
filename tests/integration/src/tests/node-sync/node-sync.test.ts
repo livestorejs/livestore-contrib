@@ -24,7 +24,7 @@ import { makeFileLogger } from './fixtures/file-logger.ts'
 import * as WorkerSchema from './worker-schema.ts'
 
 // Timeout needs to be long enough to allow for all the test runs to complete, especially in CI where the environment is slower.
-// A single test run can take significant time depending on the passed todo count and simulation params.
+// A single test run can take significant time depending on the passed todo count.
 const testTimeout = Duration.toMillis(IS_CI === true ? Duration.minutes(10) : Duration.minutes(15))
 
 // We might need to also run the tests in a CPU-limited environment as it might change the concurrency characteristics of the tests
@@ -82,7 +82,7 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
     { fastCheck: { numRuns: 4 } },
   )
 
-  // Warning: A high CreateCount coupled with high simulation params can lead to very long test runs since those get multiplied with the number of todos.
+  // Warning: A high CreateCount can lead to very long test runs.
   const CreateCount = Schema.Int.pipe(Schema.check(Schema.isBetween({ minimum: 1, maximum: 400 })))
   const CommitBatchSize = Schema.Literals([1, 2, 10, 100])
   const LEADER_PUSH_BATCH_SIZE = Schema.Literals([1, 2, 10, 100])
@@ -177,7 +177,7 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
             todoCountB,
             commitBatchSize,
             leaderPushBatchSize,
-          }),
+            }),
         })(test),
         // Logging without context (to make sure log is always displayed)
         Effect.logDuration(`${test.task.suite?.name}:${test.task.name} (Run ${runIndex + 1}/${numRuns})`),

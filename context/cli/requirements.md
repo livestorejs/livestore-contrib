@@ -9,7 +9,7 @@ backend, and exposing LiveStore to AI agents over MCP.
 Unlike the adapter, sync, integration, and devtools contrib nodes, the `cli`
 package **realizes no core `02-system/` dimension** — it is a top-level node, not
 a dimension realization (contrib [spec.md](../spec.md)). It therefore refines no core
-requirement; it is a *consumer* of core contracts, not a realization of one, so
+requirement; it is a _consumer_ of core contracts, not a realization of one, so
 these requirements carry no `refines:` markers. Where it touches core contracts
 it does so as a client: it connects to sync backends through the core sync
 provider contract

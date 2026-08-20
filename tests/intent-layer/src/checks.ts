@@ -132,7 +132,8 @@ export const runChecks = (opts: Options): CheckResult => {
   const table = parseNamespaceTable(contextDir)
   v['namespace↔dir'] = definitions.flatMap((d) => {
     const entry = table.get(d.namespace)
-    if (entry === undefined) return [`${rel(d.file)}:${d.line} — namespace ${d.namespace} (${d.id}) missing from ID table`]
+    if (entry === undefined)
+      return [`${rel(d.file)}:${d.line} — namespace ${d.namespace} (${d.id}) missing from ID table`]
     const fileDirRel = path.relative(contextDir, path.dirname(d.file))
     const nodeDir = entry.dir.replace(/\/$/, '')
     const inNode = entry.isRealization
@@ -158,11 +159,15 @@ export const runChecks = (opts: Options): CheckResult => {
           const isContrib = new RegExp(`^${CONTRIB_ID}$`).test(token)
           const isCore = new RegExp(`^${CORE_ID}$`).test(token)
           if (isContrib) {
-            return definedIds.has(token) ? [] : [`${rel(file)}:${line} — refines target ${token} not defined in contrib`]
+            return definedIds.has(token)
+              ? []
+              : [`${rel(file)}:${line} — refines target ${token} not defined in contrib`]
           }
           if (isCore) {
             if (crossRepoActive === false) return [] // guarded
-            return coreIds.has(token) ? [] : [`${rel(file)}:${line} — cross-repo refines target ${token} not in core intent layer`]
+            return coreIds.has(token)
+              ? []
+              : [`${rel(file)}:${line} — cross-repo refines target ${token} not in core intent layer`]
           }
           return [`${rel(file)}:${line} — malformed refines target ${JSON.stringify(token)}`]
         })
@@ -210,10 +215,13 @@ export const runChecks = (opts: Options): CheckResult => {
     .flatMap((dir) =>
       fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
         const p = path.join(dir, e.name)
-        if (e.isDirectory()) return e.name === '.proposed' && walkFiles(p).length > 0 ? [`${rel(p)} — committed .proposed/ records`] : []
+        if (e.isDirectory())
+          return e.name === '.proposed' && walkFiles(p).length > 0 ? [`${rel(p)} — committed .proposed/ records`] : []
         const out: string[] = []
-        if (/^\d{4}-[a-z0-9-]+\.md$/.test(e.name) === false) out.push(`${rel(p)} — decision filename must match NNNN-slug.md`)
-        if (/^Status: /m.test(fs.readFileSync(p, 'utf8')) === false) out.push(`${rel(p)} — decision record missing a Status: line`)
+        if (/^\d{4}-[a-z0-9-]+\.md$/.test(e.name) === false)
+          out.push(`${rel(p)} — decision filename must match NNNN-slug.md`)
+        if (/^Status: /m.test(fs.readFileSync(p, 'utf8')) === false)
+          out.push(`${rel(p)} — decision record missing a Status: line`)
         return out
       }),
     )

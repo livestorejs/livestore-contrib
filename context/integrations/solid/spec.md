@@ -16,14 +16,14 @@ Draft.
 
 Exported from `.` (`src/mod.ts`):
 
-| Export | File | Purpose |
-| --- | --- | --- |
-| `useStore` | `useStore.ts:105` | Acquire a store as a Solid `Resource` (undefined until loaded), augmented with Solid API |
-| `withSolidApi` | `useStore.ts:135` | Attach `useQuery` / `useClientDocument` to a store (or store accessor) |
-| `StoreRegistryProvider` / `useStoreRegistry` | `StoreRegistryContext.tsx:36`, `:61` | Scope store resolution per subtree |
-| `useQuery` (standalone) | `useQuery.ts:28` | Subscribe to any queryable given an explicit `{ store }` |
-| `useClientDocument` (standalone) | `useClientDocument.ts:90` | Read/update a client document given an explicit `{ store }` |
-| `LiveList` (experimental) | `experimental/components/LiveList.tsx:32` | Per-item live-query list; API unstable |
+| Export                                       | File                                      | Purpose                                                                                  |
+| -------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `useStore`                                   | `useStore.ts:105`                         | Acquire a store as a Solid `Resource` (undefined until loaded), augmented with Solid API |
+| `withSolidApi`                               | `useStore.ts:135`                         | Attach `useQuery` / `useClientDocument` to a store (or store accessor)                   |
+| `StoreRegistryProvider` / `useStoreRegistry` | `StoreRegistryContext.tsx:36`, `:61`      | Scope store resolution per subtree                                                       |
+| `useQuery` (standalone)                      | `useQuery.ts:28`                          | Subscribe to any queryable given an explicit `{ store }`                                 |
+| `useClientDocument` (standalone)             | `useClientDocument.ts:90`                 | Read/update a client document given an explicit `{ store }`                              |
+| `LiveList` (experimental)                    | `experimental/components/LiveList.tsx:32` | Per-item live-query list; API unstable                                                   |
 
 The standalone `useQuery` / `useClientDocument` require an explicit `store`
 option; the ergonomic surface is the store-attached form
@@ -104,7 +104,7 @@ is true and `renderToString` produces markup with no `window`
 (`src/useStore.server.test.tsx:16`–`22`, `:40`). `withSolidApi` wraps a
 pre-created in-memory store (`:34`), and a store-attached `useClientDocument`
 read renders server-side (`:58`, `useClientDocument.server.test.tsx`). SSR
-covers the store-attached read path; store *loading* on the server is out of
+covers the store-attached read path; store _loading_ on the server is out of
 scope for the current tests (LSC.INT.SOLID-R06).
 
 ## Experimental — LiveList

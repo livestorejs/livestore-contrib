@@ -219,7 +219,7 @@ export class LiveStoreGraphQLQuery<
     const operationName = graphql.getOperationAST(document)?.name?.value
 
     return otelTracer.startActiveSpan(`executeGraphQLQuery: ${operationName}`, {}, otelContext, (span) => {
-      const startMs = performance.now()
+      const startTimePerfNow = performance.now()
       span.setAttribute('graphql.variables', JSON.stringify(variableValues))
       span.setAttribute('graphql.query', graphql.print(document))
 
@@ -253,7 +253,7 @@ export class LiveStoreGraphQLQuery<
 
       const result = this.mapResult(res.data as unknown as TResult, get)
 
-      const durationMs = performance.now() - startMs
+      const durationMs = performance.now() - startTimePerfNow
 
       this.executionTimes.push(durationMs)
 

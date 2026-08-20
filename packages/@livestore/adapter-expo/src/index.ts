@@ -21,7 +21,7 @@ import {
   streamEventsWithSyncState,
 } from '@livestore/common/leader-thread'
 import type { LiveStoreSchema } from '@livestore/common/schema'
-import { LiveStoreEvent } from '@livestore/common/schema'
+import { getStateDbBaseName, LiveStoreEvent } from '@livestore/common/schema'
 import { shouldNeverHappen } from '@livestore/utils'
 import type { Schema, Scope } from '@livestore/utils/effect'
 import {
@@ -355,8 +355,7 @@ const resolveExpoPersistencePaths = ({
 
   const directory = pathJoin(directoryBasePath, subDirectory, storeId)
 
-  const schemaHashSuffix = schema.state.sqlite.hash.toString()
-  const stateDatabaseName = `livestore-${schemaHashSuffix}@${liveStoreStorageFormatVersion}.db`
+  const stateDatabaseName = `${getStateDbBaseName(schema)}@${liveStoreStorageFormatVersion}.db`
   const eventlogDatabaseName = `livestore-eventlog@${liveStoreStorageFormatVersion}.db`
 
   return { directory, stateDatabaseName, eventlogDatabaseName }
