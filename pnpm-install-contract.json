@@ -3,17 +3,18 @@
   "dependencyGraphContract": {
     "allowBuilds": {
       "@mixedbread/cli": true,
-      "@myobie/pty": true,
+      "@myobie/pty": false,
       "@parcel/watcher": true,
       "cbor-extract": true,
       "dtrace-provider": true,
-      "esbuild": true,
-      "msgpackr-extract": true,
-      "node-pty": true,
+      "esbuild": false,
+      "fsevents": false,
+      "msgpackr-extract": false,
+      "node-pty": false,
       "protobufjs": true,
       "puppeteer": true,
-      "sharp": true,
-      "unix-dgram": true,
+      "sharp": false,
+      "unix-dgram": false,
       "workerd": true
     },
     "packageManager": {
@@ -33,6 +34,8 @@
   },
   "installPolicy": {
     "dedupePeerDependents": true,
+    "ignoreScripts": true,
+    "minimumReleaseAgeExclude": ["@effect/platform", "@types/node", "effect"],
     "optimisticRepeatInstall": false,
     "packageImportMethod": {
       "live": {
@@ -46,6 +49,10 @@
     },
     "peerDependencyRules": {
       "allowedVersions": {
+        "@opentelemetry/api": ">=1.9.0",
+        "@opentelemetry/core": ">=2.2.0",
+        "@opentelemetry/resources": ">=2.2.0",
+        "@opentelemetry/sdk-trace-base": ">=2.2.0",
         "ioredis": ">=5.6.1",
         "vite": ">=7.3.1"
       }

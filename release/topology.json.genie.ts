@@ -1,5 +1,5 @@
-import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import { contribPackageNames } from '../genie/internal.ts'
+import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 
 /**
  * The trusted package topology for PR snapshot validation.

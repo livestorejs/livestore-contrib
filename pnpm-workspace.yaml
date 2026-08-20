@@ -51,26 +51,37 @@ overrides:
   '@effect/platform-node-shared': 4.0.0-beta.98
   '@effect/opentelemetry': 4.0.0-beta.98
   '@effect/vitest': 4.0.0-beta.98
+  '@opentelemetry/api': 1.9.1
+  '@opentelemetry/core': 2.8.0
+  '@opentelemetry/resources': 2.8.0
+  '@opentelemetry/sdk-trace-base': 2.8.0
 
 peerDependencyRules:
   allowedVersions:
     ioredis: '>=5.6.1'
     vite: '>=7.3.1'
+    '@opentelemetry/api': '>=1.9.0'
+    '@opentelemetry/core': '>=2.2.0'
+    '@opentelemetry/resources': '>=2.2.0'
+    '@opentelemetry/sdk-trace-base': '>=2.2.0'
 
 allowBuilds:
   '@parcel/watcher': true
-  '@myobie/pty': true
-  esbuild: true
-  msgpackr-extract: true
-  node-pty: true
-  sharp: true
-  unix-dgram: true
+  '@myobie/pty': false
+  esbuild: false
+  fsevents: false
+  msgpackr-extract: false
+  node-pty: false
+  sharp: false
+  unix-dgram: false
   '@mixedbread/cli': true
   cbor-extract: true
   dtrace-provider: true
   protobufjs: true
   puppeteer: true
   workerd: true
+
+minimumReleaseAgeExclude: ['@effect/platform', '@types/node', effect]
 
 supportedArchitectures:
   os: [linux, darwin]
@@ -83,17 +94,15 @@ strictPeerDependencies: false
 
 injectWorkspacePackages: false
 
-enableGlobalVirtualStore: true
-
-storeDir: .devenv/pnpm-store-pure-v1
-
-packageImportMethod: clone-or-copy
+packageImportMethod: auto
 
 optimisticRepeatInstall: false
 
 verifyDepsBeforeRun: false
 
 linkWorkspacePackages: true
+
+ignoreScripts: true
 
 sideEffectsCache: false
 
