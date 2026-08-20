@@ -1,3 +1,4 @@
+import { contribPackageNames } from './genie/internal.ts'
 import { tsconfigJson } from './genie/repo.ts'
 
 /**
@@ -11,15 +12,9 @@ export default tsconfigJson({
   compilerOptions: {},
   include: [],
   references: [
-    { path: './packages/@livestore/adapter-expo' },
-    { path: './packages/@livestore/adapter-node' },
-    { path: './packages/@livestore/cli' },
-    { path: './packages/@livestore/devtools-expo' },
-    { path: './packages/@livestore/graphql' },
-    { path: './packages/@livestore/solid' },
-    { path: './packages/@livestore/svelte' },
-    { path: './packages/@livestore/sync-electric' },
-    { path: './packages/@livestore/sync-s2' },
+    // Derived from the canonical package list so a new contrib package is typechecked
+    // automatically; a hand-maintained copy here would silently leave it unchecked.
+    ...contribPackageNames.map((name) => ({ path: `./packages/@livestore/${name}` })),
     { path: './tests/integration' },
     { path: './tests/sync-provider' },
   ],

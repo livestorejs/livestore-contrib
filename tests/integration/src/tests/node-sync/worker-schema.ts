@@ -1,4 +1,3 @@
-import { ClientSessionSyncProcessorSimulationParams } from '@livestore/common'
 import { ShutdownChannel } from '@livestore/common/leader-thread'
 import { Rpc, RpcGroup, Schema } from '@livestore/utils/effect'
 
@@ -9,7 +8,6 @@ export const AdapterType = Schema.Literals(['single-threaded', 'worker'])
 
 export const Params = Schema.Struct({
   leaderPushBatchSize: Schema.optional(Schema.Number),
-  simulation: Schema.optional(ClientSessionSyncProcessorSimulationParams),
 })
 
 export type Params = typeof Params.Type

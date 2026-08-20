@@ -1,10 +1,10 @@
 # S2 Sync Provider — Intuition
 
-*For: contributors to `sync-s2` · Assumes: the core sync mental model
+_For: contributors to `sync-s2` · Assumes: the core sync mental model
 (git-shaped convergence, provider = transport only) · Covers: how an S2 stream
-plays the role of the eventlog and why this provider is thinner than it looks*
+plays the role of the eventlog and why this provider is thinner than it looks_
 
-The core model says a sync provider is *just transport* — `connect/pull/push/
+The core model says a sync provider is _just transport_ — `connect/pull/push/
 ping` over the schema-defined encoding — and that a single ordering authority
 makes convergence trivial. S2 fits that shape almost literally: an S2 stream is
 an append-only log with a monotonic physical `seq_num`, so "the eventlog" and
@@ -22,17 +22,17 @@ persists and replays it, the provider alone knows it means "S2 read position."
 Treat any code that equates the two numbers as a latent bug.
 
 **Deviation from the Cloudflare/Electric providers.** Cloudflare talks its own
-wire protocol straight to a Durable Object that *enforces* fast-forward: a push
+wire protocol straight to a Durable Object that _enforces_ fast-forward: a push
 that doesn't chain onto the head comes back as `ServerAheadError`, which drives
 the leader's rebase. This provider does neither of those. It never talks to S2
-directly — it speaks three plain HTTP verbs (GET/POST/HEAD) to an *app-owned API
-proxy*, and half the package is helpers for building that proxy's S2 side. And
+directly — it speaks three plain HTTP verbs (GET/POST/HEAD) to an _app-owned API
+proxy_, and half the package is helpers for building that proxy's S2 side. And
 it does not arbitrate: `push` appends unconditionally (no `match_seq_num` fence)
 and any failure — rejection, limit, backend — collapses to `UnknownError`; the
 only condition it distinguishes is offline (via `isConnected`). So two clients
 that both think they're at head can both append, forking logical history. That
 is the crux gap, and it is a **current limitation, not a settled design**: S2
-*has* a fencing primitive the provider doesn't use yet
+_has_ a fencing primitive the provider doesn't use yet
 ([.delta/DELTA-001](./.delta/DELTA-001-no-fast-forward.md),
 [.delta/DELTA-002](./.delta/DELTA-002-untyped-failures.md)).
 

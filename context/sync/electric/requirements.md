@@ -39,15 +39,15 @@ Electric is **not in the conformance matrix** today (the 7-provider suite,
 - **LSC.SYNC.ELECTRIC-R03 Shape-based live pull:** Pull streams Electric shape
   changes via HTTP long-poll (`pullLive: true`); Electric closes the long-poll
   after ~20 s with a 204 and the client retries at the same offset. `refines:
-  LS.SYS.SYNC-R02`
+LS.SYS.SYNC-R02`
 - **LSC.SYNC.ELECTRIC-R04 Provider-opaque offset+handle cursor:** The pull
   cursor's provider metadata is `{offset, handle}`, read from Electric's
   `electric-offset` / `electric-handle` response headers; the engine persists
   and replays it (`syncMetadataJson`). The core global sequence number does not
   drive Electric pulls — navigation is by Electric's own offset. `refines:
-  LS.SYS.SYNC-R06`
+LS.SYS.SYNC-R06`
 - **LSC.SYNC.ELECTRIC-R05 Unknown-remaining pagination:** `pullPageInfoKnown:
-  false`; pull responses carry only `NoMore` or `MoreUnknown`, never
+false`; pull responses carry only `NoMore` or `MoreUnknown`, never
   `MoreKnown`, because Electric's immutable-cache design hides the remaining
   count until the stream is drained. `refines: LS.SYS.SYNC-R05`
 - **LSC.SYNC.ELECTRIC-R06 Connectivity via HEAD ping:** `connect`, `ping`, and
@@ -72,7 +72,7 @@ Electric is **not in the conformance matrix** today (the 7-provider suite,
   [.delta/DELTA-001](./.delta/DELTA-001-no-rebase-signal.md).
 - **LSC.SYNC.ELECTRIC-DQ2 Cursor/metadata shape.** `handle` is stored per event
   but is identical across every event of a shape (a `// TODO move this into some
-  kind of "global" sync metadata`); whether it should move to a per-store
+kind of "global" sync metadata`); whether it should move to a per-store
   metadata slot rather than riding each event's cursor is open.
 - **LSC.SYNC.ELECTRIC-DQ3 Shape-handle rotation.** When Electric rotates a shape
   handle it answers 409; the client's resync-from-scratch path is a sketched

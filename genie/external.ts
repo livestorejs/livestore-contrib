@@ -52,7 +52,27 @@ export const livestoreContribWorkspaceCatalog = Object.fromEntries(
   contribPackageNames.map((name) => [`@livestore/${name}`, 'workspace:*']),
 ) as Record<`@livestore/${(typeof contribPackageNames)[number]}`, 'workspace:*'>
 
-export const livestoreContribOnlyCatalog = {} as const
+/**
+ * Contrib-only catalog entries, spread last so they shadow core's.
+ *
+ * `@livestore/devtools-vite` is keyed to `LIVESTORE_RELEASE_VERSION` in core's
+ * `livestoreOnlyCatalog` because core *republishes* the DevTools artifact under its own
+ * release version, so during a core publish that version exists. Contrib sets the same env
+ * var when packing a snapshot but only consumes devtools-vite, so inheriting core's entry
+ * rewrites the dependency to a contrib snapshot version that is never published — the packed
+ * tarballs then fail to install with ERR_PNPM_NO_MATCHING_VERSION.
+ *
+ * Pinning the plain version keeps the dependency resolvable regardless of what contrib is
+ * publishing. It intentionally does NOT track core's fallback automatically: this must stay a
+ * published version, so bumping it is a deliberate act.
+ */
+const contribConsumedCoreArtifacts = {
+  '@livestore/devtools-vite': '0.4.0-dev.25',
+} as const
+
+export const livestoreContribOnlyCatalog = {
+  ...contribConsumedCoreArtifacts,
+} as const
 
 export const catalog = defineCatalog({
   ...effectUtilsCatalogWithoutEffectV3,
