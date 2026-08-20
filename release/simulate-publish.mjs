@@ -228,13 +228,38 @@ if (errors.length > 0) {
   process.exit(1)
 }
 
-const run = (command, args, options = {}) =>
-  execFileSync(command, args, {
-    cwd: rootDir,
-    env: { ...process.env, DEVENV_TASK_PASSTHROUGH: '1' },
-    stdio: 'inherit',
-    ...options,
-  })
+/**
+ * Runs a child process, inheriting stdio so long builds stream live.
+ *
+ * `captureOnFailure` swaps stdout/stderr to pipes and re-emits them next to the thrown error.
+ * Use it where the child's diagnostics are the whole story and would otherwise be separated
+ * from the failure: devenv's task runner re-emits a failed task's output non-chronologically,
+ * so the Node crash trace can land hundreds of lines *before* the cause that produced it, and
+ * `execFileSync` with `stdio: 'inherit'` always reports `stdout: null, stderr: null` on the
+ * error object regardless of what the child printed. Together those read as "no output at all".
+ *
+ * Keep it opt-in: `tsc --build`, `pnpm pack` and `npm publish` want live streaming, both for
+ * long-build progress and for the CI retry wrapper's heartbeat.
+ */
+const run = (command, args, options = {}) => {
+  const { captureOnFailure = false, ...execOptions } = options
+  const base = { cwd: rootDir, env: { ...process.env, DEVENV_TASK_PASSTHROUGH: '1' } }
+
+  if (captureOnFailure === false) {
+    return execFileSync(command, args, { ...base, stdio: 'inherit', ...execOptions })
+  }
+
+  try {
+    return execFileSync(command, args, { ...base, stdio: ['inherit', 'pipe', 'pipe'], ...execOptions })
+  } catch (error) {
+    const label = [command, ...args].join(' ')
+    process.stderr.write(`\n--- ${label} failed; captured output follows ---\n`)
+    if (error.stdout !== null && error.stdout !== undefined) process.stderr.write(`${error.stdout}`)
+    if (error.stderr !== null && error.stderr !== undefined) process.stderr.write(`${error.stderr}`)
+    process.stderr.write(`--- end captured output ---\n`)
+    throw error
+  }
+}
 
 const npmViewExists = (name, version) => {
   try {
@@ -333,7 +358,7 @@ const smokeInstallPackedTarballs = (packed) => {
       join(smokeDir, 'pnpm-workspace.yaml'),
       `packages: []\noverrides:\n${packed.map(({ pkg, tarballPath }) => `  ${JSON.stringify(pkg.name)}: ${JSON.stringify(`file:${tarballPath}`)}`).join('\n')}\n`,
     )
-    run('pnpm', ['install', '--ignore-scripts'], { cwd: smokeDir })
+    run('pnpm', ['install', '--ignore-scripts'], { cwd: smokeDir, captureOnFailure: true })
 
     for (const { pkg } of packed) {
       const installedManifest = join(smokeDir, 'node_modules', ...pkg.name.split('/'), 'package.json')
