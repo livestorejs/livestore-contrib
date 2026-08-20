@@ -21,6 +21,11 @@ on:
         required: false
         default: '0'
         type: string
+      npm_tag:
+        description: Unused by contrib; declared so the factory-issued promotion dispatch is accepted
+        required: false
+        default: latest
+        type: string
       mode:
         description: Release workflow mode
         required: true

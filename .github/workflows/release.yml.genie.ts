@@ -30,6 +30,25 @@ export default githubWorkflow({
     workflow_dispatch: {
       inputs: {
         ...prSnapshot.dispatchInputs,
+        /**
+         * Declared because the factory's scheduled-recovery dispatch passes `-f npm_tag=latest`
+         * (`pr-snapshot.ts:301`) while `dispatchInputs` does not declare it. GitHub rejects a
+         * `workflow run` carrying an undeclared input, so without this the retry path that
+         * re-dispatches an authorized-but-incomplete cohort fails instead of recovering.
+         *
+         * Nothing here reads it — the publish tag comes from the validator's `npm-tag` output —
+         * so this exists purely to satisfy the dispatch contract. Core happens to be unaffected
+         * because it already declares `npm_tag` for its own release jobs.
+         *
+         * Remove once the factory stops sending an input it does not declare
+         * (overengineeringstudio/effect-utils#1091).
+         */
+        npm_tag: {
+          description: 'Unused by contrib; declared so the factory-issued promotion dispatch is accepted',
+          required: false,
+          default: 'latest',
+          type: 'string',
+        },
         mode: {
           description: 'Release workflow mode',
           required: true,
