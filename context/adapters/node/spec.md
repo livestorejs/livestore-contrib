@@ -15,10 +15,10 @@ Draft.
 Two factories, exported from `.` (`src/index.ts:1`); persistence is a `storage`
 option on either, not a separate factory. Both return the same `ClientSession`.
 
-| Variant | Factory | Leader location | Sync config |
-| --- | --- | --- | --- |
-| Single-threaded | `makeAdapter` (`src/client-session/adapter.ts:129`) | in-process (same thread as the app; `src/client-session/adapter.ts:354`) | `sync` option, threaded into the leader layer (`src/client-session/adapter.ts:274`) |
-| Worker | `makeWorkerAdapter` (`src/client-session/adapter.ts:168`) | one `node:worker_threads` worker, serialized pool of size 1 (`src/client-session/adapter.ts:462`, `:473`) | configured inside the worker entry file passed to `makeWorker` (`src/make-leader-worker.ts:25`) |
+| Variant         | Factory                                                   | Leader location                                                                                           | Sync config                                                                                     |
+| --------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Single-threaded | `makeAdapter` (`src/client-session/adapter.ts:129`)       | in-process (same thread as the app; `src/client-session/adapter.ts:354`)                                  | `sync` option, threaded into the leader layer (`src/client-session/adapter.ts:274`)             |
+| Worker          | `makeWorkerAdapter` (`src/client-session/adapter.ts:168`) | one `node:worker_threads` worker, serialized pool of size 1 (`src/client-session/adapter.ts:462`, `:473`) | configured inside the worker entry file passed to `makeWorker` (`src/make-leader-worker.ts:25`) |
 
 Options (`NodeAdapterOptions`, `src/client-session/adapter.ts:49`): `storage`
 (required), `clientId` (default OS `hostname()`, `:187`), `sessionId` (default
@@ -38,9 +38,12 @@ WASM SQLite (`@livestore/sqlite-wasm/node`) backs every database — no
 
 - **`fs`** — leader state and eventlog databases are files under
   `baseDirectory/storeId` (default `baseDirectory` = cwd)
-  (`src/leader-thread-shared.ts:87`): `state{schemaHashSuffix}@{formatVersion}.db`
-  (suffix `fixed` under manual migration, else the schema hash;
-  `src/leader-thread-shared.ts:69`, `:89`, `:129`) and
+  (`src/leader-thread-shared.ts:86`): `{getStateDbBaseName(schema)}@{formatVersion}.db`
+  — core's shared helper (`getStateDbBaseName` in `@livestore/common/schema`),
+  yielding `state{hash}` (`src/leader-thread-shared.ts:14`, `:88`). The emitted
+  name is unchanged: the local helper this replaced already produced
+  `state{hash}`. The `fixed` suffix under manual migration is gone, since
+  `MigrationOptions.strategy` no longer exists upstream. Also
   `eventlog@{formatVersion}.db` (`:89`). Opened with `foreignKeys: true`; WAL is
   not yet enabled (`// TODO enable WAL for nodejs`, `:90`) — see
   LSC.ADAPT.NODE-DQ1.

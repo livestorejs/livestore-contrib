@@ -85,5 +85,5 @@ plus reusable proxy helpers, not the proxy.
   would then live, is open.
 - **LSC.SYNC.S2-DQ3 Record headers unused.** Events are stored as bare bodies;
   S2 record headers are not used, and the source pins the physical/logical
-  sequence decoupling to *future* compaction. What metadata (fencing token,
+  sequence decoupling to _future_ compaction. What metadata (fencing token,
   logical head) headers should carry is uncaptured.

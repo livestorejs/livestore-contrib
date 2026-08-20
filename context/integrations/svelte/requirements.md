@@ -71,5 +71,5 @@ binding conformance suite is contracted but unbuilt (core LS.SYS.VER.CONF-R04).
   component tree yield two independent stores. Whether Svelte should offer
   registry-style sharing/scoping is uncaptured.
 - **LSC.INT.SVELTE-DQ3 SSR.** There is no SSR handling; the top-level-`await
-  createStore` usage pattern's behavior under SvelteKit server rendering
+createStore` usage pattern's behavior under SvelteKit server rendering
   (client-only WASM adapter, abort-signal availability) is uncaptured.

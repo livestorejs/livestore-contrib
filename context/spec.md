@@ -27,10 +27,13 @@ context/
   devtools/        realize core 02-system/07-devtools/ (surface contract)
     expo/
   cli/             standalone tool; realizes no core dimension
+  release/         realizes core 03-delivery/02-release/ (snapshot publishing)
 ```
 
 Every contrib package has a node. `cli` realizes no core dimension and lives at
-the top level. `graphql` is a query-surface (a new live-query kind), not a
+the top level. `release/` is not a package: it describes how contrib realizes
+the core delivery contract for snapshot publishing, which spans every
+publishable package rather than any one of them. `graphql` is a query-surface (a new live-query kind), not a
 framework binding, so it lives under `query-surfaces/` and refines the core
 reactivity contract rather than the integration contract (LSC-DQ1, resolved).
 
@@ -40,18 +43,19 @@ Contrib IDs use the `LSC` prefix, mirroring the core style. Contrib IDs never
 enter the core namespace table; core contracts are referenced by their `LS.*`
 IDs with links (see below).
 
-| Namespace | Node |
-| --- | --- |
-| `LSC-*` | root |
-| `LSC.ADAPT.NODE-*` | `adapters/node/` |
-| `LSC.ADAPT.EXPO-*` | `adapters/expo/` |
-| `LSC.SYNC.ELECTRIC-*` | `sync/electric/` |
-| `LSC.SYNC.S2-*` | `sync/s2/` |
-| `LSC.INT.SOLID-*` | `integrations/solid/` |
-| `LSC.INT.SVELTE-*` | `integrations/svelte/` |
-| `LSC.QS.GQL-*` | `query-surfaces/graphql/` |
-| `LSC.DT.EXPO-*` | `devtools/expo/` |
-| `LSC.CLI-*` | `cli/` |
+| Namespace             | Node                      |
+| --------------------- | ------------------------- |
+| `LSC-*`               | root                      |
+| `LSC.ADAPT.NODE-*`    | `adapters/node/`          |
+| `LSC.ADAPT.EXPO-*`    | `adapters/expo/`          |
+| `LSC.SYNC.ELECTRIC-*` | `sync/electric/`          |
+| `LSC.SYNC.S2-*`       | `sync/s2/`                |
+| `LSC.INT.SOLID-*`     | `integrations/solid/`     |
+| `LSC.INT.SVELTE-*`    | `integrations/svelte/`    |
+| `LSC.QS.GQL-*`        | `query-surfaces/graphql/` |
+| `LSC.DT.EXPO-*`       | `devtools/expo/`          |
+| `LSC.CLI-*`           | `cli/`                    |
+| `LSC.REL-*`           | `release/`                |
 
 Realization sub-nodes (if any) extend their namespace with one more segment and
 live under the parent's directory. IDs are sequential per namespace.

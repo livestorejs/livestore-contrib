@@ -46,6 +46,11 @@
       "description": "GraphQL integration package · Set: manual"
     },
     {
+      "name": "area:megarepo",
+      "color": "1d76db",
+      "description": "megarepo CLI and conventions · Set: manual"
+    },
+    {
       "name": "area:nix",
       "color": "1d76db",
       "description": "Nix flakes, derivations, FOD hashes, builders · Set: manual"
@@ -76,8 +81,13 @@
       "description": "TypeScript code, tsconfig, and type definitions · Set: manual"
     },
     {
+      "name": "ci:publish-snapshot",
+      "color": "0e8a16",
+      "description": "Trust this fork PR branch for snapshot publishing · Set: manual"
+    },
+    {
       "name": "origin:agent",
-      "color": "a371f7",
+      "color": "6f42c1",
       "description": "Filed or primarily produced by an AI agent · Set: AI agent or manual"
     },
     {
@@ -87,17 +97,27 @@
     },
     {
       "name": "state:blocked",
-      "color": "e99695",
+      "color": "6e7781",
       "description": "Blocked on an external dependency or decision · Set: manual"
     },
     {
+      "name": "state:declined",
+      "color": "6e7781",
+      "description": "Reviewed and declined; will not be acted on · Set: manual"
+    },
+    {
+      "name": "state:duplicate",
+      "color": "6e7781",
+      "description": "Duplicate of an existing item; tracked elsewhere · Set: manual"
+    },
+    {
       "name": "state:needs-research",
-      "color": "1f8fb8",
+      "color": "6e7781",
       "description": "Needs research / investigation before scope or approach is clear · Set: manual"
     },
     {
       "name": "state:triage",
-      "color": "fbca04",
+      "color": "6e7781",
       "description": "Needs classification or owner decision · Set: manual"
     },
     {
@@ -113,7 +133,7 @@
     {
       "name": "type:chore",
       "color": "bfd4e2",
-      "description": "Maintenance, cleanup, dependencies, CI, or refactoring · Set: manual"
+      "description": "Maintenance, cleanup, dependencies, or CI · Set: manual"
     },
     {
       "name": "type:docs",
@@ -122,7 +142,7 @@
     },
     {
       "name": "type:epic",
-      "color": "1d76db",
+      "color": "8250df",
       "description": "Large tracking issue with child tasks · Set: manual"
     },
     {
@@ -139,6 +159,16 @@
       "name": "type:rca",
       "color": "5319e7",
       "description": "Root-cause analysis or investigation record · Set: manual"
+    },
+    {
+      "name": "type:refactor",
+      "color": "c5def5",
+      "description": "Behavior-preserving code restructuring · Set: manual"
+    },
+    {
+      "name": "type:task",
+      "color": "cdc5e2",
+      "description": "Scoped implementation/follow-up work (not bug/feature/docs/incident/RCA/epic) · Set: manual"
     }
   ],
   "deprecated": ["bug", "documentation", "duplicate", "enhancement", "invalid", "question", "wontfix"],

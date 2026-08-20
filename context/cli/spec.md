@@ -18,11 +18,11 @@ under `PlatformNode.NodeContext.layer` + `FetchHttpClient.layer` + info-level
 logging (`src/bin.ts:16`–`:25`). The root command carries a `--verbose` flag and
 three subcommands (`src/cli.ts:7`–`:9`):
 
-| Command | Subcommands | Source |
-| --- | --- | --- |
-| `create` | — | `src/commands/new-project.ts:221` |
-| `sync` | `export`, `import` | `src/commands/import-export.ts:280`, `:171`, `:218` |
-| `mcp` | `server` | `src/commands/mcp.ts:98`, `:77` |
+| Command  | Subcommands        | Source                                              |
+| -------- | ------------------ | --------------------------------------------------- |
+| `create` | —                  | `src/commands/new-project.ts:221`                   |
+| `sync`   | `export`, `import` | `src/commands/import-export.ts:280`, `:171`, `:218` |
+| `mcp`    | `server`           | `src/commands/mcp.ts:98`, `:77`                     |
 
 ## `create` — Project Scaffolding
 
@@ -106,7 +106,7 @@ handlers at `mcp.ts:75`):
   `_disconnect` — a **single** live instance per MCP session; connect imports the
   config module and boots an in-memory Node adapter store with blocking initial
   sync (`src/mcp-runtime/runtime.ts:1`–`:60`, esp. `makeNodeAdapter({ storage:
-  { type: 'in-memory' } … })` `:39`–`:50`, `disableDevtools: true` `:57`), and
+{ type: 'in-memory' } … })` `:39`–`:50`, `disableDevtools: true` `:57`), and
   reconnecting shuts down and replaces the previous instance
   (`src/mcp-runtime/runtime.ts:63`–`:72`).
   `_query` is read-only SQLite; `_commit_events` is annotated destructive

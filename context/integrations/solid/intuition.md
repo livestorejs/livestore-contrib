@@ -1,14 +1,14 @@
 # Solid Integration — Intuition
 
-*For: contributors to `@livestore/solid` · Assumes: the core integration mental
+_For: contributors to `@livestore/solid` · Assumes: the core integration mental
 model (thin binding over the Store + shared toolkit) and the React integration
-as reference · Covers: what changes when the framework is Solid instead of React*
+as reference · Covers: what changes when the framework is Solid instead of React_
 
 LiveStore's engine already is a fine-grained reactive graph: queries are live,
 updates are commit-atomic, results are deduplicated. React fights this — it has
 no fine-grained reactivity, so the React binding smuggles values through mutable
 refs, forces re-renders, and worries (openly, and still unverified) about tearing
-under concurrent rendering. Solid is the opposite: its signals *are* fine-grained
+under concurrent rendering. Solid is the opposite: its signals _are_ fine-grained
 reactivity, so the binding mostly gets out of the way. A query result lives in a
 signal, the subscription pushes new values through a `deepEqual` gate, and that is
 the whole reactivity story. There is no `useSyncExternalStore` analogue because
@@ -29,11 +29,11 @@ is the binding's least settled part, flagged in the package README as debt to
 remove (LSC.INT.SOLID-DQ3); a future Suspense-only path could make the accessors
 non-optional and bring the surface back in line with React's.
 
-Two traps to avoid. First: because Solid re-runs *nothing* the way React
+Two traps to avoid. First: because Solid re-runs _nothing_ the way React
 StrictMode double-invokes, the reference-counting here looks suspiciously simple —
 resist the urge to port React's double-invoke reconciliation; Solid's
 `createMemo` + `onCleanup` run once per key by construction (LSC.INT.SOLID-R04).
-Second: the surface is *not* at React parity — there is no `useSyncStatus`
+Second: the surface is _not_ at React parity — there is no `useSyncStatus`
 (LSC.INT.SOLID-DQ1), multiple concurrent store instances are unproven
 (LSC.INT.SOLID-DQ2), and devtools do not work under Solid because the Solid Vite
 plugin collides with the React-dependent devtools plugin (LSC.INT.SOLID-DQ4).
