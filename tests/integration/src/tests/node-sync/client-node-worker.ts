@@ -76,7 +76,6 @@ const makeWorkerRunnerInner = WorkerSchema.WorkerRpcs.toLayer(
           shutdownDeferred,
           params: {
             leaderPushBatchSize: params?.leaderPushBatchSize,
-            simulation: params?.simulation !== undefined ? { clientSessionSyncProcessor: params.simulation } : undefined,
           },
         })
         // @ts-expect-error for debugging

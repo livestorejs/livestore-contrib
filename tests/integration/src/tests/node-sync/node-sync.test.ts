@@ -3,7 +3,6 @@ import * as ChildProcess from 'node:child_process'
 
 import { expect } from 'vitest'
 
-import { ClientSessionSyncProcessorSimulationParams } from '@livestore/common'
 import { IS_CI, stringifyObject } from '@livestore/utils'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { WranglerDevServer } from '@livestore/utils-dev/wrangler'
@@ -25,7 +24,7 @@ import { makeFileLogger } from './fixtures/file-logger.ts'
 import * as WorkerSchema from './worker-schema.ts'
 
 // Timeout needs to be long enough to allow for all the test runs to complete, especially in CI where the environment is slower.
-// A single test run can take significant time depending on the passed todo count and simulation params.
+// A single test run can take significant time depending on the passed todo count.
 const testTimeout = Duration.toMillis(IS_CI === true ? Duration.minutes(10) : Duration.minutes(15))
 
 // We might need to also run the tests in a CPU-limited environment as it might change the concurrency characteristics of the tests
@@ -83,7 +82,7 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
     { fastCheck: { numRuns: 4 } },
   )
 
-  // Warning: A high CreateCount coupled with high simulation params can lead to very long test runs since those get multiplied with the number of todos.
+  // Warning: A high CreateCount can lead to very long test runs.
   const CreateCount = Schema.Int.pipe(Schema.check(Schema.isBetween({ minimum: 1, maximum: 400 })))
   const CommitBatchSize = Schema.Literals([1, 2, 10, 100])
   const LEADER_PUSH_BATCH_SIZE = Schema.Literals([1, 2, 10, 100])
@@ -102,16 +101,6 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB: Schema.Literal(391),
           commitBatchSize: Schema.Literal(1),
           leaderPushBatchSize: Schema.Literal(2),
-          simulationParams: Schema.Struct({
-            // Keep values within allowed 0..15 range to avoid parse errors
-            pull: Schema.Struct({
-              '1_before_leader_push_fiber_interrupt': Schema.Literal(0),
-              '2_before_leader_push_queue_clear': Schema.Literal(10),
-              '3_before_rebase_rollback': Schema.Literal(0),
-              '4_before_leader_push_queue_offer': Schema.Literal(15),
-              '5_before_leader_push_fiber_run': Schema.Literal(0),
-            }),
-          }),
         }
       : {
           storageType: WorkerSchema.StorageType,
@@ -120,11 +109,9 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB: CreateCount,
           commitBatchSize: CommitBatchSize,
           leaderPushBatchSize: LEADER_PUSH_BATCH_SIZE,
-          // TODO extend simulation tests to cover all parts of the client session and leader sync processor
-          simulationParams: ClientSessionSyncProcessorSimulationParams,
         },
     (
-      { storageType, adapterType, todoCountA, todoCountB, commitBatchSize, leaderPushBatchSize, simulationParams },
+      { storageType, adapterType, todoCountA, todoCountB, commitBatchSize, leaderPushBatchSize },
       test,
       { numRuns, runIndex },
     ) =>
@@ -136,7 +123,6 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB,
           commitBatchSize,
           leaderPushBatchSize,
-          simulationParams,
         })
 
         const storeId = nanoid(10)
@@ -148,9 +134,8 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           todoCountB,
           commitBatchSize,
           leaderPushBatchSize,
-          simulationParams,
         })
-        const params = { leaderPushBatchSize, simulation: simulationParams }
+        const params = { leaderPushBatchSize }
 
         const [clientA, clientB] = yield* Effect.all(
           [
@@ -192,8 +177,7 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
             todoCountB,
             commitBatchSize,
             leaderPushBatchSize,
-            simulationParams,
-          }),
+            }),
         })(test),
         // Logging without context (to make sure log is always displayed)
         Effect.logDuration(`${test.task.suite?.name}:${test.task.name} (Run ${runIndex + 1}/${numRuns})`),
