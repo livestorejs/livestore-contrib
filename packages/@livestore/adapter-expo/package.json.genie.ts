@@ -38,8 +38,12 @@ const runtimeDeps = catalog.compose({
       // Accept the RC cohort in addition to the beta line that
       // `@livestore/{common,utils,webmesh}` still peer-depend on. Prerelease
       // carets do not cross `rc.N`, so a plain `^4.0.0-rc.109` would be
-      // uninstallable alongside the beta.97 core deps.
-      effect: '^4.0.0-beta.97 || ^4.0.0-rc.109',
+      // uninstallable alongside the beta core deps.
+      //
+      // The beta floor is taken from `getUtilsPeerDeps()` rather than written out, so it tracks
+      // the Effect version contrib actually builds against. Hardcoding a lower floor would
+      // advertise support for a version this package is never compiled or tested against.
+      effect: `${getUtilsPeerDeps().effect} || ^${effectRcVersion}`,
       'expo-application': '^7.0.7',
       'expo-sqlite': '^16.0.8',
     },
