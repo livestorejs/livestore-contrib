@@ -8,12 +8,13 @@
  * `../../../genie/repo.ts`.
  */
 
-import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 // Imported straight from effect-utils rather than through core's re-export: contrib pins a core
 // revision that predates this step, so routing it through core would break generation here.
 import { prepareCiScriptsStep } from '../repos/effect-utils/genie/ci-workflow.ts'
+import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import {
   applyMegarepoLockStep,
+  baseTsconfigCompilerOptions as coreBaseTsconfigCompilerOptions,
   checkoutStep,
   installNixStep,
   livestorePackageDefaults as coreLivestorePackageDefaults,
@@ -65,6 +66,33 @@ export const packageJson = contribPackageJson
  */
 export const effectDevDeps = (...additionalDeps: Parameters<typeof contribCatalog.pick>) =>
   contribCatalog.pick(...utilsEffectPeerDeps, ...additionalDeps)
+
+/**
+ * Relax core's Effect-LSP gate to errors-only while contrib converges.
+ *
+ * effect-utils' `effectDiagnosticsGate` (#811) makes Effect warnings AND suggestions fail
+ * `tsgo --build`, and core inherits it unchanged. Contrib is not clean under it yet: 70 advisory
+ * diagnostics remain (5 warnings, 65 suggestions), 41 of them inside the generated
+ * `@livestore/sync-s2/src/http-client-generated.ts`. The shared policy anticipates exactly this and
+ * prescribes a local tsconfig override "until it converges, rather than carrying diagnostics in
+ * source" — so no `@effect-diagnostics` waivers are sprinkled into contrib sources.
+ *
+ * Effect ERRORS still gate, unchanged. Suggestions stay visible in build output
+ * (`includeSuggestionsInTsc`), so the burndown remains discoverable. Delete this override — not the
+ * diagnostics — once contrib reaches zero.
+ *
+ * Like `effectDevDeps`, this explicit named export shadows the `export *` re-export from core.
+ */
+export const baseTsconfigCompilerOptions = {
+  ...coreBaseTsconfigCompilerOptions,
+  plugins: [
+    {
+      ...coreBaseTsconfigCompilerOptions.plugins[0],
+      ignoreEffectWarningsInTscExitCode: true,
+      ignoreEffectSuggestionsInTscExitCode: true,
+    },
+  ],
+} as const
 
 export const githubRepositorySettings = <const TSettings extends Record<string, unknown>>(settings: TSettings) =>
   jsonArtifact({ data: settings })
