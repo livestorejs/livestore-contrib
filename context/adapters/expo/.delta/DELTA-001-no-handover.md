@@ -15,11 +15,12 @@ carrying a comment that a multi-threaded version is needed "once we'll implement
 multi-threading for the Expo adapter" (`src/shutdown-channel.ts:4`). Today there
 is one JS thread and one session, so there is no second context to hand over to.
 
-Single-leader (core LS.SYS.RT-R01) *is* satisfied — by construction, since there
+Single-leader (core LS.SYS.RT-R01) _is_ satisfied — by construction, since there
 is only ever one session.
 
 Close condition: either multi-session leadership is implemented on Expo (handover
-+ real lock status), or the core contract is refined to make handover optional
-for single-context adapters and LSC.ADAPT.EXPO-R03 is restated as a conformant
-realization of that optional contract. Mirrors the Node adapter's
-[DELTA-001](../../node/.delta/DELTA-001-no-handover.md).
+
+- real lock status), or the core contract is refined to make handover optional
+  for single-context adapters and LSC.ADAPT.EXPO-R03 is restated as a conformant
+  realization of that optional contract. Mirrors the Node adapter's
+  [DELTA-001](../../node/.delta/DELTA-001-no-handover.md).

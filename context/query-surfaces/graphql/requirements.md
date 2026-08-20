@@ -22,7 +22,7 @@ the package ships no tests and there is no query-surface conformance suite yet.
 ## Requirements
 
 - **LSC.QS.GQL-R01 GraphQL as a live-query kind:** `queryGraphQL(document,
-  variables, options)` returns the same `LiveQueryDef` shape core queries
+variables, options)` returns the same `LiveQueryDef` shape core queries
   produce; its instances are `graphql`-tagged live queries
   (`LiveStoreQueryBase` subclasses) that compose into the store's one reactive
   graph alongside db, computed, and signal queries.
@@ -48,7 +48,7 @@ the package ships no tests and there is no query-surface conformance suite yet.
   `refines: LS.SYS.STORE.RX-R03, LS.SYS.STORE.RX-R04`
 - **LSC.QS.GQL-R06 Stateless surface:** The surface holds no data state of its
   own — the schema and resolver context live on the store, results live in the
-  reactive graph — so it is a thin layer that adds a query *language* over the
+  reactive graph — so it is a thin layer that adds a query _language_ over the
   session state without adding a store or a data cache. `refines: LS.SYS.STORE.RX-R02`
 
 ## Open Design Questions
@@ -56,7 +56,7 @@ the package ships no tests and there is no query-surface conformance suite yet.
 - **LSC.QS.GQL-DQ1 Query errors crash the store.** A GraphQL execution error
   triggers a `debugger` statement and `shouldNeverHappen` — an unrecoverable
   crash — rather than surfacing a recoverable query error. Whether a failed
-  *query* should be recoverable at the query level (unlike a failed *commit*,
+  _query_ should be recoverable at the query level (unlike a failed _commit_,
   LS.SYS.STORE-R09) is uncaptured.
 - **LSC.QS.GQL-DQ2 No context-wiring helper.** `GraphQLOptions` / `makeContext`
   are exported types, but nothing in the package installs `store.context.graphql`

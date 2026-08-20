@@ -15,13 +15,13 @@ what may be published are one implementation rather than two.
 
 ## Shape
 
-| Stage | Trust | Role |
-| --- | --- | --- |
-| pack | untrusted | builds and packs the pull request's code; no credentials |
-| validate | trusted | checks the candidate against the topology without executing it |
-| attest | trusted | binds the validated digests to the pull request head |
-| authorize | trusted | current-head review, or the fork trust label |
-| publish | trusted | publishes via registry OIDC, then verifies the cohort |
+| Stage     | Trust     | Role                                                           |
+| --------- | --------- | -------------------------------------------------------------- |
+| pack      | untrusted | builds and packs the pull request's code; no credentials       |
+| validate  | trusted   | checks the candidate against the topology without executing it |
+| attest    | trusted   | binds the validated digests to the pull request head           |
+| authorize | trusted   | current-head review, or the fork trust label                   |
+| publish   | trusted   | publishes via registry OIDC, then verifies the cohort          |
 
 ## Version Scheme
 

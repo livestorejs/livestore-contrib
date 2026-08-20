@@ -43,19 +43,19 @@ Contrib IDs use the `LSC` prefix, mirroring the core style. Contrib IDs never
 enter the core namespace table; core contracts are referenced by their `LS.*`
 IDs with links (see below).
 
-| Namespace | Node |
-| --- | --- |
-| `LSC-*` | root |
-| `LSC.ADAPT.NODE-*` | `adapters/node/` |
-| `LSC.ADAPT.EXPO-*` | `adapters/expo/` |
-| `LSC.SYNC.ELECTRIC-*` | `sync/electric/` |
-| `LSC.SYNC.S2-*` | `sync/s2/` |
-| `LSC.INT.SOLID-*` | `integrations/solid/` |
-| `LSC.INT.SVELTE-*` | `integrations/svelte/` |
-| `LSC.QS.GQL-*` | `query-surfaces/graphql/` |
-| `LSC.DT.EXPO-*` | `devtools/expo/` |
-| `LSC.CLI-*` | `cli/` |
-| `LSC.REL-*` | `release/` |
+| Namespace             | Node                      |
+| --------------------- | ------------------------- |
+| `LSC-*`               | root                      |
+| `LSC.ADAPT.NODE-*`    | `adapters/node/`          |
+| `LSC.ADAPT.EXPO-*`    | `adapters/expo/`          |
+| `LSC.SYNC.ELECTRIC-*` | `sync/electric/`          |
+| `LSC.SYNC.S2-*`       | `sync/s2/`                |
+| `LSC.INT.SOLID-*`     | `integrations/solid/`     |
+| `LSC.INT.SVELTE-*`    | `integrations/svelte/`    |
+| `LSC.QS.GQL-*`        | `query-surfaces/graphql/` |
+| `LSC.DT.EXPO-*`       | `devtools/expo/`          |
+| `LSC.CLI-*`           | `cli/`                    |
+| `LSC.REL-*`           | `release/`                |
 
 Realization sub-nodes (if any) extend their namespace with one more segment and
 live under the parent's directory. IDs are sequential per namespace.

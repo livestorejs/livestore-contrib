@@ -5,8 +5,8 @@ Status: open
 The core provider contract makes the backend the single ordering authority: it
 "accepts a push only when the batch chains onto its current head" and thereby
 linearizes concurrent writers (core LS.SYS.SYNC-R01). The S2 stream satisfies
-the *authority* half of that — it is one append-only log that assigns physical
-`seq_num` and does not renumber clients' logical `seqNum`. But the *fast-forward*
+the _authority_ half of that — it is one append-only log that assigns physical
+`seq_num` and does not renumber clients' logical `seqNum`. But the _fast-forward_
 half — reject a push that does not chain onto the head, so a behind client is
 told to rebase — is not realized.
 

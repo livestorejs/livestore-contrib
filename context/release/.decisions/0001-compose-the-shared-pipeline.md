@@ -9,11 +9,11 @@ guarantee for its own packages.
 
 ## Options
 
-| Option | Consequence |
-| --- | --- |
-| Copy the pipeline into contrib | Immediate; forks the code that decides what may be published |
+| Option                                  | Consequence                                                                      |
+| --------------------------------------- | -------------------------------------------------------------------------------- |
+| Copy the pipeline into contrib          | Immediate; forks the code that decides what may be published                     |
 | Extract to a shared factory, consume it | Two repos, one implementation; needs an extraction that provably changes nothing |
-| Leave contrib without PR snapshots | No new surface; external contributions stay unusable without a local build |
+| Leave contrib without PR snapshots      | No new surface; external contributions stay unusable without a local build       |
 
 ## Decision
 

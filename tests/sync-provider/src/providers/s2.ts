@@ -311,7 +311,6 @@ const makeRouter = ({
           return yield* HttpServerResponse.json({ success: true })
         }),
       )
-
     }),
   )
 }
