@@ -66,6 +66,26 @@ dependency rewrites use the pinned core snapshot from `megarepo.lock`.
 
 Stable release dispatch remains gated on release-plan generation and approval.
 
+### PR Snapshots
+
+Every pull request packs an installable snapshot of the publishable cohort, so a
+change can be tried without building the branch. Versions are
+`0.0.0-snapshot-pr.<pr>.<headSha>`, and each package's core dependencies are
+pinned to the core snapshot recorded in `megarepo.lock` at that head.
+
+The producer job (`pack-pr-snapshot`) runs untrusted PR code with no registry
+credentials and only emits tarballs; a trusted workflow on `main` validates,
+attests, authorizes, and publishes them. Authorization requires an approving
+review for same-repository pull requests, or the `ci:publish-snapshot` label for
+fork branches — re-checked against the live pull request at publish time, so
+removing the label stops a publication that was already authorized.
+
+Install one with:
+
+```bash
+pnpm add @livestore/adapter-node@0.0.0-snapshot-pr.<pr>.<headSha>
+```
+
 ## Repository Settings
 
 GitHub repository settings are generated from `.github/*.genie.ts` sources. The
