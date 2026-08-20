@@ -33,6 +33,8 @@ in
 {
   imports = [
     taskModules.genie
+    # gh:apply-labels / gh:check-labels — reconcile .github/labels.json with live labels.
+    (taskModules.gh-labels { repo = "livestorejs/livestore-contrib"; })
     (taskModules.megarepo {
       syncAll = false;
       bootstrapMembers = [
