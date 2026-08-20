@@ -6,5 +6,4 @@
  */
 
 export const releaseTopologyPath = 'release/topology.json'
-export const prSnapshotAttestationPredicateType =
-  'https://livestore.dev/attestations/contrib-pr-snapshot-candidate/v1'
+export const prSnapshotAttestationPredicateType = 'https://livestore.dev/attestations/contrib-pr-snapshot-candidate/v1'
