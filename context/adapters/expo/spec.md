@@ -42,9 +42,14 @@ deviation from core LS.SYS.RT-R09 (see
   (`src/index.ts:251`, `:255`) under a resolved directory
   `directoryBasePath/subDirectory/storeId`
   (`src/index.ts:356`, `:358`): the state db is
-  `livestore-{schemaHashSuffix}@{formatVersion}.db` (suffix `fixed` under manual
-  migration, else the schema hash; `src/index.ts:360`, `:362`) and the eventlog
-  db is `livestore-eventlog@{formatVersion}.db` (`src/index.ts:363`).
+  `{getStateDbBaseName(schema)}@{formatVersion}.db` — core's shared helper
+  ([`LS.SCHEMA.STATE-SQLITE`](https://github.com/livestorejs/livestore/tree/main/context),
+  `getStateDbBaseName` in `@livestore/common/schema`), yielding `state{hash}`
+  (`src/index.ts:24`, `:358`) — and the eventlog db is
+  `livestore-eventlog@{formatVersion}.db` (`src/index.ts:359`). The state name
+  previously carried a `livestore-` prefix and a `fixed` suffix under manual
+  migration; both are gone — see
+  [`.decisions/0001-adopt-core-state-db-base-name.md`](./.decisions/0001-adopt-core-state-db-base-name.md).
 - **`in-memory`** — `SQLite.openDatabaseSync(':memory:', { useNewConnection: true })`
   (`src/make-sqlite-db.ts:37`).
 
