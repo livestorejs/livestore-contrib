@@ -46,3 +46,25 @@ data.
 
 Users who relied on `strategy: 'manual'` pinning the state db to a stable
 `fixed` name lose that; the capability no longer exists upstream.
+
+## Known consequence: the old file is orphaned
+
+On upgrade, the previous `livestore-{hash}@{version}.db` is left on device. Expo
+has no stale-database cleanup, and `resetExpoPersistence` (`src/index.ts:364`)
+deletes only the *currently computed* names — so after the rename it can no
+longer remove the old file, and even a persistence reset leaves it behind.
+
+Core's web adapter solves this with `cleanupOldStateDbFiles`
+(`adapter-web/src/web-worker/common/persisted-sqlite.ts:137`), but it matches on
+`path.startsWith('/state')`, so it would not recognize Expo's `livestore-`
+prefixed files even if Expo composed it.
+
+The leak is bounded — one stale file per schema hash, not unbounded growth — and
+costs storage only: correctness is unaffected, since the state database is
+derived data rebuilt from the eventlog. Accepted deliberately rather than
+overlooked; the cleanup path deletes user files on device and warrants its own
+change and testing.
+
+Close condition: Expo gains a stale-state-db cleanup that recognizes BOTH the
+historical `livestore-{hash}@{version}.db` and the current
+`state{hash}@{version}.db` shapes, keeping only the current one.
