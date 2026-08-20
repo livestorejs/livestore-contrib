@@ -52,6 +52,18 @@ export default githubWorkflow({
   jobs: {
     'source-policy': livestoreDefaultRefPolicyJob,
 
+    'pr-minimal-dev': {
+      name: 'pr/minimal-dev',
+      'runs-on': 'ubuntu-latest',
+      permissions: {
+        contents: 'read',
+      },
+      steps: [
+        { uses: 'actions/checkout@v6' },
+        { name: 'Build minimal development image', run: 'docker build --tag livestore-contrib-minimal-dev:ci .' },
+      ],
+    },
+
     // Runs fork-authored code with no secrets and a read-only token; everything it uploads is treated
     // as untrusted input by the release workflow. Kept on the shared runner because contrib's build
     // composes core from source and would otherwise pay a cold Nix build on every pull request.
