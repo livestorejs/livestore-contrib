@@ -32,4 +32,14 @@ RUN pnpm install --frozen-lockfile
 
 RUN pnpm --dir packages/@livestore/solid exec tsc -b ../../../tsconfig.dev.json --pretty false
 
-RUN pnpm --dir packages/@livestore/sync-s2 exec vitest run src/limits.test.ts
+RUN pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts \
+    && WORKSPACE_ROOT=/workspace pnpm --dir packages/@livestore/svelte exec vitest run --config tests/vitest.config.ts \
+    && pnpm --dir packages/@livestore/sync-s2 exec vitest run --config vitest.config.ts
+
+RUN pnpm --dir packages/@livestore/cli exec bun src/bin.ts --help
+
+RUN WORKSPACE_ROOT=/workspace pnpm --dir tests/integration exec vitest run --config src/tests/node-misc/vitest.config.ts
+
+RUN pnpm --dir examples/web-todomvc-solid run build
+
+RUN pnpm --dir examples/web-todomvc-solid exec wrangler deploy --dry-run --outdir /tmp/wrangler-web-todomvc-solid
