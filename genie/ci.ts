@@ -7,6 +7,7 @@
 
 export const requiredCIJobs = [
   'source-policy',
+  'pr/minimal-dev',
   'pr/quality',
   'pr/types',
   'pr/packages',

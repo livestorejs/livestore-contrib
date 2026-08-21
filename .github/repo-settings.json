@@ -29,6 +29,9 @@
             "context": "source-policy"
           },
           {
+            "context": "pr/minimal-dev"
+          },
+          {
             "context": "pr/quality"
           },
           {
