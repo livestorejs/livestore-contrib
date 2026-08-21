@@ -20,7 +20,18 @@ This repository is the contrib companion to `livestorejs/livestore`.
 
 ## Development Environment
 
-Use `devenv` for the pinned toolchain:
+Shell readiness and its boundary from validation are governed by the core
+[LS.DEL.COMP.DEV-R01 contract](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/requirements.md#requirements).
+
+Use Minimal Setup for ordinary host-native work. It requires Git, Bun, Node.js
+24, and the exact pnpm version pinned by `package.json`:
+
+```bash
+./scripts/minimal-setup.sh
+```
+
+Use `devenv` for the full pinned toolchain when the task needs generated
+sources, release tooling, browsers, or native platforms:
 
 ```bash
 devenv shell

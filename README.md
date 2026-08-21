@@ -18,16 +18,63 @@ under `repos/livestore`; they remain owned by
 
 ## Development
 
-Use the pinned toolchain:
+Developer-environment readiness is governed by the core
+[LS.DEL.COMP.DEV-R01 contract](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/requirements.md#requirements).
+
+### Minimal Setup
+
+The default host-native setup requires Git, Bun, Node.js 24, and the exact pnpm
+version declared by `package.json#packageManager`. Bootstrap the exact core
+revision and frozen workspace dependencies with:
+
+```bash
+./scripts/minimal-setup.sh
+```
+
+The script reads the core URL and commit from `megarepo.lock`, verifies the
+installed pnpm version against `package.json`, and runs a frozen install. Use
+pnpm directly for focused commands:
+
+```bash
+pnpm --dir packages/@livestore/solid exec tsc -b ../../../tsconfig.dev.json
+```
+
+The Dockerfile runs the finite Minimal Setup oracle. Compose optionally provides
+an interactive shell over a dedicated checkout:
+
+```bash
+docker compose build
+docker compose run --rm dev
+./scripts/minimal-setup.sh
+```
+
+Compose bind-mounts the checkout, so one host or container must exclusively own
+its generated files, `repos/livestore`, and dependency state at a time. Use a
+separate checkout instead of switching an initialized checkout between host and
+container ownership.
+
+The Minimal Setup oracle covers the full TypeScript graph, stable package unit
+suites, CLI execution, Node adapter integration, one Vite build, and a local
+Wrangler dry run. Browser tests, Expo native/runtime validation, generators,
+release commands, and publication require the full environment or their
+platform-specific toolchains.
+
+### Full Nix environment
+
+Use devenv when working on generated sources, releases, browsers, native
+platforms, or the complete repository contract. Shell entry prepares the locked
+composed workspace, dependencies, and generated sources; TypeScript and
+validation remain explicit:
 
 ```bash
 devenv shell
+devenv tasks run check:all --mode before
 ```
 
-Materialize the composed workspace from the checked-in megarepo lock:
+For explicit reproducible preparation without entering a shell:
 
 ```bash
-mr apply
+devenv tasks run setup:strict --mode before
 ```
 
 Refresh remote refs and update `megarepo.lock` only when intentionally moving
@@ -35,21 +82,6 @@ the composed dependency graph:
 
 ```bash
 mr fetch --apply
-```
-
-Run the full local validation before pushing:
-
-```bash
-devenv tasks run check:all --mode before
-```
-
-Focused checks:
-
-```bash
-devenv tasks run release:surface:check --mode before
-devenv tasks run workspace:shape-check --mode before
-devenv tasks run mr:check --mode before
-git diff --check
 ```
 
 ## Release Surface
@@ -70,5 +102,6 @@ Stable release dispatch remains gated on release-plan generation and approval.
 
 GitHub repository settings are generated from `.github/*.genie.ts` sources. The
 checked-in JSON artifacts define repository toggles and the `main-branch-rules`
-ruleset, including the required `source-policy`, `pr/quality`, `pr/types`,
-`pr/packages`, `pr/examples-build`, `pr/node`, and `release-surface` checks.
+ruleset, including the required `source-policy`, `pr/minimal-dev`, `pr/quality`,
+`pr/types`, `pr/packages`, `pr/examples-build`, `pr/node`, and
+`release-surface` checks.
