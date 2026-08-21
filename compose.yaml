@@ -3,6 +3,10 @@ services:
     # Bind the source directly: use a separate checkout so host and container never compete for it.
     build: .
     working_dir: /workspace
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-100}"
+    environment:
+      # Numeric users need writable package-manager state without changing the image or host home.
+      HOME: /tmp/livestore-contrib-home
     volumes:
       - .:/workspace
     stdin_open: true

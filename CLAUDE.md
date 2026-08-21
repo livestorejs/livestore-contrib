@@ -20,8 +20,9 @@ This repository is the contrib companion to `livestorejs/livestore`.
 
 ## Development Environment
 
-Shell readiness and its boundary from validation are governed by the core
-[LS.DEL.COMP.DEV-R01 contract](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/requirements.md#requirements).
+The two supported setups and their validation boundary are defined by the core
+[developer-environment spec](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/spec.md)
+and [requirements R02-R06](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/requirements.md#requirements).
 
 Use Minimal Setup for ordinary host-native work. It requires Git, Bun, Node.js
 24, and the exact pnpm version pinned by `package.json`:
@@ -30,14 +31,16 @@ Use Minimal Setup for ordinary host-native work. It requires Git, Bun, Node.js
 ./scripts/minimal-setup.sh
 ```
 
-Use `devenv` for the full pinned toolchain when the task needs generated
-sources, release tooling, browsers, or native platforms:
+Use Full Setup (Nix + devenv) when the task needs generated sources, release
+tooling, browsers, or native platforms:
 
 ```bash
 devenv shell
 ```
 
 If tools are not directly available in `$PATH`, enter the dev environment first.
+The contributor guides describe [Minimal Setup](./contributor-docs/development/minimal-setup.md)
+and [Full Setup](./contributor-docs/development/full-setup.md).
 
 ## Common Checks
 

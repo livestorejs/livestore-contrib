@@ -31,6 +31,8 @@ if [ "$actual_pnpm_version" != "$expected_pnpm_version" ]; then
   exit 1
 fi
 
+echo "Minimal Setup: Git $(git --version | cut -d' ' -f3), Node $(node --version), pnpm $actual_pnpm_version, Bun $(bun --version)"
+
 core_url="$(bun -e 'const lock = await Bun.file("megarepo.lock").json(); console.log(lock.members.livestore.url)')"
 core_commit="$(bun -e 'const lock = await Bun.file("megarepo.lock").json(); console.log(lock.members.livestore.commit)')"
 
@@ -51,3 +53,4 @@ git -C repos/livestore checkout --detach FETCH_HEAD
 test "$(git -C repos/livestore rev-parse HEAD)" = "$core_commit"
 
 pnpm install --frozen-lockfile
+echo "Minimal Setup ready. Run a focused task from contributor-docs/development/minimal-setup.md."
