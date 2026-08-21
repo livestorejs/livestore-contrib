@@ -20,6 +20,9 @@ This repository is the contrib companion to `livestorejs/livestore`.
 
 ## Development Environment
 
+Shell readiness and its boundary from validation are governed by the core
+[LS.DEL.COMP.DEV-R01 contract](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/requirements.md#requirements).
+
 Use `devenv` for the pinned toolchain:
 
 ```bash

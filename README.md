@@ -18,16 +18,24 @@ under `repos/livestore`; they remain owned by
 
 ## Development
 
-Use the pinned toolchain:
+Developer-environment readiness is governed by the core
+[LS.DEL.COMP.DEV-R01 contract](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/requirements.md#requirements).
+
+### Full environment
+
+Use the pinned toolchain. Shell entry prepares the locked composed workspace,
+dependencies, and generated sources; TypeScript and repository validation stay
+explicit:
 
 ```bash
 devenv shell
+devenv tasks run check:all --mode before
 ```
 
-Materialize the composed workspace from the checked-in megarepo lock:
+For an explicit reproducible setup without entering a shell:
 
 ```bash
-mr apply
+devenv tasks run setup:strict --mode before
 ```
 
 Refresh remote refs and update `megarepo.lock` only when intentionally moving
@@ -37,13 +45,40 @@ the composed dependency graph:
 mr fetch --apply
 ```
 
-Run the full local validation before pushing:
+### Portable environment
+
+The Dockerfile is the finite cold-start oracle; Compose adds an interactive
+shell over the current checkout:
 
 ```bash
-devenv tasks run check:all --mode before
+docker compose build
+docker compose run --rm dev
 ```
 
-Focused checks:
+Inside a fresh Compose shell, materialize the exact core commit from
+`megarepo.lock`, then install the frozen workspace:
+
+```bash
+core_url="$(bun -e 'const lock = await Bun.file("megarepo.lock").json(); console.log(lock.members.livestore.url)')"
+core_commit="$(bun -e 'const lock = await Bun.file("megarepo.lock").json(); console.log(lock.members.livestore.commit)')"
+mkdir -p repos/livestore
+git -C repos/livestore init
+git -C repos/livestore fetch --depth=1 "$core_url" "$core_commit"
+git -C repos/livestore checkout --detach FETCH_HEAD
+pnpm install --frozen-lockfile
+```
+
+Compose bind-mounts the checkout, so one host or container must exclusively own
+its generated files, `repos/livestore`, and dependency state at a time. Use a
+separate checkout before switching between host and container ownership.
+
+The portable oracle covers the full TypeScript graph, stable package unit
+suites, CLI execution, Node adapter integration, one Vite build, and a local
+Wrangler dry run. Browser tests, Expo native/runtime validation, generators,
+release commands, and publication require the full environment or their
+platform-specific toolchains.
+
+Focused full-environment checks:
 
 ```bash
 devenv tasks run release:surface:check --mode before
