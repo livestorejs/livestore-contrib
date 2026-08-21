@@ -73,7 +73,7 @@ realization choices, and gaps for the private
   viewer is a React application over immutable run artifacts, with causal-flow
   and elapsed-time projections, topology, playback, raw record inspection,
   reconstructed Client Leader State inspection, Storybook state fixtures, and
-  Playwright screenshot/interaction parity. At a timeline cursor, the viewer
+  Playwright interaction coverage. At a timeline cursor, the viewer
   may lazily replay the latest recorded Leader Event facts at or before that
   cursor through the registered Scenario Application schema and its real
   materializers in an isolated in-memory Store. It labels the result with the

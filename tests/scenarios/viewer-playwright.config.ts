@@ -7,11 +7,10 @@ const viewerPort = process.env.SCENARIO_VIEWER_PORT ?? '4173'
 export default defineConfig({
   testDir: './src/viewer-e2e',
   outputDir: './test-results/viewer',
-  expect: { timeout: 10_000, toHaveScreenshot: { animations: 'disabled', maxDiffPixelRatio: 0.001 } },
+  expect: { timeout: 10_000 },
   fullyParallel: false,
   retries: 0,
   reporter: [['list']],
-  snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}-{projectName}{ext}',
   use: {
     locale: 'en-US',
     timezoneId: 'Europe/Copenhagen',

@@ -289,8 +289,8 @@ snapshots remain follow-ups. See
 [decision 0009](./.decisions/0009-reconstruct-leader-state-from-recorded-events.md).
 
 Storybook exercises primitives and complete viewer states from the tracked
-references. Playwright verifies interaction semantics and approved desktop
-light, desktop dark, and narrow light screenshots with reduced motion. The
+references. Playwright verifies interaction semantics across desktop light,
+desktop dark, and narrow light viewports with reduced motion. The
 viewer is replay-only today; live streaming/control is tracked in
 [DELTA-002](./.delta/DELTA-002-replay-only-viewer.md) (LSC.VER.SCEN-R06).
 

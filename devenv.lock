@@ -919,11 +919,11 @@
       },
       "locked": {
         "dir": "nix/playwright-flake",
-        "lastModified": 1786294021,
-        "narHash": "sha256-zkXbcC6JnWJRiq3HYJnjX7Jaa2ZMnax4sTzzZEBr5bU=",
+        "lastModified": 1785264161,
+        "narHash": "sha256-Wzhv0SIJRyeMHlPk89A/CAGSX5mWgvfEYNK8ByGI/8k=",
         "owner": "overengineeringstudio",
         "repo": "effect-utils",
-        "rev": "070fda11a09f8da2d4cbb479b46fcf50709f387e",
+        "rev": "165e63eefb6ccb3e70bddc6d0ba0272be25976fe",
         "type": "github"
       },
       "original": {

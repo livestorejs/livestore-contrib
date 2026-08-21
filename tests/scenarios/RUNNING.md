@@ -136,7 +136,7 @@ pnpm --dir tests/scenarios storybook
 pnpm --dir tests/scenarios storybook:build
 ```
 
-Run the viewer interaction and screenshot gate:
+Run the viewer interaction gate:
 
 ```sh
 pnpm --dir tests/scenarios viewer:parity
