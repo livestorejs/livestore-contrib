@@ -17,7 +17,7 @@ Vitest.describe('Scenario elapsed-time instructions', () => {
       const clientA = client('client-a').withSessions('main')
       const main = clientA.session('main')
       const compiled = normalizeScenario(
-        Scenario.start({ application: todo, clients: [clientA] }).pipe(
+        Scenario.start({ application: todo, clients: [clientA] }).steps(
           wait('20ms'),
           repeat(
             Array.from({ length: 3 }, (_, offset) =>

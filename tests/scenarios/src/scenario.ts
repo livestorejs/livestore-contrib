@@ -1,5 +1,3 @@
-import { Pipeable } from 'effect'
-
 import type { Schema } from '@livestore/utils/effect'
 
 import { parseScenarioDurationMs } from './duration.ts'
@@ -62,7 +60,7 @@ type ParallelSpec =
   | { readonly _tag: 'restart-client'; readonly client: ScenarioClient }
   | { readonly _tag: 'backend-unavailable' | 'backend-available' }
 
-type SequenceExpectation =
+type SequenceRequirement =
   | 'all-finish'
   | 'first-finish'
   | 'last-finish'
@@ -93,7 +91,7 @@ type InstructionSpec =
   | {
       readonly _tag: 'parallel'
       readonly operations: ReadonlyArray<ParallelSpec>
-      readonly expectation?:
+      readonly requirement?:
         | 'overlap'
         | 'all-finish'
         | { readonly operations: 'overlap' | 'all-finish'; readonly allowIndefinite?: boolean }
@@ -104,7 +102,7 @@ type InstructionSpec =
       readonly actions: SequenceActions
       readonly description?: string
       readonly delayBetweenActionsMs: number | null
-      readonly expectation?: SequenceExpectation
+      readonly requirement?: SequenceRequirement
     }
 
 interface OracleSpec {
@@ -122,7 +120,7 @@ interface ScenarioStart {
 }
 
 export interface ScenarioOperation {
-  (plan: ScenarioPlan): ScenarioPlan
+  readonly _tag: 'ScenarioOperation'
   readonly spec: InstructionSpec
 }
 
@@ -152,18 +150,14 @@ export class ScenarioPlan {
     readonly instructions: ReadonlyArray<InstructionSpec> = [],
     readonly expectations: ReadonlyArray<OracleSpec> | undefined = undefined,
   ) {}
+}
 
-  pipe(...operations: ReadonlyArray<(plan: ScenarioPlan) => ScenarioPlan>): ScenarioPlan {
-    return Pipeable.pipeArguments(this, arguments) as ScenarioPlan
+export class ScenarioBuilder extends ScenarioPlan {
+  steps(...operations: ReadonlyArray<ScenarioOperation>): ScenarioBuilder {
+    return new ScenarioBuilder(this.start, [...this.instructions, ...operations.map(({ spec }) => spec)])
   }
 
-  append(spec: InstructionSpec): ScenarioPlan {
-    return new ScenarioPlan(this.start, [...this.instructions, spec], this.expectations)
-  }
-
-  withExpectations(expectations: ReadonlyArray<OracleSpec>): ScenarioPlan {
-    if (this.expectations !== undefined)
-      throw new ScenarioSourceError('A Scenario may define final expectations only once')
+  expect(...expectations: ReadonlyArray<OracleSpec>): ScenarioPlan {
     if (expectations.length === 0) throw new ScenarioSourceError('Explicit expectations cannot be empty')
     return new ScenarioPlan(this.start, this.instructions, expectations)
   }
@@ -293,7 +287,7 @@ export const scenarioApplication = <const TApplication extends ScenarioApplicati
   ) as ScenarioApplication<TApplication>
 
 const makeOperation = <TSpec extends InstructionSpec>(spec: TSpec): ScenarioOperation & { readonly spec: TSpec } =>
-  Object.assign((plan: ScenarioPlan) => plan.append(spec), { spec })
+  Object.freeze({ _tag: 'ScenarioOperation', spec })
 
 export const note = (text: string): ScenarioOperation => makeOperation({ _tag: 'annotation', text })
 
@@ -336,7 +330,7 @@ export const settle = (
 export const parallel = (
   operations: ReadonlyArray<ScenarioOperation>,
   options: {
-    readonly expect?:
+    readonly require?:
       | 'overlap'
       | 'all-finish'
       | { readonly operations: 'overlap' | 'all-finish'; readonly allowIndefinite?: boolean }
@@ -357,13 +351,13 @@ export const parallel = (
     }
     return spec
   })
-  return makeOperation({ _tag: 'parallel', operations: specs, expectation: options.expect })
+  return makeOperation({ _tag: 'parallel', operations: specs, requirement: options.require })
 }
 
 interface SequenceOptions {
   readonly description?: string
   readonly between?: string | number
-  readonly expect?: SequenceExpectation
+  readonly require?: SequenceRequirement
 }
 
 const sequence = (
@@ -377,7 +371,7 @@ const sequence = (
     actions,
     description: options.description,
     delayBetweenActionsMs: options.between === undefined ? null : compileDuration(options.between),
-    expectation: options.expect,
+    requirement: options.require,
   })
 
 export const repeat = (actions: ReadonlyArray<ScenarioAction>, options: SequenceOptions = {}): ScenarioOperation =>
@@ -408,11 +402,6 @@ export const stateContainsIds = (
   participants?: ScenarioParticipantSelection,
 ): OracleSpec => ({ _tag: 'state-contains-ids', participants, inspector, expectedIds })
 
-export const expect =
-  (...expectations: ReadonlyArray<OracleSpec>) =>
-  (plan: ScenarioPlan): ScenarioPlan =>
-    plan.withExpectations(expectations)
-
 export const parameter = {
   integer: (defaultValue: number): ScenarioParameter<number> => {
     if (Number.isInteger(defaultValue) === false)
@@ -436,12 +425,12 @@ export const parameter = {
   }),
 }
 
-const start = (definition: ScenarioStart): ScenarioPlan => {
+const start = (definition: ScenarioStart): ScenarioBuilder => {
   if (definition.clients.length === 0) throw new ScenarioSourceError('At least one initial Client is required')
   if (definition.seed !== undefined && (Number.isInteger(definition.seed) === false || definition.seed < 0)) {
     throw new ScenarioSourceError('Scenario seed must be a non-negative integer')
   }
-  return new ScenarioPlan({ ...definition, clients: [...definition.clients] })
+  return new ScenarioBuilder({ ...definition, clients: [...definition.clients] })
 }
 
 const parameterized = <const TParameters extends ScenarioParameters>(
@@ -687,15 +676,15 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
           compileParallel(operation, `${parallelId}:operation-${pad(index + 1, 4)}`),
         )
         instructions.push({ _tag: 'parallel', id: parallelId, operations })
-        if (spec.expectation !== undefined) {
-          const expectation =
-            typeof spec.expectation === 'string'
-              ? { operations: spec.expectation, allowIndefinite: false }
-              : { ...spec.expectation, allowIndefinite: spec.expectation.allowIndefinite ?? false }
+        if (spec.requirement !== undefined) {
+          const requirement =
+            typeof spec.requirement === 'string'
+              ? { operations: spec.requirement, allowIndefinite: false }
+              : { ...spec.requirement, allowIndefinite: spec.requirement.allowIndefinite ?? false }
           addHistoryOracle(
             operations.map(({ id }) => id),
-            expectation.operations === 'overlap',
-            expectation.allowIndefinite,
+            requirement.operations === 'overlap',
+            requirement.allowIndefinite,
           )
         }
         break
@@ -735,20 +724,20 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
           delayBetweenActionsMs: spec.delayBetweenActionsMs,
           actions,
         })
-        if (spec.expectation !== undefined) {
-          const expectation =
-            typeof spec.expectation === 'string'
+        if (spec.requirement !== undefined) {
+          const requirement =
+            typeof spec.requirement === 'string'
               ? {
-                  finish: spec.expectation.replace(/-finish$/, '') as 'all' | 'first' | 'last' | 'first-and-last',
+                  finish: spec.requirement.replace(/-finish$/, '') as 'all' | 'first' | 'last' | 'first-and-last',
                   allowIndefinite: false,
                 }
-              : { ...spec.expectation, allowIndefinite: spec.expectation.allowIndefinite ?? false }
+              : { ...spec.requirement, allowIndefinite: spec.requirement.allowIndefinite ?? false }
           const selected =
-            expectation.finish === 'all'
+            requirement.finish === 'all'
               ? actions
-              : expectation.finish === 'first'
+              : requirement.finish === 'first'
                 ? [actions[0]!]
-                : expectation.finish === 'last'
+                : requirement.finish === 'last'
                   ? [actions.at(-1)!]
                   : actions.length === 1
                     ? [actions[0]!]
@@ -756,7 +745,7 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
           addHistoryOracle(
             selected.map(({ id }) => id),
             false,
-            expectation.allowIndefinite,
+            requirement.allowIndefinite,
           )
         }
         break

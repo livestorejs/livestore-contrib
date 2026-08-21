@@ -35,7 +35,8 @@ realization choices, and gaps for the private
 - **LSC.VER.SCEN-R03 One portable model and corpus across profiles:** Typed
   Application definitions over real `LiveStoreSchema` values, declarative and
   versioned Scenario plans, named actions, one typed immutable `.scenario.ts`
-  pipeline API, Scenario-owned seeded authoring, one ordered instruction stream,
+  builder with ordered `.steps(...)` and terminal `.expect(...)`, Scenario-owned
+  seeded authoring, one ordered instruction stream,
   optional zero-effect annotations, topology/lifecycle/fault plans, lexical
   participant aliases with no runtime instruction, default or explicitly
   scoped oracle contracts, and preflight capability derivation are shared

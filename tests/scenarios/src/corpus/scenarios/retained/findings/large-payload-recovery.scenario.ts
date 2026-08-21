@@ -4,7 +4,6 @@ import {
   client,
   disconnect,
   eventlogsConverge,
-  expect,
   generate,
   note,
   parameter,
@@ -28,18 +27,19 @@ export default Scenario.parameterized(
       application: todo,
       about: `An Event with a ${payloadBytes}-byte string crosses offline storage and backend synchronization.`,
       clients: [clientA, clientB],
-    }).pipe(
-      note('Commit the payload while Client A cannot reach the backend.'),
-      disconnect(clientA),
-      generate([todo.createTodo({ id: 'large-payload', text: 'x'.repeat(payloadBytes) }).as(sessionA)], {
-        description: 'Generate largeStringAction (1 actions)',
-      }),
-      reconnect(clientA),
-      expect(
+    })
+      .steps(
+        note('Commit the payload while Client A cannot reach the backend.'),
+        disconnect(clientA),
+        generate([todo.createTodo({ id: 'large-payload', text: 'x'.repeat(payloadBytes) }).as(sessionA)], {
+          description: 'Generate largeStringAction (1 actions)',
+        }),
+        reconnect(clientA),
+      )
+      .expect(
         pendingResolved(both),
         eventlogsConverge(both),
         stateConverges('todos', both),
         stateContainsIds('todos', ['large-payload'], both),
       ),
-    ),
 )

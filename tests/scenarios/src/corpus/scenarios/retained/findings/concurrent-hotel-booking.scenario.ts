@@ -11,7 +11,7 @@ export default Scenario.start({
   application: hotelBooking,
   about: 'Rebase two locally valid hotel bookings into a SQLite-enforced inventory violation.',
   clients: [clientA, clientB],
-}).pipe(
+}).steps(
   note('Both Clients confirm that one standard hotel room remains available.'),
   hotelBooking.initializeHotelRoomInventory({ roomType: 'standard', available: 1 }).as(sessionB),
   settle(both),

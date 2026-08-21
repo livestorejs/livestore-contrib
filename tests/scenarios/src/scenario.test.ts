@@ -5,7 +5,6 @@ import {
   alias,
   client,
   eventlogsConverge,
-  expect as finalExpectations,
   generate,
   normalizeScenario,
   note,
@@ -43,14 +42,14 @@ describe('Scenario as code', () => {
     ])
   })
 
-  it('builds an immutable pipeline and normalizes it to the runner AST', () => {
+  it('builds immutable steps and normalizes them to the runner AST', () => {
     const { clientA, sessionA } = topology()
     const start = Scenario.start({
       application: todo,
       about: 'A readable TypeScript Scenario.',
       clients: [clientA],
     })
-    const source = start.pipe(
+    const source = start.steps(
       note('Write locally.'),
       todo.createTodo({ id: 'todo-1', text: 'First' }).as(sessionA),
       wait('25ms'),
@@ -86,10 +85,9 @@ describe('Scenario as code', () => {
       Scenario.start({
         application: todo,
         clients: [clientA, clientB],
-      }).pipe(
-        todo.createTodo({ id: 'todo-1', text: 'First' }).as(sessionA),
-        finalExpectations(pendingResolved(both), eventlogsConverge(both), stateConverges('todos', both)),
-      ),
+      })
+        .steps(todo.createTodo({ id: 'todo-1', text: 'First' }).as(sessionA))
+        .expect(pendingResolved(both), eventlogsConverge(both), stateConverges('todos', both)),
       { id: 'aliases' },
     )
 
@@ -103,10 +101,22 @@ describe('Scenario as code', () => {
     ).toBe(true)
   })
 
+  it('finalizes explicit expectations so later steps are unavailable', () => {
+    const { clientA, sessionA } = topology()
+    const finalized = Scenario.start({ application: todo, clients: [clientA] })
+      .steps(todo.createTodo({ id: 'todo-1', text: 'First' }).as(sessionA))
+      .expect(pendingResolved(sessionA))
+
+    expect(finalized).not.toHaveProperty('steps')
+    expect(finalized).not.toHaveProperty('expect')
+    // @ts-expect-error A finalized ScenarioPlan cannot accept more steps.
+    void finalized.steps
+  })
+
   it('decodes declared parameters and rejects unknown overrides', () => {
     const { clientA, sessionA } = topology()
     const source = Scenario.parameterized({ count: parameter.integer(2) }, ({ count }) =>
-      Scenario.start({ application: todo, clients: [clientA] }).pipe(
+      Scenario.start({ application: todo, clients: [clientA] }).steps(
         repeat(
           Array.from({ length: count }, (_, offset) =>
             todo.createTodo({ id: `todo-${offset + 1}`, text: `Todo ${offset + 1}` }).as(sessionA),
@@ -128,7 +138,7 @@ describe('Scenario as code', () => {
 
   it('expands generated actions deterministically from the effective seed', () => {
     const { clientA, sessionA } = topology()
-    const source = Scenario.start({ application: todo, seed: 42, clients: [clientA] }).pipe(
+    const source = Scenario.start({ application: todo, seed: 42, clients: [clientA] }).steps(
       generate(({ random }) =>
         Array.from({ length: 3 }, (_, offset) =>
           todo
@@ -156,9 +166,12 @@ describe('Scenario as code', () => {
           todo.createTodo({ id: `helper-${offset}`, text: `Helper ${offset}` }).as(sessionA),
         ),
       )
-    const compiled = normalizeScenario(Scenario.start({ application: todo, clients: [clientA] }).pipe(createTodos(4)), {
-      id: 'ordinary-helper',
-    })
+    const compiled = normalizeScenario(
+      Scenario.start({ application: todo, clients: [clientA] }).steps(createTodos(4)),
+      {
+        id: 'ordinary-helper',
+      },
+    )
 
     expect(compiled.instructions[0]).toMatchObject({ _tag: 'action-sequence', actions: expect.any(Array) })
     expect(compiled.instructions[0]!._tag === 'action-sequence' && compiled.instructions[0]!.actions).toHaveLength(4)
@@ -166,7 +179,7 @@ describe('Scenario as code', () => {
 
   it('rejects invalid topology references during normalization', () => {
     const { clientA, sessionA, clientB, sessionB } = topology()
-    const source = Scenario.start({ application: todo, clients: [clientA] }).pipe(
+    const source = Scenario.start({ application: todo, clients: [clientA] }).steps(
       todo.createTodo({ id: 'todo-1', text: 'First' }).as(sessionB),
     )
     expect(() => normalizeScenario(source, { id: 'invalid-reference' })).toThrow(ScenarioSourceError)

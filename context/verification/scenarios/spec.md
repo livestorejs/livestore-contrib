@@ -23,11 +23,13 @@ published Scenario product package (LSC.VER.SCEN-R01).
 ## Scenario and Application Model
 
 Committed and local cases are trusted `.scenario.ts` modules using an immutable
-pipeline API. Evaluating a module produces a `ScenarioPlan`; normalization
-validates the complete plan and produces the current serializable Scenario AST
-before execution. The filename stem supplies Scenario identity. Source selects
-one registered Application, declares explicit Client/session topology, and
-contains one ordered body of operations, faults, annotations, action sequences,
+builder API. `.steps(...)` contains the ordered body of operations, while an
+optional terminal `.expect(...)` finalizes explicit expectations and cannot be
+followed by more steps. Evaluating a module produces a `ScenarioPlan`;
+normalization validates the complete plan and produces the current serializable
+Scenario AST before execution. The filename stem supplies Scenario identity.
+Source selects one registered Application, declares explicit Client/session
+topology, and contains operations, faults, annotations, action sequences,
 intermediate Settlement instructions, and optional final expectations.
 Profile/backend selection, Store identity, capabilities, tags, format versions,
 and runner-owned instruction/oracle IDs are not authored. Lexical aliases give
@@ -47,7 +49,7 @@ branches, and reusable authoring helpers are ordinary typed TypeScript. One-off
 logic stays in its Scenario module; genuinely shared helpers use normal module
 imports, with no registry or companion naming convention. Their finite
 instruction fragments pass through the same normalizer-owned identity,
-participant, capability, and Application-action validation as direct pipeline
+participant, capability, and Application-action validation as direct authored
 operations. The Scenario never
 redeclares Events or materializers. The normalized plan remains the runner and
 artifact boundary; the runner does not interpret source text or load helper

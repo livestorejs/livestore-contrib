@@ -9,8 +9,9 @@ observable and why the artifact and viewer are useful_
 
 A `.scenario.ts` module reads as a distributed sync story—Clients write,
 disconnect, reconnect, join late, or lose access to a backend. Its immutable
-pipeline is normalized into the exact portable plan run through real LiveStore
-participants. The runner records one semantic trace
+ordered steps and optional terminal expectations are normalized into the exact
+portable plan run through real LiveStore participants. The runner records one
+semantic trace
 instead of leaving the result spread across process logs, browser consoles, and
 database snapshots.
 
@@ -43,7 +44,7 @@ not claim that the system settled or met a deadline. The trace records what was
 requested and how much controller-monotonic time actually elapsed, so the
 viewer can separate intentional idle time from slow work.
 
-Scenario-as-code keeps the plan-shaped pipeline declarative while allowing
+Scenario-as-code keeps the plan-shaped steps declarative while allowing
 ordinary typed TypeScript for loops, branches, and reusable functions. One-off
 logic stays in its Scenario module; shared helpers are normal imported modules,
 not registered runner vocabulary. Source is trusted authoring code, but the

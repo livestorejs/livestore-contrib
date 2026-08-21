@@ -1,7 +1,7 @@
 # TypeScript Scenario authoring
 
 Scenario sources are trusted `.scenario.ts` modules. They use an immutable
-TypeScript pipeline, receive normal editor completion and type checking, and
+TypeScript builder, receive normal editor completion and type checking, and
 default-export either `Scenario.start(...)` or `Scenario.parameterized(...)`.
 The runner does not execute this authoring API. Source is evaluated first and
 normalized into the same serializable `ScenarioAst` used by artifacts and every
@@ -24,7 +24,6 @@ import {
   client,
   disconnect,
   eventlogsConverge,
-  expect,
   pendingResolved,
   reconnect,
   Scenario,
@@ -40,12 +39,13 @@ export default Scenario.start({
   application: todo,
   about: 'Client A writes offline, reconnects, and converges with Client B.',
   clients: [clientA, clientB],
-}).pipe(
-  disconnect(clientA),
-  todo.createTodo({ id: 'offline', text: 'Written offline' }).as(sessionA),
-  reconnect(clientA),
-  expect(pendingResolved(both), eventlogsConverge(both)),
-)
+})
+  .steps(
+    disconnect(clientA),
+    todo.createTodo({ id: 'offline', text: 'Written offline' }).as(sessionA),
+    reconnect(clientA),
+  )
+  .expect(pendingResolved(both), eventlogsConverge(both))
 ```
 
 Application methods are inferred from the registered Application definition,
@@ -56,9 +56,9 @@ specific handle with `.session(name)`. Append `.disconnected()` after
 lexical name for a session selection; it does not add source declarations or
 runtime instructions.
 
-## Pipeline operations
+## Ordered steps and final expectations
 
-The ordered pipeline supports:
+`.steps(...)` accepts these ordered operations:
 
 - application actions such as `todo.createTodo(input).as(sessionA)`;
 - `note(text)` and `wait(duration)`;
@@ -67,14 +67,15 @@ The ordered pipeline supports:
 - `stopSession(session)`, `restartSession(session)`, and `restartClient(client)`;
 - `createClient(configuredClient)` and `addSession(client.session(name))`;
 - `settle(selection, { reconnect: [...] })` as an intermediate barrier;
-- `parallel([...], { expect: 'overlap' })` for concurrent operations;
-- `repeat(actions, { between: '250ms', expect: 'all-finish' })`;
-- `generate(actionsOrFunction, options)` for seed-aware construction; and
-- one final `expect(...)` operation.
+- `parallel([...], { require: 'overlap' })` for concurrent operations;
+- `repeat(actions, { between: '250ms', require: 'all-finish' })`; and
+- `generate(actionsOrFunction, options)` for seed-aware construction.
 
-Without `expect(...)`, pending resolution and ordered Eventlog convergence are
-checked for every session still running at the end. An explicit expectation
-list replaces both defaults. Available final expectations are
+An optional terminal `.expect(...)` follows `.steps(...)`; its finalized
+`ScenarioPlan` cannot accept more steps. Without `.expect(...)`, pending
+resolution and ordered Eventlog convergence are checked for every session still
+running at the end. An explicit expectation list replaces both defaults.
+Available final expectations are
 `pendingResolved`, `eventlogsConverge`, `stateConverges`, and
 `stateContainsIds`.
 
@@ -88,7 +89,7 @@ Use `Scenario.parameterized` for CLI-overridable values:
 
 ```ts
 export default Scenario.parameterized({ event_count: parameter.integer(100) }, ({ event_count: eventCount }) =>
-  Scenario.start({ application: todo, clients: [clientA] }).pipe(
+  Scenario.start({ application: todo, clients: [clientA] }).steps(
     repeat(
       Array.from({ length: eventCount }, (_, offset) =>
         todo.createTodo({ id: `todo-${offset + 1}`, text: `Todo ${offset + 1}` }).as(main),

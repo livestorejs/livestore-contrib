@@ -5,7 +5,6 @@ import {
   backendUnavailable,
   client,
   eventlogsConverge,
-  expect,
   parallel,
   pendingResolved,
   Scenario,
@@ -24,28 +23,29 @@ export default Scenario.start({
   application: todo,
   about: 'Two Clients retain local writes while the backend route is unavailable, then recover and converge.',
   clients: [clientA, clientB],
-}).pipe(
-  note('Remove the shared backend route and retain local writes on both Clients.'),
-  backendUnavailable(),
-  parallel([
-    todo
-      .createTodo({
-        id: 'todo-outage-a',
-        text: 'Written by Client A during the backend outage',
-      })
-      .as(sessionA),
-    todo
-      .createTodo({
-        id: 'todo-outage-b',
-        text: 'Written by Client B during the backend outage',
-      })
-      .as(sessionB),
-  ]),
-  backendAvailable(),
-  expect(
+})
+  .steps(
+    note('Remove the shared backend route and retain local writes on both Clients.'),
+    backendUnavailable(),
+    parallel([
+      todo
+        .createTodo({
+          id: 'todo-outage-a',
+          text: 'Written by Client A during the backend outage',
+        })
+        .as(sessionA),
+      todo
+        .createTodo({
+          id: 'todo-outage-b',
+          text: 'Written by Client B during the backend outage',
+        })
+        .as(sessionB),
+    ]),
+    backendAvailable(),
+  )
+  .expect(
     pendingResolved(both),
     eventlogsConverge(both),
     stateConverges('todos', both),
     stateContainsIds('todos', ['todo-outage-a', 'todo-outage-b'], both),
-  ),
-)
+  )

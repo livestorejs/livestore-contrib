@@ -9,7 +9,7 @@ export default Scenario.start({
   seed: 1445,
   about: 'A seeded Scenario expands readable TypeScript into concrete todo actions.',
   clients: [clientA],
-}).pipe(
+}).steps(
   note('Generate concrete createTodo actions here in the Scenario and dispatch them in order.'),
   generate(
     ({ random }) =>
@@ -22,7 +22,7 @@ export default Scenario.start({
           })
           .as(sessionA)
       }),
-    { description: 'Generate seededTodoActions (40 actions)', expect: 'all-finish' },
+    { description: 'Generate seededTodoActions (40 actions)', require: 'all-finish' },
   ),
 )
 

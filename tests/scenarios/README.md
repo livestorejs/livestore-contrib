@@ -121,19 +121,21 @@ pnpm --dir tests/scenarios scenario:run \
   --scenario-file local/scenarios/my-investigation.scenario.ts
 ```
 
-A Scenario is a trusted TypeScript module with an immutable pipeline:
+A Scenario is a trusted TypeScript module with immutable ordered steps and
+optional terminal expectations:
 
 ```ts
 export default Scenario.start({
   application: todo,
   about: 'Client A writes offline, reconnects, and converges.',
   clients: [clientA, clientB],
-}).pipe(
-  disconnect(clientA),
-  todo.createTodo({ id: 'offline', text: 'Written offline' }).as(sessionA),
-  reconnect(clientA),
-  expect(pendingResolved(both), eventlogsConverge(both)),
-)
+})
+  .steps(
+    disconnect(clientA),
+    todo.createTodo({ id: 'offline', text: 'Written offline' }).as(sessionA),
+    reconnect(clientA),
+  )
+  .expect(pendingResolved(both), eventlogsConverge(both))
 ```
 
 Normal TypeScript handles loops, branches, parameters, generated actions, and

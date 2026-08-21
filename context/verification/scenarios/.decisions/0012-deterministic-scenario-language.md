@@ -1,4 +1,4 @@
-# 0012 — Author deterministic Scenarios as typed pipelines
+# 0012 — Author deterministic Scenarios with typed steps and expectations
 
 Status: accepted (design interview, 2026-08-09); implemented
 
@@ -14,12 +14,17 @@ semantics or application behavior into prose.
 ## Decision
 
 Author committed and local cases as trusted `.scenario.ts` modules using an
-immutable `Scenario.start({...}).pipe(...)` API. The filename stem is the
+immutable `Scenario.start({...}).steps(...).expect(...)` builder API. The filename stem is the
 Scenario ID. Source selects one typed Application explicitly, may add a
 description and seed, declares every initial Client and session, and provides
-one ordered pipeline of instructions plus optional final expectations. Aliases
+one ordered set of instructions plus optional final expectations. `.expect(...)`
+finalizes the plan so it cannot be followed by more steps. Aliases
 are ordinary lexical constants over explicit session values and never appear in
 the normalized instruction stream.
+
+Step-local operation-history constraints use a `require` option, such as
+`parallel(actions, { require: 'overlap' })`, so they cannot be confused with
+terminal `.expect(...)` properties.
 
 Application action methods and their inputs are inferred from the registered
 Application definition. TypeScript supplies syntax, comments, imports, loops,
@@ -37,7 +42,7 @@ instruction/operation/oracle IDs, and emits the serializable `ScenarioAst`
 already consumed by the runner and artifacts. Profile/backend selection, Store
 ID, capabilities, tags, format versions, and runner IDs remain unauthored.
 
-When no final `expect(...)` operation is authored, normalize pending-resolution
+When no terminal `.expect(...)` is authored, normalize pending-resolution
 and exact ordered Eventlog-convergence oracles for every session still running
 after the last instruction. An explicit expectation list replaces both
 defaults and may name a session or lexical alias. Explicit `settle(...)` remains
@@ -52,7 +57,7 @@ does not widen: the runner receives only validated data.
 
 ## Consequences
 
-Scenarios retain a plan-shaped, scan-friendly pipeline while gaining standard
+Scenarios retain plan-shaped, scan-friendly steps while gaining standard
 TypeScript highlighting, completion, formatting, refactoring, and general
 programmability. Renaming a file intentionally changes Scenario identity.
 Adding explicit expectations requires spelling every desired oracle, avoiding
