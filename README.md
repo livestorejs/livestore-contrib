@@ -5,7 +5,7 @@ framework integrations, platform adapters, sync providers, devtools, GraphQL
 integration, and CLI tooling that live outside the core engine repository.
 
 The repository architecture source of truth is maintained in
-[`livestorejs/livestore`](https://github.com/livestorejs/livestore/tree/main/context/repo-architecture).
+[`livestorejs/livestore`](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/.decisions/0001-two-repo-composition.md).
 
 ## Packages
 
@@ -18,38 +18,21 @@ under `repos/livestore`; they remain owned by
 
 ## Development
 
-Use the pinned toolchain:
+Choose the smallest setup that covers the work. The core
+[developer-environment spec](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/spec.md)
+and [requirements R02-R06](https://github.com/livestorejs/livestore/blob/main/context/03-delivery/01-composition/01-developer-environment/requirements.md#requirements)
+define the shared boundary.
+
+| Setup | Use it for | Start here |
+| --- | --- | --- |
+| Minimal Setup | Ordinary TypeScript, package tests, and web or Worker builds | [Minimal Setup guide](./contributor-docs/development/minimal-setup.md) |
+| Full Setup (Nix + devenv) | Generators, browsers, native platforms, releases, and repository-wide checks | [Full Setup guide](./contributor-docs/development/full-setup.md) |
+
+For the default host-native path, verify the prerequisites described in the
+Minimal Setup guide and run:
 
 ```bash
-devenv shell
-```
-
-Materialize the composed workspace from the checked-in megarepo lock:
-
-```bash
-mr apply
-```
-
-Refresh remote refs and update `megarepo.lock` only when intentionally moving
-the composed dependency graph:
-
-```bash
-mr fetch --apply
-```
-
-Run the full local validation before pushing:
-
-```bash
-devenv tasks run check:all --mode before
-```
-
-Focused checks:
-
-```bash
-devenv tasks run release:surface:check --mode before
-devenv tasks run workspace:shape-check --mode before
-devenv tasks run mr:check --mode before
-git diff --check
+./scripts/minimal-setup.sh
 ```
 
 ## Release Surface
@@ -70,5 +53,6 @@ Stable release dispatch remains gated on release-plan generation and approval.
 
 GitHub repository settings are generated from `.github/*.genie.ts` sources. The
 checked-in JSON artifacts define repository toggles and the `main-branch-rules`
-ruleset, including the required `source-policy`, `pr/quality`, `pr/types`,
-`pr/packages`, `pr/examples-build`, `pr/node`, and `release-surface` checks.
+ruleset, including the required `source-policy`, `pr/minimal-dev`, `pr/quality`,
+`pr/types`, `pr/packages`, `pr/examples-build`, `pr/node`, and
+`release-surface` checks.

@@ -182,6 +182,7 @@ in
   tasks."ci:quality" = {
     description = "Run PR quality checks for contrib";
     after = [
+      "genie:check"
       "lint:check"
       "mr:lock-sync-check"
       "workspace:shape-check"
