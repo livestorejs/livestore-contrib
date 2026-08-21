@@ -36,6 +36,11 @@ echo "Minimal Setup: Git $(git --version | cut -d' ' -f3), Node $(node --version
 core_url="$(bun -e 'const lock = await Bun.file("megarepo.lock").json(); console.log(lock.members.livestore.url)')"
 core_commit="$(bun -e 'const lock = await Bun.file("megarepo.lock").json(); console.log(lock.members.livestore.commit)')"
 
+if [ -L repos/livestore ]; then
+  echo "repos/livestore is a symlink; use a separate checkout for Minimal Setup." >&2
+  exit 1
+fi
+
 if [ -e repos/livestore ] && [ ! -d repos/livestore/.git ]; then
   echo "repos/livestore already exists but is not a Git checkout; use a separate checkout for Minimal Setup." >&2
   exit 1
