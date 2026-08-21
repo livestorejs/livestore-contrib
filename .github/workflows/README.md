@@ -6,8 +6,8 @@ sources. Edit the Genie sources and regenerate instead of editing YAML outputs.
 ## `ci.yml`
 
 Primary pull request validation for the contrib workspace. The stable checks
-are `source-policy`, `pr/quality`, `pr/types`, `pr/packages`,
-`pr/examples-build`, `pr/node`, and `release-surface`.
+are `source-policy`, `pr/minimal-dev`, `pr/quality`, `pr/types`,
+`pr/packages`, `pr/examples-build`, `pr/node`, and `release-surface`.
 
 ## `release.yml`
 
@@ -26,6 +26,6 @@ approval are added.
 ## Repository Settings
 
 Repository settings are generated from `.github/repository-settings.json.genie.ts`
-and `.github/repo-settings.json.genie.ts`. The generated JSON artifacts are the
-source of truth for GitHub repository toggles and the `main-branch-rules`
-ruleset.
+and `.github/repo-settings.json.genie.ts`. Those typed sources are authoritative;
+the generated JSON artifacts are the reviewable and applied projections for
+GitHub repository toggles and the `main-branch-rules` ruleset.

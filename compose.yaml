@@ -1,0 +1,10 @@
+services:
+  dev:
+    # Bind the source directly: use a separate checkout so host and container never compete for it.
+    build: .
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    stdin_open: true
+    tty: true
+    command: bash

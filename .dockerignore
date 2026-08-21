@@ -1,0 +1,12 @@
+.git
+.devenv*
+.direnv
+node_modules
+.pnpm-home
+.pnpm-store
+repos
+**/dist
+**/*.tsbuildinfo
+tmp*
+*.log
+*.db

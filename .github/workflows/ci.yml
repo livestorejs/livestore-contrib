@@ -388,6 +388,15 @@ jobs:
           process.exit(1)
           NODE
         shell: bash
+  pr-minimal-dev:
+    name: pr/minimal-dev
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build minimal development image
+        run: 'docker build --tag livestore-contrib-minimal-dev:ci .'
   pack-pr-snapshot:
     if: github.event_name == 'pull_request'
     runs-on: [namespace-profile-linux-x86-64, 'namespace-features:github.run-id=${{ github.run_id }}']
