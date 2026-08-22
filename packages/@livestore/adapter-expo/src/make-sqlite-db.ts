@@ -31,7 +31,7 @@ type ExpoDatabaseInput =
 export type MakeExpoSqliteDb = MakeSqliteDb<Metadata, ExpoDatabaseInput, { _tag: 'expo' } & Metadata>
 
 export const makeSqliteDb: MakeExpoSqliteDb = (input: ExpoDatabaseInput) =>
-  Effect.gen(function* () {
+  Effect.sync(() => {
     // console.log('makeSqliteDb', input)
     if (input._tag === 'in-memory') {
       const db = SQLite.openDatabaseSync(':memory:', { useNewConnection: true })
@@ -60,6 +60,8 @@ export const makeSqliteDb: MakeExpoSqliteDb = (input: ExpoDatabaseInput) =>
         },
       }) as any
     }
+
+    return shouldNeverHappen('makeSqliteDb: unexpected input')
   })
 
 const makeSqliteDb_ = <TMetadata extends Metadata>({
