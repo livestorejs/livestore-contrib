@@ -3,7 +3,6 @@ import { Effect, type Schema, type Scope } from '@livestore/utils/effect'
 
 import { ScenarioOperationError } from '../application/definition.ts'
 import {
-  deriveScenarioTopology,
   type HostSystemObservation,
   type ParticipantRef,
   type ParticipantSnapshot,
@@ -351,6 +350,7 @@ const deriveSyncObservation = (args: {
 export const captureSnapshots = (args: {
   host: ParticipantHost
   scenario: ScenarioAst
+  participants: ReadonlyArray<ParticipantRef>
   record: TraceRecorder
 }): Effect.Effect<
   {
@@ -367,13 +367,9 @@ export const captureSnapshots = (args: {
       ),
     ),
   ]
-  const participants = deriveScenarioTopology(args.scenario).flatMap((client) =>
-    client.sessions.map((sessionId) => ({ clientId: client.id, sessionId })),
-  )
-
   return Effect.gen(function* () {
     const evidenceByParticipant = new Map<string, number[]>()
-    const snapshots = yield* Effect.forEach(participants, (participant) =>
+    const snapshots = yield* Effect.forEach(args.participants, (participant) =>
       Effect.gen(function* () {
         const sync = yield* args.host.observeSync(participant)
         const syncRecord = args.record({

@@ -389,7 +389,12 @@ export const runScenario = (args: {
         activeInstructionId = undefined
       }
 
-      const snapshotResult = yield* captureSnapshots({ host: args.host, scenario: args.scenario, record })
+      const snapshotResult = yield* captureSnapshots({
+        host: args.host,
+        scenario: args.scenario,
+        participants: terminalParticipants,
+        record,
+      })
       const verdicts = evaluateOracles({
         oracles: args.scenario.oracles,
         snapshots: snapshotResult.snapshots,

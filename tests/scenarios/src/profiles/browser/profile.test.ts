@@ -2,6 +2,9 @@ import { FetchHttpClient, Layer } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
 import { makeLocalSyncCfScenarioBackend } from '../../backends.ts'
+import { todo } from '../../corpus/applications/todo.ts'
+import { Scenario, client, normalizeScenario, stopSession } from '../../scenario.ts'
+import { expectOfflineEventCorrelationLifecycle } from '../../test-support/runner-assertions.ts'
 import {
   Effect,
   Vitest,
@@ -12,7 +15,6 @@ import {
   runBrowserLocalSyncCfScenario,
   todoApplication,
 } from '../../test-support/scenario-test-kit.ts'
-import { expectOfflineEventCorrelationLifecycle } from '../../test-support/runner-assertions.ts'
 import { makeBrowserHost } from './host.ts'
 
 const makeLocalBackend = makeLocalSyncCfScenarioBackend.pipe(
@@ -46,6 +48,31 @@ Vitest.describe('browser profile', () => {
         yield* host.restartSession({ operationId: 'restart-session-a', target })
 
         expect((yield* backend.observe(storeId)).events).toEqual([])
+      }).pipe(Vitest.withTestCtx(test)),
+    120_000,
+  )
+
+  Vitest.live(
+    'captures final snapshots only for sessions still running',
+    (test) =>
+      Effect.gen(function* () {
+        const clientA = client('client-a').withSessions('session-a1', 'session-a2')
+        const sessionA1 = clientA.session('session-a1')
+        const scenario = normalizeScenario(
+          Scenario.start({ application: todo, clients: [clientA] }).steps(stopSession(sessionA1)),
+          { id: 'browser-stopped-final-session' },
+        )
+
+        const artifact = yield* runBrowserLocalSyncCfScenario({
+          scenario,
+          applicationId: todoApplication.id,
+          options: { runId: 'browser-stopped-final-session-test', sourceRevision: 'test' },
+        })
+
+        expect(artifact.status).toBe('passed')
+        expect(artifact.snapshots.map(({ participant }) => participant)).toEqual([
+          { clientId: 'client-a', sessionId: 'session-a2' },
+        ])
       }).pipe(Vitest.withTestCtx(test)),
     120_000,
   )
