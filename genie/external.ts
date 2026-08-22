@@ -8,11 +8,11 @@ import { effectV4Catalog, livestoreOnlyCatalog, obsoleteEffectV3Packages } from 
 import { coreOwnedPackageNames, contribPackageNames } from './internal.ts'
 
 /**
- * Contrib pins one Effect release ahead of core's `4.0.0-beta.97` so the
- * contrib-owned surface resolves at `4.0.0-beta.98`. This still satisfies core's
- * `^4.0.0-beta.97` peer ranges while letting contrib move independently.
+ * Contrib matches core's Effect 4 cohort (`4.0.0-rc.109` from
+ * livestorejs/livestore#1558). Prerelease carets do not match across `rc.N`, so
+ * pinning one release ahead would unsatisfy core's `^4.0.0-rc.109` peers.
  */
-const contribEffectVersion = '4.0.0-beta.98'
+const contribEffectVersion = '4.0.0-rc.109'
 
 /**
  * Reuse core's Effect v4 package-name set (single source of truth for *which*

@@ -18,7 +18,7 @@ import {
 
 import * as ApiSchema from './api-schema.ts'
 
-export class InvalidOperationError extends Schema.TaggedErrorClass<InvalidOperationError>(
+export class InvalidOperationError extends Schema.TaggedError<InvalidOperationError>(
   '~@livestore/sync-electric/InvalidOperationError',
 )('InvalidOperationError', {
   operation: Schema.Literals(['delete', 'update']),

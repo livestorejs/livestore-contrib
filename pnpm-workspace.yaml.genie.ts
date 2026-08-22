@@ -10,12 +10,11 @@ import { rootWorkspaceExtraMembers, rootWorkspacePackages } from './package.json
 const { peerDependencyRules: _effectV3PeerDependencyRules, ...contribPnpmPolicySettings } = commonPnpmPolicySettings
 
 /**
- * Dedupe the Effect v4 family to contrib's single `4.0.0-beta.98` pin across the
- * workspace. Core's materialized packages (e.g. `@livestore/peer-deps`) pin some
- * of these to core's `4.0.0-beta.97`; without overrides pnpm would install both
- * betas side by side. Overriding also rewrites the recorded peer ranges to exact
- * versions in the lockfile, which the generated catalog peer-dep validator can
- * evaluate (its minimal semver cannot resolve caret prerelease ranges).
+ * Dedupe the Effect v4 family to contrib's single `4.0.0-rc.109` pin across the
+ * workspace. Core's materialized packages (e.g. `@livestore/peer-deps`) pin the
+ * same cohort; the override keeps the lockfile on one exact version so the
+ * generated catalog peer-dep validator can evaluate it (its minimal semver
+ * cannot resolve caret prerelease ranges).
  */
 const effectDedupeOverrides = catalog.pick(
   'effect',
