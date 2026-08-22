@@ -544,6 +544,15 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
     }
     return { clientId: target.clientId, sessionId: target.sessionId }
   }
+  const requireStoppedSession = (target: ScenarioSession): ParticipantRef => {
+    const state = clients.get(target.clientId)?.sessions.get(target.sessionId)
+    if (state === undefined)
+      throw new ScenarioSourceError(`Unknown participant '${participantKey(target)}' at this source position`)
+    if (state !== 'stopped') {
+      throw new ScenarioSourceError(`Participant '${participantKey(target)}' is running at this source position`)
+    }
+    return { clientId: target.clientId, sessionId: target.sessionId }
+  }
   const selection = (value: ScenarioParticipantSelection, allowStopped = false): ReadonlyArray<ParticipantRef> => {
     const members = value._tag === 'ScenarioAlias' ? value.members : [value]
     if (members.length === 0) throw new ScenarioSourceError('Participant selection cannot be empty')
@@ -579,14 +588,51 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
         requireClient(spec.client)
         return { _tag: spec._tag, id, clientId: spec.client.id }
       case 'stop-session':
+        return { _tag: 'stop-session', id, target: requireSession(spec.target) }
       case 'restart-session':
-        return { _tag: spec._tag, id, target: requireSession(spec.target, spec._tag === 'restart-session') }
+        return { _tag: 'restart-session', id, target: requireStoppedSession(spec.target) }
       case 'restart-client':
         requireClient(spec.client)
         return { _tag: 'restart-client', id, clientId: spec.client.id }
       case 'backend-unavailable':
       case 'backend-available':
         return { _tag: spec._tag, id }
+    }
+  }
+  const applyParallelLifecycleTransitions = (operations: ReadonlyArray<ParallelOperationStep>): void => {
+    const sessionTransitions = new Map<
+      string,
+      { readonly target: ParticipantRef; readonly status: 'running' | 'stopped' }
+    >()
+    const restartedClients = new Set<string>()
+
+    for (const operation of operations) {
+      if (operation._tag === 'restart-client') {
+        if (
+          restartedClients.has(operation.clientId) === true ||
+          [...sessionTransitions.values()].some(({ target }) => target.clientId === operation.clientId)
+        ) {
+          throw new ScenarioSourceError(`Parallel lifecycle operations conflict for Client '${operation.clientId}'`)
+        }
+        restartedClients.add(operation.clientId)
+      } else if (operation._tag === 'stop-session' || operation._tag === 'restart-session') {
+        const key = participantKey(operation.target)
+        if (sessionTransitions.has(key) === true || restartedClients.has(operation.target.clientId) === true) {
+          throw new ScenarioSourceError(`Parallel lifecycle operations conflict for participant '${key}'`)
+        }
+        sessionTransitions.set(key, {
+          target: operation.target,
+          status: operation._tag === 'restart-session' ? 'running' : 'stopped',
+        })
+      }
+    }
+
+    for (const clientId of restartedClients) {
+      const state = clients.get(clientId)!
+      for (const sessionId of state.sessions.keys()) state.sessions.set(sessionId, 'running')
+    }
+    for (const { target, status } of sessionTransitions.values()) {
+      clients.get(target.clientId)!.sessions.set(target.sessionId, status)
     }
   }
   const addHistoryOracle = (operationIds: ReadonlyArray<string>, requireOverlap: boolean, allowIndefinite: boolean) => {
@@ -621,7 +667,7 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
         break
       case 'stop-session':
       case 'restart-session': {
-        const state = requireSession(spec.target, spec._tag === 'restart-session')
+        const state = spec._tag === 'restart-session' ? requireStoppedSession(spec.target) : requireSession(spec.target)
         clients
           .get(spec.target.clientId)!
           .sessions.set(spec.target.sessionId, spec._tag === 'restart-session' ? 'running' : 'stopped')
@@ -675,6 +721,7 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
         const operations = spec.operations.map((operation, index) =>
           compileParallel(operation, `${parallelId}:operation-${pad(index + 1, 4)}`),
         )
+        applyParallelLifecycleTransitions(operations)
         instructions.push({ _tag: 'parallel', id: parallelId, operations })
         if (spec.requirement !== undefined) {
           const requirement =

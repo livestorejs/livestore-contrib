@@ -9,11 +9,14 @@ import {
   normalizeScenario,
   note,
   parameter,
+  parallel,
   pendingResolved,
   repeat,
+  restartSession,
   Scenario,
   ScenarioSourceError,
   stateConverges,
+  stopSession,
   wait,
 } from './scenario.ts'
 
@@ -186,5 +189,50 @@ describe('Scenario as code', () => {
     expect(() => normalizeScenario(source, { id: 'invalid-reference' })).toThrow(
       "Unknown participant 'client-b/session-b' at this source position",
     )
+  })
+
+  it('applies parallel lifecycle transitions to subsequent source positions', () => {
+    const clientA = client('client-a').withSessions('session-a', 'session-b')
+    const sessionA = clientA.session('session-a')
+    const sessionB = clientA.session('session-b')
+    const siblingAction = todo.createTodo({ id: 'sibling', text: 'Sibling action' }).as(sessionB)
+
+    const stopped = Scenario.start({ application: todo, clients: [clientA] }).steps(
+      parallel([stopSession(sessionA), siblingAction]),
+      todo.createTodo({ id: 'after-stop', text: 'Must be rejected' }).as(sessionA),
+    )
+    expect(() => normalizeScenario(stopped, { id: 'parallel-stop' })).toThrow(
+      "Participant 'client-a/session-a' is stopped at this source position",
+    )
+
+    const restarted = Scenario.start({ application: todo, clients: [clientA] }).steps(
+      stopSession(sessionA),
+      parallel([restartSession(sessionA), siblingAction]),
+      todo.createTodo({ id: 'after-restart', text: 'Must be accepted' }).as(sessionA),
+    )
+    const normalized = normalizeScenario(restarted, { id: 'parallel-restart' })
+    expect(normalized.instructions.at(-1)).toEqual(
+      expect.objectContaining({ _tag: 'action', target: { clientId: 'client-a', sessionId: 'session-a' } }),
+    )
+  })
+
+  it('rejects ambiguous lifecycle transitions', () => {
+    const clientA = client('client-a').withSessions('session-a')
+    const sessionA = clientA.session('session-a')
+
+    expect(() =>
+      normalizeScenario(Scenario.start({ application: todo, clients: [clientA] }).steps(restartSession(sessionA)), {
+        id: 'restart-running-session',
+      }),
+    ).toThrow("Participant 'client-a/session-a' is running at this source position")
+
+    expect(() =>
+      normalizeScenario(
+        Scenario.start({ application: todo, clients: [clientA] }).steps(
+          parallel([stopSession(sessionA), stopSession(sessionA)]),
+        ),
+        { id: 'conflicting-parallel-lifecycle' },
+      ),
+    ).toThrow("Parallel lifecycle operations conflict for participant 'client-a/session-a'")
   })
 })
