@@ -1,4 +1,7 @@
-import { expectOfflineEventCorrelationLifecycle } from '../../test-support/runner-assertions.ts'
+import { FetchHttpClient, Layer } from '@livestore/utils/effect'
+import { PlatformNode } from '@livestore/utils/node'
+
+import { makeLocalSyncCfScenarioBackend } from '../../backends.ts'
 import {
   Effect,
   Vitest,
@@ -9,8 +12,44 @@ import {
   runBrowserLocalSyncCfScenario,
   todoApplication,
 } from '../../test-support/scenario-test-kit.ts'
+import { expectOfflineEventCorrelationLifecycle } from '../../test-support/runner-assertions.ts'
+import { makeBrowserHost } from './host.ts'
+
+const makeLocalBackend = makeLocalSyncCfScenarioBackend.pipe(
+  Effect.provide(Layer.mergeAll(PlatformNode.NodeServices.layer, FetchHttpClient.layer)),
+)
 
 Vitest.describe('browser profile', () => {
+  Vitest.live(
+    'keeps a restarted session offline until its Client reconnects',
+    (test) =>
+      Effect.gen(function* () {
+        const backend = yield* makeLocalBackend
+        const host = yield* makeBrowserHost({ applicationId: todoApplication.id, backend })
+        const storeId = 'browser-offline-session-restart'
+        const target = { clientId: 'client-a', sessionId: 'session-a' }
+
+        yield* host.createClient({
+          operationId: 'create-client-a',
+          storeId,
+          client: { id: target.clientId, sessions: [target.sessionId], initiallyConnected: false },
+        })
+        yield* host.dispatchAction({
+          operationId: 'write-offline',
+          target,
+          action: 'createTodo',
+          input: { id: 'offline-restart', text: 'Must remain pending across restart' },
+        })
+        expect((yield* backend.observe(storeId)).events).toEqual([])
+
+        yield* host.stopSession({ operationId: 'stop-session-a', target })
+        yield* host.restartSession({ operationId: 'restart-session-a', target })
+
+        expect((yield* backend.observe(storeId)).events).toEqual([])
+      }).pipe(Vitest.withTestCtx(test)),
+    120_000,
+  )
+
   Vitest.live(
     'runs the offline writer recovery through the browser SharedWorker topology',
     (test) =>

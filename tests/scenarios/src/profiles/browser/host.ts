@@ -6,7 +6,7 @@ import { chromium, type BrowserContext, type Page } from '@playwright/test'
 import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
 
 import { EventSequenceNumber } from '@livestore/common/schema'
-import { Effect, Schema, type Scope } from '@livestore/utils/effect'
+import { Effect, Schema, Semaphore, type Scope } from '@livestore/utils/effect'
 
 import {
   participantHostFailure,
@@ -83,6 +83,7 @@ export const makeBrowserHost = (args: {
     const clients = new Map<string, BrowserClientController>()
     const eventRefs = makeEventRefRegistry()
     const observationClock = makeParticipantClock('browser-host')
+    const disconnectedStartupSemaphore = yield* Semaphore.make(1)
     let observedStoreId: string | undefined
 
     yield* Effect.addFinalizer(() =>
@@ -159,7 +160,28 @@ export const makeBrowserHost = (args: {
     const restartSession: ParticipantHost['restartSession'] = (command) =>
       Effect.gen(function* () {
         const client = yield* getClient(clients, command.target.clientId)
-        yield* client.restartSession(command.target.sessionId)
+        if (client.connected() === true) {
+          yield* client.restartSession(command.target.sessionId)
+        } else {
+          const storeId = observedStoreId
+          if (storeId === undefined)
+            return yield* Effect.fail(browserRequestRejected('Browser store is not initialized'))
+          yield* Effect.gen(function* () {
+            // A new Store boots with its sync latch open. Hold the provider
+            // boundary until the restarted page has restored the Client's
+            // declared offline latch, otherwise persisted pending events can
+            // escape during createStorePromise.
+            const backendWasAvailable = (yield* args.backend.observe(storeId)).connected
+            if (backendWasAvailable === true) yield* args.backend.setAvailability(false)
+            yield* client
+              .restartSession(command.target.sessionId)
+              .pipe(
+                Effect.ensuring(
+                  backendWasAvailable === true ? args.backend.setAvailability(true).pipe(Effect.orDie) : Effect.void,
+                ),
+              )
+          }).pipe(disconnectedStartupSemaphore.withPermits(1))
+        }
         return acknowledge(command.operationId)
       })
 
@@ -387,6 +409,7 @@ const makeBrowserClient = (args: {
             sessionId,
             onRuntimeFailure: (failure) => state.runtimeFailures.push(failure),
           })
+          if (state.connected === false) yield* setClientSyncConnectivity(new Map([[sessionId, page]]), false)
           state.pages.set(sessionId, page)
         })
 
