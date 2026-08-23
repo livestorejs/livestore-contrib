@@ -13,6 +13,11 @@ not_found_handling = "single-page-application"
 name = "SYNC_BACKEND_DO"
 class_name = "SyncBackendDO"
 
+[[durable_objects.bindings]]
+name = "PRESENCE_DO"
+class_name = "PresenceDurableObject"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SyncBackendDO"]
+new_classes = ["PresenceDurableObject"]
