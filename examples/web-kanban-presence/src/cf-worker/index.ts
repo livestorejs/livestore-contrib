@@ -1,10 +1,7 @@
 import type { CfTypes } from '@livestore/sync-cf/cf-worker'
 import * as SyncBackend from '@livestore/sync-cf/cf-worker'
-import { PresenceDurableObject } from '@livestore/sync-cf/cf-worker'
 
 import { SyncPayload } from '../livestore/schema.ts'
-
-export { PresenceDurableObject }
 
 export class SyncBackendDO extends SyncBackend.makeDurableObject({
   onPush: async (message, context) => {
@@ -21,21 +18,8 @@ const validatePayload = (payload: { authToken: string } | undefined, context: { 
   }
 }
 
-export interface Env extends SyncBackend.Env {
-  PRESENCE_DO: DurableObjectNamespace<PresenceDurableObject>
-}
-
 export default {
-  async fetch(request: CfTypes.Request, env: Env, ctx: CfTypes.ExecutionContext) {
-    // Presence channel: upgrade WebSocket connections to the presence DO.
-    const url = new URL(request.url)
-    if (url.pathname === '/presence') {
-      const storeId = url.searchParams.get('storeId') ?? 'kanban-demo'
-      const doId = env.PRESENCE_DO.idFromName(storeId)
-      return env.PRESENCE_DO.get(doId).fetch(request as never)
-    }
-
-    // Durable board: the standard sync-cf backend.
+  async fetch(request: CfTypes.Request, _env: SyncBackend.Env, ctx: CfTypes.ExecutionContext) {
     const searchParams = SyncBackend.matchSyncRequest(request)
     if (searchParams !== undefined) {
       return SyncBackend.handleSyncRequest({

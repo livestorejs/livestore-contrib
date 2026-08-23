@@ -124,9 +124,9 @@ button {
 
 .cursor {
   position: fixed;
-  transform: translate(-50%, -50%);
-  /* Smooth cursor movement between presence updates (~50ms interval). */
-  transition: left 60ms linear, top 60ms linear;
+  /* No transition: presence updates arrive every ~40ms; interpolating on top
+     of that reads as lag/jitter. Snap straight to each received position. */
+  will-change: left, top;
 }
 
 .cursor-pointer {
@@ -145,7 +145,7 @@ button {
   white-space: nowrap;
 }
 
-/* Live drag overlay */
+/* Live drag overlay — renders the dragged card at the peer's cursor */
 .drag-layer {
   position: fixed;
   inset: 0;
@@ -153,25 +153,19 @@ button {
   z-index: 101;
 }
 
-.live-drag {
+.remote-drag-card {
   position: fixed;
-  transform: translate(-50%, -50%);
-  padding: 8px 12px;
-  border-radius: 8px;
+  /* Identical to the local dnd-kit DragOverlay card — no extra styling. */
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.25);
+}
+
+.remote-drag-name {
+  position: absolute;
+  top: -20px;
+  left: 8px;
   color: #fff;
-  font-size: 13px;
-  box-shadow: 0 6px 16px rgb(0 0 0 / 0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 120px;
-}
-
-.live-drag .drag-label {
   font-size: 11px;
-  opacity: 0.9;
-}
-
-.live-drag .drag-card-title {
-  font-weight: 600;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
 }

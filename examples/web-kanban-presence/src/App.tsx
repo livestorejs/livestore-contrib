@@ -71,6 +71,7 @@ const SortableCard: React.FC<{ card: Card; dragging?: boolean }> = ({ card, drag
     <div
       ref={setNodeRef}
       className="kanban-card"
+      data-card-id={card.id}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
       {...attributes}
       {...listeners}
@@ -139,14 +140,19 @@ const KanbanBoard: React.FC = () => {
   const cards = store.useQuery(cards$)
 
   // Ephemeral presence: online count + live cursors + live dragging.
-  // Broadcast-only; never persisted to SQLite or the eventlog. Served by the
-  // Node presence server started alongside `vite dev` (see vite.config.ts).
+  // Broadcast-only; never persisted to SQLite or the eventlog. Rides the same
+  // sync party (`/sync`) — single party hosts both the durable eventlog and
+  // the ephemeral presence room.
+  const [userName, setUserName] = useState(
+    () => globalThis.localStorage?.getItem('kanban-name') ?? '',
+  )
   const presenceOptions = useMemo(
     () => ({
-      url: 'ws://127.0.0.1:8787',
+      url: `${globalThis.location.origin}/sync`,
       storeId,
-      clientId: (globalThis as any).__KANBAN_CLIENT_ID ?? `client-${crypto.randomUUID().slice(0, 8)}`,
-      name: (globalThis as any).__KANBAN_NAME ?? 'Guest',
+      clientId: `client-${crypto.randomUUID().slice(0, 8)}`,
+      name: globalThis.localStorage?.getItem('kanban-name') || 'Guest',
+      payload: { authToken: 'insecure-token-change-me' },
     }),
     [storeId],
   )
@@ -154,6 +160,17 @@ const KanbanBoard: React.FC = () => {
   const onlineCount = useOnlineCount(presence)
   const cursors = usePresenceCursors(presence)
   const draggingPeers = usePresenceDragging(presence)
+
+  const changeUserName = useCallback(
+    (name: string) => {
+      setUserName(name)
+      globalThis.localStorage?.setItem('kanban-name', name)
+      if (name.trim() !== '') {
+        Effect.runFork(presence.setName(name.trim()))
+      }
+    },
+    [presence],
+  )
 
   const [newColumnTitle, setNewColumnTitle] = useState('')
   const [newCardTitles, setNewCardTitles] = useState<Record<string, string>>({})
@@ -283,6 +300,13 @@ const KanbanBoard: React.FC = () => {
               {onlineCount} online
             </span>
             <input
+              className="name-input"
+              placeholder="Your name"
+              value={userName}
+              onChange={(e) => changeUserName(e.target.value)}
+              onBlur={() => userName.trim() === '' && changeUserName('Guest')}
+            />
+            <input
               className="new-column-input"
               placeholder="New column title"
               value={newColumnTitle}
@@ -322,27 +346,30 @@ const KanbanBoard: React.FC = () => {
           })}
         </div>
 
-        {/* Live drag overlay: shows what each peer is dragging */}
+        {/* Live drag overlay — the dragged card rendered with the exact dnd-kit
+            card UI at the peer's cursor, mirroring their local DragOverlay. */}
         <div className="drag-layer">
           {draggingPeers.map(({ clientId: cid, name, dragging }) => {
             const cursor = cursors.find((c) => c.clientId === cid)?.cursor
+            if (cursor === undefined) return null
             return (
               <div
                 key={cid}
-                className="live-drag"
+                className="kanban-card remote-drag-card"
                 data-testid={`drag-${cid}`}
-                style={
-                  cursor !== undefined
-                    ? {
-                        left: cursor.x + dragging.deltaX,
-                        top: cursor.y + dragging.deltaY,
-                        backgroundColor: COLORS[Math.abs(hashString(cid)) % COLORS.length],
-                      }
-                    : undefined
-                }
+                style={{
+                  left: cursor.x + dragging.deltaX,
+                  top: cursor.y + dragging.deltaY,
+                  width: cardWidth(dragging.cardId),
+                }}
               >
-                <span className="drag-label">{name ?? cid}</span>
-                <span className="drag-card-title">{cardTitle(dragging.cardId, cards)}</span>
+                {cardTitle(dragging.cardId, cards)}
+                <span
+                  className="remote-drag-name"
+                  style={{ backgroundColor: COLORS[Math.abs(hashString(cid)) % COLORS.length] }}
+                >
+                  {name ?? cid}
+                </span>
               </div>
             )
           })}
@@ -378,3 +405,7 @@ const hashString = (s: string) => {
 }
 
 const cardTitle = (cardId: string, cards: readonly Card[]) => cards.find((c) => c.id === cardId)?.title ?? cardId
+
+/** Measured pixel width of a rendered card, so remote drag ghosts match exactly. */
+const cardWidth = (cardId: string) =>
+  document.querySelector(`[data-card-id="${cardId}"]`)?.getBoundingClientRect().width ?? 200
