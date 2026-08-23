@@ -170,7 +170,7 @@ Vitest.describe('S2-specific', { timeout: 60000 }, () => {
         parentSeqNum: EventSequenceNumber.Global.make(1),
       })
 
-      const jsonEncode = Schema.encodeEffect(Schema.UnknownFromJsonString)
+      const jsonEncode = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))
       yield* providerSpecific.appendRaw(storeId, [yield* jsonEncode(ev1), yield* jsonEncode(ev2)])
 
       // Non-live pull should yield the 2 events

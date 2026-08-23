@@ -1,4 +1,4 @@
-import { McpServer } from 'effect/unstable/ai'
+import { McpProtocol, McpServer } from 'effect/unstable/ai'
 
 import { Effect, Layer, Logger } from '@livestore/utils/effect'
 import { Cli, PlatformNode } from '@livestore/utils/node'
@@ -86,6 +86,7 @@ const mcpServerCommand = Cli.Command.make(
     return yield* McpServer.layerStdio({
       name: 'livestore-mcp',
       version: '0.1.0',
+      protocols: [McpProtocol.v2025_06_18],
     }).pipe(
       Layer.provide(LivestoreResources),
       Layer.provide(LivestoreTools),

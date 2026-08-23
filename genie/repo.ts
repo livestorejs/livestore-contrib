@@ -22,7 +22,6 @@ import {
   preparePinnedDevenvStep,
   restorePnpmStateStep,
   type PnpmPackageClosureConfig,
-  utilsEffectPeerDeps,
   validateNixStoreStep,
   type WorkspaceIdentity,
 } from '../repos/livestore/genie/repo.ts'
@@ -58,29 +57,6 @@ export const catalog = contribCatalog
 export const packageJson = contribPackageJson
 
 /**
- * Override core's `effectDevDeps` so contrib-owned packages resolve Effect
- * dev dependencies against contrib's catalog (`4.0.0-beta.98`) instead of core's
- * (`4.0.0-beta.97`). This explicit named export shadows the `export *` re-export
- * from core's repo helpers.
- */
-export const effectDevDeps = (...additionalDeps: Parameters<typeof contribCatalog.pick>) =>
-  contribCatalog.pick(...utilsEffectPeerDeps, ...additionalDeps)
-
-/**
- * Publish Effect peer ranges against the version contrib actually builds with.
- *
- * Core's `getUtilsPeerDeps` derives ranges from core's catalog. Contrib deliberately pins one
- * Effect release behind core, so inheriting core's helper publishes `^4.0.0-beta.99` on packages
- * compiled and tested against `4.0.0-beta.98`. `beta.98` does not satisfy `^beta.99`, so that
- * combination fails strict peer installation for existing beta.98 consumers, while beta.99
- * consumers receive artifacts never built against their declared minimum.
- *
- * Shadows core's export the same way `effectDevDeps` above does, so the published peer range and
- * the compiled version cannot drift apart again on a future core bump.
- */
-export const getUtilsPeerDeps = () => contribCatalog.peers(...utilsEffectPeerDeps)
-
-/**
  * Relax core's Effect-LSP gate to errors-only while contrib converges.
  *
  * effect-utils' `effectDiagnosticsGate` (#811) makes Effect warnings AND suggestions fail
@@ -94,7 +70,7 @@ export const getUtilsPeerDeps = () => contribCatalog.peers(...utilsEffectPeerDep
  * (`includeSuggestionsInTsc`), so the burndown remains discoverable. Delete this override — not the
  * diagnostics — once contrib reaches zero.
  *
- * Like `effectDevDeps`, this explicit named export shadows the `export *` re-export from core.
+ * This explicit named export shadows the `export *` re-export from core.
  */
 export const baseTsconfigCompilerOptions = {
   ...coreBaseTsconfigCompilerOptions,

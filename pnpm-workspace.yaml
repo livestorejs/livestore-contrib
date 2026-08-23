@@ -44,13 +44,13 @@ packages:
   - tests/sync-provider
 
 overrides:
-  effect: 4.0.0-beta.98
-  '@effect/platform-browser': 4.0.0-beta.98
-  '@effect/platform-bun': 4.0.0-beta.98
-  '@effect/platform-node': 4.0.0-beta.98
-  '@effect/platform-node-shared': 4.0.0-beta.98
-  '@effect/opentelemetry': 4.0.0-beta.98
-  '@effect/vitest': 4.0.0-beta.98
+  effect: 4.0.0-rc.111
+  '@effect/platform-browser': 4.0.0-rc.111
+  '@effect/platform-bun': 4.0.0-rc.111
+  '@effect/platform-node': 4.0.0-rc.111
+  '@effect/platform-node-shared': 4.0.0-rc.111
+  '@effect/opentelemetry': 4.0.0-rc.111
+  '@effect/vitest': 4.0.0-rc.111
   '@opentelemetry/api': 1.9.1
   '@opentelemetry/core': 2.8.0
   '@opentelemetry/resources': 2.8.0
