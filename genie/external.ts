@@ -7,24 +7,9 @@ import {
 import { effectV4Catalog, livestoreOnlyCatalog, obsoleteEffectV3Packages } from '../repos/livestore/genie/external.ts'
 import { coreOwnedPackageNames, contribPackageNames } from './internal.ts'
 
-/**
- * Contrib pins one Effect release ahead of core's `4.0.0-beta.97` so the
- * contrib-owned surface resolves at `4.0.0-beta.98`. This still satisfies core's
- * `^4.0.0-beta.97` peer ranges while letting contrib move independently.
- */
-const contribEffectVersion = '4.0.0-beta.98'
-
-/**
- * Reuse core's Effect v4 package-name set (single source of truth for *which*
- * packages exist under v4) but remap every version to contrib's pin.
- */
-const contribEffectV4Catalog = Object.fromEntries(
-  Object.keys(effectV4Catalog).map((name) => [name, contribEffectVersion]),
-) as Record<keyof typeof effectV4Catalog, typeof contribEffectVersion>
-
 const obsoleteEffectV3PackageNames = new Set<string>(obsoleteEffectV3Packages)
 
-const contribEffectV4CatalogPackageNames = new Set<string>(Object.keys(contribEffectV4Catalog))
+const effectV4CatalogPackageNames = new Set<string>(Object.keys(effectV4Catalog))
 
 /**
  * Keep inheriting non-Effect tooling versions from effect-utils while contrib
@@ -34,8 +19,7 @@ const contribEffectV4CatalogPackageNames = new Set<string>(Object.keys(contribEf
  */
 const effectUtilsCatalogWithoutEffectV3 = Object.fromEntries(
   Object.entries(effectUtilsCatalog).filter(
-    ([name]) =>
-      obsoleteEffectV3PackageNames.has(name) === false && contribEffectV4CatalogPackageNames.has(name) === false,
+    ([name]) => obsoleteEffectV3PackageNames.has(name) === false && effectV4CatalogPackageNames.has(name) === false,
   ),
 )
 
@@ -77,7 +61,7 @@ export const livestoreContribOnlyCatalog = {
 export const catalog = defineCatalog({
   ...effectUtilsCatalogWithoutEffectV3,
   ...contribCatalogOverrides,
-  ...contribEffectV4Catalog,
+  ...effectV4Catalog,
   ...coreWorkspaceCatalog,
   ...livestoreContribWorkspaceCatalog,
   ...livestoreOnlyCatalog,

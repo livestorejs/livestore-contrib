@@ -207,7 +207,7 @@ Returns when not connected:
 {
   "_tag": "disconnected"
 }`,
-    parameters: Schema.Struct({}),
+    parameters: Tool.EmptyParams,
     success: Schema.Union([
       Schema.TaggedStruct('connected', {
         storeId: Schema.String,
@@ -226,7 +226,7 @@ Returns when not connected:
 
 Example success:
 { "_tag": "disconnected" }`,
-    parameters: Schema.Struct({}),
+    parameters: Tool.EmptyParams,
     success: Schema.TaggedStruct('disconnected', {}),
   }),
 

@@ -13,6 +13,7 @@ import { ecommerceSchemaContent } from '../mcp-content/schemas/ecommerce.ts'
 import { socialSchemaContent } from '../mcp-content/schemas/social.ts'
 import { todoSchemaContent } from '../mcp-content/schemas/todo.ts'
 import { toolHandlers } from './mcp-tool-handlers.ts'
+import { supportedMcpProtocols } from './mcp-protocols.ts'
 // Tools imports
 import { livestoreToolkit } from './mcp-tools-defs.ts'
 
@@ -86,6 +87,7 @@ const mcpServerCommand = Cli.Command.make(
     return yield* McpServer.layerStdio({
       name: 'livestore-mcp',
       version: '0.1.0',
+      protocols: supportedMcpProtocols,
     }).pipe(
       Layer.provide(LivestoreResources),
       Layer.provide(LivestoreTools),

@@ -88,6 +88,15 @@ Runs a stdio MCP server (`McpServer.layerStdio`, name `livestore-mcp`, version
 `'0.1.0'`, stdin/stdout via `PlatformNode`; pretty logging to stderr)
 (`src/commands/mcp.ts:80`–`:95`). It provides two layers:
 
+Protocol negotiation supports, in newest-first order, `2025-11-25`,
+`2025-06-18`, `2025-03-26`, and `2024-11-05`
+(`src/commands/mcp-protocols.ts:7`–`:12`). The server selects the exact protocol
+adapter when the client offers one of those versions; when no exact adapter is
+available, it falls back to the first (newest) adapter, `2025-11-25`. The MCP
+server receives this ordered protocol list at `src/commands/mcp.ts:87`–`:91`,
+and `src/commands/mcp-protocols.test.ts:7`–`:18` locks both the newest-first
+fallback order and exact-version selection for every supported offer.
+
 **Resources** (`src/commands/mcp.ts:17`–`:73`): eight static `livestore://…`
 documents — `overview`, `features`, `getting-started`, `architecture`, and four
 example schemas (`schemas/todo|blog|social|ecommerce`).
