@@ -7,9 +7,12 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  getFirstCollision,
+  pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragMoveEvent,
   type DragStartEvent,
@@ -38,6 +41,25 @@ const errorBoundaryFallback = <div>Something went wrong</div>
 const suspenseFallback = <div>Loading app...</div>
 
 type Card = { id: string; title: string; columnId: string }
+
+/**
+ * Prefer the innermost droppable under the pointer (a card over its column),
+ * so dragging onto a card reorders it and the column highlight only appears
+ * when hovering empty column space.
+ */
+const innermostCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args)
+  if (pointerCollisions.length > 0) {
+    // Order by droppable rect area ascending → smallest (innermost) first.
+    const byArea = [...pointerCollisions].sort((a, b) => {
+      const ra = args.droppableContainers.find((c) => c.id === a.id)?.rect.current
+      const rb = args.droppableContainers.find((c) => c.id === b.id)?.rect.current
+      return (ra ? ra.width * ra.height : Infinity) - (rb ? rb.width * rb.height : Infinity)
+    })
+    return byArea
+  }
+  return closestCorners(args)
+}
 
 const SortableCard: React.FC<{ card: Card; dragging?: boolean }> = ({ card, dragging }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -119,9 +141,16 @@ const KanbanBoard: React.FC = () => {
   // Ephemeral presence: online count + live cursors + live dragging.
   // Broadcast-only; never persisted to SQLite or the eventlog. Served by the
   // Node presence server started alongside `vite dev` (see vite.config.ts).
-  const presenceUrl = 'ws://127.0.0.1:8787'
-  const clientId = useMemo(() => (globalThis as any).__KANBAN_CLIENT_ID ?? `client-${crypto.randomUUID().slice(0, 8)}`, [])
-  const presence = usePresenceWsClient({ url: presenceUrl, storeId, clientId, name: clientId })
+  const presenceOptions = useMemo(
+    () => ({
+      url: 'ws://127.0.0.1:8787',
+      storeId,
+      clientId: (globalThis as any).__KANBAN_CLIENT_ID ?? `client-${crypto.randomUUID().slice(0, 8)}`,
+      name: (globalThis as any).__KANBAN_NAME ?? 'Guest',
+    }),
+    [storeId],
+  )
+  const presence = usePresenceWsClient(presenceOptions)
   const onlineCount = useOnlineCount(presence)
   const cursors = usePresenceCursors(presence)
   const draggingPeers = usePresenceDragging(presence)
@@ -207,14 +236,13 @@ const KanbanBoard: React.FC = () => {
       const targetIds = targetCards.map((c) => c.id)
 
       if (overType === 'card' && targetColumnId === card.columnId) {
-        // Reorder within the same column.
+        // Reorder within the same column: rewrite every position so the
+        // durable positions stay contiguous (0..n-1).
         const oldIndex = targetIds.indexOf(card.id)
         const newIndex = targetIds.indexOf(String(over.id))
         const reordered = arrayMove(targetIds, oldIndex, newIndex)
         reordered.forEach((id, position) => {
-          if (id !== card.id || position !== oldIndex) {
-            store.commit(events.cardMoved({ id, columnId: targetColumnId, position }))
-          }
+          store.commit(events.cardMoved({ id, columnId: targetColumnId, position }))
         })
       } else if (card.columnId !== targetColumnId) {
         // Cross-column move: append to the target column.
@@ -242,7 +270,7 @@ const KanbanBoard: React.FC = () => {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={innermostCollisionDetection}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
