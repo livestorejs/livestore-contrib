@@ -3,10 +3,10 @@
   "members": {
     "livestore": {
       "url": "https://github.com/livestorejs/livestore",
-      "ref": "schickling/2026-08-23-effect4",
-      "commit": "7b84e11aeb28526baeef65d9f1976e2327cf4a46",
+      "ref": "main",
+      "commit": "9fd312cd51d0c38b9e53a78bb4fc211ee4f9c5d2",
       "pinned": true,
-      "lockedAt": "2026-08-23T20:25:01.570Z"
+      "lockedAt": "2026-08-23T20:58:51.653Z"
     },
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",
