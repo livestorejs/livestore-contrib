@@ -2,6 +2,7 @@ import type { CfTypes } from '@livestore/sync-cf/cf-worker'
 import * as SyncBackend from '@livestore/sync-cf/cf-worker'
 
 import { SyncPayload } from '../livestore/schema.ts'
+import { presenceSchemas } from '../livestore/presence-schemas.ts'
 
 export class SyncBackendDO extends SyncBackend.makeDurableObject({
   onPush: async (message, context) => {
@@ -9,6 +10,12 @@ export class SyncBackendDO extends SyncBackend.makeDurableObject({
   },
   onPull: async (message, context) => {
     console.log('onPull', message, 'storeId:', context.storeId)
+  },
+  // Presence channels declared once here; every client patch is validated
+  // against these schemas before fan-out.
+  presence: {
+    schemas: presenceSchemas,
+    room: { memberIdleTtlMs: 15_000, sweepIntervalMs: 5_000 },
   },
 }) {}
 

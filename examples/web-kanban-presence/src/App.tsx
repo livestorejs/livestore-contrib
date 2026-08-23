@@ -1,5 +1,5 @@
 import type React from 'react'
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 
 import {
@@ -24,14 +24,14 @@ import { StoreRegistry } from '@livestore/livestore'
 import { StoreRegistryProvider } from '@livestore/react'
 import { Effect } from '@livestore/utils/effect'
 
+import type { CursorState } from './livestore/presence-schemas.ts'
+import { presenceSchemas } from './livestore/presence-schemas.ts'
 import { columns$, cards$ } from './livestore/queries.ts'
 import { events } from './livestore/schema.ts'
 import { useAppStore } from './livestore/store.ts'
 import {
-  useOnlineCount,
-  usePresenceCursors,
-  usePresenceDragging,
-  usePresenceWsClient,
+  usePresenceClient,
+  usePresenceSnapshot,
 } from './presence/hooks.ts'
 import { getStoreId } from './util/store-id.ts'
 
@@ -85,9 +85,10 @@ const KanbanColumn: React.FC<{
   column: { id: string; title: string }
   cards: Card[]
   onAddCard: (title: string) => void
+  onDelete: () => void
   newCardTitle: string
   onNewCardTitle: (title: string) => void
-}> = ({ column, cards, onAddCard, newCardTitle, onNewCardTitle }) => {
+}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle }) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: 'column' as const, columnId: column.id } })
 
   return (
@@ -97,7 +98,12 @@ const KanbanColumn: React.FC<{
       data-column-id={column.id}
       style={{ outline: isOver ? '2px solid #3b82f6' : undefined }}
     >
-      <h3 className="kanban-column-title">{column.title}</h3>
+      <div className="kanban-column-header">
+        <h3 className="kanban-column-title">{column.title}</h3>
+        <button className="kanban-column-delete" onClick={onDelete} aria-label={`Delete ${column.title}`}>
+          ×
+        </button>
+      </div>
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="kanban-cards">
           {cards.map((card) => (
@@ -143,30 +149,61 @@ const KanbanBoard: React.FC = () => {
   // Broadcast-only; never persisted to SQLite or the eventlog. Rides the same
   // sync party (`/sync`) — single party hosts both the durable eventlog and
   // the ephemeral presence room.
+  //
+  // clientId is stable per browser tab (sessionStorage), so a refresh rejoins
+  // as the same member instead of adding a duplicate; `leave` fires on tab
+  // close via the `pagehide` handler below.
   const [userName, setUserName] = useState(
     () => globalThis.localStorage?.getItem('kanban-name') ?? '',
   )
   const presenceOptions = useMemo(
-    () => ({
-      url: `${globalThis.location.origin}/sync`,
-      storeId,
-      clientId: `client-${crypto.randomUUID().slice(0, 8)}`,
-      name: globalThis.localStorage?.getItem('kanban-name') || 'Guest',
-      payload: { authToken: 'insecure-token-change-me' },
-    }),
+    () => {
+      const clientIdKey = 'kanban-client-id'
+      let clientId = globalThis.sessionStorage?.getItem(clientIdKey)
+      if (clientId === null) {
+        clientId = `client-${crypto.randomUUID().slice(0, 8)}`
+        globalThis.sessionStorage?.setItem(clientIdKey, clientId)
+      }
+      return {
+        url: `${globalThis.location.origin}/sync`,
+        storeId,
+        clientId,
+        name: globalThis.localStorage?.getItem('kanban-name') || 'Guest',
+        payload: { authToken: 'insecure-token-change-me' },
+        channels: presenceSchemas,
+      }
+    },
     [storeId],
   )
-  const presence = usePresenceWsClient(presenceOptions)
-  const onlineCount = useOnlineCount(presence)
-  const cursors = usePresenceCursors(presence)
-  const draggingPeers = usePresenceDragging(presence)
+  const presence = usePresenceClient(presenceOptions)
+  const presenceSnapshot = usePresenceSnapshot(presence)
+  const onlineCount = presenceSnapshot.members.filter((m) => m.online === true).length
+  // Own member state first so you can see exactly what peers see (dimmed).
+  const cursors = presenceSnapshot.members.flatMap((m) => {
+    const state = m.state as CursorState | undefined
+    return m.online === true && state?.cursor !== undefined
+      ? [{
+          clientId: m.clientId,
+          name: m.name,
+          cursor: state.cursor,
+          isSelf: m.clientId === presence.clientId,
+        }]
+      : []
+  })
+  // Remote drags: card + position of the dragging peer's cursor.
+  const remoteDrags = presenceSnapshot.members.flatMap((m) => {
+    const state = m.state as CursorState | undefined
+    return m.clientId !== presence.clientId && m.online === true && state?.dragging !== undefined
+      ? [{ clientId: m.clientId, name: m.name, dragging: state.dragging }]
+      : []
+  })
 
   const changeUserName = useCallback(
     (name: string) => {
       setUserName(name)
       globalThis.localStorage?.setItem('kanban-name', name)
       if (name.trim() !== '') {
-        Effect.runFork(presence.setName(name.trim()))
+        Effect.runFork(presence.setState('cursor', { name: name.trim() }))
       }
     },
     [presence],
@@ -214,7 +251,7 @@ const KanbanBoard: React.FC = () => {
       const card = cards.find((c) => c.id === id) ?? null
       setActiveCard(card)
       if (card !== null) {
-        Effect.runFork(presence.setDragging({ cardId: card.id, deltaX: 0, deltaY: 0 }))
+        Effect.runFork(presence.setState('cursor', { dragging: { cardId: card.id, deltaX: 0, deltaY: 0 } }))
       }
     },
     [cards, presence],
@@ -224,7 +261,9 @@ const KanbanBoard: React.FC = () => {
     (event: DragMoveEvent) => {
       const id = String(event.active.id)
       const { x, y } = event.delta
-      Effect.runFork(presence.setDragging({ cardId: id, deltaX: x, deltaY: y }))
+      // Broadcast the running drag delta; peers render the ghost at their own
+      // view of this client's cursor plus the delta, so no drift accumulates.
+      Effect.runFork(presence.setState('cursor', { dragging: { cardId: id, deltaX: x, deltaY: y } }))
     },
     [presence],
   )
@@ -232,7 +271,7 @@ const KanbanBoard: React.FC = () => {
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveCard(null)
-      Effect.runFork(presence.setDragging(undefined))
+      Effect.runFork(presence.setState('cursor', { dragging: undefined }))
       const { active, over } = event
       if (over === null) return
 
@@ -278,10 +317,17 @@ const KanbanBoard: React.FC = () => {
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (presence !== undefined) {
-        Effect.runFork(presence.setCursor(e.clientX, e.clientY))
+        Effect.runFork(presence.setState('cursor', { cursor: { x: e.clientX, y: e.clientY } }))
       }
     },
     [presence],
+  )
+
+  const deleteColumn = useCallback(
+    (columnId: string) => {
+      store.commit(events.columnDeleted({ id: columnId }))
+    },
+    [store],
   )
 
   return (
@@ -317,26 +363,21 @@ const KanbanBoard: React.FC = () => {
           </div>
         </header>
 
-        {/* Live cursors overlay — Supabase-style pointer + name label */}
+        {/* Live cursors overlay — Figma-style arrow + name label. Includes the
+            local client so you can verify exactly what peers see. */}
         <div className="cursor-layer">
           {cursors.map(({ clientId: cid, name, cursor }) => {
             const color = COLORS[Math.abs(hashString(cid)) % COLORS.length]
+            const isSelf = cid === presence.clientId
             return (
               <div
                 key={cid}
                 className="cursor"
                 data-testid={`cursor-${cid}`}
-                style={{ left: cursor.x, top: cursor.y }}
+                style={{ left: cursor.x, top: cursor.y, opacity: isSelf ? 0.45 : 1 }}
               >
-                <svg
-                  className="cursor-pointer"
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill={color}
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M5.65376 12.2373l5.16266-8.48998c.22842-.37383.42723-.70011.59823-.99242.171-.29232.30251-.58008.39451-.86329.092-.28321.13801-.57109.13801-.86367 0-.27921-.0425-.52456-.12751-.73607-.08502-.2115-.21533-.38815-.39093-.52995-.1756-.1418-.40713-.21269-.69459-.21269-.04029 0-.12442.00262-.25237.00787-.12795.00525-.2945.02661-.49965.06408s-.37423.10196-.59489.20329c-.22067.10133-.45557.23458-.70472.39974-.24914.16517-.51169.38153-.78764.64908l-9.43087 9.20246c-.26937.26353-.46713.48297-.59327.65832-.12614.17534-.22678.35627-.30193.54278-.07516.1865-.11274.37872-.11274.57666 0 .19205.03346.38369.1004.57492.06693.19123.15868.36712.27526.52766.11657.16055.2484.29321.39547.398s.31329.17615.47692.21932c.16364.04316.32419.06475.48167.06475h7.91005c.30934 0 .61555-.04682.91864-.14046s.56033-.23262.77063-.41668c.21029-.18406.3833-.40238.51903-.65497.13573-.25259.20356-.52657.20356-.82193 0-.1418-.00864-.30282-.02591-.48305-.01727-.18023-.05133-.36956-.10217-.56799z" />
+                <svg className="cursor-pointer" width="20" height="20" viewBox="0 0 24 24" fill={color}>
+                  <path d="M4 2l16 11.5h-6.9L9.6 22 4 2z" />
                 </svg>
                 <div className="cursor-name" style={{ backgroundColor: color }}>
                   {name ?? cid}
@@ -347,19 +388,20 @@ const KanbanBoard: React.FC = () => {
         </div>
 
         {/* Live drag overlay — the dragged card rendered with the exact dnd-kit
-            card UI at the peer's cursor, mirroring their local DragOverlay. */}
+            card UI (same tilt) at the peer's cursor. The peer's cursor is their
+            real pointer position, so following it is drift-free. */}
         <div className="drag-layer">
-          {draggingPeers.map(({ clientId: cid, name, dragging }) => {
+          {remoteDrags.map(({ clientId: cid, name, dragging }) => {
             const cursor = cursors.find((c) => c.clientId === cid)?.cursor
             if (cursor === undefined) return null
             return (
               <div
                 key={cid}
-                className="kanban-card remote-drag-card"
+                className="kanban-card kanban-card-dragging remote-drag-card"
                 data-testid={`drag-${cid}`}
                 style={{
-                  left: cursor.x + dragging.deltaX,
-                  top: cursor.y + dragging.deltaY,
+                  left: cursor.x,
+                  top: cursor.y,
                   width: cardWidth(dragging.cardId),
                 }}
               >
@@ -384,6 +426,7 @@ const KanbanBoard: React.FC = () => {
               newCardTitle={newCardTitles[column.id] ?? ''}
               onNewCardTitle={(title) => setNewCardTitles((prev) => ({ ...prev, [column.id]: title }))}
               onAddCard={(title) => addCard(column.id, title)}
+              onDelete={() => deleteColumn(column.id)}
             />
           ))}
         </div>

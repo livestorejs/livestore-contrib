@@ -3,19 +3,21 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { PresenceClient } from '@livestore/sync-cf/presence'
 import { makePresenceClient } from '@livestore/sync-cf/presence/client'
 import type { PresenceSnapshot } from '@livestore/sync-cf/presence'
-import { Effect, Fiber, Stream, SubscriptionRef } from '@livestore/utils/effect'
+import { Effect, Fiber, Stream } from '@livestore/utils/effect'
 
-const emptySnapshot: PresenceSnapshot = { storeId: '', clients: [] }
+import type { presenceSchemas } from '../livestore/presence-schemas.ts'
 
-const emptySnapshotRef = Effect.runSync(SubscriptionRef.make<PresenceSnapshot>(emptySnapshot))
+type Client = PresenceClient<typeof presenceSchemas>
+const CURSOR_CHANNEL = 'cursor' as keyof typeof presenceSchemas & string
 
-/** Subscribes to the presence room snapshot, re-rendering on every change. */
-export const usePresence = (client: PresenceClient): PresenceSnapshot =>
+const emptySnapshot: PresenceSnapshot = { storeId: '', channel: '', members: [] }
+
+/** Subscribes to the cursor channel's room snapshot. */
+export const usePresenceSnapshot = (client: Client): PresenceSnapshot =>
   useSyncExternalStore(
     (onChange) => {
-      const ref = client.snapshot ?? emptySnapshotRef
       const fiber = Effect.runFork(
-        SubscriptionRef.changes(ref).pipe(
+        client.snapshots(CURSOR_CHANNEL).pipe(
           Stream.runForEach(() => Effect.sync(onChange)),
         ),
       )
@@ -23,75 +25,44 @@ export const usePresence = (client: PresenceClient): PresenceSnapshot =>
         Effect.runFork(Fiber.interrupt(fiber))
       }
     },
-    () => (client.snapshot ?? emptySnapshotRef).value,
+    // Synchronous read of the client's own snapshot ref.
+    () => client.snapshotRef(CURSOR_CHANNEL).value,
     () => emptySnapshot,
-  )
-
-/** Presence states of all peers (excludes the local client). */
-export const usePresencePeers = (client: PresenceClient) =>
-  usePresence(client).clients.filter((c) => c.clientId !== client.clientId)
-
-/**
- * Number of clients in the room. The room prunes silent peers by TTL, so this
- * tracks live connections.
- */
-export const useOnlineCount = (client: PresenceClient) =>
-  usePresence(client).clients.filter((c) => c.online === true).length
-
-/** Live cursor positions of all *peers* (your own mouse is already visible). */
-export const usePresenceCursors = (client: PresenceClient) =>
-  usePresence(client).clients.flatMap((c) =>
-    c.clientId !== client.clientId && c.cursor !== undefined
-      ? [{ clientId: c.clientId, name: c.name, cursor: c.cursor }]
-      : [],
-  )
-
-/** Users currently typing (excluding the local client). */
-export const useTypingUsers = (client: PresenceClient) =>
-  usePresence(client).clients.filter((c) => c.clientId !== client.clientId && c.typing === true)
-
-/** Peers currently dragging a card (PartyKit-style live drag). */
-export const usePresenceDragging = (client: PresenceClient) =>
-  usePresence(client).clients.flatMap((c) =>
-    c.dragging !== undefined ? [{ clientId: c.clientId, name: c.name, dragging: c.dragging }] : [],
   )
 
 /**
  * Hook returning a presence client attached to the sync party, scoped to the
- * component lifecycle.
- *
- * The client's socket + Snapshots stream live in a `Scope` kept open by a
- * never-completing fiber; interrupting that fiber on unmount disconnects.
+ * component lifecycle. Interrupting the holder fiber on unmount disconnects.
  */
-export const usePresenceWsClient = (options: Parameters<typeof makePresenceClient>[0]): PresenceClient => {
-  const [client, setClient] = useState<PresenceClient | undefined>(undefined)
+export const usePresenceClient = (
+  options: Parameters<typeof makePresenceClient>[0],
+): Client => {
+  const [client, setClient] = useState<Client | undefined>(undefined)
   useEffect(() => {
+    let active = true
     const fiber = Effect.runFork(
       Effect.scoped(
         Effect.gen(function* () {
           const c = yield* makePresenceClient(options)
+          if (active === false) return
           yield* Effect.sync(() => setClient(c))
           yield* Effect.never
         }),
       ),
     )
     return () => {
+      active = false
       Effect.runFork(Fiber.interrupt(fiber))
     }
   }, [options])
   return client ?? emptyClient
 }
 
-const emptyClient = {
+const emptyClient: Client = {
   storeId: '',
   clientId: '',
-  snapshot: emptySnapshotRef,
-  snapshots: Stream.empty,
-  setState: () => Effect.void,
-  setCursor: () => Effect.void,
-  setTyping: () => Effect.void,
-  setTextCursor: () => Effect.void,
-  setName: () => Effect.void,
-  setDragging: () => Effect.void,
+  snapshots: (() => Stream.empty) as any,
+  snapshotRef: (() => ({ value: emptySnapshot })) as any,
+  setState: (() => Effect.void) as any,
   leave: Effect.void,
-} as unknown as PresenceClient
+}

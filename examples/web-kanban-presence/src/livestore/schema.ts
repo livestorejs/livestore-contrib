@@ -31,6 +31,10 @@ export const events = {
     name: 'v1.KanbanColumnRenamed',
     schema: Schema.Struct({ id: Schema.String, title: Schema.String }),
   }),
+  columnDeleted: Events.synced({
+    name: 'v1.KanbanColumnDeleted',
+    schema: Schema.Struct({ id: Schema.String }),
+  }),
   cardCreated: Events.synced({
     name: 'v1.KanbanCardCreated',
     schema: Schema.Struct({ id: Schema.String, title: Schema.String, columnId: Schema.String, position: Schema.Finite }),
@@ -48,6 +52,10 @@ export const events = {
 const materializers = State.SQLite.materializers(events, {
   'v1.KanbanColumnCreated': ({ id, title, position }) => tables.columns.insert({ id, title, position }),
   'v1.KanbanColumnRenamed': ({ id, title }) => tables.columns.update({ title }).where({ id }),
+  'v1.KanbanColumnDeleted': ({ id }) => [
+    tables.cards.delete().where({ columnId: id }),
+    tables.columns.delete().where({ id }),
+  ],
   'v1.KanbanCardCreated': ({ id, title, columnId, position }) => tables.cards.insert({ id, title, columnId, position }),
   'v1.KanbanCardMoved': ({ id, columnId, position }) => tables.cards.update({ columnId, position }).where({ id }),
   'v1.KanbanCardRenamed': ({ id, title }) => tables.cards.update({ title }).where({ id }),
