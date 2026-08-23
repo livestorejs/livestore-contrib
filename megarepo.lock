@@ -4,9 +4,9 @@
     "livestore": {
       "url": "https://github.com/livestorejs/livestore",
       "ref": "schickling/2026-08-23-effect4",
-      "commit": "bf23fc08103a4bf738abd68dba33ff6b059933f8",
+      "commit": "7b84e11aeb28526baeef65d9f1976e2327cf4a46",
       "pinned": true,
-      "lockedAt": "2026-08-23T19:29:36.978Z"
+      "lockedAt": "2026-08-23T20:25:01.570Z"
     },
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",
