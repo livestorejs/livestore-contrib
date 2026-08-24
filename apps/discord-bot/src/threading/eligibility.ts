@@ -81,17 +81,17 @@ export const classifyContent = (
   const hasRichContent = candidate.attachmentCount > 0 || candidate.hasPoll
 
   if (normalized.length === 0) {
-    return hasRichContent ? undefined : candidate.stickerCount > 0 ? "reaction_symbols_only" : "empty"
+    return hasRichContent === true ? undefined : candidate.stickerCount > 0 ? "reaction_symbols_only" : "empty"
   }
 
   const exactPhrase = normalizeExactPhrase(normalized)
-  if (greetingVocabulary.has(exactPhrase)) return "greeting"
-  if (reactionVocabulary.has(exactPhrase)) return "reaction"
-  if (isRecognizedCommand(normalized, config.legacyCommands)) return "recognized_command"
-  if (hasRichContent) return undefined
-  if (isUrlOnly(normalized)) return "url_only"
-  if (isNumericOrVersionOnly(normalized)) return "numeric_or_version_only"
-  if (isReactionSymbolsOnly(normalized)) return "reaction_symbols_only"
+  if (greetingVocabulary.has(exactPhrase) === true) return "greeting"
+  if (reactionVocabulary.has(exactPhrase) === true) return "reaction"
+  if (isRecognizedCommand(normalized, config.legacyCommands) === true) return "recognized_command"
+  if (hasRichContent === true) return undefined
+  if (isUrlOnly(normalized) === true) return "url_only"
+  if (isNumericOrVersionOnly(normalized) === true) return "numeric_or_version_only"
+  if (isReactionSymbolsOnly(normalized) === true) return "reaction_symbols_only"
   return undefined
 }
 
@@ -104,12 +104,12 @@ const classifySource = (
 ): AutomaticRejectionReason | undefined => {
   if (candidate.environment !== config.environment) return "wrong_environment"
   if (candidate.source.guildId !== config.guildId) return "wrong_guild"
-  if (!config.parentChannelIds.has(candidate.source.channelId)) return "parent_channel_not_configured"
-  if (!isGuildChannelKind(candidate.sourceChannelKind)) return "source_is_thread_or_dm"
-  if (!config.admittedParentKinds.has(candidate.sourceChannelKind) || !topLevelGuildKinds.has(candidate.sourceChannelKind)) {
+  if (config.parentChannelIds.has(candidate.source.channelId) === false) return "parent_channel_not_configured"
+  if (isGuildChannelKind(candidate.sourceChannelKind) === false) return "source_is_thread_or_dm"
+  if (config.admittedParentKinds.has(candidate.sourceChannelKind) === false || topLevelGuildKinds.has(candidate.sourceChannelKind) === false) {
     return "unsupported_channel_kind"
   }
-  if (!intentional && (candidate.messageKind === "Reply" || candidate.hasMessageReference)) return "reply"
+  if (intentional === false && (candidate.messageKind === "Reply" || candidate.hasMessageReference === true)) return "reply"
   if (candidate.messageKind === "System") return "non_ordinary_message"
   if (candidate.authorKind === "Bot") return "bot_author"
   if (candidate.authorKind === "Webhook") return "webhook_author"
@@ -128,7 +128,7 @@ const isRecognizedCommand = (content: string, legacyCommands: ReadonlySet<string
 
 const isUrlOnly = (content: string): boolean =>
   content.split(" ").every((token) => {
-    const candidate = token.startsWith("<") && token.endsWith(">") ? token.slice(1, -1) : token
+    const candidate = token.startsWith("<") === true && token.endsWith(">") === true ? token.slice(1, -1) : token
     try {
       const url = new URL(candidate)
       return url.protocol === "https:" || url.protocol === "http:"

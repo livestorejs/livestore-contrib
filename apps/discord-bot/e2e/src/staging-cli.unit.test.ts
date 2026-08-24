@@ -92,7 +92,7 @@ describe("standalone staging E2E CLI", () => {
   it.each([
     ["missing --live", args.filter((value) => value !== "--live")],
     ["duplicate --live", ["--live", ...args]],
-    ["wrong confirmation", args.map((value) => (value.startsWith("I_UNDERSTAND") ? "yes" : value))],
+    ["wrong confirmation", args.map((value) => (value.startsWith("I_UNDERSTAND") === true ? "yes" : value))],
     ["missing manifest", args.slice(0, 1)],
     ["unknown token option", [...args, "--token", "secret"]],
   ])("rejects %s before reading configuration or running", async (_label, invalidArgs) => {

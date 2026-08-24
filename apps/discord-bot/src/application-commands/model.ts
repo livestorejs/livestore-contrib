@@ -8,29 +8,31 @@ export const ApplicationCommandKind = Schema.Literals([1, 2, 3, 4]).annotate({
 })
 export type ApplicationCommandKind = typeof ApplicationCommandKind.Type
 
+const ApplicationCommandChoice = Schema.Struct({
+  name: Schema.String,
+  value: Schema.String,
+})
+
 export const ApplicationCommandOption = Schema.Struct({
   type: Schema.Literal(3),
   name: Schema.Trimmed.check(Schema.isNonEmpty()),
   description: Schema.Trimmed.check(Schema.isNonEmpty()),
   required: Schema.Boolean,
   autocomplete: Schema.optional(Schema.Boolean),
-  choices: Schema.optional(Schema.Array(Schema.Struct({
-    name: Schema.String,
-    value: Schema.String,
-  }))),
-  minLength: Schema.optional(Schema.Number),
-  maxLength: Schema.optional(Schema.Number),
-}).annotate({ identifier: "DiscordBot.ApplicationCommandOption" })
+  choices: ApplicationCommandChoice.pipe(Schema.Array, Schema.optional),
+  minLength: Schema.optional(Schema.Finite),
+  maxLength: Schema.optional(Schema.Finite),
+}).pipe(Schema.annotate({ identifier: "DiscordBot.ApplicationCommandOption" }))
 export type ApplicationCommandOption = typeof ApplicationCommandOption.Type
 
-export const ApplicationIntegrationType = Schema.Literals([0, 1]).annotate({
+export const ApplicationIntegrationType = Schema.Literals([0, 1]).pipe(Schema.annotate({
   identifier: "DiscordBot.ApplicationIntegrationType",
-})
+}))
 export type ApplicationIntegrationType = typeof ApplicationIntegrationType.Type
 
-export const InteractionContextType = Schema.Literals([0, 1, 2]).annotate({
+export const InteractionContextType = Schema.Literals([0, 1, 2]).pipe(Schema.annotate({
   identifier: "DiscordBot.InteractionContextType",
-})
+}))
 export type InteractionContextType = typeof InteractionContextType.Type
 
 /** Scope-independent command semantics owned by this bot. */
@@ -41,9 +43,9 @@ export const ApplicationCommand = Schema.Struct({
   options: Schema.Array(ApplicationCommandOption),
   defaultMemberPermissions: Schema.NullOr(Schema.String),
   nsfw: Schema.Boolean,
-  integrationTypes: Schema.optional(Schema.Array(ApplicationIntegrationType)),
-  contexts: Schema.optional(Schema.Array(InteractionContextType)),
-}).annotate({ identifier: "DiscordBot.ApplicationCommand" })
+  integrationTypes: ApplicationIntegrationType.pipe(Schema.Array, Schema.optional),
+  contexts: InteractionContextType.pipe(Schema.Array, Schema.optional),
+}).pipe(Schema.annotate({ identifier: "DiscordBot.ApplicationCommand" }))
 export type ApplicationCommand = typeof ApplicationCommand.Type
 
 export const GuildCommandScope = Schema.TaggedStruct("GuildCommandScope", {

@@ -28,7 +28,7 @@ describe("operator source validation", () => {
       const facts = yield* reader.read(source)
       const candidate = candidateForOperator(
         source,
-        Schema.decodeUnknownSync(EnvironmentName)("staging"),
+        yield* Schema.decodeUnknownEffect(EnvironmentName)("staging"),
         undefined,
         "incident repair",
         "unix-peer:uid=42",

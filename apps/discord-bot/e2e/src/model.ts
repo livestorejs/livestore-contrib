@@ -170,8 +170,8 @@ export const opaqueHash = (value: string): string =>
   createHash("sha256").update(value).digest("hex").slice(0, 16)
 
 export const aggregateVerdict = (receipts: ReadonlyArray<ScenarioReceipt>): Verdict =>
-  receipts.some((receipt) => receipt.verdict === "FAIL")
+  receipts.some((receipt) => receipt.verdict === "FAIL") === true
     ? "FAIL"
-    : receipts.some((receipt) => receipt.verdict === "UNRUN")
+    : receipts.some((receipt) => receipt.verdict === "UNRUN") === true
       ? "UNRUN"
       : "PASS"

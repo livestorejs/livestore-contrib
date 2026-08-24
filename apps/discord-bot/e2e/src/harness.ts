@@ -107,7 +107,7 @@ const runScenario = async (input: {
     markerHash: opaqueHash(marker),
   } as const
 
-  if (scenario.executor === "human-assisted" && !input.allowHumanAssisted) {
+  if (scenario.executor === "human-assisted" && input.allowHumanAssisted === false) {
     return {
       ...base,
       verdict: "UNRUN",
@@ -148,7 +148,7 @@ const runScenario = async (input: {
           author: "human",
         })
         const candidate = await pollForThread(transport, target, source.id)
-        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker)) {
+        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
           owned.thread = candidate
           passed = true
         }
@@ -164,7 +164,7 @@ const runScenario = async (input: {
           author: "human",
         })
         const candidate = await pollForThread(transport, target, source.id)
-        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker)) {
+        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
           // This is a policy failure, but the exact source-anchored identity is
           // still sufficient to cleanup-own the unexpected artifact.
           owned.thread = candidate
@@ -180,7 +180,7 @@ const runScenario = async (input: {
           author: "automated-actor",
         })
         const candidate = await pollForThread(transport, target, source.id)
-        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker)) {
+        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
           owned.thread = candidate
         }
         passed = candidate === undefined
@@ -197,7 +197,7 @@ const runScenario = async (input: {
           sourceMessageId: source.id,
           reason: `Discord E2E ${marker}`,
         })
-        if (result._tag === "Created" && isOwnedThread(result.thread, source, target, marker)) {
+        if (result._tag === "Created" && isOwnedThread(result.thread, source, target, marker) === true) {
           owned.thread = result.thread
           passed = true
         }
@@ -222,7 +222,7 @@ const runScenario = async (input: {
           first._tag === "Created" &&
           second._tag === "AlreadySatisfied" &&
           first.thread.id === second.thread.id &&
-          isOwnedThread(first.thread, source, target, marker)
+          isOwnedThread(first.thread, source, target, marker) === true
         ) {
           owned.thread = first.thread
           passed = true
@@ -261,7 +261,7 @@ const runScenario = async (input: {
           satisfied.length === 1 &&
           thread !== undefined &&
           satisfiedThread?.id === thread.id &&
-          isOwnedThread(thread, source, target, marker)
+          isOwnedThread(thread, source, target, marker) === true
         ) {
           owned.thread = thread
           passed = true
@@ -282,9 +282,9 @@ const runScenario = async (input: {
         })
         const responseOwned = ownResponse(result.response)
         if (
-          responseOwned &&
+          responseOwned === true &&
           result._tag === "Created" &&
-          isOwnedThread(result.thread, source, target, marker)
+          isOwnedThread(result.thread, source, target, marker) === true
         ) {
           owned.thread = result.thread
           passed = true
@@ -305,10 +305,10 @@ const runScenario = async (input: {
         })
         const responseOwned = ownResponse(result.response)
         const candidate = await transport.findThreadForMessage(target.guildId, source.id)
-        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker)) {
+        if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
           owned.thread = candidate
         }
-        passed = responseOwned && result._tag === "Denied" && candidate === undefined
+        passed = responseOwned === true && result._tag === "Denied" && candidate === undefined
         break
       }
       case "docs-public": {
@@ -319,7 +319,7 @@ const runScenario = async (input: {
           persona: "member",
         })
         const responseOwned = ownResponse(result.response)
-        passed = responseOwned && result._tag === "Answered" && result.response.hasAnswer && result.response.hasSources
+        passed = responseOwned === true && result._tag === "Answered" && result.response.hasAnswer === true && result.response.hasSources === true
         break
       }
       case "docs-role-restricted": {
@@ -330,7 +330,7 @@ const runScenario = async (input: {
           persona: "contributor",
         })
         const responseOwned = ownResponse(result.response)
-        passed = responseOwned && result._tag === "Answered" && result.response.hasAnswer && result.response.hasSources
+        passed = responseOwned === true && result._tag === "Answered" && result.response.hasAnswer === true && result.response.hasSources === true
         break
       }
       case "docs-denied": {
@@ -341,7 +341,7 @@ const runScenario = async (input: {
           persona: "member",
         })
         const responseOwned = ownResponse(result.response)
-        passed = responseOwned && result._tag === "Denied"
+        passed = responseOwned === true && result._tag === "Denied"
         break
       }
     }
@@ -349,7 +349,7 @@ const runScenario = async (input: {
     const cleanupResult = await cleanup(transport, target, owned)
     if (
       cause instanceof E2EPrerequisiteUnavailableError &&
-      !Object.values(cleanupResult).includes("failed")
+      Object.values(cleanupResult).includes("failed") === false
     ) {
       return {
         ...base,
@@ -362,7 +362,7 @@ const runScenario = async (input: {
     return {
       ...base,
       verdict: "FAIL",
-      reason: Object.values(cleanupResult).includes("failed") ? "cleanup-failed" : "transport-failed",
+      reason: Object.values(cleanupResult).includes("failed") === true ? "cleanup-failed" : "transport-failed",
       artifactHashes: artifactHashes(owned),
       cleanup: cleanupResult,
     }
@@ -372,8 +372,8 @@ const runScenario = async (input: {
   const cleanupFailed = Object.values(cleanupResult).includes("failed")
   return {
     ...base,
-    verdict: passed && !cleanupFailed ? "PASS" : "FAIL",
-    reason: cleanupFailed ? "cleanup-failed" : passed ? "assertions-passed" : "assertion-failed",
+    verdict: passed === true && cleanupFailed === false ? "PASS" : "FAIL",
+    reason: cleanupFailed === true ? "cleanup-failed" : passed === true ? "assertions-passed" : "assertion-failed",
     artifactHashes: artifactHashes(owned),
     cleanup: cleanupResult,
   }
@@ -394,7 +394,7 @@ export const runE2EMatrix = async (input: {
   const startedAt = new Date().toISOString()
   let scenarios: ReadonlyArray<ScenarioReceipt>
 
-  if (!input.target.allowedChannelIds.has(input.target.channelId)) {
+  if (input.target.allowedChannelIds.has(input.target.channelId) === false) {
     scenarios = scenarioMatrix.map((scenario) => ({
       scenario: scenario.id,
       executor: scenario.executor,
@@ -412,7 +412,7 @@ export const runE2EMatrix = async (input: {
         channel.id === input.target.channelId &&
         channel.guildId === input.target.guildId &&
         channel.topic?.includes(input.target.requiredTopicSentinel) === true
-      if (!targetMatches) {
+      if (targetMatches === false) {
         scenarios = scenarioMatrix.map((scenario) => ({
           scenario: scenario.id,
           executor: scenario.executor,

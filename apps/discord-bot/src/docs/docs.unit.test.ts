@@ -13,7 +13,7 @@ import {
   CorpusUnavailable,
   DocumentationSnapshot,
   DocsQueryResult,
-  type DocsTelemetryEvent,
+  DocsTelemetryEvent,
 } from './domain.ts'
 import { makeOpenAiRequest, openAiDocsConfiguration } from './openai.ts'
 import { renderDocsMessages } from './render.ts'
@@ -79,7 +79,7 @@ it.effect('caches for the bounded TTL and never serves stale on refresh failure'
     let fail = false
     const load = Effect.suspend(() => {
       calls += 1
-      return fail
+      return fail === true
         ? Effect.fail(new CorpusUnavailable({ reason: 'transport', message: 'synthetic failure' }))
         : Effect.succeed(snapshot)
     })
@@ -150,7 +150,7 @@ it.effect('uses one explicit-query workflow for CLI and Discord without content 
       { query: privateQuery, sourceCount: 2 },
       { query: privateQuery, sourceCount: 2 },
     ])
-    const serialized = JSON.stringify(telemetry)
+    const serialized = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Array(DocsTelemetryEvent)))(telemetry)
     expect(serialized).not.toContain(privateQuery)
     expect(serialized).not.toContain('Define events')
     expect(serialized).not.toContain('https://')
@@ -228,7 +228,7 @@ it('pins the no-storage Luna Responses request and strict output schema', () => 
 it.effect('bounds concurrent and rate-limited provider admission with one-way principals', () => Effect.gen(function* () {
   let now = 1_000
   const correlated: Array<string> = []
-  const limits = Schema.decodeUnknownSync(DocsAdmissionLimits)({
+  const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
     maximumConcurrentPerPrincipal: 1,
     maximumConcurrentGlobal: 2,
     maximumRequestsPerPrincipalWindow: 1,
@@ -266,7 +266,7 @@ it.effect('bounds concurrent and rate-limited provider admission with one-way pr
 
 it.effect('shares global concurrency, rate, and token ceilings across principals', () => Effect.gen(function* () {
   let now = 1_000
-  const limits = Schema.decodeUnknownSync(DocsAdmissionLimits)({
+  const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
     ...defaultTestAdmissionLimits,
     maximumConcurrentGlobal: 1,
     maximumRequestsGlobalWindow: 1,
@@ -289,7 +289,7 @@ it.effect('shares global concurrency, rate, and token ceilings across principals
 
 it.effect('charges the full reservation when provider usage is unknown', () => Effect.gen(function* () {
   let now = 1_000
-  const limits = Schema.decodeUnknownSync(DocsAdmissionLimits)({
+  const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
     ...defaultTestAdmissionLimits,
     maximumTokensPerPrincipalWindow: 50,
   })
@@ -306,6 +306,10 @@ it.effect('charges the full reservation when provider usage is unknown', () => E
 it.effect('denies oversized input before the provider and emits content-free telemetry', () => {
   const telemetry: Array<DocsTelemetryEvent> = []
   let providerCalls = 0
+  const oversizedCandidate = Schema.decodeUnknownSync(AnswerEngineResult)({
+    candidate: { supported: false, answer: 'unused', citations: [] },
+    usage: { inputTokens: 0, outputTokens: 0 },
+  })
   const limits = Schema.decodeUnknownSync(DocsAdmissionLimits)({
     ...defaultTestAdmissionLimits,
     maximumInputTokensPerRequest: 1,
@@ -319,10 +323,7 @@ it.effect('denies oversized input before the provider and emits content-free tel
         configurationIdentity: 'fake:docs-v1',
         answer: () => Effect.sync(() => {
           providerCalls += 1
-          return Schema.decodeUnknownSync(AnswerEngineResult)({
-            candidate: { supported: false, answer: 'unused', citations: [] },
-            usage: { inputTokens: 0, outputTokens: 0 },
-          })
+          return oversizedCandidate
         }),
       })),
       Layer.succeed(DocsTelemetry, DocsTelemetry.of({
@@ -341,8 +342,9 @@ it.effect('denies oversized input before the provider and emits content-free tel
     expect(result).toEqual({ _tag: 'Unavailable', reason: 'admission_denied' })
     expect(providerCalls).toBe(0)
     expect(telemetry).toMatchObject([{ outcome: 'admission_denied', admissionDenial: 'input_too_large' }])
-    expect(JSON.stringify(telemetry)).not.toContain('private-member-sentinel')
-    expect(JSON.stringify(telemetry)).not.toContain('private-query-sentinel')
+    const serialized = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Array(DocsTelemetryEvent)))(telemetry)
+    expect(serialized).not.toContain('private-member-sentinel')
+    expect(serialized).not.toContain('private-query-sentinel')
   }).pipe(Effect.provide(layer))
 })
 

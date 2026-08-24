@@ -1,7 +1,7 @@
 import { Cause, Effect, Exit, Schema } from 'effect'
 
 import type { BotControlClient } from '../control/contract.ts'
-import { ControlError, ControlResult, type ControlError as ControlErrorType } from '../control/schema.ts'
+import { ControlError, ControlResult, type ControlError as ControlErrorType, type ControlResult as ControlResultType } from '../control/schema.ts'
 import { CliExit, type CliIo, type OutputMode } from './model.ts'
 import { parseCli } from './parse.ts'
 
@@ -22,7 +22,7 @@ export const runCli = (args: readonly string[], client: BotControlClient, io: Cl
     }
 
     const exit = yield* Effect.exit(parsed.invocation.run(client))
-    if (Exit.isSuccess(exit)) {
+    if (Exit.isSuccess(exit) === true) {
       renderResult(exit.value, parsed.invocation.output, io)
       return exit.value._tag === 'Unrun' ? CliExit.Unrun : CliExit.Success
     }
@@ -35,8 +35,8 @@ export const runCli = (args: readonly string[], client: BotControlClient, io: Cl
     return CliExit.UnexpectedDefect
   })
 
-const renderResult = (result: typeof ControlResult.Type, output: OutputMode, io: CliIo) => {
-  if (machineOutput(output, io)) {
+const renderResult = (result: ControlResultType, output: OutputMode, io: CliIo) => {
+  if (machineOutput(output, io) === true) {
     io.stdout(JSON.stringify(encodeResult(result)))
     return
   }
@@ -47,7 +47,7 @@ const renderResult = (result: typeof ControlResult.Type, output: OutputMode, io:
 }
 
 const renderError = (error: ControlErrorType, output: OutputMode, io: CliIo) => {
-  if (machineOutput(output, io)) io.stdout(JSON.stringify(encodeError(error)))
+  if (machineOutput(output, io) === true) io.stdout(JSON.stringify(encodeError(error)))
   else {
     io.stderr(`CRITICAL ${error._tag}: ${error.message}`)
     if (error._tag === 'ControlAmbiguousOutcome' && error.correlationId !== undefined) {

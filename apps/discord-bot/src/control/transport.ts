@@ -1,7 +1,7 @@
 import type { Effect } from 'effect'
 
 import type { BotControlClient } from './contract.ts'
-import { ControlDependencyUnavailable } from './schema.ts'
+import type { ControlDependencyUnavailable } from './schema.ts'
 
 export type UnixSocketAddress = {
   readonly _tag: 'UnixSocketAddress'

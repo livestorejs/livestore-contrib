@@ -48,8 +48,8 @@ export const renderDocsMessages = (
 
   for (const line of text.split('\n')) {
     const isFenceDelimiter = line.startsWith('```')
-    const closesFence = isFenceDelimiter && fenceOpening !== undefined
-    const reserve = fenceOpening === undefined || closesFence ? 0 : 4
+    const closesFence = isFenceDelimiter === true && fenceOpening !== undefined
+    const reserve = fenceOpening === undefined || closesFence === true ? 0 : 4
     const separator = current.length === 0 ? '' : '\n'
 
     if (current.length + separator.length + line.length > bounds.maximumMessageCharacters - reserve) {
@@ -63,8 +63,8 @@ export const renderDocsMessages = (
     }
     current += `${nextSeparator}${line}`
 
-    if (isFenceDelimiter) {
-      if (closesFence) fenceOpening = undefined
+    if (isFenceDelimiter === true) {
+      if (closesFence === true) fenceOpening = undefined
       else fenceOpening = line
     }
   }

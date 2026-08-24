@@ -15,7 +15,7 @@ export class DocsProviderReadinessError extends Schema.TaggedError<DocsProviderR
 
 /** Provider boundary used by startup admission and by deterministic tests. */
 export interface DocsProviderReadinessPort {
-  readonly inspect: () => Effect.Effect<DocsProviderReadiness, DocsProviderReadinessError>
+  readonly inspect: Effect.Effect<DocsProviderReadiness, DocsProviderReadinessError>
 }
 
 export interface DocsProviderReadinessExpectation {
@@ -27,12 +27,12 @@ export interface DocsProviderReadinessExpectation {
 export const admitDocsProvider = (
   port: DocsProviderReadinessPort,
   expected: DocsProviderReadinessExpectation,
-) => port.inspect().pipe(
+) => port.inspect.pipe(
   Effect.flatMap(actual => actual.projectId !== expected.projectId
     ? Effect.fail(new DocsProviderReadinessError({ reason: "wrong_project", message: "Provider project identity differs from deployment" }))
     : actual.model !== expected.model
       ? Effect.fail(new DocsProviderReadinessError({ reason: "wrong_project", message: "Provider model differs from deployment" }))
       : actual.store !== false
         ? Effect.fail(new DocsProviderReadinessError({ reason: "wrong_posture", message: "Provider retention posture is not store:false" }))
-        : actual.admitted ? Effect.succeed(actual) : Effect.fail(new DocsProviderReadinessError({ reason: "unavailable", message: "Provider project is not admitted" }))),
+        : actual.admitted === true ? Effect.succeed(actual) : Effect.fail(new DocsProviderReadinessError({ reason: "unavailable", message: "Provider project is not admitted" }))),
 )

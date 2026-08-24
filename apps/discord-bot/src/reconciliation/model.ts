@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema"
-import { DiscordSnowflake, JournalState, ThreadActionRecord } from "../journal/model.ts"
+import type { DiscordSnowflake, JournalState, ThreadActionRecord } from "../journal/model.ts"
 
 export const ReconciliationEligibleState = Schema.Literals(["pending", "creating", "unknown_external"])
 export type ReconciliationEligibleState = typeof ReconciliationEligibleState.Type
@@ -74,4 +74,4 @@ export class ThreadObservationError extends Schema.TaggedError<ThreadObservation
   { message: Schema.String, cause: Schema.Defect() },
 ) {}
 
-export type ReconciliationRecord = typeof ThreadActionRecord.Type
+export type ReconciliationRecord = ThreadActionRecord

@@ -42,7 +42,7 @@ const readFlag = (args: ReadonlyArray<string>, flag: string): string | undefined
   const occurrences = args.flatMap((value, index) => (value === flag ? [index] : []))
   if (occurrences.length !== 1) return undefined
   const value = args[occurrences[0]! + 1]
-  return value === undefined || value.startsWith("--") ? undefined : value
+  return value === undefined || value.startsWith("--") === true ? undefined : value
 }
 
 const parseArguments = (
@@ -132,8 +132,10 @@ export const runStagingCli = async (input: {
       manifest,
       confirmation: parsed.value.confirmation,
       actorBotToken: input.environment[actorTokenEnvironmentVariable],
-      humanHandoffBrokerExecutable: parsed.value.humanHandoffBrokerExecutable,
       humanAssisted: parsed.value.humanHandoffBrokerExecutable !== undefined,
+      ...(parsed.value.humanHandoffBrokerExecutable === undefined
+        ? {}
+        : { humanHandoffBrokerExecutable: parsed.value.humanHandoffBrokerExecutable }),
     })
     return {
       exitCode: exitForReceipt(receipt),

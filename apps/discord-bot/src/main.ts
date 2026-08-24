@@ -16,11 +16,11 @@ const args = process.argv.slice(2)
 export const program = args[0] === "serve"
   ? Effect.gen(function* () {
       const configPath = yield* readConfigPath(args)
-      const config = yield* loadRuntimeConfig(configPath)
-      yield* runRuntime(config, configPath)
+      const config = yield* loadRuntimeConfig(configPath).pipe(Effect.orDie)
+      return yield* runRuntime(config, configPath).pipe(Effect.orDie)
     }).pipe(Effect.scoped)
   : Effect.gen(function* () {
-      const environment = args.includes("production") ? "production" : "staging"
+      const environment = args.includes("production") === true ? "production" : "staging"
       const socketPath = process.env.LIVESTORE_DISCORD_CONTROL_SOCKET ?? defaultControlSocket(environment).path
       const client = yield* makeUnixBotControlClient(socketPath)
       const code = yield* runCli(args, client, {
@@ -47,4 +47,4 @@ const observability = process.env.OTEL_EXPORTER_OTLP_ENDPOINT === undefined
       resource: { serviceName: "livestore-discord", serviceVersion: process.env.OTEL_SERVICE_VERSION ?? process.env.LIVESTORE_DISCORD_RELEASE_ID ?? "unknown", attributes: { environment: process.env.OTEL_DEPLOYMENT_ENVIRONMENT ?? process.env.LIVESTORE_DISCORD_ENVIRONMENT ?? "unknown" } },
     }).pipe(Layer.provide(NodeHttpClient.layerUndici))
 
-program.pipe(Effect.provide(observability), Effect.provide(NodeServices.layer), NodeRuntime.runMain)
+program.pipe(Effect.provide(Layer.merge(observability, NodeServices.layer)), NodeRuntime.runMain)

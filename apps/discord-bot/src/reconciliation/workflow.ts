@@ -190,10 +190,10 @@ const reconcileRecord = (
       }
 
       const deadlineElapsed = request.now >= record.reconcileBy
-      const targetDisposition: ReconciliationDisposition = deadlineElapsed
+      const targetDisposition: ReconciliationDisposition = deadlineElapsed === true
         ? request.mode._tag === "Plan" ? "would_mark_manual_review" : "manual_review"
         : request.mode._tag === "Plan" ? "would_record_absence" : "absence_recorded"
-      const targetState = deadlineElapsed ? "manual_review" as const : "unknown_external" as const
+      const targetState = deadlineElapsed === true ? "manual_review" as const : "unknown_external" as const
       if (request.mode._tag === "Plan") {
         return Effect.succeed(receipt(
           record.sourceMessageId,
@@ -222,14 +222,14 @@ const reconcileRecord = (
 }
 
 const validateRequest = (request: ReconciliationRequest): ReconciliationRequest => {
-  if (!Number.isSafeInteger(request.now) || request.now < 0) {
+  if (Number.isSafeInteger(request.now) === false || request.now < 0) {
     throw new InvalidReconciliationRequest({ message: "now must be a non-negative safe integer" })
   }
   if (request.mode._tag === "Apply" && request.mode.reason.trim().length < 3) {
     throw new InvalidReconciliationRequest({ message: "apply requires a non-empty operator reason" })
   }
   if (request.selection._tag === "All" && request.selection.limit !== undefined &&
-    (!Number.isSafeInteger(request.selection.limit) || request.selection.limit < 1 ||
+    (Number.isSafeInteger(request.selection.limit) === false || request.selection.limit < 1 ||
       request.selection.limit > maximumReconciliationLimit)) {
     throw new InvalidReconciliationRequest({
       message: `all limit must be between 1 and ${maximumReconciliationLimit}`,
@@ -252,10 +252,19 @@ const receipt = (
     beforeState,
     afterState,
     disposition,
-    mutated ? "1" : "0",
+    mutated === true ? "1" : "0",
     threadId ?? "",
     unrunReason ?? "",
   ].join("\n")
   const receiptId = `reconcile-${createHash("sha256").update(material).digest("hex").slice(0, 20)}`
-  return { receiptId, sourceMessageId, beforeState, afterState, disposition, mutated, threadId, unrunReason }
+  return {
+    receiptId,
+    sourceMessageId,
+    beforeState,
+    afterState,
+    disposition,
+    mutated,
+    ...(threadId === undefined ? {} : { threadId }),
+    ...(unrunReason === undefined ? {} : { unrunReason }),
+  }
 }

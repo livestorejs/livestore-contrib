@@ -12,7 +12,7 @@ const WorkerInput = Schema.Tuple([
 ])
 
 const program = Effect.gen(function* () {
-  const [path, sourceMessageIdRaw, channelIdRaw, trigger] = Schema.decodeUnknownSync(WorkerInput)(process.argv.slice(2))
+  const [path, sourceMessageIdRaw, channelIdRaw, trigger] = yield* Schema.decodeUnknownEffect(WorkerInput)(process.argv.slice(2))
   const journal = yield* makeSqliteThreadActionJournal({ path })
   const result = yield* journal.claim({
     sourceMessageId: decodeDiscordSnowflake(sourceMessageIdRaw),
@@ -21,7 +21,8 @@ const program = Effect.gen(function* () {
     now: Date.now(),
     reconcileBy: Date.now() + 60_000,
   })
-  yield* Effect.sync(() => process.stdout.write(`${JSON.stringify({ acquired: result.acquired })}\n`))
+  const output = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({ acquired: result.acquired })
+  yield* Effect.sync(() => process.stdout.write(`${output}\n`))
 })
 
-NodeRuntime.runMain(Effect.scoped(program))
+program.pipe(Effect.scoped, NodeRuntime.runMain)

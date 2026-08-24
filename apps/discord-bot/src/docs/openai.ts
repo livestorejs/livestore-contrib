@@ -1,4 +1,5 @@
-import { Duration, Effect, Layer, Redacted, Schema } from 'effect'
+import { Duration, Effect, Layer, Schema } from 'effect'
+import type { Redacted } from 'effect'
 import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/unstable/http'
 
 import { AnswerCandidate, AnswerEngineFailure, AnswerUsage, type DocumentationSource } from './domain.ts'
@@ -125,10 +126,18 @@ export const makeOpenAiAnswerEngineLayer = (config: OpenAiAnswerEngineConfig) =>
         )
         return {
           candidate,
-          usage: Schema.decodeUnknownSync(AnswerUsage)({
+          usage: yield* Schema.decodeUnknownEffect(AnswerUsage)({
             inputTokens: decoded.usage.input_tokens,
             outputTokens: decoded.usage.output_tokens,
-          }),
+          }).pipe(
+            Effect.mapError(
+              () =>
+                new AnswerEngineFailure({
+                  reason: 'decode',
+                  message: 'The documentation answer provider usage was invalid',
+                }),
+            ),
+          ),
         }
       })
       return AnswerEngine.of({ configurationIdentity: openAiDocsConfigurationIdentity, answer })
@@ -139,7 +148,7 @@ export const makeOpenAiAnswerEngineLayer = (config: OpenAiAnswerEngineConfig) =>
 export const makeOpenAiProviderReadinessPort = (config: OpenAiAnswerEngineConfig & {
   readonly projectId: string
 }) => (client: HttpClient.HttpClient): DocsProviderReadinessPort => ({
-  inspect: () => HttpClientRequest.get(`https://api.openai.com/v1/models/${openAiDocsConfiguration.model}`).pipe(
+  inspect: HttpClientRequest.get(`https://api.openai.com/v1/models/${openAiDocsConfiguration.model}`).pipe(
     HttpClientRequest.bearerToken(config.apiKey),
     HttpClientRequest.setHeader('OpenAI-Project', config.projectId),
     client.execute,

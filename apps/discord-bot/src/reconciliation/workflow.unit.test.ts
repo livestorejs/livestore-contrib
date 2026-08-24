@@ -4,7 +4,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import { decodeDiscordSnowflake, type ThreadActionRecord } from "../journal/model.ts"
-import type { ThreadActionJournalService } from "../journal/service.ts"
+import type { JournalUnavailableError, JournalWriteError, ThreadActionJournalService } from "../journal/service.ts"
 import { makeSqliteThreadActionJournal } from "../journal/sqlite.ts"
 import type { ThreadObservation, ReconciliationMode } from "./model.ts"
 import type { ThreadObservationPort } from "./port.ts"
@@ -226,7 +226,7 @@ const ambiguous = (
   sourceMessageId: typeof firstId,
   now: number,
   reconcileBy: number,
-): Effect.Effect<ThreadActionRecord, import("../journal/service.ts").JournalWriteError | import("../journal/service.ts").JournalUnavailableError> =>
+): Effect.Effect<ThreadActionRecord, JournalWriteError | JournalUnavailableError> =>
   Effect.gen(function* () {
     const claimed = yield* journal.claim({ sourceMessageId, channelId, trigger: "operator", now, reconcileBy })
     return yield* journal.markCreating({ sourceMessageId, claimToken: claimed.record.claimToken, now })

@@ -20,9 +20,12 @@ import {
   OperatorReason,
   type ControlError as ControlErrorType,
   type ControlResult as ControlResultType,
+  type DeploymentEnvironment as DeploymentEnvironmentType,
+  type DiscordMessageRef as DiscordMessageRefType,
+  type OperatorReason as OperatorReasonType,
 } from "../control/schema.ts"
 import type { ThreadActionJournalService } from "../journal/service.ts"
-import type { ReconciliationResult } from "../reconciliation/index.ts"
+import type { ReconciliationError, ReconciliationResult } from "../reconciliation/index.ts"
 import type { ThreadObservationPort } from "../reconciliation/port.ts"
 import { DocsWorkflow, renderDocsResult, type DocsWorkflowService } from "../docs/index.ts"
 import { classifyIntentionalSource, EnvironmentName, type ThreadOutcome } from "../threading/index.ts"
@@ -70,6 +73,11 @@ export interface ControlSocketPolicy {
   readonly mode: RuntimeConfigPayload["_tag"]
 }
 
+class ControlSocketInspectionError extends Schema.TaggedError<ControlSocketInspectionError>()(
+  "ControlSocketInspectionError",
+  { message: Schema.String },
+) {}
+
 export const makeLocalBotControl = (options: {
   readonly config: RuntimeConfigPayload
   readonly configPath: string
@@ -80,32 +88,32 @@ export const makeLocalBotControl = (options: {
   readonly sourceObserver: ThreadObservationPort
   readonly thread: (candidate: ReturnType<typeof candidateForOperator>) => Effect.Effect<ThreadOutcome>
   readonly reconcile: (input: {
-    readonly selection: { readonly _tag: "One"; readonly sourceMessageId: typeof DiscordMessageRef.Type["messageId"] } | {
+    readonly selection: { readonly _tag: "One"; readonly sourceMessageId: DiscordMessageRefType["messageId"] } | {
       readonly _tag: "All"
       readonly state?: "creating" | "unknown_external"
       readonly limit?: number
     }
     readonly mode: { readonly _tag: "Plan" } | { readonly _tag: "Apply"; readonly reason: string }
     readonly now: number
-  }) => Effect.Effect<ReconciliationResult, unknown>
+  }) => Effect.Effect<ReconciliationResult, ReconciliationError>
   readonly commands: ReturnType<typeof makeApplicationCommandsReconciler>
 }): ControlHandlers => {
   const unsupported = (message: string) => Effect.fail(new ControlGateUnrun({ message }))
-  const inspect = (source: typeof DiscordMessageRef.Type) => options.journal.get(source.messageId).pipe(
+  const inspect = (source: DiscordMessageRefType) => options.journal.get(source.messageId).pipe(
     Effect.mapError(() => new ControlDependencyUnavailable({ dependency: "journal", message: "Action journal is unavailable" })),
     Effect.map(record => success(record === undefined ? "No action journal record exists." :
       `state=${record.state} thread=${record.threadId ?? "none"} outcome=${record.outcomeCode ?? "none"}`)),
   )
   const create = (input: {
-    readonly source: typeof DiscordMessageRef.Type
-    readonly environment: typeof DeploymentEnvironment.Type
-    readonly reason: typeof OperatorReason.Type
+    readonly source: DiscordMessageRefType
+    readonly environment: DeploymentEnvironmentType
+    readonly reason: OperatorReasonType
     readonly name?: string
   }, principal: ControlPrincipal) => {
     if (input.environment !== options.config.environment) {
       return Effect.fail(new ControlApplicationFailure({ message: "Requested environment does not match the running bot" }))
     }
-    if (input.source.guildId !== options.config.guildId || !options.config.actionChannelIds.includes(input.source.channelId)) {
+    if (input.source.guildId !== options.config.guildId || options.config.actionChannelIds.includes(input.source.channelId) === false) {
       return Effect.fail(new ControlApplicationFailure({ message: "Requested source is outside the configured guild/channel scope" }))
     }
     return options.sourceReader.read(input.source).pipe(
@@ -143,12 +151,12 @@ export const makeLocalBotControl = (options: {
 
   return { invoke: (operation, payload, principal) => {
     try {
-      if (!principal.canRead) {
+      if (principal.canRead === false) {
         return Effect.fail(new ControlAuthorizationRejected({
           message: "Control transport could not prove an authorized operator principal",
         }))
       }
-      if (isWriteOperation(operation, payload) && !principal.canWrite) {
+      if (isWriteOperation(operation, payload) === true && principal.canWrite === false) {
         return Effect.fail(new ControlAuthorizationRejected({
           message: "Control transport could not prove an authorized operator principal for this write",
         }))
@@ -157,7 +165,7 @@ export const makeLocalBotControl = (options: {
         case "ThreadInspect": return inspect(decodeSource(payload).source)
         case "ThreadPlan": {
           const input = Schema.decodeUnknownSync(Schema.Struct({ source: DiscordMessageRef, name: Schema.optional(Schema.String), noAi: Schema.Boolean }))(payload)
-          if (input.source.guildId !== options.config.guildId || !options.config.actionChannelIds.includes(input.source.channelId)) {
+          if (input.source.guildId !== options.config.guildId || options.config.actionChannelIds.includes(input.source.channelId) === false) {
             return Effect.fail(new ControlApplicationFailure({ message: "Requested source is outside the configured guild/channel scope" }))
           }
           return options.sourceReader.read(input.source).pipe(
@@ -203,7 +211,11 @@ export const makeLocalBotControl = (options: {
             )),
           )
         }
-        case "ThreadCreate": return create(Schema.decodeUnknownSync(Schema.Struct({ source: DiscordMessageRef, environment: DeploymentEnvironment, apply: Schema.Literal(true), reason: OperatorReason, name: Schema.optional(Schema.String) }))(payload), principal)
+        case "ThreadCreate": {
+          const input = Schema.decodeUnknownSync(Schema.Struct({ source: DiscordMessageRef, environment: DeploymentEnvironment, apply: Schema.Literal(true), reason: OperatorReason, name: Schema.optional(Schema.String) }))(payload)
+          const base = { source: input.source, environment: input.environment, reason: input.reason }
+          return input.name === undefined ? create(base, principal) : create({ ...base, name: input.name }, principal)
+        }
         case "ThreadStatus": return inspect(decodeSource(payload).source)
         case "ThreadReconcile": {
           const input = Schema.decodeUnknownSync(Schema.Struct({
@@ -218,13 +230,17 @@ export const makeLocalBotControl = (options: {
           if (input.all === (input.source !== undefined)) {
             return Effect.fail(new ControlApplicationFailure({ message: "Choose exactly one source or --all" }))
           }
-          if (input.apply && (input.environment !== options.config.environment || input.reason === undefined)) {
+          if (input.apply === true && (input.environment !== options.config.environment || input.reason === undefined)) {
             return Effect.fail(new ControlApplicationFailure({ message: "Apply requires the running environment and an operator reason" }))
           }
-          const selection = input.all
-            ? { _tag: "All" as const, state: input.state, limit: input.limit }
+          const selection = input.all === true
+            ? {
+                _tag: "All" as const,
+                ...(input.state === undefined ? {} : { state: input.state }),
+                ...(input.limit === undefined ? {} : { limit: input.limit }),
+              }
             : { _tag: "One" as const, sourceMessageId: input.source!.messageId }
-          const mode = input.apply
+          const mode = input.apply === true
             ? { _tag: "Apply" as const, reason: input.reason! }
             : { _tag: "Plan" as const }
           return options.reconcile({ selection, mode, now: Date.now() }).pipe(
@@ -235,7 +251,7 @@ export const makeLocalBotControl = (options: {
         case "ThreadPolicyExplain": {
           const input = decodeSource(payload)
           return Effect.succeed(success(
-            options.config.actionChannelIds.includes(input.source.channelId)
+            options.config.actionChannelIds.includes(input.source.channelId) === true
               ? "Source parent channel is configured; automatic content facts require message retrieval."
               : "Source parent channel is not configured for automatic threading.",
             "Planned",
@@ -281,7 +297,7 @@ export const makeLocalBotControl = (options: {
           return options.commands.sync(options.config.commandScope).pipe(
             Effect.map(result => commandDiffResult(
               result.after,
-              result.changed ? "Success" : "AlreadySatisfied",
+              result.changed === true ? "Success" : "AlreadySatisfied",
             )),
             Effect.mapError(() => new ControlApplicationFailure({ message: "Application-command sync failed" })),
           )
@@ -380,7 +396,7 @@ const handleSocket = (
       socket.end()
       return
     }
-    if (!isOperation(request.operation)) {
+    if (isOperation(request.operation) === false) {
       socket.end()
       return
     }
@@ -395,7 +411,7 @@ const handleSocket = (
         )),
       ),
     ).then(exit => {
-      const response = Exit.isSuccess(exit)
+      const response = Exit.isSuccess(exit) === true
         ? { apiVersion: 1 as const, id: request.id, result: exit.value }
         : { apiVersion: 1 as const, id: request.id, error: extractControlError(exit) }
       socket.end(`${encodeResponse(response)}\n`)
@@ -408,9 +424,9 @@ const handleSocket = (
 }
 
 const extractControlError = (exit: Exit.Exit<unknown, ControlErrorType>): ControlErrorType => {
-  if (Exit.isSuccess(exit)) return new ControlApplicationFailure({ message: "Control operation unexpectedly succeeded without a result" })
+  if (Exit.isSuccess(exit) === true) return new ControlApplicationFailure({ message: "Control operation unexpectedly succeeded without a result" })
   const error = Cause.findErrorOption(exit.cause)
-  return Option.isSome(error)
+  return Option.isSome(error) === true
     ? error.value
     : new ControlApplicationFailure({ message: "Control operation failed unexpectedly" })
 }
@@ -436,7 +452,7 @@ const auditControlOperation = (
   principal: ControlPrincipal,
   effect: Effect.Effect<ControlResultType, ControlErrorType>,
 ) => {
-  if (!isWriteOperation(operation, payload)) return effect
+  if (isWriteOperation(operation, payload) === false) return effect
   const annotate = Effect.annotateLogs({
     controlOperation: operation,
     controlPrincipal: principal.id,
@@ -477,7 +493,7 @@ const renderReconciliationResult = (applied: boolean) => (result: Reconciliation
   const unrun = result.receipts.filter(receipt => receipt.disposition === "unrun").length
   const mutated = result.receipts.filter(receipt => receipt.mutated).length
   return {
-    _tag: unrun > 0 ? "Unrun" : applied ? "Success" : "Planned",
+    _tag: unrun > 0 ? "Unrun" : applied === true ? "Success" : "Planned",
     summary: `receipts=${result.receipts.length} mutated=${mutated} unrun=${unrun} truncated=${result.truncated}`,
     receiptId: result.receipts.length === 1 ? result.receipts[0]?.receiptId : undefined,
   }
@@ -522,10 +538,10 @@ export const classifyFilesystemControlPolicy = (input: {
   const socketOwnerIsRuntime = input.runtimeUid !== undefined && input.socket.uid === input.runtimeUid
   if (
     input.path !== expectedPath ||
-    !input.directory.isDirectory || input.directory.uid !== 0 ||
+    input.directory.isDirectory === false || input.directory.uid !== 0 ||
     (directoryMode & 0o2000) === 0 || (directoryMode & 0o007) !== 0 ||
-    !input.socket.isSocket || input.socket.gid !== input.directory.gid ||
-    (!socketOwnerIsRuntime && input.socket.uid !== 0) || socketMode !== 0o660
+    input.socket.isSocket === false || input.socket.gid !== input.directory.gid ||
+    (socketOwnerIsRuntime === false && input.socket.uid !== 0) || socketMode !== 0o660
   ) return undefined
   return {
     id: `unix-group:gid=${input.directory.gid}:environment=${input.environment}`,
@@ -556,7 +572,7 @@ const resolveControlPrincipal = (
         environment: policy.environment,
         directory: fileIdentity(directory),
         socket: fileIdentity(socketInfo),
-        runtimeUid: process.getuid?.(),
+        ...(process.getuid?.() === undefined ? {} : { runtimeUid: process.getuid() }),
       })
       if (filesystemPrincipal === undefined) return unverifiedPrincipal(policy.environment)
       const credentials = readPeerCredentials(socket)
@@ -566,11 +582,13 @@ const resolveControlPrincipal = (
             filesystemPrincipal,
             operatorGid: Number(directory.gid),
             credentials,
-            runtimeUid: process.getuid?.(),
+            ...(process.getuid?.() === undefined ? {} : { runtimeUid: process.getuid() }),
             environment: policy.environment,
           })
     },
-    catch: cause => cause,
+    catch: cause => new ControlSocketInspectionError({
+      message: cause instanceof Error ? cause.message : "Control socket inspection failed",
+    }),
   }).pipe(Effect.catchCause(() => Effect.succeed(unverifiedPrincipal(policy.environment))))
 }
 
@@ -581,7 +599,7 @@ export const classifyPeerControlPrincipal = (input: {
   readonly runtimeUid?: number
   readonly environment: ControlSocketPolicy["environment"]
 }): ControlPrincipal => {
-  if (!input.filesystemPrincipal.canRead || !input.filesystemPrincipal.canWrite ||
+  if (input.filesystemPrincipal.canRead === false || input.filesystemPrincipal.canWrite === false ||
     input.credentials.gid !== input.operatorGid) {
     return unverifiedPrincipal(input.environment)
   }
@@ -628,8 +646,8 @@ const fileIdentity = (info: Awaited<ReturnType<typeof lstat>>): FileIdentity => 
 const removeStaleSocket = async (path: string) => {
   try {
     const info = await lstat(path)
-    if (!info.isSocket()) throw new Error("Control socket path exists and is not a socket")
-    if (await socketAcceptsConnections(path)) throw new Error("Control socket is already owned by a live process")
+    if (info.isSocket() === false) throw new Error("Control socket path exists and is not a socket")
+    if (await socketAcceptsConnections(path) === true) throw new Error("Control socket is already owned by a live process")
     await unlink(path)
   } catch (cause) {
     if ((cause as NodeJS.ErrnoException).code !== "ENOENT") throw cause

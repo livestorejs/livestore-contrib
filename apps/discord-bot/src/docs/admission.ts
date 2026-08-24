@@ -128,7 +128,7 @@ export const makeDocsAdmission = (options: DocsAdmissionOptions = {}): DocsAdmis
       const reservedTokens = input.estimatedInputTokens + limits.maximumOutputTokensPerRequest
       const denial = assessAdmission(input.estimatedInputTokens, reservedTokens, principal, globalState, limits)
       if (denial !== undefined) {
-        if (isEmpty(principal)) principals.delete(principalKey)
+        if (isEmpty(principal) === true) principals.delete(principalKey)
         return { _tag: 'Denied', reason: denial }
       }
 
@@ -143,7 +143,7 @@ export const makeDocsAdmission = (options: DocsAdmissionOptions = {}): DocsAdmis
       return {
         _tag: 'Admitted',
         complete: usage => Effect.sync(() => {
-          if (completed) return
+          if (completed === true) return
           completed = true
           const completedAt = now()
           // Unknown usage is charged at the full reservation so post-submit failures cannot bypass ceilings.
@@ -158,7 +158,7 @@ export const makeDocsAdmission = (options: DocsAdmissionOptions = {}): DocsAdmis
           globalState.tokenSamples.push({ at: completedAt, tokens: actualTokens })
           prune(principal, completedAt, limits.principalRequestWindowMillis, limits.tokenWindowMillis)
           prune(globalState, completedAt, limits.globalRequestWindowMillis, limits.tokenWindowMillis)
-          if (isEmpty(principal)) {
+          if (isEmpty(principal) === true) {
             principals.delete(principalKey)
           }
         }),

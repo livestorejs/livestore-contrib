@@ -2,6 +2,7 @@ import { join } from "node:path"
 import { readFile } from "node:fs/promises"
 import { NodeHttpClient, NodeSocket } from "@effect/platform-node"
 import { Discord, DiscordConfig, DiscordREST } from "dfx"
+import type { GatewayLifecycleEvent } from "dfx/DiscordGateway"
 import { DiscordGateway, DiscordLive } from "dfx/gateway"
 import { Context, Deferred, Effect, Fiber, Layer, Redacted, Ref, Schema, Stream } from "effect"
 import { HttpClient } from "effect/unstable/http"
@@ -35,11 +36,12 @@ import { acquireActionAuthority } from "./authority-lock.ts"
 import type { RuntimeConfigPayload } from "./config.ts"
 import { makeLocalBotControl, serveBotControl } from "./control.ts"
 import { FakeDiscordActionsLive, FakeDocsPortsLive, fakeThreadMutation } from "./fake-ports.ts"
-import { makeDiscordEventHandlersLayer } from "./handlers.ts"
+import { DocsChannelResolutionError, makeDiscordEventHandlersLayer } from "./handlers.ts"
 import { deriveRuntimeState, initialHealthState, isReady, serveHealth, type RuntimeHealthState } from "./health.ts"
 import {
   makeDfxOperatorSourceReader,
   makeJournalReconciliation,
+  OperatorSourceTransportError,
   type OperatorSourceReader,
 } from "./threading-adapter.ts"
 import {
@@ -52,12 +54,27 @@ export interface RuntimeHandle {
   readonly healthPort: number
   readonly health: Ref.Ref<RuntimeHealthState>
   readonly eventHandlers: typeof DiscordEventHandlers.Service
-  readonly failure: Effect.Effect<never, unknown>
+  readonly failure: Effect.Effect<never, RuntimeGatewayFailure>
 }
 
 export class DiscordIdentityAdmissionError extends Schema.TaggedError<DiscordIdentityAdmissionError>()(
   "DiscordIdentityAdmissionError",
   { expectedApplicationId: Schema.String, message: Schema.String },
+) {}
+
+class RuntimeSecretFileError extends Schema.TaggedError<RuntimeSecretFileError>()(
+  "RuntimeSecretFileError",
+  { name: Schema.String, message: Schema.String },
+) {}
+
+export class RuntimeGatewayFailure extends Schema.TaggedError<RuntimeGatewayFailure>()(
+  "RuntimeGatewayFailure",
+  { message: Schema.String, cause: Schema.Defect() },
+) {}
+
+export class GatewayReadinessError extends Schema.TaggedError<GatewayReadinessError>()(
+  "GatewayReadinessError",
+  { reason: Schema.Literals(["stream_ended", "terminal_failure"]), message: Schema.String, cause: Schema.optional(Schema.Defect()) },
 ) {}
 
 const FakeDocsWorkflowLive = makeDocsWorkflowLayer().pipe(Layer.provide(FakeDocsPortsLive))
@@ -69,7 +86,7 @@ export const gatewayIntents = Discord.GatewayIntentBits.Guilds |
   Discord.GatewayIntentBits.MessageContent
 
 /** Acquires the complete fake-composable tracer bullet in one Effect scope. */
-export const acquireRuntime = (config: RuntimeConfigPayload, configPath: string) => Effect.gen(function* () {
+export const acquireRuntime = Effect.fn("runtime.acquire")(function* (config: RuntimeConfigPayload, configPath: string) {
   const health = yield* Ref.make<RuntimeHealthState>(initialHealthState(config.environment, config.releaseId))
   yield* acquireActionAuthority(config.stateDirectory)
   yield* Ref.update(health, current => ({ ...current, actionAuthority: true }))
@@ -85,6 +102,7 @@ export const acquireRuntime = (config: RuntimeConfigPayload, configPath: string)
   const gatewayFailure = services.gateway === undefined
     ? undefined
     : yield* services.gateway.failure.pipe(
+        Effect.mapError(error => new RuntimeGatewayFailure({ message: "Discord gateway terminated", cause: error })),
         Effect.tapError(() => Ref.update(health, current => ({
           ...current,
           state: "terminal" as const,
@@ -98,7 +116,7 @@ export const acquireRuntime = (config: RuntimeConfigPayload, configPath: string)
   // does not replay READY, so delaying this until after recovery could miss it.
   const gatewayReady = services.gateway === undefined
     ? undefined
-    : yield* awaitGatewayReady(services.gateway, health).pipe(Effect.forkScoped)
+    : yield* awaitGatewayReady(services.gateway, health).pipe(Effect.orDie, Effect.forkScoped)
 
   const thread = makeThreadWorkflow({
     reconciliation: makeJournalReconciliation(journal),
@@ -122,7 +140,9 @@ export const acquireRuntime = (config: RuntimeConfigPayload, configPath: string)
   yield* runJournalMaintenance(journal, reconcile, health, "close-interrupted")
 
   const eventHandlers = yield* DiscordEventHandlers.pipe(Effect.provide(
-    makeDiscordEventHandlersLayer(config, { thread, docsReady: services.docsReady, resolveDocsChannelParent: services.resolveDocsChannelParent }).pipe(
+    makeDiscordEventHandlersLayer(config, services.resolveDocsChannelParent === undefined
+      ? { thread, docsReady: services.docsReady }
+      : { thread, docsReady: services.docsReady, resolveDocsChannelParent: services.resolveDocsChannelParent }).pipe(
       Layer.provide(Layer.merge(
         Layer.succeed(DiscordActions, services.actions),
         Layer.succeed(DocsWorkflow, services.docs),
@@ -184,10 +204,10 @@ export const acquireRuntime = (config: RuntimeConfigPayload, configPath: string)
 
   const failure = gatewayFailure === undefined ? Effect.never : Fiber.join(gatewayFailure)
   return { healthPort: healthServer.port, health, eventHandlers, failure } satisfies RuntimeHandle
-}).pipe(Effect.withSpan("runtime.acquire"))
+})
 
 export const runRuntime = (config: RuntimeConfigPayload, configPath: string) => Effect.gen(function* () {
-  const handle = yield* acquireRuntime(config, configPath)
+  const handle = yield* acquireRuntime(config, configPath).pipe(Effect.orDie)
   yield* Effect.logInfo(`LiveStore Discord bot ready environment=${config.environment} mode=${config._tag} healthPort=${handle.healthPort}`)
   return yield* handle.failure
 })
@@ -270,7 +290,11 @@ const makeRealServices = (config: Extract<RuntimeConfigPayload, { readonly _tag:
   }).pipe(Layer.provideMerge(docsPorts))
   const context = yield* Layer.build(Layer.merge(discordBase, docsLayer))
   const rest = Context.get(context, DiscordREST)
-  yield* verifyDiscordApplicationIdentity(rest, config.applicationId)
+  yield* verifyDiscordApplicationIdentity({
+    getMyOauth2Application: () => rest.getMyOauth2Application().pipe(
+      Effect.mapError(cause => new DiscordIdentityReadError({ message: "Discord identity request failed", cause })),
+    ),
+  }, config.applicationId)
   const readiness = makeOpenAiProviderReadinessPort({ apiKey: openAiApiKey, projectId: config.openAi.projectId })(
     Context.get(titleHttpContext, HttpClient.HttpClient),
   )
@@ -283,7 +307,11 @@ const makeRealServices = (config: Extract<RuntimeConfigPayload, { readonly _tag:
     title,
     observer: makeDfxThreadObservation(rest),
     commands: makeApplicationCommandsReconciler(makeDfxApplicationCommandsPort(rest)),
-    sourceReader: makeDfxOperatorSourceReader(rest),
+    sourceReader: makeDfxOperatorSourceReader({
+      getMessage: (channelId, messageId) => rest.getMessage(channelId, messageId).pipe(
+        Effect.mapError(cause => new OperatorSourceTransportError({ message: "Discord source message request failed" })),
+      ),
+    }),
     gateway: Context.get(context, DiscordGateway),
     mutation: makeDfxThreadMutation(rest),
     docsReady,
@@ -296,9 +324,12 @@ const makeRealServices = (config: Extract<RuntimeConfigPayload, { readonly _tag:
           // Both independently supplied identities must agree; an absent or
           // inconsistent REST ancestry therefore fails audience admission.
           guildId: canonicalGuildId === guildId ? canonicalGuildId : "",
-          parentChannelId: 'parent_id' in channel && typeof channel.parent_id === 'string' ? channel.parent_id : undefined,
+          ...('parent_id' in channel && typeof channel.parent_id === 'string'
+            ? { parentChannelId: channel.parent_id }
+            : {}),
         }
       }),
+      Effect.mapError(cause => new DocsChannelResolutionError({ message: "Discord channel request failed" })),
     ),
   }
 })
@@ -309,7 +340,7 @@ const readSecretFile = (path: string, name: string) => Effect.tryPromise({
     if (value.length === 0) throw new Error(`${name} file is empty`)
     return Redacted.make(value)
   },
-  catch: () => new Error(`${name} file could not be read`),
+    catch: () => new RuntimeSecretFileError({ name, message: `${name} file could not be read` }),
 })
 
 /** Readiness follows Discord's READY dispatch, not allocated shard objects. */
@@ -319,26 +350,23 @@ export const awaitGatewayReady = (
 ) => gateway.shards.pipe(
   Effect.flatMap(shards => awaitGatewayReadySignal(
     gateway.lifecycle,
-    gateway.failure,
+    gateway.failure.pipe(Effect.mapError(error => new GatewayReadinessError({ reason: "terminal_failure", message: "Discord gateway terminated", cause: error }))),
     new Set([...shards].map(shard => shard.id[0])),
     health,
   )),
 )
 
-export const awaitGatewayReadySignal = (
-  lifecycle: Stream.Stream<unknown, unknown, never>,
-  failure: Effect.Effect<never, unknown, never>,
+export const awaitGatewayReadySignal = Effect.fn("runtime.discord.awaitReady")(function* (
+  lifecycle: Stream.Stream<unknown, never, never>,
+  failure: Effect.Effect<never, GatewayReadinessError, never>,
   expectedShardIds: Iterable<number> = [],
   health?: Ref.Ref<RuntimeHealthState>,
-) => Effect.gen(function* () {
+) {
   const stateRef = yield* Ref.make(initialGatewayReadiness(expectedShardIds))
-  const readySignal = yield* Deferred.make<void, unknown>()
-  const observe = yield* Stream.runForEach(lifecycle, rawEvent => Effect.gen(function* () {
-      // The legacy shape is accepted only for the existing unit seam; the
-      // production gateway supplies GatewayLifecycleEvent values.
-      const event = typeof rawEvent === "object" && rawEvent !== null && "_tag" in rawEvent
-        ? rawEvent as import("dfx/DiscordGateway").GatewayLifecycleEvent
-        : { _tag: "Ready" as const, shardId: 0 }
+  const readySignal = yield* Deferred.make<void, GatewayReadinessError>()
+  const observer = yield* Effect.forkChild(Stream.runForEach(lifecycle, rawEvent => Effect.gen(function* () {
+      const event = decodeGatewayLifecycleEvent(rawEvent)
+      if (event === undefined) return
       const next = yield* Ref.updateAndGet(stateRef, state =>
         applyGatewayLifecycle(state, event),
       )
@@ -352,13 +380,30 @@ export const awaitGatewayReadySignal = (
           return { ...next, state: deriveRuntimeState(next) }
         })
       }
-      if (isGatewayReady(next)) yield* Deferred.succeed(readySignal, void 0)
+      if (isGatewayReady(next) === true) yield* Deferred.succeed(readySignal, void 0)
   })).pipe(
-    Effect.andThen(Deferred.fail(readySignal, "gateway_ready_stream_ended")),
-    Effect.forkDetach,
-  )
-  yield* Effect.raceFirst(Deferred.await(readySignal), failure)
-}).pipe(Effect.withSpan("runtime.discord.awaitReady"))
+    Effect.andThen(Deferred.fail(readySignal, new GatewayReadinessError({ reason: "stream_ended", message: "Gateway lifecycle stream ended before READY" }))),
+  ))
+  yield* Effect.raceFirst(Deferred.await(readySignal), failure).pipe(Effect.ensuring(Fiber.interrupt(observer)))
+})
+
+const decodeGatewayLifecycleEvent = (value: unknown): GatewayLifecycleEvent | undefined => {
+  if (typeof value !== "object" || value === null || !("_tag" in value) || !("shardId" in value)) return undefined
+  const record = value as Record<string, unknown>
+  const tag = record._tag
+  const shardId = record.shardId
+  if (typeof tag !== "string" || typeof shardId !== "number" || Number.isInteger(shardId) === false || Number.isFinite(shardId) === false || shardId < 0) return undefined
+  if (tag === "Connecting" || tag === "Ready" || tag === "Resumed") return { _tag: tag, shardId }
+  if (tag === "Disconnected" && record.retryable === true) {
+    return {
+      _tag: tag,
+      shardId,
+      retryable: true,
+      ...(typeof record.code === "number" && Number.isFinite(record.code) === true ? { code: record.code } : {}),
+    }
+  }
+  return undefined
+}
 
 const runJournalMaintenance = (
   journal: ThreadActionJournalService,
@@ -381,7 +426,7 @@ const runJournalMaintenance = (
     }
     return { ...next, state: deriveRuntimeState(next) }
   })
-  if (result.truncated) yield* Effect.logWarning("Discord journal recovery batch was truncated")
+  if (result.truncated === true) yield* Effect.logWarning("Discord journal recovery batch was truncated")
 }).pipe(
   Effect.tapError(() => Ref.update(health, (current): RuntimeHealthState => ({
     ...current,
@@ -389,11 +434,17 @@ const runJournalMaintenance = (
     state: "starting",
   }))),
   Effect.withSpan("runtime.journal.maintenance"),
+  Effect.orDie,
 )
 
 interface IdentityRest {
-  readonly getMyOauth2Application: () => Effect.Effect<{ readonly id: string }, unknown>
+  readonly getMyOauth2Application: () => Effect.Effect<{ readonly id: string }, DiscordIdentityReadError>
 }
+
+export class DiscordIdentityReadError extends Schema.TaggedError<DiscordIdentityReadError>()(
+  "DiscordIdentityReadError",
+  { message: Schema.String, cause: Schema.Defect() },
+) {}
 
 /** Verifies the token's application identity before mutation handlers exist. */
 export const verifyDiscordApplicationIdentity = (

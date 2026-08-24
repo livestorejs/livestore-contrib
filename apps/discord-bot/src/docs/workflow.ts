@@ -49,8 +49,10 @@ export const makeDocsWorkflowLayer = (admissionOptions: DocsWorkflowOptions = {}
         return unavailable('invalid_query')
       }
 
-      const snapshotResult = yield* corpus.snapshot({ refresh: input.refreshCorpus }).pipe(Effect.result)
-      if (Result.isFailure(snapshotResult)) {
+      const snapshotResult = yield* corpus.snapshot(
+        input.refreshCorpus === undefined ? {} : { refresh: input.refreshCorpus },
+      ).pipe(Effect.result)
+      if (Result.isFailure(snapshotResult) === true) {
         yield* telemetry.emit(event(input, 'corpus_unavailable'))
         return unavailable('corpus_unavailable')
       }
@@ -114,19 +116,20 @@ export const makeDocsWorkflowLayer = (admissionOptions: DocsWorkflowOptions = {}
           Effect.ensuring(Effect.suspend(() => Effect.all([
             admissionDecision.complete(observedUsage),
             monthlyReservation?._tag === 'Reserved'
-              ? admissionOptions.stateStore!.settleMonthly({
-                id: monthlyReservation.id,
-                outcome: 'charge',
-                // Unknown usage remains charged at the conservative reservation.
-                costUsdMicros: observedUsage === undefined
-                  ? undefined
-                  : (admissionOptions.estimatedCostUsdMicros ?? lunaCostUsdMicros)(observedUsage),
-              })
+              ? admissionOptions.stateStore!.settleMonthly(
+                observedUsage === undefined
+                  ? { id: monthlyReservation.id, outcome: 'charge' }
+                  : {
+                    id: monthlyReservation.id,
+                    outcome: 'charge',
+                    costUsdMicros: (admissionOptions.estimatedCostUsdMicros ?? lunaCostUsdMicros)(observedUsage),
+                  },
+              )
               : Effect.void,
           ]))),
         )
 
-      if (Result.isFailure(generated)) {
+      if (Result.isFailure(generated) === true) {
         yield* telemetry.emit(
           event(input, 'provider_unavailable', snapshot, cacheStatus, engine.configurationIdentity, sources.length),
         )
@@ -134,7 +137,7 @@ export const makeDocsWorkflowLayer = (admissionOptions: DocsWorkflowOptions = {}
       }
 
       const { candidate, usage } = generated.success
-      if (!hasValidCandidateShape(candidate)) {
+      if (hasValidCandidateShape(candidate) === false) {
         yield* telemetry.emit(
           event(
             input,
@@ -161,7 +164,7 @@ export const makeDocsWorkflowLayer = (admissionOptions: DocsWorkflowOptions = {}
       }
 
       const byId = new Map(sources.map((source) => [source.id, source]))
-      if (candidate.citations.some((citation) => !byId.has(citation))) {
+      if (candidate.citations.some((citation) => !byId.has(citation)) === true) {
         yield* telemetry.emit(
           event(input, 'invalid_citation', snapshot, cacheStatus, engine.configurationIdentity, sources.length, usage),
         )
@@ -171,7 +174,7 @@ export const makeDocsWorkflowLayer = (admissionOptions: DocsWorkflowOptions = {}
         const source = byId.get(id)
         return source === undefined ? [] : [{ id, canonicalUrl: source.canonicalUrl }]
       })
-      if (!Arr.isArrayNonEmpty(citations)) {
+      if (Arr.isArrayNonEmpty(citations) === false) {
         yield* telemetry.emit(
           event(input, 'invalid_citation', snapshot, cacheStatus, engine.configurationIdentity, sources.length, usage),
         )
@@ -228,7 +231,7 @@ const hasValidCandidateShape = (candidate: {
 }) => {
   if (candidate.answer.trim().length === 0) return false
   if (new Set(candidate.citations).size !== candidate.citations.length) return false
-  return candidate.supported ? candidate.citations.length > 0 : candidate.citations.length === 0
+  return candidate.supported === true ? candidate.citations.length > 0 : candidate.citations.length === 0
 }
 
 const event = (

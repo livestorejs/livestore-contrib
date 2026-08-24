@@ -59,7 +59,7 @@ export const makeThreadWorkflow = (ports: ThreadWorkflowPorts, config: ThreadWor
         return { _tag: "PolicyRejected", source: candidate.source, reason: decision.reason }
       }
     } else {
-      if (!candidate.trigger.authorized) return { _tag: "AuthorizationRejected", source: candidate.source }
+      if (candidate.trigger.authorized === false) return { _tag: "AuthorizationRejected", source: candidate.source }
       const reason = classifyIntentionalSource(candidate, config.policy)
       if (reason === "existing_thread" && candidate.existingThreadId !== undefined) {
         return { _tag: "AlreadySatisfied", source: candidate.source, threadId: candidate.existingThreadId }

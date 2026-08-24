@@ -36,7 +36,7 @@ describe("application command desired state", () => {
 
 describe("diffApplicationCommands", () => {
   it("is deterministic and independent of inventory order", () => {
-    const actual = [...desiredApplicationCommands].reverse()
+    const actual = desiredApplicationCommands.toReversed()
     expect(diffApplicationCommands(desiredApplicationCommands, actual)).toEqual({
       changes: [
         expect.objectContaining({ kind: "unchanged", key: "1:docs" }),

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import { Effect, Stream } from "effect"
 import { assessDfxTerminalCloseAdmission } from "../discord/terminal-close.ts"
-import { awaitGatewayReadySignal, verifyDiscordApplicationIdentity } from "./app.ts"
+import { awaitGatewayReadySignal, GatewayReadinessError, verifyDiscordApplicationIdentity } from "./app.ts"
 import { RuntimeConfigFile, summarizeConfig } from "./config.ts"
 import { isDefinitiveDiscordMutationFailure } from "./threading-adapter.ts"
 
@@ -108,11 +108,15 @@ describe("runtime config", () => {
   })
 
   it("admits readiness only after an actual READY dispatch", async () => {
-    await expect(Effect.runPromise(awaitGatewayReadySignal(Stream.make({ session_id: "session" }), Effect.never)))
+    await expect(Effect.runPromise(awaitGatewayReadySignal(Stream.make({ _tag: "Ready", shardId: 0 }), Effect.never)))
       .resolves.toBeUndefined()
+    for (const malformed of [null, {}, { _tag: "Ready", shardId: Number.NaN }]) {
+      await expect(Effect.runPromise(awaitGatewayReadySignal(Stream.make(malformed), Effect.never)))
+        .rejects.toMatchObject({ _tag: "GatewayReadinessError", reason: "stream_ended" })
+    }
     await expect(Effect.runPromise(awaitGatewayReadySignal(Stream.empty, Effect.never)))
-      .rejects.toBe("gateway_ready_stream_ended")
-    await expect(Effect.runPromise(awaitGatewayReadySignal(Stream.never, Effect.fail("terminal_gateway_failure"))))
-      .rejects.toBe("terminal_gateway_failure")
+      .rejects.toMatchObject({ _tag: "GatewayReadinessError", reason: "stream_ended" })
+    await expect(Effect.runPromise(awaitGatewayReadySignal(Stream.never, Effect.fail(new GatewayReadinessError({ reason: "terminal_failure", message: "terminal_gateway_failure" })))))
+      .rejects.toMatchObject({ _tag: "GatewayReadinessError", reason: "terminal_failure" })
   })
 })

@@ -21,8 +21,8 @@ describe("deployable runtime tracer bullet", () => {
       const config = yield* testConfig
       const runtime = yield* acquireRuntime(config, "test-config.json")
       const client = yield* makeUnixBotControlClient(config.controlSocketPath)
-      const source = Schema.decodeUnknownSync(DiscordMessageRef)({ guildId, channelId, messageId })
-      const reason = Schema.decodeUnknownSync(OperatorReason)("runtime tracer bullet")
+      const source = yield* Schema.decodeUnknownEffect(DiscordMessageRef)({ guildId, channelId, messageId })
+      const reason = yield* Schema.decodeUnknownEffect(OperatorReason)("runtime tracer bullet")
 
       const planned = yield* client.ThreadPlan({ source, name: "Runtime tracer", noAi: true })
       expect(planned._tag).toBe("Planned")
@@ -38,7 +38,7 @@ describe("deployable runtime tracer bullet", () => {
       expect(docs.summary).toContain("Fake source-backed answer")
 
       const reconciliation = yield* client.ThreadReconcile({
-        source: Schema.decodeUnknownSync(DiscordMessageRef)({ guildId, channelId, messageId: "100000000000000099" }),
+        source: yield* Schema.decodeUnknownEffect(DiscordMessageRef)({ guildId, channelId, messageId: "100000000000000099" }),
         all: false,
         apply: false,
       })
@@ -51,7 +51,7 @@ describe("deployable runtime tracer bullet", () => {
       expect(commandSync._tag).toBe("AlreadySatisfied")
 
       const automaticMessageId = "100000000000000004"
-      yield* runtime.eventHandlers.onAutomaticMessage(Schema.decodeUnknownSync(AutomaticMessage)({
+      yield* runtime.eventHandlers.onAutomaticMessage(yield* Schema.decodeUnknownEffect(AutomaticMessage)({
         guildId,
         channelId,
         messageId: automaticMessageId,
@@ -66,7 +66,7 @@ describe("deployable runtime tracer bullet", () => {
         hasAttachments: false,
         hasPoll: false,
       }))
-      const automaticSource = Schema.decodeUnknownSync(DiscordMessageRef)({ guildId, channelId, messageId: automaticMessageId })
+      const automaticSource = yield* Schema.decodeUnknownEffect(DiscordMessageRef)({ guildId, channelId, messageId: automaticMessageId })
       expect((yield* client.ThreadStatus({ source: automaticSource })).summary).toContain("state=created")
 
       const ready = yield* Effect.tryPromise(() => fetch(`http://127.0.0.1:${runtime.healthPort}/readyz`))
@@ -93,7 +93,7 @@ const testConfig = Effect.gen(function* () {
     _tag: "fake",
     environment: "staging",
     applicationId: "100000000000000010",
-    commandScope: Schema.decodeUnknownSync(ApplicationCommandScope)({
+    commandScope: yield* Schema.decodeUnknownEffect(ApplicationCommandScope)({
       _tag: "GuildCommandScope",
       applicationId: "100000000000000010",
       guildId,

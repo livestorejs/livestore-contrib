@@ -26,12 +26,12 @@ export const makeDfxThreadMutation = (
         Effect.mapError(
           cause =>
             new ThreadMutationError({
-              kind: isDefinitiveDiscordMutationFailure(cause) ? "terminal" : "ambiguous",
-              code: isDefinitiveDiscordMutationFailure(cause)
+              kind: isDefinitiveDiscordMutationFailure(cause) === true ? "terminal" : "ambiguous",
+              code: isDefinitiveDiscordMutationFailure(cause) === true
                 ? "discord_definitive_failure"
                 : "discord_create_outcome_unknown",
               message:
-                isDefinitiveDiscordMutationFailure(cause)
+                isDefinitiveDiscordMutationFailure(cause) === true
                   ? "Discord definitively rejected thread creation"
                   : "Discord thread creation did not return a safely classifiable result; reconcile before another write",
             }),

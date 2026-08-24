@@ -1,4 +1,4 @@
-import { Duration, Effect, Option, Redacted, Schema } from "effect"
+import { Duration, Effect, Option, Schema, type Redacted } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { TitleProposalError, type ThreadTitlePort } from "./title.ts"
 
@@ -38,7 +38,7 @@ export const makeOpenAiThreadTitlePort = (config: OpenAiThreadTitleConfig) =>
         Effect.mapError(() => titleFailure("transport", "The title provider could not be reached")),
         Effect.timeoutOption(Duration.millis(config.timeoutMillis ?? 10_000)),
       )
-      if (Option.isNone(responseOption)) {
+      if (Option.isNone(responseOption) === true) {
         return yield* titleFailure("timeout", "The title provider timed out")
       }
       const response = responseOption.value

@@ -88,7 +88,7 @@ class InternalTransitionConflict extends Error {
 
 const makeService = (options: SqliteJournalOptions): InternalService => {
   const busyTimeoutMs = options.busyTimeoutMs ?? defaultBusyTimeoutMs
-  if (!Number.isSafeInteger(busyTimeoutMs) || busyTimeoutMs < 0) {
+  if (Number.isSafeInteger(busyTimeoutMs) === false || busyTimeoutMs < 0) {
     throw new TypeError("busyTimeoutMs must be a non-negative safe integer")
   }
 
@@ -199,7 +199,7 @@ const makeService = (options: SqliteJournalOptions): InternalService => {
   const markCreated = (input: MarkCreatedInput) =>
     transition("markCreated", input, ["pending", "creating", "unknown_external"], "created", {
       threadId: input.threadId,
-      outcomeCode: input.resolution === "existing" ? "existing_thread" : undefined,
+      ...(input.resolution === "existing" ? { outcomeCode: "existing_thread" as const } : {}),
     })
 
   const markUnknownExternal = (input: MarkUnknownExternalInput) =>
@@ -217,7 +217,7 @@ const makeService = (options: SqliteJournalOptions): InternalService => {
 
   const observeAmbiguity = Effect.fn("discord.journal.observeAmbiguity")((input: ObserveAmbiguityInput) =>
     transitionEffect("observeAmbiguity", () => {
-      if (!Number.isSafeInteger(input.minimumObservations) || input.minimumObservations < 1) {
+      if (Number.isSafeInteger(input.minimumObservations) === false || input.minimumObservations < 1) {
         throw new TypeError("minimumObservations must be a positive safe integer")
       }
       database.exec("BEGIN IMMEDIATE")
@@ -226,7 +226,7 @@ const makeService = (options: SqliteJournalOptions): InternalService => {
           database.prepare("SELECT * FROM thread_actions WHERE source_message_id = ?").get(input.sourceMessageId),
         )
         const expectedStates: ReadonlyArray<JournalState> = ["creating", "unknown_external"]
-        if (current.claimToken !== input.claimToken || !expectedStates.includes(current.state)) {
+        if (current.claimToken !== input.claimToken || expectedStates.includes(current.state) === false) {
           throw new InternalTransitionConflict(input.sourceMessageId, expectedStates, "unknown_external")
         }
         const observationCount = current.observationCount + 1
@@ -238,10 +238,10 @@ const makeService = (options: SqliteJournalOptions): InternalService => {
             WHERE source_message_id = ? AND claim_token = ? AND state IN ('creating', 'unknown_external')
           `)
           .run(
-            exhausted ? "manual_review" : "unknown_external",
+            exhausted === true ? "manual_review" : "unknown_external",
             input.now,
             observationCount,
-            exhausted ? "ambiguous_mutation_unresolved" : "awaiting_remote_observation",
+            exhausted === true ? "ambiguous_mutation_unresolved" : "awaiting_remote_observation",
             input.sourceMessageId,
             input.claimToken,
           )
@@ -260,7 +260,7 @@ const makeService = (options: SqliteJournalOptions): InternalService => {
   const deleteExpiredTerminal = Effect.fn("discord.journal.deleteExpiredTerminal")((input: CleanupInput) =>
     fromDatabase("deleteExpiredTerminal", () => {
       const retentionMs = input.retentionMs ?? terminalRetentionMs
-      if (!Number.isSafeInteger(retentionMs) || retentionMs < 0) {
+      if (Number.isSafeInteger(retentionMs) === false || retentionMs < 0) {
         throw new TypeError("retentionMs must be a non-negative safe integer")
       }
       return Number(
@@ -401,10 +401,10 @@ const decodeRowRequired = (row: unknown): ThreadActionRecordType => {
       trigger: Schema.String,
       claim_token: Schema.String,
       thread_id: Schema.NullOr(Schema.String),
-      claimed_at: Schema.Number,
-      updated_at: Schema.Number,
-      reconcile_by: Schema.Number,
-      observation_count: Schema.Number,
+      claimed_at: Schema.Finite,
+      updated_at: Schema.Finite,
+      reconcile_by: Schema.Finite,
+      observation_count: Schema.Finite,
       outcome_code: Schema.NullOr(Schema.String),
     }),
   )(row) satisfies RawThreadActionRecord

@@ -20,9 +20,14 @@ const useApplicationCommands = 1n << 31n
 export interface RuntimeWorkflows {
   readonly thread: (candidate: ThreadCandidate) => Effect.Effect<ThreadOutcome>
   /** Resolves a channel's parent through Discord REST; absent in fake mode. */
-  readonly resolveDocsChannelParent?: (input: { readonly guildId: string; readonly channelId: string }) => Effect.Effect<{ readonly guildId: string; readonly parentChannelId?: string }, unknown>
+  readonly resolveDocsChannelParent?: (input: { readonly guildId: string; readonly channelId: string }) => Effect.Effect<{ readonly guildId: string; readonly parentChannelId?: string }, DocsChannelResolutionError>
   readonly docsReady?: boolean
 }
+
+export class DocsChannelResolutionError extends Schema.TaggedError<DocsChannelResolutionError>()(
+  "DocsChannelResolutionError",
+  { message: Schema.String },
+) {}
 
 export const makeDiscordEventHandlersLayer = (config: RuntimeConfigPayload, workflows: RuntimeWorkflows) =>
   Layer.effect(DiscordEventHandlers, Effect.gen(function* () {
@@ -58,11 +63,11 @@ export const makeDiscordEventHandlersLayer = (config: RuntimeConfigPayload, work
 
     const onDocsInteraction = Effect.fn("runtime.handlers.docsInteraction")(function* (input: DocsInteraction) {
       const resolved = workflows.resolveDocsChannelParent === undefined
-        ? Effect.succeed({ guildId: input.guildId, parentChannelId: undefined })
-        : workflows.resolveDocsChannelParent({ guildId: input.guildId, channelId: input.channelId }).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
+        ? Effect.succeed<{ readonly guildId: string; readonly parentChannelId?: string }>({ guildId: input.guildId })
+        : workflows.resolveDocsChannelParent({ guildId: input.guildId, channelId: input.channelId }).pipe(Effect.orDie, Effect.catchCause(() => Effect.void))
       const channel = yield* resolved
-      const authorized = workflows.docsReady !== false && channel !== undefined && channel.guildId === config.guildId && docsAuthorized(config, input, channel.parentChannelId)
-      if (!authorized) {
+      const authorized = workflows.docsReady !== false && channel !== undefined && channel.guildId === config.guildId && docsAuthorized(config, input, channel.parentChannelId) === true
+      if (authorized === false) {
         yield* actions.respondInteraction({
           route: input.route,
           visibility: "ephemeral",
@@ -89,9 +94,9 @@ export const makeDiscordEventHandlersLayer = (config: RuntimeConfigPayload, work
     })
 
     return DiscordEventHandlers.of({
-      onAutomaticMessage: input => safelyHandle(onAutomaticMessage(input)),
-      onCreateThreadInteraction: input => safelyHandle(onCreateThreadInteraction(input)),
-      onDocsInteraction: input => safelyHandle(onDocsInteraction(input)),
+      onAutomaticMessage: input => safelyHandle(onAutomaticMessage(input).pipe(Effect.orDie)),
+      onCreateThreadInteraction: input => safelyHandle(onCreateThreadInteraction(input).pipe(Effect.orDie)),
+      onDocsInteraction: input => safelyHandle(onDocsInteraction(input).pipe(Effect.orDie)),
     })
   }))
 
@@ -99,18 +104,18 @@ const toAutomaticCandidate = (config: RuntimeConfigPayload, input: AutomaticMess
   environment: Schema.decodeUnknownSync(EnvironmentName)(config.environment),
   source: { guildId: input.guildId, channelId: input.channelId, messageId: input.messageId },
   sourceChannelKind: input.sourceChannelKind ?? "GuildText",
-  messageKind: input.isReply ? "Reply" : input.authorIsSystem ? "System" : "Default",
+  messageKind: input.isReply === true ? "Reply" : input.authorIsSystem === true ? "System" : "Default",
   hasMessageReference: input.isReply,
-  authorKind: input.authorIsBot
+  authorKind: input.authorIsBot === true
     ? "Bot"
-    : input.hasWebhookAuthor
+    : input.hasWebhookAuthor === true
       ? "Webhook"
-      : input.hasApplicationAuthor
+      : input.hasApplicationAuthor === true
         ? "Application"
         : "Human",
   existingThreadId: input.existingThreadId,
   content: input.content,
-  attachmentCount: input.hasAttachments ? 1 : 0,
+  attachmentCount: input.hasAttachments === true ? 1 : 0,
   hasPoll: input.hasPoll,
   stickerCount: 0,
   trigger: { _tag: "Automatic", deliveryCorrelation: input.messageId },
@@ -125,12 +130,12 @@ const hasPermission = (encoded: string, permission: bigint) => {
 }
 
 const docsAuthorized = (config: RuntimeConfigPayload, input: DocsInteraction, parentChannelId?: string) => {
-  if (!hasPermission(input.actor.effectivePermissions, useApplicationCommands)) return false
-  if (!hasPermission(input.applicationPermissions, useApplicationCommands)) return false
+  if (hasPermission(input.actor.effectivePermissions, useApplicationCommands) === false) return false
+  if (hasPermission(input.applicationPermissions, useApplicationCommands) === false) return false
   const channelId = parentChannelId ?? input.channelId
-  if (config.docsAudience.publicChannelIds.includes(channelId)) return true
-  return config.docsAudience.roleRestrictedChannelIds.includes(channelId) &&
-    input.actor.roleIds.some(role => config.docsAudience.contributorMaintainerRoleIds.includes(role))
+  if (config.docsAudience.publicChannelIds.includes(channelId) === true) return true
+  return config.docsAudience.roleRestrictedChannelIds.includes(channelId) === true &&
+    input.actor.roleIds.some(role => config.docsAudience.contributorMaintainerRoleIds.includes(role)) === true
 }
 
 const renderThreadOutcome = (outcome: ThreadOutcome): string => {
@@ -145,8 +150,9 @@ const renderThreadOutcome = (outcome: ThreadOutcome): string => {
 }
 
 /** The Gateway callback cannot fail; report a content-free failure and keep serving. */
-const safelyHandle = (effect: Effect.Effect<void, unknown>) => effect.pipe(
+const safelyHandle = (effect: Effect.Effect<void, never>) => effect.pipe(
   Effect.catchCause(() => Effect.logError("Discord event handler failed")),
+  Effect.orDie,
 )
 
 /** Delivers one public initial response followed by ordered public messages. */
@@ -157,7 +163,7 @@ export const deliverDocsMessages = (
 ) => Effect.suspend(() => {
   let lastSuccessfulOrdinal = 0
   return Effect.gen(function* () {
-    const deliver = (content: string, followUp: boolean) => (followUp
+    const deliver = (content: string, followUp: boolean) => (followUp === true
       ? actions.followUpInteractionResponse({ route, visibility: "public", content })
       : actions.editInteractionResponse({ route, visibility: "public", content })).pipe(
         Effect.tap(() => Effect.sync(() => { lastSuccessfulOrdinal += 1 })),
