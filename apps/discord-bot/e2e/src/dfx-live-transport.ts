@@ -69,7 +69,7 @@ export const defaultRunCommand: CommandRunner = (executable, args) =>
   })
 
 const asSnowflake = (value: string, operation: string): Snowflake => {
-  if (!/^\d{17,20}$/u.test(value)) throw new Error(`${operation} returned an invalid snowflake`)
+  if (/^\d{17,20}$/u.test(value) === false) throw new Error(`${operation} returned an invalid snowflake`)
   return value as Snowflake
 }
 

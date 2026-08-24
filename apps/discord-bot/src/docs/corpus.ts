@@ -73,7 +73,16 @@ export const digestCorpus = Effect.fn('docs.corpus.digest')(function* (content: 
       }),
   })
   const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-  return Schema.decodeUnknownSync(CorpusDigest)(`sha256:${hex}`)
+  return yield* Schema.decodeUnknownEffect(CorpusDigest)(`sha256:${hex}`).pipe(
+    Effect.mapError(
+      (cause) =>
+        new CorpusUnavailable({
+          reason: 'invalid',
+          message: 'Could not encode the documentation corpus digest',
+          cause,
+        }),
+    ),
+  )
 })
 
 export const loadCanonicalSnapshot = Effect.fn('docs.corpus.load')(function* (
@@ -105,7 +114,7 @@ export const loadCanonicalSnapshot = Effect.fn('docs.corpus.load')(function* (
     })
   }
   const contentType = response.headers['content-type']?.toLowerCase() ?? ''
-  if (!contentType.startsWith('text/plain')) {
+  if (contentType.startsWith('text/plain') === false) {
     return yield* new CorpusUnavailable({
       reason: 'content_type',
       message: `The canonical corpus returned unsupported content type ${contentType || 'missing'}`,

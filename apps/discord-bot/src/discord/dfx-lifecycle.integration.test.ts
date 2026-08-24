@@ -6,6 +6,8 @@ import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import { describe, expect, it } from "vitest"
 
+type WebSocketBinaryType = "blob" | "arraybuffer"
+
 /**
  * This deliberately exercises DFX's Sharder and Shard layers, rather than
  * reproducing their PubSub/queue implementation in application code.
@@ -70,7 +72,7 @@ class TestGatewaySocket extends EventTarget implements globalThis.WebSocket {
   readonly protocol = ""
   readonly readyState = this.OPEN
   readonly url = "wss://gateway.discord.test"
-  binaryType: BinaryType = "blob"
+  binaryType: WebSocketBinaryType = "blob"
   onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null
   onerror: ((this: WebSocket, ev: Event) => unknown) | null = null
   onmessage: ((this: WebSocket, ev: MessageEvent) => unknown) | null = null
@@ -107,7 +109,7 @@ class TerminalGatewaySocket extends EventTarget implements globalThis.WebSocket 
   readonly protocol = ""
   readonly readyState = this.OPEN
   readonly url = "wss://gateway.discord.test"
-  binaryType: BinaryType = "blob"
+  binaryType: WebSocketBinaryType = "blob"
   onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null
   onerror: ((this: WebSocket, ev: Event) => unknown) | null = null
   onmessage: ((this: WebSocket, ev: MessageEvent) => unknown) | null = null

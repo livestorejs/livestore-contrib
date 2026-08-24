@@ -17,6 +17,7 @@ const applicationId = Schema.decodeSync(DiscordSnowflake)("200000000000000001")
 const guildId = Schema.decodeSync(DiscordSnowflake)("300000000000000001")
 const guildScope: GuildCommandScope = { _tag: "GuildCommandScope", applicationId, guildId }
 const globalScope: GlobalCommandScope = { _tag: "GlobalCommandScope", applicationId }
+const retiredApplicationId = Schema.decodeSync(DiscordSnowflake)(RetiredHistoricalApplicationId)
 
 describe("DFX application command port", () => {
   it.effect("uses only the configured guild route for staging-style scope", () =>
@@ -57,7 +58,7 @@ describe("DFX application command port", () => {
       const port = makeDfxApplicationCommandsPort(fakeRest(calls, []))
       const retired: GlobalCommandScope = {
         _tag: "GlobalCommandScope",
-        applicationId: Schema.decodeSync(DiscordSnowflake)(RetiredHistoricalApplicationId),
+        applicationId: retiredApplicationId,
       }
       const listError = yield* port.list(retired).pipe(Effect.flip)
       const replaceError = yield* port.replace(retired, desiredApplicationCommands).pipe(Effect.flip)

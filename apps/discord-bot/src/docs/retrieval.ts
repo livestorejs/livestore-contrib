@@ -62,7 +62,7 @@ export const selectDocumentationSources = (
       return { source, ordinal, score }
     })
     .filter(({ score }) => score > 0)
-    .sort((left, right) => right.score - left.score || left.ordinal - right.ordinal)
+    .toSorted((left, right) => right.score - left.score || left.ordinal - right.ordinal)
 
   const candidates =
     ranked.length > 0 ? ranked : snapshot.sources.slice(0, 1).map((source, ordinal) => ({ source, ordinal, score: 0 }))

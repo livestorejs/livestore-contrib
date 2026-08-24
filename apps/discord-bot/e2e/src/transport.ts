@@ -7,7 +7,7 @@ import type {
 } from "./model.ts"
 
 export class E2EPrerequisiteUnavailableError extends Error {
-  readonly name = "E2EPrerequisiteUnavailableError"
+  override readonly name = "E2EPrerequisiteUnavailableError"
 }
 
 export type OperatorResult =

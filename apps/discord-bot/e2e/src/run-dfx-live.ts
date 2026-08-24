@@ -45,17 +45,31 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
         executable: input.humanHandoffBrokerExecutable,
         runCommand: input.runCommand ?? defaultRunCommand,
       })
+  const createHumanMessage = input.createHumanMessage ?? humanBroker?.createMessage
+  const invokeMessageAction = input.invokeMessageAction ?? humanBroker?.invokeMessageAction
+  const invokeDocs = input.invokeDocs ?? humanBroker?.invokeDocs
+  const deleteHumanResponse = input.deleteHumanResponse ?? humanBroker?.deleteResponse
   const live = makeDfxLiveTransport({
     actorBotToken: input.actorBotToken,
     target: input.manifest.target,
     botControlSocket: input.manifest.botControlSocket,
-    cliExecutable: input.cliExecutable,
-    runCommand: input.runCommand,
-    createHumanMessage: input.createHumanMessage ?? humanBroker?.createMessage,
-    invokeMessageAction: input.invokeMessageAction ?? humanBroker?.invokeMessageAction,
-    invokeDocs: input.invokeDocs ?? humanBroker?.invokeDocs,
-    deleteHumanResponse: input.deleteHumanResponse ?? humanBroker?.deleteResponse,
-    deleteHumanMessage: humanBroker?.deleteMessage,
+    ...(input.cliExecutable === undefined ? {} : { cliExecutable: input.cliExecutable }),
+    ...(input.runCommand === undefined ? {} : { runCommand: input.runCommand }),
+    ...(createHumanMessage === undefined
+      ? {}
+      : { createHumanMessage }),
+    ...(invokeMessageAction === undefined
+      ? {}
+      : { invokeMessageAction }),
+    ...(invokeDocs === undefined
+      ? {}
+      : { invokeDocs }),
+    ...(deleteHumanResponse === undefined
+      ? {}
+      : { deleteHumanResponse }),
+    ...(humanBroker?.deleteMessage === undefined
+      ? {}
+      : { deleteHumanMessage: humanBroker.deleteMessage }),
   })
   try {
     return await runLiveStaging({

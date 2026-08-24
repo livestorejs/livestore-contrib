@@ -91,7 +91,7 @@ export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
       const message = { id: id(), channelId, marker, author } satisfies MessageSnapshot
       messages.set(message.id, message)
       counts.createdMessages += 1
-      if (author === "human" && !isFiltered(content)) await createThread(message)
+      if (author === "human" && isFiltered(content) === false) await createThread(message)
       return message
     },
     findThreadForMessage: async (_guildId, sourceMessageId) => threads.get(sourceMessageId),
@@ -102,7 +102,7 @@ export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
       if (existing !== undefined) return { _tag: "AlreadySatisfied", thread: existing }
       const wasPending = pendingCreates.has(sourceMessageId)
       const thread = await createThread(source)
-      return wasPending
+      return wasPending === true
         ? { _tag: "AlreadySatisfied", thread }
         : { _tag: "Created", thread }
     },
@@ -120,20 +120,20 @@ export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
     invokeDocs: async ({ marker, location, persona }): Promise<DocsResult> => {
       const authorized =
         location === "public" || persona === "contributor" || persona === "maintainer"
-      return authorized
+      return authorized === true
         ? { _tag: "Answered", response: response(marker, true, true) }
         : { _tag: "Denied", response: response(marker, false, false) }
     },
     deleteThread: async (threadId) => {
-      if (!threads.delete(threadId)) throw new Error("thread not found")
+      if (threads.delete(threadId) === false) throw new Error("thread not found")
       counts.deletedThreads += 1
     },
     deleteMessage: async (_channelId, messageId) => {
-      if (!messages.delete(messageId)) throw new Error("message not found")
+      if (messages.delete(messageId) === false) throw new Error("message not found")
       counts.deletedMessages += 1
     },
     deleteResponse: async (responseId) => {
-      if (!responses.delete(responseId)) throw new Error("response not found")
+      if (responses.delete(responseId) === false) throw new Error("response not found")
       counts.deletedResponses += 1
     },
   }

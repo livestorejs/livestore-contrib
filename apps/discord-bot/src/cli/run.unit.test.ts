@@ -10,6 +10,7 @@ import { CliOperationNames, decodeMessageUrl, parseCli } from './parse.ts'
 import { runCli } from './run.ts'
 
 const messageUrl = 'https://discord.com/channels/10000000000000001/10000000000000002/10000000000000003'
+const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
 const result = Schema.decodeUnknownSync(ControlResult)({
   _tag: 'Success',
   summary: 'operation completed',
@@ -107,7 +108,7 @@ describe('livestore-discord control CLI', () => {
       const exit = yield* runCli(['thread', 'inspect', messageUrl, '--output', 'json'], client, fixture.io)
       expect(exit).toBe(CliExit.Success)
       expect(fixture.calls).toEqual(['ThreadInspect'])
-      expect(JSON.parse(fixture.stdout[0] ?? '')).toEqual({
+      expect(decodeJson(fixture.stdout[0] ?? '')).toEqual({
         _tag: 'Success',
         summary: 'operation completed',
         correlationId: 'correlation-1',
@@ -163,7 +164,7 @@ describe('livestore-discord control CLI', () => {
       const client = yield* RpcTest.makeClient(BotControl)
       const exit = yield* runCli(['thread', 'inspect', messageUrl, '--output', 'json'], client, fixture.io)
       expect(exit).toBe(CliExit.Rejected)
-      expect(JSON.parse(fixture.stdout[0] ?? '')).toEqual({
+      expect(decodeJson(fixture.stdout[0] ?? '')).toEqual({
         _tag: 'ControlAuthorizationRejected',
         message: 'operator denied',
       })

@@ -131,7 +131,7 @@ describe("Discord bot composed E2E tracer bullet", () => {
     const transport = {
       ...world.transport,
       deleteThread: async (threadId: Snowflake) => {
-        if (first) {
+        if (first === true) {
           first = false
           throw new Error("fixture cleanup failure")
         }

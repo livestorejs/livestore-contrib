@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
-import { Rpc, RpcClient, RpcGroup } from 'effect/unstable/rpc'
+import { Rpc, RpcGroup } from 'effect/unstable/rpc'
+import type { RpcClient } from 'effect/unstable/rpc'
 
 import {
   AmbiguousJournalState,

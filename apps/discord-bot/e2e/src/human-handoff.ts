@@ -58,7 +58,7 @@ export const makeCommandHumanHandoffBroker = (input: {
 }
 
 const record = (value: unknown, label: string): Record<string, unknown> => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (typeof value !== "object" || value === null || Array.isArray(value) === true) {
     throw new Error(`Human handoff broker returned invalid ${label}`)
   }
   return value as Record<string, unknown>
@@ -73,7 +73,7 @@ const attended = (decoded: Record<string, unknown>, label: string): void => {
 }
 
 const snowflake = (value: unknown, label: string): Snowflake => {
-  if (typeof value !== "string" || !/^\d{17,20}$/u.test(value)) {
+  if (typeof value !== "string" || /^\d{17,20}$/u.test(value) === false) {
     throw new Error(`Human handoff broker returned invalid ${label}`)
   }
   return value as Snowflake

@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises"
 import { Effect, Schema } from "effect"
 import { ApplicationCommandScope, RetiredHistoricalApplicationId } from "../application-commands/index.ts"
-import { BotDeploymentConfig, DeploymentBase, normalizeDeploymentConfig } from "./deployment-contract.ts"
+import { DeploymentBase, normalizeDeploymentConfig } from "./deployment-contract.ts"
+import type { BotDeploymentConfig } from "./deployment-contract.ts"
 
 const NonEmpty = Schema.Trimmed.check(Schema.isNonEmpty())
 const AbsolutePath = NonEmpty.check(Schema.makeFilter((value: string) => value.startsWith("/"), { expected: "an absolute filesystem path" }))

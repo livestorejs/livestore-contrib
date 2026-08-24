@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest"
-import { Effect, Redacted } from "effect"
+import { Effect, Redacted, Schema } from "effect"
 import { HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
 import { expect } from "vitest"
 import {
@@ -38,7 +38,7 @@ it("pins a foreground no-storage Luna request with a strict title schema", () =>
 
 it("places only the supplied projected string beside fixed instructions", () => {
   const projected = "Discuss sync with [user] using [link]"
-  const serialized = JSON.stringify(makeOpenAiTitleRequest(projected))
+  const serialized = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(makeOpenAiTitleRequest(projected))
 
   expect(serialized.match(new RegExp(projected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))).toHaveLength(1)
   for (const excluded of [
@@ -52,7 +52,7 @@ it("places only the supplied projected string beside fixed instructions", () => 
 
 it.effect("decodes a strict structured title from the Responses envelope", () =>
   Effect.gen(function* () {
-    const port = yield* makePortWithResponse(200, responseEnvelope(JSON.stringify({ title: "Cross-tab sync" })))
+    const port = yield* makePortWithResponse(200, responseEnvelope(jsonString({ title: "Cross-tab sync" })))
     expect(yield* port.propose("How does sync work?")).toBe("Cross-tab sync")
   }),
 )
@@ -65,18 +65,18 @@ it.effect("returns content-free typed status and decode failures", () =>
     expect(status._tag).toBe("Failure")
     if (status._tag === "Failure") {
       expect(status.failure.code).toBe("status")
-      expect(JSON.stringify(status.failure)).not.toContain(privateInput)
+      expect(jsonString(status.failure)).not.toContain(privateInput)
     }
 
     const decodePort = yield* makePortWithResponse(
       200,
-      responseEnvelope(JSON.stringify({ title: "Valid", unexpected: privateInput })),
+      responseEnvelope(jsonString({ title: "Valid", unexpected: privateInput })),
     )
     const decode = yield* Effect.result(decodePort.propose(privateInput))
     expect(decode._tag).toBe("Failure")
     if (decode._tag === "Failure") {
       expect(decode.failure.code).toBe("decode")
-      expect(JSON.stringify(decode.failure)).not.toContain(privateInput)
+      expect(jsonString(decode.failure)).not.toContain(privateInput)
     }
   }),
 )
@@ -115,7 +115,7 @@ it.effect("distinguishes timeout from transport and rejects out-of-bound input b
 const makePortWithResponse = (status: number, body: unknown) => {
   const client = HttpClient.make(request => Effect.succeed(HttpClientResponse.fromWeb(
     request,
-    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }),
+    new Response(jsonString(body), { status, headers: { "content-type": "application/json" } }),
   )))
   return makeOpenAiThreadTitlePort({ apiKey }).pipe(Effect.provideService(HttpClient.HttpClient, client))
 }
@@ -127,3 +127,5 @@ const responseEnvelope = (text: string) => ({
     content: [{ type: "output_text", text }],
   }],
 })
+
+const jsonString = (value: unknown) => Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)

@@ -17,7 +17,7 @@ export type GatewayCloseDisposition = typeof GatewayCloseDisposition.Type
 
 /** Mirrors the selected DFX capability used before its reconnect schedule. */
 export const classifyGatewayClose = (code: number): GatewayCloseDisposition =>
-  DiscordWS.isTerminalGatewayCloseCode(code)
+  DiscordWS.isTerminalGatewayCloseCode(code) === true
     ? { _tag: "Terminate", code }
     : { _tag: "Reconnect", code }
 
@@ -48,10 +48,14 @@ export const assessDfxTerminalCloseAdmission: Effect.Effect<
     new DiscordWS.TerminalGatewayCloseError({ code: 4004 })._tag ===
     "TerminalGatewayCloseError"
 
-  return LIB_VERSION === "1.0.15" &&
-    terminalSetIsExact &&
-    transientRemainsRetryable &&
-    typedFailureIsPresent
+  // This aggregate intentionally models the admission contract as a boolean.
+  // oxlint-disable-next-line overeng/explicit-boolean-compare
+  return [
+    LIB_VERSION === "1.0.15",
+    terminalSetIsExact,
+    transientRemainsRetryable,
+    typedFailureIsPresent,
+  ].every(value => value === true)
     ? Effect.void
     : Effect.fail(
         new TerminalCloseAdmissionError({

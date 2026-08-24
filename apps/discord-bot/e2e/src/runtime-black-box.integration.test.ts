@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
-import { createConnection, createServer } from "node:net"
+import { createConnection, createServer, type Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { DatabaseSync } from "node:sqlite"
@@ -212,7 +212,7 @@ const cli = async (
       `CLI ${args.slice(0, 2).join(" ")} returned invalid JSON: ${summarizeFailure(result)} runtime=${summarizeFailure(runtime.output())}`,
     )
   }
-  if (!isControlResult(decoded)) {
+  if (isControlResult(decoded) === false) {
     throw new Error(`CLI ${args.slice(0, 2).join(" ")} returned an invalid control result`)
   }
   return decoded
@@ -241,7 +241,7 @@ const startChild = (args: ReadonlyArray<string>): RunningChild => {
 }
 
 const stopChild = async (running: RunningChild) => {
-  if (!runningChildren.has(running)) return
+  if (runningChildren.has(running) === false) return
   if (running.child.exitCode !== null || running.child.signalCode !== null) {
     runningChildren.delete(running)
     await running.exited
@@ -252,7 +252,7 @@ const stopChild = async (running: RunningChild) => {
     running.exited.then(() => true),
     new Promise<false>(resolveTimeout => setTimeout(() => resolveTimeout(false), 3_000)),
   ])
-  if (!exited) {
+  if (exited === false) {
     running.child.kill("SIGKILL")
     await running.exited
   }
@@ -269,7 +269,7 @@ const waitUntilReady = async (port: number, runtime: RunningChild) => {
     }
     try {
       const response = await fetch(`http://127.0.0.1:${port}/readyz`, { signal: AbortSignal.timeout(500) })
-      if (response.ok) return await response.json()
+      if (response.ok === true) return await response.json()
     } catch {
       // Connection refusal is expected while the child acquires its resources.
     }
@@ -334,11 +334,11 @@ const childEnvironment = (): NodeJS.ProcessEnv => ({
 
 /** Holds both control connections until they have concurrently reached the process boundary. */
 const makeTwoClientBarrier = async (path: string, upstreamPath: string) => {
-  const clients: Array<{ readonly socket: import("node:net").Socket; data: string; ended: boolean }> = []
-  const sockets = new Set<import("node:net").Socket>()
+  const clients: Array<{ readonly socket: Socket; data: string; ended: boolean }> = []
+  const sockets = new Set<Socket>()
   let arrivals = 0
   const release = () => {
-    if (clients.length !== 2 || clients.some(client => !client.ended)) return
+    if (clients.length !== 2 || clients.some(client => client.ended === false) === true) return
     for (const admitted of clients) {
       const upstream = createConnection(upstreamPath)
       sockets.add(upstream)

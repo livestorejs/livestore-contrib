@@ -15,8 +15,9 @@ export const makeApplicationCommandsReconciler = (port: ApplicationCommandsPort)
       Effect.map(actual => diffApplicationCommands(desiredForScope(scope), actual)),
       Effect.withSpan("discord.applicationCommands.diff"),
     ),
-  sync: (scope: ApplicationCommandScope) =>
-    Effect.gen(function* () {
+  sync: Effect.fn("discord.applicationCommands.sync")(function* (
+    scope: ApplicationCommandScope,
+  ) {
       const desired = desiredForScope(scope)
       const actual = yield* port.list(scope)
       const before = diffApplicationCommands(desired, actual)
@@ -26,18 +27,18 @@ export const makeApplicationCommandsReconciler = (port: ApplicationCommandsPort)
           message: "Discord returned duplicate command identities; refusing bulk replacement",
         })
       }
-      if (!before.hasChanges) return { changed: false as const, before, after: before }
+      if (before.hasChanges === false) return { changed: false as const, before, after: before }
 
       const replaced = yield* port.replace(scope, desired)
       const after = diffApplicationCommands(desired, replaced)
-      if (after.hasChanges) {
+      if (after.hasChanges === true) {
         return yield* new ApplicationCommandResidualDrift({
           diff: after,
           message: "Discord application commands still drift after bulk replacement",
         })
       }
       return { changed: true as const, before, after }
-    }).pipe(Effect.withSpan("discord.applicationCommands.sync")),
+  }),
 })
 
 const desiredForScope = (

@@ -44,12 +44,12 @@ export const initialHealthState = (
 })
 
 export const isReady = (state: RuntimeHealthState) =>
-  state.state !== "terminal" && state.actionAuthority && state.journal && state.identityVerified && state.restProbe === "ok" &&
-  state.gateway === "ready" && state.handlersRegistered
+  state.state !== "terminal" && state.actionAuthority === true && state.journal === true && state.identityVerified === true && state.restProbe === "ok" &&
+  state.gateway === "ready" && state.handlersRegistered === true
 
 /** Computes lifecycle state from dependency observations; callers do not set ready by hand. */
 export const deriveRuntimeState = (state: RuntimeHealthState): RuntimeState =>
-  state.state === "terminal" ? "terminal" : isReady(state) ? "ready" :
+  state.state === "terminal" ? "terminal" : isReady(state) === true ? "ready" :
     state.gateway === "disconnected" || state.gateway === "fatal" || state.restProbe === "failed" ? "degraded" : "starting"
 
 export const serveHealth = (state: Ref.Ref<RuntimeHealthState>, host: "127.0.0.1", port: number) =>
@@ -63,7 +63,7 @@ export const serveHealth = (state: Ref.Ref<RuntimeHealthState>, host: "127.0.0.1
         Effect.runPromise(Ref.get(state)).then(current => {
           const ready = isReady(current)
           const success = request.url === "/healthz" ? current.state !== "terminal" : ready
-          response.writeHead(success ? 200 : 503, { "content-type": "application/json" })
+          response.writeHead(success === true ? 200 : 503, { "content-type": "application/json" })
           response.end(JSON.stringify({ apiVersion: 1, state: current.state, ready, environment: current.environment,
             releaseId: current.releaseId, capabilities: { threading: isReady(current), docs: current.docsReady },
             identityVerified: current.identityVerified, restProbe: current.restProbe, lastRestProbeAt: current.lastRestProbeAt,

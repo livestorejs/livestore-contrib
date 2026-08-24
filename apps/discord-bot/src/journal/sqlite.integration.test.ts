@@ -23,7 +23,7 @@ describe("SQLite thread action journal", () => {
   it.effect("reports unavailable storage as a typed readiness failure", () =>
     Effect.gen(function* () {
       const missingParent = `/tmp/livestore-discord-missing-${randomUUID()}/journal.sqlite`
-      const failure = yield* Effect.flip(Effect.scoped(makeSqliteThreadActionJournal({ path: missingParent })))
+      const failure = yield* Effect.scoped(makeSqliteThreadActionJournal({ path: missingParent })).pipe(Effect.flip)
       expect(failure).toBeInstanceOf(JournalUnavailableError)
       expect(failure.operation).toBe("initialize")
     }),

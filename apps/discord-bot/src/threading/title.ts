@@ -35,7 +35,7 @@ export const projectAiTitleInput = (content: string): string | undefined => {
 /** Validates an external or operator proposal without silently repairing it. */
 export const validateThreadName = (proposal: string): ThreadName | undefined => {
   const normalized = normalizeWhitespace(proposal)
-  if (normalized.length === 0 || [...normalized].length > maxThreadNameCodePoints || /\p{C}/u.test(normalized)) return undefined
+  if (normalized.length === 0 || [...normalized].length > maxThreadNameCodePoints || /\p{C}/u.test(normalized) === true) return undefined
   return Schema.decodeUnknownSync(ThreadName)(normalized)
 }
 
@@ -52,7 +52,7 @@ export const resolveThreadName = Effect.fn("threading.resolveThreadName")(
       return validateThreadName(candidate.trigger.requestedTitle) ?? deriveLocalThreadName(candidate.content)
     }
 
-    if (!config.aiTitleChannelIds.has(candidate.source.channelId)) return deriveLocalThreadName(candidate.content)
+    if (config.aiTitleChannelIds.has(candidate.source.channelId) === false) return deriveLocalThreadName(candidate.content)
     const input = projectAiTitleInput(candidate.content)
     if (input === undefined) return deriveLocalThreadName(candidate.content)
 

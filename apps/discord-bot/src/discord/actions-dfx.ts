@@ -53,7 +53,15 @@ export const DiscordActionsDfxLive = Layer.effect(
             ),
             Effect.withSpan("discord.actions.editInteractionResponse"),
           ),
-      followUpInteractionResponse: message => followUpInteractionResponse(rest, message),
+  followUpInteractionResponse: message => followUpInteractionResponse({
+    executeWebhook: (webhookId, webhookToken, options) => rest
+      .executeWebhook(webhookId, webhookToken, options)
+      .pipe(Effect.mapError(cause => new DiscordActionError({
+        operation: "follow-up-interaction-response",
+        message: "Discord failed to send an interaction follow-up response",
+        cause,
+      }))),
+  }, message),
       respondInteraction: message => respondInteraction(rest, message),
     })
   }),
@@ -71,7 +79,7 @@ interface FollowUpRest {
         readonly allowed_mentions: { readonly parse: readonly [] }
       }
     },
-  ) => Effect.Effect<unknown, unknown>
+  ) => Effect.Effect<unknown, DiscordActionError>
 }
 
 /** Application follow-ups use the interaction token as a webhook credential. */
@@ -85,8 +93,10 @@ export const followUpInteractionResponse = (
     params: { wait: true },
     payload: {
       content: message.content,
-      flags: message.visibility === "ephemeral" ? Discord.MessageFlags.Ephemeral : undefined,
       allowed_mentions: { parse: [] },
+      ...(message.visibility === "ephemeral"
+        ? { flags: Discord.MessageFlags.Ephemeral }
+        : {}),
     },
   },
 ).pipe(

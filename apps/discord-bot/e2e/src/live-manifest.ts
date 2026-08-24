@@ -10,13 +10,13 @@ export interface LiveManifest {
 }
 
 export class LiveManifestError extends Error {
-  readonly name = "LiveManifestError"
+  override readonly name = "LiveManifestError"
 }
 
 const snowflakePattern = /^\d{17,20}$/u
 
 const object = (value: unknown, label: string): Record<string, unknown> => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (typeof value !== "object" || value === null || Array.isArray(value) === true) {
     throw new LiveManifestError(`${label} must be an object`)
   }
   return value as Record<string, unknown>
@@ -40,12 +40,12 @@ const string = (value: unknown, label: string): string => {
 
 const snowflake = (value: unknown, label: string): Snowflake => {
   const parsed = string(value, label)
-  if (!snowflakePattern.test(parsed)) throw new LiveManifestError(`${label} must be a snowflake`)
+  if (snowflakePattern.test(parsed) === false) throw new LiveManifestError(`${label} must be a snowflake`)
   return parsed as Snowflake
 }
 
 const positiveInteger = (value: unknown, label: string): number => {
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+  if (typeof value !== "number" || Number.isSafeInteger(value) === false || value <= 0) {
     throw new LiveManifestError(`${label} must be a positive integer`)
   }
   return value
@@ -85,7 +85,7 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
   )
   const guildId = snowflake(targetInput.guildId, "target.guildId")
   const channelId = snowflake(targetInput.channelId, "target.channelId")
-  if (!Array.isArray(targetInput.allowedChannelIds)) {
+  if (Array.isArray(targetInput.allowedChannelIds) === false) {
     throw new LiveManifestError("target.allowedChannelIds must be an array")
   }
   const allowedChannelIds = new Set(
@@ -93,7 +93,7 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
       snowflake(value, `target.allowedChannelIds[${index}]`),
     ),
   )
-  if (!allowedChannelIds.has(channelId)) {
+  if (allowedChannelIds.has(channelId) === false) {
     throw new LiveManifestError("target.channelId must be explicitly allowlisted")
   }
   if (targetInput.requiredTopicSentinel !== topicSentinel) {
@@ -101,15 +101,15 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
   }
 
   const actorBotTokenRef = string(root.actorBotTokenRef, "actorBotTokenRef")
-  if (!/^op:\/\/[^/]+\/[^/]+\/.+$/u.test(actorBotTokenRef)) {
+  if (/^op:\/\/[^/]+\/[^/]+\/.+$/u.test(actorBotTokenRef) === false) {
     throw new LiveManifestError("actorBotTokenRef must be an op:// reference")
   }
   const botControlSocket = string(root.botControlSocket, "botControlSocket")
   const normalizedSocket = posix.normalize(botControlSocket)
   if (
     normalizedSocket !== botControlSocket ||
-    !normalizedSocket.startsWith("/run/discord-bot/staging/") ||
-    !normalizedSocket.endsWith(".sock")
+    normalizedSocket.startsWith("/run/discord-bot/staging/") === false ||
+    normalizedSocket.endsWith(".sock") === false
   ) {
     throw new LiveManifestError(
       "botControlSocket must be a normalized .sock path inside /run/discord-bot/staging",

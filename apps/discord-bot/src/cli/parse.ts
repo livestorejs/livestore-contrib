@@ -47,7 +47,7 @@ const helpFor = (scope: string, action?: string) => {
 }
 
 export const parseCli = (args: readonly string[]): ParseResult => {
-  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+  if (args.length === 0 || args.includes('--help') === true || args.includes('-h') === true) {
     return { _tag: 'Help', text: args.length === 0 ? rootHelp : helpFor(args[0] ?? '', args[1]) }
   }
 
@@ -72,18 +72,18 @@ export const parseCli = (args: readonly string[]): ParseResult => {
     run: CliInvocation['run'],
     permitsNdjson = false,
   ): ParseResult =>
-    output === 'ndjson' && !permitsNdjson
+    output === 'ndjson' && permitsNdjson === false
       ? usage('--output ndjson is only valid for a streaming or list command')
       : { _tag: 'Invocation', invocation: { operation, output, permitsNdjson, run } }
 
   if (scope === 'thread' && action === 'inspect') {
     const value = readSource()
-    if (isParseResult(value)) return value
+    if (isParseResult(value) === true) return value
     return invocation('ThreadInspect', (client) => client.ThreadInspect({ source: value }))
   }
   if (scope === 'thread' && action === 'plan') {
     const value = readSource()
-    if (isParseResult(value)) return value
+    if (isParseResult(value) === true) return value
     return invocation('ThreadPlan', (client) =>
       client.ThreadPlan({
         source: value,
@@ -94,7 +94,7 @@ export const parseCli = (args: readonly string[]): ParseResult => {
   }
   if (scope === 'thread' && action === 'create') {
     const value = readSource()
-    if (isParseResult(value)) return value
+    if (isParseResult(value) === true) return value
     const guard = parseMutationGuard(args)
     if (guard._tag === 'UsageError') return usage(guard.message)
     return invocation('ThreadCreate', (client) =>
@@ -107,20 +107,20 @@ export const parseCli = (args: readonly string[]): ParseResult => {
   }
   if (scope === 'thread' && action === 'status') {
     const value = readSource()
-    if (isParseResult(value)) return value
+    if (isParseResult(value) === true) return value
     return invocation('ThreadStatus', (client) => client.ThreadStatus({ source: value }))
   }
   if (scope === 'thread' && action === 'reconcile') {
-    const all = args.includes('--all')
-    const sourceResult = all ? undefined : readSource()
-    if (sourceResult !== undefined && isParseResult(sourceResult)) return sourceResult
-    const apply = args.includes('--apply')
-    const reason = apply ? decodeReason(readFlag(args, '--reason')) : undefined
+    const all = args.includes('--all') === true
+    const sourceResult = all === true ? undefined : readSource()
+    if (sourceResult !== undefined && isParseResult(sourceResult) === true) return sourceResult
+    const apply = args.includes('--apply') === true
+    const reason = apply === true ? decodeReason(readFlag(args, '--reason')) : undefined
     if (reason?._tag === 'UsageError') return usage(reason.message)
-    const environmentResult = apply ? decodeEnvironment(readFlag(args, '--environment')) : undefined
+    const environmentResult = apply === true ? decodeEnvironment(readFlag(args, '--environment')) : undefined
     if (environmentResult?._tag === 'UsageError') return usage(environmentResult.message)
     const state = readFlag(args, '--state')
-    if (state !== undefined && !['creating', 'unknown_external'].includes(state)) {
+    if (state !== undefined && ['creating', 'unknown_external'].includes(state) === false) {
       return usage('--state must be creating or unknown_external')
     }
     const limit = readOptionalPositiveInt(args, '--limit')
@@ -142,7 +142,7 @@ export const parseCli = (args: readonly string[]): ParseResult => {
   }
   if (scope === 'policy' && action === 'explain') {
     const value = readSource()
-    if (isParseResult(value)) return value
+    if (isParseResult(value) === true) return value
     return invocation('ThreadPolicyExplain', (client) => client.ThreadPolicyExplain({ source: value }))
   }
   if (scope === 'docs' && action === 'query') {
@@ -156,7 +156,7 @@ export const parseCli = (args: readonly string[]): ParseResult => {
     return invocation('DocsStatus', (client) => client.DocsStatus({}))
   }
   if (scope === 'runtime' && action === 'health') {
-    const watch = args.includes('--watch')
+    const watch = args.includes('--watch') === true
     return invocation('RuntimeHealth', (client) => client.RuntimeHealth({ watch }), watch)
   }
   if (scope === 'runtime' && action === 'status') {
@@ -183,7 +183,7 @@ export const parseCli = (args: readonly string[]): ParseResult => {
     const guard = parseMutationGuard(args)
     if (guard._tag === 'UsageError') return usage(guard.message)
     if (guard.value.environment !== 'staging') return usage('e2e run only permits --environment staging')
-    if (!args.includes('--confirm-live-write')) return usage('e2e run requires --confirm-live-write')
+    if (args.includes('--confirm-live-write') === false) return usage('e2e run requires --confirm-live-write')
     return invocation('StagingE2ERun', (client) =>
       client.StagingE2ERun({
         ...guard.value,
@@ -217,7 +217,7 @@ const parseSource = (
   | { readonly _tag: 'UsageError'; readonly message: string } => {
   try {
     const positional = args[position]
-    if (positional !== undefined && !positional.startsWith('--')) {
+    if (positional !== undefined && positional.startsWith('--') === false) {
       return { _tag: 'Source', source: decodeMessageUrl(positional) }
     }
     return {
@@ -234,7 +234,7 @@ const parseSource = (
 }
 
 const parseMutationGuard = (args: readonly string[]) => {
-  if (!args.includes('--apply')) return { _tag: 'UsageError', message: 'write command requires --apply' } as const
+  if (args.includes('--apply') === false) return { _tag: 'UsageError', message: 'write command requires --apply' } as const
   const environment = decodeEnvironment(readFlag(args, '--environment'))
   if (environment._tag === 'UsageError') return environment
   const reason = decodeReason(readFlag(args, '--reason'))
@@ -266,7 +266,7 @@ const decodeReason = (value: string | undefined) => {
 
 const parseOutput = (args: readonly string[]) => {
   const value = readFlag(args, '--output') ?? 'auto'
-  return ['auto', 'log', 'json', 'ndjson'].includes(value)
+  return ['auto', 'log', 'json', 'ndjson'].includes(value) === true
     ? ({ _tag: 'Output', output: value as OutputMode } as const)
     : ({ _tag: 'UsageError', message: '--output must be auto, log, json, or ndjson', help: rootHelp } as const)
 }
@@ -280,7 +280,7 @@ const readOptionalPositiveInt = (args: readonly string[], flag: string): number 
   const raw = readFlag(args, flag)
   if (raw === undefined) return undefined
   const value = Number(raw)
-  return Number.isSafeInteger(value) && value > 0 ? value : `${flag} must be a positive integer`
+  return Number.isSafeInteger(value) === true && value > 0 ? value : `${flag} must be a positive integer`
 }
 
 const isParseResult = (value: DiscordMessageRefType | ParseResult): value is ParseResult => '_tag' in value

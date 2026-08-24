@@ -81,22 +81,22 @@ export const normalizeDeploymentConfig = (config: BotDeploymentConfig): BotDeplo
     },
   }
   if (normalized.actionChannelIds.length === 0) throw new Error("actionChannelIds must be non-empty")
-  if (!subset(normalized.aiTitleChannelIds, normalized.actionChannelIds)) {
+  if (subset(normalized.aiTitleChannelIds, normalized.actionChannelIds) === false) {
     throw new Error("aiTitleChannelIds must be a subset of actionChannelIds")
   }
-  if (!subset(normalized.aiTitleChannelIds, normalized.docsAudience.publicChannelIds)) {
+  if (subset(normalized.aiTitleChannelIds, normalized.docsAudience.publicChannelIds) === false) {
     throw new Error("AI-title channels must be public docs channels")
   }
-  if (intersects(normalized.docsAudience.publicChannelIds, normalized.docsAudience.roleRestrictedChannelIds)) {
+  if (intersects(normalized.docsAudience.publicChannelIds, normalized.docsAudience.roleRestrictedChannelIds) === true) {
     throw new Error("docs audience channel sets must be disjoint")
   }
   if (normalized.docsAudience.roleRestrictedChannelIds.length > 0 && normalized.docsAudience.contributorMaintainerRoleIds.length === 0) {
     throw new Error("role-restricted docs channels require contributor/maintainer roles")
   }
-  if (normalized.environment === "production" && intersects(normalized.actionChannelIds, normalized.stagingOnlyChannelIds)) {
+  if (normalized.environment === "production" && intersects(normalized.actionChannelIds, normalized.stagingOnlyChannelIds) === true) {
     throw new Error("production action channels cannot overlap staging-only channels")
   }
-  if (normalized.environment === "staging" && !normalized.actionChannelIds.includes(normalized.e2e.targetChannelId)) {
+  if (normalized.environment === "staging" && normalized.actionChannelIds.includes(normalized.e2e.targetChannelId) === false) {
     throw new Error("staging E2E target must be an action channel")
   }
   return normalized

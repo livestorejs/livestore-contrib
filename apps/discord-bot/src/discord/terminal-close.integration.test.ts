@@ -7,6 +7,8 @@ import * as TestClock from "effect/testing/TestClock"
 import * as Socket from "effect/unstable/socket/Socket"
 import { terminalGatewayCloseCodes } from "./terminal-close.ts"
 
+type WebSocketBinaryType = "blob" | "arraybuffer"
+
 describe("selected DFX terminal-close behavior", () => {
   it.each(terminalGatewayCloseCodes)(
     "stops after terminal code %i and exposes the typed failure",
@@ -38,7 +40,6 @@ const observeTerminalClose = (code: number) => {
   )
 
   return Effect.runPromise(
-    Effect.scoped(
       Effect.gen(function* () {
         const discordWs = yield* DiscordWS.DiscordWS
         const socket = yield* discordWs.connect({ onConnecting: Effect.void })
@@ -50,16 +51,14 @@ const observeTerminalClose = (code: number) => {
         yield* TestClock.adjust("2 seconds")
         yield* Effect.yieldNow
         return { attempts, failure: yield* Fiber.join(failureFiber) }
-      }),
-    ).pipe(
-      Effect.provide(
-        DiscordWS.DiscordWSLive.pipe(
-          Layer.provide(DiscordWS.JsonDiscordWSCodecLive),
-        ),
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(Layer.mergeAll(
+          DiscordWS.DiscordWSLive.pipe(Layer.provide(DiscordWS.JsonDiscordWSCodecLive)),
+          constructorLayer,
+          TestClock.layer(),
+        )),
       ),
-      Effect.provide(constructorLayer),
-      Effect.provide(TestClock.layer()),
-    ),
   )
 }
 
@@ -76,7 +75,6 @@ const observeConnectionAttempts = (code: number) => {
   )
 
   return Effect.runPromise(
-    Effect.scoped(
       Effect.gen(function* () {
         const discordWs = yield* DiscordWS.DiscordWS
         yield* discordWs.connect({ onConnecting: Effect.void })
@@ -84,16 +82,14 @@ const observeConnectionAttempts = (code: number) => {
         yield* TestClock.adjust("2 seconds")
         yield* Effect.yieldNow
         return attempts
-      }),
-    ).pipe(
-      Effect.provide(
-        DiscordWS.DiscordWSLive.pipe(
-          Layer.provide(DiscordWS.JsonDiscordWSCodecLive),
-        ),
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(Layer.mergeAll(
+          DiscordWS.DiscordWSLive.pipe(Layer.provide(DiscordWS.JsonDiscordWSCodecLive)),
+          constructorLayer,
+          TestClock.layer(),
+        )),
       ),
-      Effect.provide(constructorLayer),
-      Effect.provide(TestClock.layer()),
-    ),
   )
 }
 
@@ -107,7 +103,7 @@ class ClosingWebSocket extends EventTarget implements globalThis.WebSocket {
   readonly protocol = ""
   readonly readyState = this.OPEN
   readonly url = "wss://gateway.discord.gg/"
-  binaryType: BinaryType = "blob"
+  binaryType: WebSocketBinaryType = "blob"
   onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null
   onerror: ((this: WebSocket, ev: Event) => unknown) | null = null
   onmessage: ((this: WebSocket, ev: MessageEvent) => unknown) | null = null

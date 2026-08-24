@@ -13,19 +13,20 @@ export const diffApplicationCommands = (
   const desiredByKey = indexCommands(desired)
   const actualByKey = indexCommands(actual)
   const keys = [...new Set([...desiredByKey.commands.keys(), ...actualByKey.commands.keys()])]
-    .sort((left, right) => left.localeCompare(right))
+    .toSorted((left, right) => left.localeCompare(right))
 
   const changes: Array<ApplicationCommandChange> = keys.map(key => {
     const desiredCommand = desiredByKey.commands.get(key)
     const actualCommand = actualByKey.commands.get(key)
     if (desiredCommand === undefined) return { kind: "delete", key, actual: actualCommand! }
     if (actualCommand === undefined) return { kind: "create", key, desired: desiredCommand }
-    return commandsEqual(desiredCommand, actualCommand)
+    const equal = commandsEqual(desiredCommand, actualCommand)
+    return equal === true
       ? { kind: "unchanged", key, desired: desiredCommand, actual: actualCommand }
       : { kind: "update", key, desired: desiredCommand, actual: actualCommand }
   })
 
-  const duplicateActualKeys = [...actualByKey.duplicates].sort((left, right) =>
+  const duplicateActualKeys = [...actualByKey.duplicates].toSorted((left, right) =>
     left.localeCompare(right),
   )
   return {
@@ -41,7 +42,7 @@ const indexCommands = (commands: ReadonlyArray<ApplicationCommand>) => {
   const duplicates = new Set<string>()
   for (const command of commands) {
     const key = commandKey(command)
-    if (indexed.has(key)) duplicates.add(key)
+    if (indexed.has(key) === true) duplicates.add(key)
     else indexed.set(key, command)
   }
   return { commands: indexed, duplicates }

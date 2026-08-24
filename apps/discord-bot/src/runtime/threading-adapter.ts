@@ -1,8 +1,9 @@
 import { Clock, Effect, Schema } from "effect"
-import type { ThreadActionJournalService } from "../journal/service.ts"
+import type { ThreadActionJournalService, JournalWriteError } from "../journal/service.ts"
 import {
   DiscordSnowflake as JournalSnowflake,
   type JournalOutcomeCode,
+  type DiscordSnowflake as JournalSnowflakeType,
 } from "../journal/model.ts"
 import {
   ThreadReconciliationError,
@@ -11,6 +12,7 @@ import {
   type ThreadClaimHandle,
   type ThreadReconciliationPort,
 } from "../threading/index.ts"
+import type { DiscordSnowflake as DiscordSnowflakeType } from "../threading/model.ts"
 import { decodeDiscordSourceMessage } from "../discord/source-message.ts"
 export { isDefinitiveDiscordMutationFailure } from "../discord/thread-mutation-dfx.ts"
 
@@ -42,8 +44,13 @@ export class OperatorSourceReadError extends Schema.TaggedError<OperatorSourceRe
 ) {}
 
 interface DfxMessageReader {
-  readonly getMessage: (channelId: string, messageId: string) => Effect.Effect<unknown, unknown>
+  readonly getMessage: (channelId: string, messageId: string) => Effect.Effect<unknown, OperatorSourceTransportError>
 }
+
+export class OperatorSourceTransportError extends Schema.TaggedError<OperatorSourceTransportError>()(
+  "OperatorSourceTransportError",
+  { message: Schema.String },
+) {}
 
 /** Reads the exact operator source through the narrowest available DFX REST port. */
 export const makeDfxOperatorSourceReader = (rest: DfxMessageReader): OperatorSourceReader => ({
@@ -74,17 +81,18 @@ export const makeJournalReconciliation = (journal: ThreadActionJournalService): 
   }))
 
   return {
-    prepare: candidate => Effect.gen(function* () {
+    prepare: Effect.fn("runtime.reconciliation.prepare")(function* (candidate) {
       const currentTime = yield* now
-      const sourceMessageId = Schema.decodeUnknownSync(JournalSnowflake)(candidate.source.messageId)
+      const sourceMessageId = decodeJournalSnowflake(candidate.source.messageId)
+      const channelId = decodeJournalSnowflake(candidate.source.channelId)
       const result = yield* journal.claim({
         sourceMessageId,
-        channelId: Schema.decodeUnknownSync(JournalSnowflake)(candidate.source.channelId),
+        channelId,
         trigger: candidate.trigger._tag === "Automatic" ? "automatic" : candidate.trigger._tag === "DiscordManual" ? "manual" : "operator",
         now: currentTime,
         reconcileBy: currentTime + reconciliationWindowMillis,
       }).pipe(mapError)
-      if (result.acquired) {
+      if (result.acquired === true) {
         return {
           _tag: "Proceed",
           handle: { sourceMessageId: candidate.source.messageId, claimToken: result.record.claimToken },
@@ -93,11 +101,11 @@ export const makeJournalReconciliation = (journal: ThreadActionJournalService): 
       if (result.record.state === "created" && result.record.threadId !== null) {
         return {
           _tag: "AlreadySatisfied",
-          threadId: Schema.decodeUnknownSync(DiscordSnowflake)(result.record.threadId),
+          threadId: decodeDiscordSnowflake(result.record.threadId),
         } as const
       }
       return { _tag: "Ambiguous" } as const
-    }).pipe(Effect.withSpan("runtime.reconciliation.prepare")),
+    }),
     markCreating: handle => transition(handle, (sourceMessageId, claimToken, currentTime) =>
       journal.markCreating({ sourceMessageId, claimToken, now: currentTime })),
     markCreated: (handle, threadId) => transition(handle, (sourceMessageId, claimToken, currentTime) =>
@@ -115,23 +123,26 @@ export const makeJournalReconciliation = (journal: ThreadActionJournalService): 
   }
 }
 
-const transition = (
+const transition = Effect.fn("runtime.reconciliation.transition")(function* (
   handle: ThreadClaimHandle,
-  write: (sourceMessageId: typeof JournalSnowflake.Type, claimToken: string, now: number) => Effect.Effect<unknown, unknown>,
-) => Effect.gen(function* () {
-  const sourceMessageId = Schema.decodeUnknownSync(JournalSnowflake)(handle.sourceMessageId)
+  write: (sourceMessageId: JournalSnowflakeType, claimToken: string, now: number) => Effect.Effect<unknown, JournalWriteError>,
+) {
+  const sourceMessageId = decodeJournalSnowflake(handle.sourceMessageId)
   yield* write(sourceMessageId, handle.claimToken, yield* Clock.currentTimeMillis).pipe(
-    Effect.mapError(cause => new ThreadReconciliationError({
+    Effect.mapError((cause: unknown) => new ThreadReconciliationError({
       code: "journal_transition_failed",
       message: cause instanceof Error ? cause.message : "Action journal transition failed",
     })),
   )
-}).pipe(Effect.withSpan("runtime.reconciliation.transition"))
+})
+
+const decodeJournalSnowflake = (value: string): JournalSnowflakeType => Schema.decodeUnknownSync(JournalSnowflake)(value)
+const decodeDiscordSnowflake = (value: string): DiscordSnowflakeType => Schema.decodeUnknownSync(DiscordSnowflake)(value)
 
 function outcomeCode(code: string, ambiguous: true): "discord_timeout" | "stale_creating"
 function outcomeCode(code: string, ambiguous: false): "discord_definitive_failure"
 function outcomeCode(code: string, ambiguous: boolean): JournalOutcomeCode {
-  return ambiguous ? (code.includes("stale") ? "stale_creating" : "discord_timeout") : "discord_definitive_failure"
+  return ambiguous === true ? (code.includes("stale") === true ? "stale_creating" : "discord_timeout") : "discord_definitive_failure"
 }
 
 
@@ -154,13 +165,13 @@ export const candidateForOperator = (
 const decodeOperatorSource = (source: ThreadCandidate["source"], message: unknown): OperatorSourceFacts => {
   const facts = decodeDiscordSourceMessage(source, message)
   return {
-    messageKind: facts.isReply ? "Reply" : facts.messageType === 0 ? "Default" : "System",
+    messageKind: facts.isReply === true ? "Reply" : facts.messageType === 0 ? "Default" : "System",
     hasMessageReference: facts.isReply,
-    authorKind: facts.authorIsBot
+    authorKind: facts.authorIsBot === true
       ? "Bot"
-      : facts.hasWebhookAuthor
+      : facts.hasWebhookAuthor === true
         ? "Webhook"
-        : facts.hasApplicationAuthor
+        : facts.hasApplicationAuthor === true
           ? "Application"
           : "Human",
     existingThreadId: facts.existingThreadId,
@@ -172,7 +183,7 @@ const decodeOperatorSource = (source: ThreadCandidate["source"], message: unknow
 }
 
 const discordStatus = (cause: unknown): number | undefined => {
-  if (!isRecord(cause) || !isRecord(cause.response)) return undefined
+  if (isRecord(cause) === false || isRecord(cause.response) === false) return undefined
   return typeof cause.response.status === "number" ? cause.response.status : undefined
 }
 

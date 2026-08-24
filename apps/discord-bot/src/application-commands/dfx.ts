@@ -67,7 +67,7 @@ const fromDiscordCommand = (
     command.dm_permission === undefined,
     command.handler === undefined,
   ].every(Boolean) === false
-  if (unsupportedCommandFields) return unsupported(key, "unsupported command metadata")
+  if (unsupportedCommandFields === true) return unsupported(key, "unsupported command metadata")
   if (command.contexts === null) return unsupported(key, "null interaction contexts")
 
   const options: Array<ApplicationCommand["options"][number]> = []

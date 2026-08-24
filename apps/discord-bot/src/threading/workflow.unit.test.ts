@@ -167,7 +167,7 @@ describe("thread workflow", () => {
   it.effect("fails safely when reconciliation returns a handle for another source", () =>
     Effect.gen(function* () {
       const events: Array<string> = []
-      const wrongSource = Schema.decodeUnknownSync(DiscordSnowflake)("10000000000000009")
+      const wrongSource = yield* Schema.decodeUnknownEffect(DiscordSnowflake)("10000000000000009")
       const outcome = yield* makeThreadWorkflow(makePorts(events, {
         _tag: "Proceed",
         handle: { ...claimHandle, sourceMessageId: wrongSource },
