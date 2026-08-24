@@ -1,4 +1,4 @@
-import type React from 'react'
+import React from 'react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 
@@ -9,6 +9,7 @@ import {
   closestCorners,
   getFirstCollision,
   pointerWithin,
+  useDndMonitor,
   useDroppable,
   useSensor,
   useSensors,
@@ -38,6 +39,17 @@ import { getStoreId } from './util/store-id.ts'
 const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4']
 
 const errorBoundaryFallback = <div>Something went wrong</div>
+const DraggerColorContext = React.createContext<string>('#3b82f6')
+export const useDraggerColor = () => React.useContext(DraggerColorContext)
+
+const DraggerMonitor: React.FC<{ onChange: (id: string | null) => void }> = ({ onChange }) => {
+  useDndMonitor({
+    onDragStart: (e) => onChange(String(e.active.id)),
+    onDragEnd: () => onChange(null),
+    onDragCancel: () => onChange(null),
+  })
+  return null
+}
 const suspenseFallback = <div>Loading app...</div>
 
 type Card = { id: string; title: string; columnId: string }
@@ -88,7 +100,8 @@ const KanbanColumn: React.FC<{
   onDelete: () => void
   newCardTitle: string
   onNewCardTitle: (title: string) => void
-}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle }) => {
+  draggerColor: string
+}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle, draggerColor }) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: 'column' as const, columnId: column.id } })
 
   return (
@@ -96,7 +109,7 @@ const KanbanColumn: React.FC<{
       ref={setNodeRef}
       className="kanban-column"
       data-column-id={column.id}
-      style={{ outline: isOver ? '2px solid #3b82f6' : undefined }}
+      style={{ outline: isOver ? `2px solid ${draggerColor}` : undefined }}
     >
       <div className="kanban-column-header">
         <h3 className="kanban-column-title">{column.title}</h3>
@@ -157,22 +170,14 @@ const KanbanBoard: React.FC = () => {
     () => globalThis.localStorage?.getItem('kanban-name') ?? '',
   )
   const presenceOptions = useMemo(
-    () => {
-      const clientIdKey = 'kanban-client-id'
-      let clientId = globalThis.sessionStorage?.getItem(clientIdKey)
-      if (clientId === null) {
-        clientId = `client-${crypto.randomUUID().slice(0, 8)}`
-        globalThis.sessionStorage?.setItem(clientIdKey, clientId)
-      }
-      return {
-        url: `${globalThis.location.origin}/sync`,
-        storeId,
-        clientId,
-        name: globalThis.localStorage?.getItem('kanban-name') || 'Guest',
-        payload: { authToken: 'insecure-token-change-me' },
-        channels: presenceSchemas,
-      }
-    },
+    () => ({
+      url: `${globalThis.location.origin}/sync`,
+      storeId,
+      clientId: `client-${crypto.randomUUID().slice(0, 8)}`,
+      name: globalThis.localStorage?.getItem('kanban-name') || 'Guest',
+      payload: { authToken: 'insecure-token-change-me' },
+      channels: presenceSchemas,
+    }),
     [storeId],
   )
   const presence = usePresenceClient(presenceOptions)
@@ -198,12 +203,25 @@ const KanbanBoard: React.FC = () => {
       : []
   })
 
-  const changeUserName = useCallback(
+  const applyName = useCallback(
     (name: string) => {
       setUserName(name)
       globalThis.localStorage?.setItem('kanban-name', name)
       if (name.trim() !== '') {
         Effect.runFork(presence.setState('cursor', { name: name.trim() }))
+      }
+    },
+    [presence],
+  )
+
+  const [draggerId, setDraggerId] = useState<string | null>(null)
+  const changeUserName = useCallback(
+    (name: string) => {
+      const next = name.trim() === '' ? 'Guest' : name
+      setUserName(next)
+      globalThis.localStorage?.setItem('kanban-name', next)
+      if (next.trim() !== '') {
+        Effect.runFork(presence.setState('cursor', { name: next }))
       }
     },
     [presence],
@@ -330,8 +348,11 @@ const KanbanBoard: React.FC = () => {
     [store],
   )
 
+  const draggerColor = draggerId !== null ? (COLORS[Math.abs(hashString(draggerId)) % COLORS.length] ?? '#3b82f6') : '#3b82f6'
   return (
-    <DndContext
+    <DraggerColorContext.Provider value={draggerColor}>
+      <DraggerMonitor onChange={setDraggerId} />
+      <DndContext
       sensors={sensors}
       collisionDetection={innermostCollisionDetection}
       onDragStart={handleDragStart}
@@ -349,8 +370,15 @@ const KanbanBoard: React.FC = () => {
               className="name-input"
               placeholder="Your name"
               value={userName}
-              onChange={(e) => changeUserName(e.target.value)}
-              onBlur={() => userName.trim() === '' && changeUserName('Guest')}
+              onChange={(e) => applyName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur()
+                }
+              }}
+              onBlur={() => {
+                if (userName.trim() === '') changeUserName('Guest')
+              }}
             />
             <input
               className="new-column-input"
@@ -376,12 +404,12 @@ const KanbanBoard: React.FC = () => {
                 data-testid={`cursor-${cid}`}
                 style={{ left: cursor.x, top: cursor.y, opacity: isSelf ? 0.45 : 1 }}
               >
-                <svg className="cursor-pointer" width="20" height="20" viewBox="0 0 24 24" fill={color}>
-                  <path d="M4 2l16 11.5h-6.9L9.6 22 4 2z" />
-                </svg>
                 <div className="cursor-name" style={{ backgroundColor: color }}>
                   {name ?? cid}
                 </div>
+                <svg className="cursor-pointer" width="20" height="20" viewBox="0 0 24 24" fill={color}>
+                  <path d="M4 2l16 11.5h-6.9L9.6 22 4 2z" />
+                </svg>
               </div>
             )
           })}
@@ -427,6 +455,7 @@ const KanbanBoard: React.FC = () => {
               onNewCardTitle={(title) => setNewCardTitles((prev) => ({ ...prev, [column.id]: title }))}
               onAddCard={(title) => addCard(column.id, title)}
               onDelete={() => deleteColumn(column.id)}
+              draggerColor={draggerColor}
             />
           ))}
         </div>
@@ -438,6 +467,7 @@ const KanbanBoard: React.FC = () => {
         </DragOverlay>
       </div>
     </DndContext>
+    </DraggerColorContext.Provider>
   )
 }
 

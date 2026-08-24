@@ -159,7 +159,9 @@ button {
 }
 
 .cursor-name {
-  margin-top: 2px;
+  /* Sit above the arrow head with a small gap */
+  margin-bottom: 4px;
+  transform: translateY(-100%);
   padding: 2px 8px;
   border-radius: 4px;
   color: #fff;
