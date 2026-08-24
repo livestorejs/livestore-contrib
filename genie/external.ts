@@ -55,12 +55,12 @@ const requestedContribReleaseVersion = process.env.LIVESTORE_RELEASE_VERSION
 const requestedCoreReleaseVersion = process.env.LIVESTORE_CORE_RELEASE_VERSION
 const mirroredDevVersionPattern = /^\d+\.\d+\.\d+-dev\.\d+$/
 
-export const contribCoreReleaseVersion =
+export const isMirroredDevRelease =
   requestedContribReleaseVersion === requestedCoreReleaseVersion &&
   requestedCoreReleaseVersion !== undefined &&
   mirroredDevVersionPattern.test(requestedCoreReleaseVersion)
-    ? requestedCoreReleaseVersion
-    : '0.5.0-dev.0'
+
+export const contribCoreReleaseVersion = isMirroredDevRelease ? requestedCoreReleaseVersion : '0.5.0-dev.0'
 
 export const contribConsumedCoreArtifacts = {
   '@livestore/devtools-vite': contribCoreReleaseVersion,
