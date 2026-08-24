@@ -65,7 +65,7 @@ const SortableCard: React.FC<{
   isDropTarget: boolean
   dropColor: string | undefined
 }> = ({ card, isActiveDrag, isDropTarget, dropColor }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+  const { attributes, listeners, setNodeRef } = useSortable({
     id: card.id,
     data: { type: 'card' as const, columnId: card.columnId, cardId: card.id },
   })
@@ -76,9 +76,7 @@ const SortableCard: React.FC<{
       className="kanban-card"
       data-card-id={card.id}
       style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isActiveDrag ? 0.4 : 1,
+        opacity: isActiveDrag ? 0.3 : 1,
         outline: isDropTarget ? `2px dashed ${dropColor ?? '#3b82f6'}` : undefined,
         outlineOffset: '-2px',
       }}
