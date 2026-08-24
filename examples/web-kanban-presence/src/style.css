@@ -138,19 +138,20 @@ button {
   font-size: 13px;
 }
 
-/* Presence cursors overlay */
+/* Presence cursors overlay — above the drag layer so cursors are always
+   visible even when a peer is dragging a card underneath them */
 .cursor-layer {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  /* Above all cards/columns (which create stacking contexts via transform) */
-  z-index: 1000;
+  z-index: 1002;
 }
 
 .cursor {
   position: fixed;
-  /* No transition: presence updates arrive every ~40ms; interpolating on top
-     of that reads as lag/jitter. Snap straight to each received position. */
+  /* Anchor: the arrow tip is at (0, 0) of this div = the reported pointer
+     position. No transition: updates arrive every ~40ms; interpolating reads
+     as lag/jitter. */
   will-change: left, top;
 }
 
@@ -160,9 +161,10 @@ button {
 }
 
 .cursor-name {
-  /* Sit above the arrow head with a small gap */
-  margin-bottom: 4px;
-  transform: translateY(-100%);
+  /* Absolutely positioned above the arrow tip */
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
   padding: 2px 8px;
   border-radius: 4px;
   color: #fff;

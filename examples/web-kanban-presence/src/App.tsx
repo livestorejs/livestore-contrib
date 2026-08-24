@@ -62,9 +62,7 @@ const innermostCollisionDetection: CollisionDetection = (args) => {
 const SortableCard: React.FC<{
   card: Card
   isActiveDrag: boolean
-  isDropTarget: boolean
-  dropColor: string | undefined
-}> = ({ card, isActiveDrag, isDropTarget, dropColor }) => {
+}> = ({ card, isActiveDrag }) => {
   const { attributes, listeners, setNodeRef } = useSortable({
     id: card.id,
     data: { type: 'card' as const, columnId: card.columnId, cardId: card.id },
@@ -75,11 +73,7 @@ const SortableCard: React.FC<{
       ref={setNodeRef}
       className="kanban-card"
       data-card-id={card.id}
-      style={{
-        opacity: isActiveDrag ? 0.3 : 1,
-        outline: isDropTarget ? `2px dashed ${dropColor ?? '#3b82f6'}` : undefined,
-        outlineOffset: '-2px',
-      }}
+      style={{ opacity: isActiveDrag ? 0.3 : 1 }}
       {...attributes}
       {...listeners}
     >
@@ -97,8 +91,7 @@ const KanbanColumn: React.FC<{
   onNewCardTitle: (title: string) => void
   hoverColor: string | undefined
   activeDragId: string | null
-  overCardId: string | null
-}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle, hoverColor, activeDragId, overCardId }) => {
+}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle, hoverColor, activeDragId }) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: 'column' as const, columnId: column.id } })
 
   return (
@@ -117,13 +110,7 @@ const KanbanColumn: React.FC<{
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="kanban-cards">
           {cards.map((card) => (
-            <SortableCard
-              key={card.id}
-              card={card}
-              isActiveDrag={activeDragId === card.id}
-              isDropTarget={overCardId === card.id}
-              dropColor={hoverColor}
-            />
+            <SortableCard key={card.id} card={card} isActiveDrag={activeDragId === card.id} />
           ))}
         </div>
       </SortableContext>
@@ -269,7 +256,6 @@ const KanbanBoard: React.FC = () => {
   const [newCardTitles, setNewCardTitles] = useState<Record<string, string>>({})
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const [overCardId, setOverCardId] = useState<string | null>(null)
   const boardRef = useRef<HTMLDivElement>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -328,12 +314,7 @@ const KanbanBoard: React.FC = () => {
       const id = String(event.active.id)
       const { x, y } = event.delta
       Effect.runFork(presence.setState('cursor', { dragging: { cardId: id, deltaX: x, deltaY: y } }))
-      // Track drop-target card for outline highlight
-      if (event.over !== null && event.over.data.current?.type === 'card' && String(event.over.id) !== id) {
-        setOverCardId(String(event.over.id))
-      } else {
-        setOverCardId(null)
-      }
+
     },
     [presence],
   )
@@ -342,7 +323,6 @@ const KanbanBoard: React.FC = () => {
     (event: DragEndEvent) => {
       setActiveCard(null)
       setActiveDragId(null)
-      setOverCardId(null)
       Effect.runFork(presence.setState('cursor', { dragging: undefined }))
       const { active, over } = event
       if (over === null) return
@@ -395,7 +375,18 @@ const KanbanBoard: React.FC = () => {
   )
 
   // Column hover color follows the currently-dragging client's assigned color.
-  const activeDraggerColor = remoteDrags.length > 0 ? (remoteDrags[0]?.color ?? '#3b82f6') : undefined
+  // Column hover color: the currently-dragging client's assigned color
+  // (works for both local and remote drags).
+  const activeDraggerColor = (() => {
+    if (activeCard !== null) {
+      // Local user is dragging — use their color
+      return COLORS[Math.abs(hashString(presence.clientId)) % COLORS.length] ?? '#3b82f6'
+    }
+    if (remoteDrags.length > 0) {
+      return remoteDrags[0]?.color ?? '#3b82f6'
+    }
+    return undefined
+  })()
 
   return (
     <DndContext
@@ -407,7 +398,6 @@ const KanbanBoard: React.FC = () => {
       onDragCancel={() => {
         setActiveCard(null)
         setActiveDragId(null)
-        setOverCardId(null)
         Effect.runFork(presence.setState('cursor', { dragging: undefined }))
       }}
     >
@@ -479,6 +469,7 @@ const KanbanBoard: React.FC = () => {
                   left: cursor.x,
                   top: cursor.y,
                   width: cardWidth(dragging.cardId),
+                  transform: 'translate(-50%, -50%)',
                   outline: `2px solid ${color}`,
                 }}
               >
@@ -500,7 +491,6 @@ const KanbanBoard: React.FC = () => {
               onDelete={() => deleteColumn(column.id)}
               hoverColor={activeDraggerColor}
               activeDragId={activeDragId}
-              overCardId={overCardId}
             />
           ))}
         </div>
