@@ -32,6 +32,26 @@ manifests' dependencies instead (LSC.REL-R3).
 
 The main-branch snapshot scheme is unchanged and still carries both SHAs.
 
+## Manual Mirrored Dev Publication
+
+The generated release workflow exposes a maintainer-dispatched `publish-dev`
+mode on `main` as a narrow escape hatch for a coordinated prerelease. The
+dispatcher supplies `contrib_version` and `core_version`; both must be the same
+`x.y.z-dev.N` SemVer. Before contrib can publish, the live npm `dev` tag for
+`@livestore/common` must already point to that version, and every required core
+package must be visible at it.
+
+The trusted job publishes the exact `release/topology.json` contrib cohort
+under the npm `dev` tag with provenance. An existing package version is accepted
+only when its registry digest matches the newly packed artifact; the job
+verifies the mutable tag (and fails rather than attempting an out-of-band tag
+repair), verifies direct rewritten core dependencies, and
+records the source SHA and package digests in an uploaded manifest.
+
+This escape hatch does not implement core-triggered dispatch or automatic
+lockstep orchestration. A maintainer must dispatch contrib after verifying the
+matching core cohort; automatic mirrored publication remains future work.
+
 ## Core Version Resolution
 
 The core version a snapshot depends on is read from the registry, not derived.

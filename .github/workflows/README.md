@@ -20,6 +20,12 @@ snapshot versions include both the pinned core commit and the contrib commit,
 while core dependency rewrites use the pinned core snapshot from
 `megarepo.lock`.
 
+An explicit `mode=publish-dev` dispatch on `main` publishes the matching
+`contrib_version` and `core_version` under the npm `dev` tag. Both inputs must
+be the same `x.y.z-dev.N` prerelease (for example, `0.5.0-dev.0`), and the core
+version must already be available on npm. Dev publishing uses the same npm
+trusted-publishing workflow identity and rejects token-based authentication.
+
 Stable release publishing remains blocked until release-plan generation and
 approval are added.
 

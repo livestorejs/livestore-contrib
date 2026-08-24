@@ -246,7 +246,10 @@ in
       release_version="''${LIVESTORE_RELEASE_VERSION:-0.0.0-snapshot-$git_sha}"
       core_release_version="''${LIVESTORE_CORE_RELEASE_VERSION:-0.0.0-snapshot-$core_sha}"
 
-      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 \
+        LIVESTORE_RELEASE_VERSION="$release_version" \
+        LIVESTORE_CORE_RELEASE_VERSION="$core_release_version" \
+        genie --writeable
       node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --dry-run
     '';
   };
@@ -279,7 +282,9 @@ in
 
       release_version="0.0.0-snapshot-pr.$PR_NUMBER.$GIT_SHA"
 
-      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 \
+        LIVESTORE_RELEASE_VERSION="$release_version" \
+        genie --writeable
       node release/simulate-publish.mjs \
         --version "$release_version" \
         --core-sha "$core_sha" \
@@ -308,8 +313,58 @@ in
         exit 1
       fi
 
-      DEVENV_TASK_PASSTHROUGH=1 LIVESTORE_RELEASE_VERSION="$release_version" genie --writeable
+      DEVENV_TASK_PASSTHROUGH=1 \
+        LIVESTORE_RELEASE_VERSION="$release_version" \
+        LIVESTORE_CORE_RELEASE_VERSION="$core_release_version" \
+        genie --writeable
       node release/simulate-publish.mjs --version "$release_version" --core-version "$core_release_version" --verify-core --publish
+    '';
+  };
+  tasks."release:dev" = {
+    description = "Publish matching contrib and core dev prerelease versions";
+    after = [
+      "mr:check"
+      "pnpm:install"
+    ];
+    exec = ''
+      set -euo pipefail
+      cd "$DEVENV_ROOT"
+
+      : "''${LIVESTORE_RELEASE_VERSION:?LIVESTORE_RELEASE_VERSION is required}"
+      : "''${LIVESTORE_CORE_RELEASE_VERSION:?LIVESTORE_CORE_RELEASE_VERSION is required}"
+      : "''${LIVESTORE_RELEASE_MANIFEST:?LIVESTORE_RELEASE_MANIFEST is required}"
+
+      dev_semver_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$'
+      if [[ ! "$LIVESTORE_RELEASE_VERSION" =~ $dev_semver_pattern ]]; then
+        echo "LIVESTORE_RELEASE_VERSION must be a dev prerelease semver such as 0.5.0-dev.0" >&2
+        exit 1
+      fi
+      if [ "$LIVESTORE_RELEASE_VERSION" != "$LIVESTORE_CORE_RELEASE_VERSION" ]; then
+        echo "Contrib and core dev release versions must match exactly." >&2
+        exit 1
+      fi
+
+      if [ -n "''${NODE_AUTH_TOKEN:-}" ] || [ -n "''${NPM_TOKEN:-}" ]; then
+        echo "npm dev publishing must use trusted publishing; token auth is not allowed in this task." >&2
+        exit 1
+      fi
+
+      DEVENV_TASK_PASSTHROUGH=1 \
+        LIVESTORE_RELEASE_VERSION="$LIVESTORE_RELEASE_VERSION" \
+        LIVESTORE_CORE_RELEASE_VERSION="$LIVESTORE_CORE_RELEASE_VERSION" \
+        genie --writeable --defer-validation
+      pnpm install --no-frozen-lockfile
+      DEVENV_TASK_PASSTHROUGH=1 \
+        LIVESTORE_RELEASE_VERSION="$LIVESTORE_RELEASE_VERSION" \
+        LIVESTORE_CORE_RELEASE_VERSION="$LIVESTORE_CORE_RELEASE_VERSION" \
+        genie --check
+      node release/simulate-publish.mjs \
+        --version "$LIVESTORE_RELEASE_VERSION" \
+        --core-version "$LIVESTORE_CORE_RELEASE_VERSION" \
+        --tag dev \
+        --verify-core \
+        --publish \
+        --manifest-out "$LIVESTORE_RELEASE_MANIFEST"
     '';
   };
   tasks."test:integration:node" = {
@@ -458,8 +513,17 @@ in
       }
 
       const workspaceYaml = fs.readFileSync('pnpm-workspace.yaml', 'utf8')
-      const yamlPackages = workspaceYaml
-        .split('\n')
+      const workspaceLines = workspaceYaml.split('\n')
+      const packagesStart = workspaceLines.indexOf('packages:')
+      if (packagesStart === -1) {
+        throw new Error('pnpm-workspace.yaml must contain a packages block')
+      }
+      const packagesEndOffset = workspaceLines
+        .slice(packagesStart + 1)
+        .findIndex((line) => /^\S/.test(line))
+      const packagesEnd = packagesEndOffset === -1 ? workspaceLines.length : packagesStart + 1 + packagesEndOffset
+      const yamlPackages = workspaceLines
+        .slice(packagesStart + 1, packagesEnd)
         .map((line) => line.match(/^  - (.+)$/)?.[1])
         .filter(Boolean)
 

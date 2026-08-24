@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -13,6 +14,8 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
+
+import { cleanupPackedRun } from './simulate-publish-cleanup.mjs'
 
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
@@ -36,6 +39,7 @@ const publish = hasArg('--publish')
 const dryRun = hasArg('--dry-run')
 const packOnly = hasArg('--pack-only')
 const outDir = readArg('--out-dir')
+const manifestOut = readArg('--manifest-out')
 const npmTag = readArg('--tag') ?? 'snapshot'
 const verifyCore = hasArg('--verify-core')
 
@@ -46,6 +50,14 @@ if (exclusiveModes.length > 1) {
 }
 if (packOnly === true && (outDir === undefined || outDir.length === 0)) {
   console.error('--pack-only requires --out-dir')
+  process.exit(1)
+}
+if (hasArg('--manifest-out') && (manifestOut === undefined || manifestOut.length === 0)) {
+  console.error('--manifest-out requires a path')
+  process.exit(1)
+}
+if (manifestOut !== undefined && publish === false) {
+  console.error('--manifest-out requires --publish')
   process.exit(1)
 }
 if (explicitCoreVersion !== undefined && coreSha !== undefined) {
@@ -66,11 +78,15 @@ if (coreSha !== undefined && /^[0-9a-f]{40}$/.test(coreSha) === false) {
  * deterministic instead of guessing a prefix.
  */
 const resolveCoreVersionForSha = (sha) => {
-  const raw = execFileSync('npm', ['view', '@livestore/common', 'versions', '--json'], {
-    cwd: rootDir,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
-  })
+  const raw = execFileSync(
+    'npm',
+    ['view', '@livestore/common', 'versions', '--json', '--registry=https://registry.npmjs.org'],
+    {
+      cwd: rootDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    },
+  )
   const matches = JSON.parse(raw).filter((version) => version.endsWith(sha) === true)
   if (matches.length !== 1) {
     console.error(`Expected exactly one published @livestore/common version ending in ${sha}, found ${matches.length}`)
@@ -110,6 +126,15 @@ const packages = packagePaths.map((path) => ({ path, manifest: readJson(path) })
 const publishablePackages = packages.filter(
   ({ manifest }) => manifest.private !== true && manifest.publishConfig?.access === 'public',
 )
+const releaseTopology = readJson('release/topology.json')
+const topologyPackageNames = releaseTopology.publishablePackageNames
+const discoveredPackageNames = publishablePackages.map(({ manifest }) => manifest.name).toSorted()
+if (
+  Array.isArray(topologyPackageNames) === false ||
+  JSON.stringify([...topologyPackageNames].toSorted()) !== JSON.stringify(discoveredPackageNames)
+) {
+  addError('publishable package cohort must exactly match release/topology.json')
+}
 const contribPackageNames = new Set(publishablePackages.map(({ manifest }) => manifest.name))
 const requiredCorePackages = new Set()
 
@@ -196,6 +221,11 @@ for (const { path, manifest } of publishablePackages) {
       if (isLocalProtocol(spec)) {
         addError(`${manifest.name} ${section}.${dependencyName} still uses local protocol ${spec}`)
       }
+      if (npmTag === 'dev' && dependencyName === '@livestore/devtools-vite' && spec !== coreReleaseVersion) {
+        addError(
+          `${manifest.name} ${section}.@livestore/devtools-vite must equal core release version ${coreReleaseVersion}`,
+        )
+      }
     }
   }
 
@@ -263,13 +293,81 @@ const run = (command, args, options = {}) => {
 
 const npmViewExists = (name, version) => {
   try {
-    execFileSync('npm', ['view', `${name}@${version}`, 'version'], {
+    execFileSync('npm', ['view', `${name}@${version}`, 'version', '--registry=https://registry.npmjs.org'], {
       cwd: rootDir,
       stdio: 'ignore',
     })
     return true
   } catch {
     return false
+  }
+}
+
+const npmViewJson = (spec, field) => {
+  const commandArgs = ['view', spec]
+  if (field !== undefined) commandArgs.push(field)
+  commandArgs.push('--json', '--registry=https://registry.npmjs.org')
+  return JSON.parse(
+    execFileSync('npm', commandArgs, {
+      cwd: rootDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }),
+  )
+}
+
+const digestFile = (path, algorithm) => createHash(algorithm).update(readFileSync(path)).digest('base64')
+
+const tarballDigests = (path) => ({
+  integrity: `sha512-${digestFile(path, 'sha512')}`,
+  shasum: createHash('sha1').update(readFileSync(path)).digest('hex'),
+})
+
+const registryMetadata = (name, version) => npmViewJson(`${name}@${version}`)
+
+const registryTagVersion = (name, tag) => npmViewJson(name, 'dist-tags')?.[tag]
+
+const assertRegistryArtifact = ({ pkg, digests }) => {
+  const metadata = registryMetadata(pkg.name, pkg.version)
+  if (metadata?.dist?.shasum !== digests.shasum || metadata?.dist?.integrity !== digests.integrity) {
+    throw new Error(`${pkg.name}@${pkg.version} exists with registry bytes that differ from the packed candidate`)
+  }
+  return metadata
+}
+
+const dependencyChecksForPackage = ({ pkg, metadata }) => {
+  const expectedDependencies = pkg.rewrites.map(({ section, dependencyName, to }) => ({
+    section,
+    name: dependencyName,
+    expected: to,
+  }))
+  if (npmTag === 'dev') {
+    for (const section of dependencySections) {
+      const expected = pkg.manifest?.[section]?.['@livestore/devtools-vite']
+      if (expected !== undefined) expectedDependencies.push({ section, name: '@livestore/devtools-vite', expected })
+    }
+  }
+  return expectedDependencies.map(({ section, name, expected }) => {
+    const actual = metadata?.[section]?.[name]
+    return { section, name, expected, actual, verified: actual === expected }
+  })
+}
+
+const verifyPublishedDependencies = ({ pkg, metadata }) => {
+  for (const check of dependencyChecksForPackage({ pkg, metadata })) {
+    if (check.verified === false) {
+      throw new Error(
+        `${pkg.name}@${pkg.version} ${check.section}.${check.name} is ${check.actual ?? 'missing'}, expected ${check.expected} on npm`,
+      )
+    }
+  }
+}
+
+const verifyTag = (pkg) => {
+  if (registryTagVersion(pkg.name, npmTag) !== pkg.version) {
+    throw new Error(
+      `${pkg.name} dist-tag ${npmTag} does not point to ${pkg.version}; this trusted-publishing lane cannot safely repair tags out of band`,
+    )
   }
 }
 
@@ -337,9 +435,14 @@ const restoreGeneratedFiles = () => {
 
 const verifyRequiredCorePackages = () => {
   if (verifyCore === false) return
-  for (const packageName of [...requiredCorePackages].sort()) {
+  const packagesToVerify = new Set(requiredCorePackages)
+  if (npmTag === 'dev') packagesToVerify.add('@livestore/devtools-vite')
+  for (const packageName of [...packagesToVerify].sort()) {
     if (npmViewExists(packageName, plan.coreVersion) === false) {
       throw new Error(`Required core package is not visible on npm: ${packageName}@${plan.coreVersion}`)
+    }
+    if (npmTag === 'dev' && registryTagVersion(packageName, 'dev') !== plan.coreVersion) {
+      throw new Error(`${packageName} dist-tag dev must point to ${plan.coreVersion} before contrib publishing`)
     }
   }
 }
@@ -396,7 +499,7 @@ if (dryRun === true || publish === true || packOnly === true) {
 
     for (const pkg of plan.packages) {
       const { packDir, tarballPath } = packPackage(pkg)
-      packed.push({ pkg, packDir, tarballPath })
+      packed.push({ pkg, packDir, tarballPath, digests: tarballDigests(tarballPath) })
     }
 
     smokeInstallPackedTarballs(packed)
@@ -414,14 +517,17 @@ if (dryRun === true || publish === true || packOnly === true) {
     }
 
     if (packOnly === false) {
-      for (const { pkg, tarballPath } of packed) {
+      for (const { pkg, tarballPath, digests } of packed) {
         const existing = npmViewExists(pkg.name, pkg.version)
         if (existing === true && publish === true) {
-          console.log(`${pkg.name}@${pkg.version} already published, skipping`)
+          assertRegistryArtifact({ pkg, digests })
+          verifyTag(pkg)
+          console.log(`${pkg.name}@${pkg.version} already matches the packed candidate; skipping publish`)
           continue
         }
 
         const publishArgs = ['publish', tarballPath, `--tag=${npmTag}`, '--access=public', '--ignore-scripts']
+        if (publish === true) publishArgs.push('--provenance')
         if (dryRun === true) publishArgs.push('--dry-run')
         run('npm', publishArgs)
         console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
@@ -429,13 +535,52 @@ if (dryRun === true || publish === true || packOnly === true) {
     }
 
     if (publish === true) {
-      for (const pkg of plan.packages) {
+      const verifiedRegistryMetadata = new Map()
+      for (const { pkg, digests } of packed) {
         waitForNpmView(pkg.name, pkg.version)
+        const metadata = assertRegistryArtifact({ pkg, digests })
+        verifyTag(pkg)
+        verifyPublishedDependencies({ pkg, metadata })
+        verifiedRegistryMetadata.set(pkg.name, metadata)
+      }
+
+      if (manifestOut !== undefined) {
+        const absoluteManifestOut = isAbsolute(manifestOut) ? manifestOut : join(rootDir, manifestOut)
+        mkdirSync(dirname(absoluteManifestOut), { recursive: true })
+        writeFileSync(
+          absoluteManifestOut,
+          `${JSON.stringify(
+            {
+              schemaVersion: 1,
+              sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim(),
+              npmTag,
+              version: releaseVersion,
+              coreVersion: plan.coreVersion,
+              packageCount: plan.packageCount,
+              cohort: plan.packages.map((pkg) => pkg.name),
+              packages: packed.map(({ pkg, digests }) => ({
+                name: pkg.name,
+                version: pkg.version,
+                shasum: digests.shasum,
+                integrity: digests.integrity,
+                dependencyChecks: dependencyChecksForPackage({
+                  pkg,
+                  metadata: verifiedRegistryMetadata.get(pkg.name),
+                }),
+              })),
+            },
+            null,
+            2,
+          )}\n`,
+        )
       }
     }
   } finally {
-    restoreManifestRewrites()
-    restoreGeneratedFiles()
+    cleanupPackedRun({
+      publish,
+      restoreManifests: restoreManifestRewrites,
+      restoreGeneratedProjection: restoreGeneratedFiles,
+    })
     for (const { packDir } of packed) {
       rmSync(packDir, { recursive: true, force: true })
     }

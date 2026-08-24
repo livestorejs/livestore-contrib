@@ -1,4 +1,4 @@
-import { catalog } from './genie/external.ts'
+import { catalog, contribCoreReleaseVersion } from './genie/external.ts'
 import { commonPnpmPolicySettings, pnpmWorkspaceYaml, repoPnpmAllowBuilds } from './genie/repo.ts'
 import { rootWorkspaceExtraMembers, rootWorkspacePackages } from './package.json.genie.ts'
 
@@ -24,6 +24,18 @@ const effectDedupeOverrides = catalog.pick(
   '@effect/opentelemetry',
   '@effect/vitest',
 )
+
+/** Published core cohort consumed transitively by the deliberately external DevTools artifact. */
+const coreDevReleaseCohort = [
+  `@livestore/adapter-web@${contribCoreReleaseVersion}`,
+  `@livestore/common-cf@${contribCoreReleaseVersion}`,
+  `@livestore/common@${contribCoreReleaseVersion}`,
+  `@livestore/devtools-vite@${contribCoreReleaseVersion}`,
+  `@livestore/sqlite-wasm@${contribCoreReleaseVersion}`,
+  `@livestore/utils@${contribCoreReleaseVersion}`,
+  `@livestore/wa-sqlite@${contribCoreReleaseVersion}`,
+  `@livestore/webmesh@${contribCoreReleaseVersion}`,
+] as const
 
 /**
  * Suppress the false-positive catalog peer-dep conflict for `ioredis`: Effect v4's
@@ -78,10 +90,52 @@ const contribCatalogDuplicateExceptions = [
       "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
   },
   {
+    package: '@livestore/adapter-web',
+    versions: [contribCoreReleaseVersion, '0.4.0-dev.25'],
+    reason:
+      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing examples still consume the previous devtools cohort.',
+  },
+  {
+    package: '@livestore/common',
+    versions: [contribCoreReleaseVersion, '0.4.0'],
+    reason:
+      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
+  },
+  {
+    package: '@livestore/common-cf',
+    versions: [contribCoreReleaseVersion, '0.4.0'],
+    reason:
+      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
+  },
+  {
+    package: '@livestore/devtools-vite',
+    versions: [contribCoreReleaseVersion, '0.4.0-dev.25'],
+    reason:
+      'Generated publishable packages deliberately consume the new core dev cohort while static examples remain on the previous devtools cohort.',
+  },
+  {
+    package: '@livestore/sqlite-wasm',
+    versions: [contribCoreReleaseVersion, '0.4.0'],
+    reason:
+      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
+  },
+  {
     package: '@livestore/utils',
-    versions: ['0.4.0', '0.4.0-dev.25'],
+    versions: ['0.4.0', '0.4.0-dev.25', contribCoreReleaseVersion],
     reason:
       "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
+  },
+  {
+    package: '@livestore/wa-sqlite',
+    versions: [contribCoreReleaseVersion, '0.4.0'],
+    reason:
+      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
+  },
+  {
+    package: '@livestore/webmesh',
+    versions: [contribCoreReleaseVersion, '0.4.0'],
+    reason:
+      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
   },
   {
     package: '@playwright/test',
@@ -198,6 +252,7 @@ export default pnpmWorkspaceYaml.root({
   extraMembers: rootWorkspaceExtraMembers,
   catalogVersions: catalog,
   ...contribPnpmPolicySettings,
+  minimumReleaseAgeExclude: [...contribPnpmPolicySettings.minimumReleaseAgeExclude, ...coreDevReleaseCohort],
   peerDependencyRules: contribPeerDependencyRules,
   injectWorkspacePackages: false,
   allowBuilds: repoPnpmAllowBuilds,
