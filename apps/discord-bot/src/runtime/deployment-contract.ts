@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Schema } from 'effect'
 
 const NonEmpty = Schema.Trimmed.check(Schema.isNonEmpty())
 const Snowflake = Schema.String.check(Schema.isPattern(/^\d{17,20}$/))
@@ -6,16 +6,16 @@ const SecretRef = NonEmpty.check(Schema.isMaxLength(512))
 const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0))
 
 export const DeploymentTelemetry = Schema.Struct({
-  sink: Schema.Literal("dev3-tempo"),
-  delivery: Schema.Literal("best-effort"),
-  accessBoundary: Schema.Literal("tailnet-trusted-grafana"),
+  sink: Schema.Literal('dev3-tempo'),
+  delivery: Schema.Literal('best-effort'),
+  accessBoundary: Schema.Literal('tailnet-trusted-grafana'),
   retentionDays: PositiveInt.check(Schema.isLessThanOrEqualTo(30)),
 })
 
 export const DeploymentOpenAi = Schema.Struct({
   projectId: NonEmpty.check(Schema.isMaxLength(128)),
   serviceAccountSecretRef: SecretRef,
-  retentionPosture: Schema.Literal("standard-store-false"),
+  retentionPosture: Schema.Literal('standard-store-false'),
   limits: Schema.Struct({
     requestsPerMemberPerHour: PositiveInt,
     requestsPerMinute: PositiveInt,
@@ -27,7 +27,7 @@ export const DeploymentOpenAi = Schema.Struct({
 
 export const DeploymentBase = {
   schemaVersion: Schema.Literal(1),
-  environment: Schema.Literals(["staging", "production"]),
+  environment: Schema.Literals(['staging', 'production']),
   applicationId: Snowflake,
   guildId: Snowflake,
   actionChannelIds: Schema.Array(Snowflake),
@@ -47,11 +47,11 @@ export const DeploymentBase = {
 export const BotDeploymentConfig = Schema.Union([
   Schema.Struct({
     ...DeploymentBase,
-    environment: Schema.Literal("production"),
+    environment: Schema.Literal('production'),
   }),
   Schema.Struct({
     ...DeploymentBase,
-    environment: Schema.Literal("staging"),
+    environment: Schema.Literal('staging'),
     e2e: Schema.Struct({
       actorApplicationId: Snowflake,
       actorTokenSecretRef: SecretRef,
@@ -59,7 +59,7 @@ export const BotDeploymentConfig = Schema.Union([
       requiredPurposeMarker: NonEmpty.check(Schema.isMaxLength(256)),
     }),
   }),
-]).annotate({ identifier: "DiscordBot.Runtime.BotDeploymentConfig.v1" })
+]).annotate({ identifier: 'DiscordBot.Runtime.BotDeploymentConfig.v1' })
 export type BotDeploymentConfig = typeof BotDeploymentConfig.Type
 
 /**
@@ -80,28 +80,39 @@ export const normalizeDeploymentConfig = (config: BotDeploymentConfig): BotDeplo
       contributorMaintainerRoleIds: unique(config.docsAudience.contributorMaintainerRoleIds),
     },
   }
-  if (normalized.actionChannelIds.length === 0) throw new Error("actionChannelIds must be non-empty")
+  if (normalized.actionChannelIds.length === 0) throw new Error('actionChannelIds must be non-empty')
   if (subset(normalized.aiTitleChannelIds, normalized.actionChannelIds) === false) {
-    throw new Error("aiTitleChannelIds must be a subset of actionChannelIds")
+    throw new Error('aiTitleChannelIds must be a subset of actionChannelIds')
   }
   if (subset(normalized.aiTitleChannelIds, normalized.docsAudience.publicChannelIds) === false) {
-    throw new Error("AI-title channels must be public docs channels")
+    throw new Error('AI-title channels must be public docs channels')
   }
   if (intersects(normalized.docsAudience.publicChannelIds, normalized.docsAudience.roleRestrictedChannelIds) === true) {
-    throw new Error("docs audience channel sets must be disjoint")
+    throw new Error('docs audience channel sets must be disjoint')
   }
-  if (normalized.docsAudience.roleRestrictedChannelIds.length > 0 && normalized.docsAudience.contributorMaintainerRoleIds.length === 0) {
-    throw new Error("role-restricted docs channels require contributor/maintainer roles")
+  if (
+    normalized.docsAudience.roleRestrictedChannelIds.length > 0 &&
+    normalized.docsAudience.contributorMaintainerRoleIds.length === 0
+  ) {
+    throw new Error('role-restricted docs channels require contributor/maintainer roles')
   }
-  if (normalized.environment === "production" && intersects(normalized.actionChannelIds, normalized.stagingOnlyChannelIds) === true) {
-    throw new Error("production action channels cannot overlap staging-only channels")
+  if (
+    normalized.environment === 'production' &&
+    intersects(normalized.actionChannelIds, normalized.stagingOnlyChannelIds) === true
+  ) {
+    throw new Error('production action channels cannot overlap staging-only channels')
   }
-  if (normalized.environment === "staging" && normalized.actionChannelIds.includes(normalized.e2e.targetChannelId) === false) {
-    throw new Error("staging E2E target must be an action channel")
+  if (
+    normalized.environment === 'staging' &&
+    normalized.actionChannelIds.includes(normalized.e2e.targetChannelId) === false
+  ) {
+    throw new Error('staging E2E target must be an action channel')
   }
   return normalized
 }
 
 const unique = <T>(values: ReadonlyArray<T>): Array<T> => [...new Set(values)]
-const subset = (values: ReadonlyArray<string>, superset: ReadonlyArray<string>) => values.every(value => superset.includes(value))
-const intersects = (left: ReadonlyArray<string>, right: ReadonlyArray<string>) => left.some(value => right.includes(value))
+const subset = (values: ReadonlyArray<string>, superset: ReadonlyArray<string>) =>
+  values.every((value) => superset.includes(value))
+const intersects = (left: ReadonlyArray<string>, right: ReadonlyArray<string>) =>
+  left.some((value) => right.includes(value))

@@ -1,4 +1,5 @@
-import { runE2EMatrix } from "./harness.ts"
+import { runE2EMatrix } from './harness.ts'
+import type { LiveManifest } from './live-manifest.ts'
 import {
   aggregateVerdict,
   liveWriteConfirmation,
@@ -7,9 +8,8 @@ import {
   opaqueHash,
   scenarioMatrix,
   type RunReceipt,
-} from "./model.ts"
-import type { LiveManifest } from "./live-manifest.ts"
-import type { E2ETransport } from "./transport.ts"
+} from './model.ts'
+import type { E2ETransport } from './transport.ts'
 
 export interface LiveRunnerInput {
   readonly manifest: LiveManifest | undefined
@@ -24,22 +24,22 @@ const unrunReceipt = (): RunReceipt => {
   const scenarios = scenarioMatrix.map((scenario) => ({
     scenario: scenario.id,
     executor: scenario.executor,
-    verdict: "UNRUN" as const,
-    reason: "prerequisite-missing" as const,
-    targetHash: opaqueHash("unconfigured-staging-target"),
+    verdict: 'UNRUN' as const,
+    reason: 'prerequisite-missing' as const,
+    targetHash: opaqueHash('unconfigured-staging-target'),
     markerHash: opaqueHash(makeMarker(runId, scenario.id)),
     artifactHashes: [],
     cleanup: {
-      sourceMessage: "not-needed" as const,
-      thread: "not-needed" as const,
-      response: "not-needed" as const,
+      sourceMessage: 'not-needed' as const,
+      thread: 'not-needed' as const,
+      response: 'not-needed' as const,
     },
   }))
 
   return {
     schemaVersion: 1,
     runId,
-    environment: "staging",
+    environment: 'staging',
     startedAt,
     finishedAt: new Date().toISOString(),
     scenarios,
@@ -52,16 +52,12 @@ const unrunReceipt = (): RunReceipt => {
  * injection happen outside this function; absent prerequisites produce UNRUN.
  */
 export const runLiveStaging = async (input: LiveRunnerInput): Promise<RunReceipt> => {
-  if (
-    input.manifest === undefined ||
-    input.transport === undefined ||
-    input.confirmation !== liveWriteConfirmation
-  ) {
+  if (input.manifest === undefined || input.transport === undefined || input.confirmation !== liveWriteConfirmation) {
     return unrunReceipt()
   }
 
   return runE2EMatrix({
-    environment: "staging",
+    environment: 'staging',
     target: input.manifest.target,
     transport: input.transport,
     allowHumanAssisted: input.humanAssisted,

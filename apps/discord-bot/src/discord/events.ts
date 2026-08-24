@@ -1,8 +1,9 @@
-import * as Context from "effect/Context"
-import type * as Effect from "effect/Effect"
-import * as Schema from "effect/Schema"
-import { DiscordSnowflake, InteractionRoute } from "./actions.ts"
-import { SourceChannelKind } from "../threading/model.ts"
+import * as Context from 'effect/Context'
+import type * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
+
+import { SourceChannelKind } from '../threading/model.ts'
+import { DiscordSnowflake, InteractionRoute } from './actions.ts'
 
 export const AutomaticMessage = Schema.Struct({
   guildId: DiscordSnowflake,
@@ -20,14 +21,14 @@ export const AutomaticMessage = Schema.Struct({
   hasPoll: Schema.Boolean,
   existingThreadId: Schema.optional(DiscordSnowflake),
   sourceChannelKind: Schema.optional(SourceChannelKind),
-}).annotate({ identifier: "Discord.AutomaticMessage" })
+}).annotate({ identifier: 'Discord.AutomaticMessage' })
 export type AutomaticMessage = typeof AutomaticMessage.Type
 
 export const InteractionActor = Schema.Struct({
   userId: DiscordSnowflake,
   roleIds: Schema.Array(DiscordSnowflake),
   effectivePermissions: Schema.String,
-}).annotate({ identifier: "Discord.InteractionActor" })
+}).annotate({ identifier: 'Discord.InteractionActor' })
 export type InteractionActor = typeof InteractionActor.Type
 
 export const CreateThreadInteraction = Schema.Struct({
@@ -37,7 +38,7 @@ export const CreateThreadInteraction = Schema.Struct({
   actor: InteractionActor,
   sourceMessage: AutomaticMessage,
   applicationPermissions: Schema.String,
-}).annotate({ identifier: "Discord.CreateThreadInteraction" })
+}).annotate({ identifier: 'Discord.CreateThreadInteraction' })
 export type CreateThreadInteraction = typeof CreateThreadInteraction.Type
 
 export const DocsInteraction = Schema.Struct({
@@ -47,19 +48,16 @@ export const DocsInteraction = Schema.Struct({
   actor: InteractionActor,
   applicationPermissions: Schema.String,
   query: Schema.Trimmed.check(Schema.isNonEmpty()),
-}).annotate({ identifier: "Discord.DocsInteraction" })
+}).annotate({ identifier: 'Discord.DocsInteraction' })
 export type DocsInteraction = typeof DocsInteraction.Type
 
 /** Decoded inbound events. Implementations invoke shared product workflows. */
 export interface DiscordEventHandlersService {
   readonly onAutomaticMessage: (input: AutomaticMessage) => Effect.Effect<void>
-  readonly onCreateThreadInteraction: (
-    input: CreateThreadInteraction,
-  ) => Effect.Effect<void>
+  readonly onCreateThreadInteraction: (input: CreateThreadInteraction) => Effect.Effect<void>
   readonly onDocsInteraction: (input: DocsInteraction) => Effect.Effect<void>
 }
 
-export class DiscordEventHandlers extends Context.Service<
-  DiscordEventHandlers,
-  DiscordEventHandlersService
->()("livestore-discord/DiscordEventHandlers") {}
+export class DiscordEventHandlers extends Context.Service<DiscordEventHandlers, DiscordEventHandlersService>()(
+  'livestore-discord/DiscordEventHandlers',
+) {}

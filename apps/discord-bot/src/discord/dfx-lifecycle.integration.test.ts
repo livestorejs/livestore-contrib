@@ -1,33 +1,35 @@
-import { DiscordConfig, MemoryRateLimitStoreLive } from "dfx"
-import { DiscordGateway, DiscordGatewayLive, DiscordWS, ShardStore } from "dfx/gateway"
-import { ShardStateStore } from "dfx/DiscordGateway/Shard/StateStore"
-import { Effect, Layer, Option, Redacted, Stream } from "effect"
-import { HttpClient, HttpClientResponse } from "effect/unstable/http"
-import * as Socket from "effect/unstable/socket/Socket"
-import { describe, expect, it } from "vitest"
+import { DiscordConfig, MemoryRateLimitStoreLive } from 'dfx'
+import { ShardStateStore } from 'dfx/DiscordGateway/Shard/StateStore'
+import { DiscordGateway, DiscordGatewayLive, DiscordWS, ShardStore } from 'dfx/gateway'
+import { Effect, Layer, Option, Redacted, Stream } from 'effect'
+import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
+import * as Socket from 'effect/unstable/socket/Socket'
+import { describe, expect, it } from 'vitest'
 
-type WebSocketBinaryType = "blob" | "arraybuffer"
+type WebSocketBinaryType = 'blob' | 'arraybuffer'
 
 /**
  * This deliberately exercises DFX's Sharder and Shard layers, rather than
  * reproducing their PubSub/queue implementation in application code.
  */
-describe("DFX gateway lifecycle wiring", () => {
-  it("replays READY emitted before a late gateway subscriber", async () => {
+describe('DFX gateway lifecycle wiring', () => {
+  it('replays READY emitted before a late gateway subscriber', async () => {
     const gateway = await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
           const service = yield* DiscordGateway
-          yield* Effect.sleep("50 millis")
-          return Option.getOrThrow(yield* Stream.runHead(Stream.filter(service.lifecycle, event => event._tag === "Ready")))
+          yield* Effect.sleep('50 millis')
+          return Option.getOrThrow(
+            yield* Stream.runHead(Stream.filter(service.lifecycle, (event) => event._tag === 'Ready')),
+          )
         }),
       ).pipe(Effect.provide(makeGatewayLayer((_url: string) => new TestGatewaySocket()))),
     )
 
-    expect(gateway).toEqual({ _tag: "Ready", shardId: 0 })
+    expect(gateway).toEqual({ _tag: 'Ready', shardId: 0 })
   })
 
-  it("propagates a terminal close through Sharder to DiscordGateway.failure", async () => {
+  it('propagates a terminal close through Sharder to DiscordGateway.failure', async () => {
     const failure = await Effect.runPromise(
       Effect.scoped(
         Effect.gen(function* () {
@@ -37,17 +39,17 @@ describe("DFX gateway lifecycle wiring", () => {
       ).pipe(Effect.provide(makeGatewayLayer((_url: string) => new TerminalGatewaySocket()))),
     )
 
-    expect(failure).toMatchObject({ _tag: "TerminalGatewayCloseError", code: 4004 })
+    expect(failure).toMatchObject({ _tag: 'TerminalGatewayCloseError', code: 4004 })
   })
 })
 
-const testHttpClient = HttpClient.make(request =>
+const testHttpClient = HttpClient.make((request) =>
   Effect.succeed(
-      HttpClientResponse.fromWeb(
+    HttpClientResponse.fromWeb(
       request,
       new Response(
         JSON.stringify({
-          url: "wss://gateway.discord.test",
+          url: 'wss://gateway.discord.test',
           shards: 1,
           session_start_limit: {
             total: 1000,
@@ -56,7 +58,7 @@ const testHttpClient = HttpClient.make(request =>
             max_concurrency: 1,
           },
         }),
-        { status: 200, headers: { "content-type": "application/json" } },
+        { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     ),
   ),
@@ -68,11 +70,11 @@ class TestGatewaySocket extends EventTarget implements globalThis.WebSocket {
   readonly CLOSING = 2
   readonly CLOSED = 3
   readonly bufferedAmount = 0
-  readonly extensions = ""
-  readonly protocol = ""
+  readonly extensions = ''
+  readonly protocol = ''
   readonly readyState = this.OPEN
-  readonly url = "wss://gateway.discord.test"
-  binaryType: WebSocketBinaryType = "blob"
+  readonly url = 'wss://gateway.discord.test'
+  binaryType: WebSocketBinaryType = 'blob'
   onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null
   onerror: ((this: WebSocket, ev: Event) => unknown) | null = null
   onmessage: ((this: WebSocket, ev: MessageEvent) => unknown) | null = null
@@ -84,9 +86,9 @@ class TestGatewaySocket extends EventTarget implements globalThis.WebSocket {
     queueMicrotask(() =>
       this.emitMessage({
         op: 0,
-        t: "READY",
+        t: 'READY',
         s: 1,
-        d: { session_id: "test-session", resume_gateway_url: "wss://gateway.discord.test" },
+        d: { session_id: 'test-session', resume_gateway_url: 'wss://gateway.discord.test' },
       }),
     )
   }
@@ -95,7 +97,7 @@ class TestGatewaySocket extends EventTarget implements globalThis.WebSocket {
   close(_code?: number, _reason?: string) {}
 
   private emitMessage(message: unknown) {
-    this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(message) }))
+    this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(message) }))
   }
 }
 
@@ -105,11 +107,11 @@ class TerminalGatewaySocket extends EventTarget implements globalThis.WebSocket 
   readonly CLOSING = 2
   readonly CLOSED = 3
   readonly bufferedAmount = 0
-  readonly extensions = ""
-  readonly protocol = ""
+  readonly extensions = ''
+  readonly protocol = ''
   readonly readyState = this.OPEN
-  readonly url = "wss://gateway.discord.test"
-  binaryType: WebSocketBinaryType = "blob"
+  readonly url = 'wss://gateway.discord.test'
+  binaryType: WebSocketBinaryType = 'blob'
   onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null
   onerror: ((this: WebSocket, ev: Event) => unknown) | null = null
   onmessage: ((this: WebSocket, ev: MessageEvent) => unknown) | null = null
@@ -118,10 +120,10 @@ class TerminalGatewaySocket extends EventTarget implements globalThis.WebSocket 
   constructor() {
     super()
     queueMicrotask(() => {
-      const event = new Event("close")
+      const event = new Event('close')
       Object.defineProperties(event, {
         code: { value: 4004 },
-        reason: { value: "terminal-close wiring probe" },
+        reason: { value: 'terminal-close wiring probe' },
       })
       this.dispatchEvent(event)
     })
@@ -131,22 +133,23 @@ class TerminalGatewaySocket extends EventTarget implements globalThis.WebSocket 
   close(_code?: number, _reason?: string) {}
 }
 
-const makeGatewayLayer = (socketConstructor: (url: string) => WebSocket) => DiscordGatewayLive.pipe(
-  Layer.provide(
-    DiscordConfig.layer({
-      token: Redacted.make("test-token"),
-      rest: { baseUrl: "https://discord.test" },
-      gateway: { shardCount: 1, identifyRateLimit: [1_000, 1] },
-    }),
-  ),
-  Layer.provide(
-    Layer.mergeAll(
-      Layer.succeed(Socket.WebSocketConstructor, socketConstructor),
-      Layer.succeed(HttpClient.HttpClient, testHttpClient),
-      MemoryRateLimitStoreLive,
-      ShardStore.MemoryShardStoreLive,
-      ShardStateStore.MemoryLive,
-      DiscordWS.JsonDiscordWSCodecLive,
+const makeGatewayLayer = (socketConstructor: (url: string) => WebSocket) =>
+  DiscordGatewayLive.pipe(
+    Layer.provide(
+      DiscordConfig.layer({
+        token: Redacted.make('test-token'),
+        rest: { baseUrl: 'https://discord.test' },
+        gateway: { shardCount: 1, identifyRateLimit: [1_000, 1] },
+      }),
     ),
-  ),
-)
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.succeed(Socket.WebSocketConstructor, socketConstructor),
+        Layer.succeed(HttpClient.HttpClient, testHttpClient),
+        MemoryRateLimitStoreLive,
+        ShardStore.MemoryShardStoreLive,
+        ShardStateStore.MemoryLive,
+        DiscordWS.JsonDiscordWSCodecLive,
+      ),
+    ),
+  )

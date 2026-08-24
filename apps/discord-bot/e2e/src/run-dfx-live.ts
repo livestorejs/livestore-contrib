@@ -1,8 +1,8 @@
-import { defaultRunCommand, makeDfxLiveTransport, type CommandRunner } from "./dfx-live-transport.ts"
-import { makeCommandHumanHandoffBroker } from "./human-handoff.ts"
-import type { LiveManifest } from "./live-manifest.ts"
-import { runLiveStaging } from "./live-runner.ts"
-import type { MessageSnapshot, RunReceipt, Snowflake } from "./model.ts"
+import { defaultRunCommand, makeDfxLiveTransport, type CommandRunner } from './dfx-live-transport.ts'
+import { makeCommandHumanHandoffBroker } from './human-handoff.ts'
+import type { LiveManifest } from './live-manifest.ts'
+import { runLiveStaging } from './live-runner.ts'
+import type { MessageSnapshot, RunReceipt, Snowflake } from './model.ts'
 
 export interface RunDfxLiveInput {
   readonly manifest: LiveManifest | undefined
@@ -18,19 +18,15 @@ export interface RunDfxLiveInput {
     readonly marker: string
     readonly content: string
   }) => Promise<MessageSnapshot>
-  readonly invokeMessageAction?: Parameters<typeof makeDfxLiveTransport>[0]["invokeMessageAction"]
-  readonly invokeDocs?: Parameters<typeof makeDfxLiveTransport>[0]["invokeDocs"]
-  readonly deleteHumanResponse?: Parameters<typeof makeDfxLiveTransport>[0]["deleteHumanResponse"]
+  readonly invokeMessageAction?: Parameters<typeof makeDfxLiveTransport>[0]['invokeMessageAction']
+  readonly invokeDocs?: Parameters<typeof makeDfxLiveTransport>[0]['invokeDocs']
+  readonly deleteHumanResponse?: Parameters<typeof makeDfxLiveTransport>[0]['deleteHumanResponse']
   readonly humanAssisted?: boolean
 }
 
 /** Runs configured lanes; absent human-assisted callbacks truthfully produce UNRUN. */
 export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunReceipt> => {
-  if (
-    input.manifest === undefined ||
-    input.actorBotToken === undefined ||
-    input.actorBotToken.trim() === ""
-  ) {
+  if (input.manifest === undefined || input.actorBotToken === undefined || input.actorBotToken.trim() === '') {
     return runLiveStaging({
       manifest: input.manifest,
       confirmation: input.confirmation,
@@ -39,12 +35,13 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
     })
   }
 
-  const humanBroker = input.humanHandoffBrokerExecutable === undefined
-    ? undefined
-    : makeCommandHumanHandoffBroker({
-        executable: input.humanHandoffBrokerExecutable,
-        runCommand: input.runCommand ?? defaultRunCommand,
-      })
+  const humanBroker =
+    input.humanHandoffBrokerExecutable === undefined
+      ? undefined
+      : makeCommandHumanHandoffBroker({
+          executable: input.humanHandoffBrokerExecutable,
+          runCommand: input.runCommand ?? defaultRunCommand,
+        })
   const createHumanMessage = input.createHumanMessage ?? humanBroker?.createMessage
   const invokeMessageAction = input.invokeMessageAction ?? humanBroker?.invokeMessageAction
   const invokeDocs = input.invokeDocs ?? humanBroker?.invokeDocs
@@ -55,29 +52,18 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
     botControlSocket: input.manifest.botControlSocket,
     ...(input.cliExecutable === undefined ? {} : { cliExecutable: input.cliExecutable }),
     ...(input.runCommand === undefined ? {} : { runCommand: input.runCommand }),
-    ...(createHumanMessage === undefined
-      ? {}
-      : { createHumanMessage }),
-    ...(invokeMessageAction === undefined
-      ? {}
-      : { invokeMessageAction }),
-    ...(invokeDocs === undefined
-      ? {}
-      : { invokeDocs }),
-    ...(deleteHumanResponse === undefined
-      ? {}
-      : { deleteHumanResponse }),
-    ...(humanBroker?.deleteMessage === undefined
-      ? {}
-      : { deleteHumanMessage: humanBroker.deleteMessage }),
+    ...(createHumanMessage === undefined ? {} : { createHumanMessage }),
+    ...(invokeMessageAction === undefined ? {} : { invokeMessageAction }),
+    ...(invokeDocs === undefined ? {} : { invokeDocs }),
+    ...(deleteHumanResponse === undefined ? {} : { deleteHumanResponse }),
+    ...(humanBroker?.deleteMessage === undefined ? {} : { deleteHumanMessage: humanBroker.deleteMessage }),
   })
   try {
     return await runLiveStaging({
       manifest: input.manifest,
       confirmation: input.confirmation,
       transport: live.transport,
-      humanAssisted:
-        input.humanAssisted === true || input.humanHandoffBrokerExecutable !== undefined,
+      humanAssisted: input.humanAssisted === true || input.humanHandoffBrokerExecutable !== undefined,
     })
   } finally {
     await live.dispose()

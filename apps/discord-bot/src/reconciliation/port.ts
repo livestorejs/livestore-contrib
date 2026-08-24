@@ -1,6 +1,7 @@
-import type * as Effect from "effect/Effect"
-import type { DiscordSnowflake } from "../journal/model.ts"
-import type { ThreadObservation, ThreadObservationError } from "./model.ts"
+import type * as Effect from 'effect/Effect'
+
+import type { DiscordSnowflake } from '../journal/model.ts'
+import type { ThreadObservation, ThreadObservationError } from './model.ts'
 
 export interface ObserveSourceThreadInput {
   readonly sourceMessageId: DiscordSnowflake

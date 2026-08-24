@@ -13,8 +13,8 @@ import {
   type Snowflake,
   type StagingTarget,
   type ThreadSnapshot,
-} from "./model.ts"
-import { E2EPrerequisiteUnavailableError, type E2ETransport } from "./transport.ts"
+} from './model.ts'
+import { E2EPrerequisiteUnavailableError, type E2ETransport } from './transport.ts'
 
 interface OwnedArtifacts {
   source: MessageSnapshot | undefined
@@ -23,9 +23,9 @@ interface OwnedArtifacts {
 }
 
 const noCleanup: ArtifactCleanup = {
-  sourceMessage: "not-needed",
-  thread: "not-needed",
-  response: "not-needed",
+  sourceMessage: 'not-needed',
+  thread: 'not-needed',
+  response: 'not-needed',
 }
 
 const pollForThread = async (
@@ -59,34 +59,38 @@ const cleanup = async (
   target: StagingTarget,
   owned: OwnedArtifacts,
 ): Promise<ArtifactCleanup> => {
-  const result: { sourceMessage: ArtifactCleanup["sourceMessage"]; thread: ArtifactCleanup["thread"]; response: ArtifactCleanup["response"] } = {
-    sourceMessage: "not-needed",
-    thread: "not-needed",
-    response: "not-needed",
+  const result: {
+    sourceMessage: ArtifactCleanup['sourceMessage']
+    thread: ArtifactCleanup['thread']
+    response: ArtifactCleanup['response']
+  } = {
+    sourceMessage: 'not-needed',
+    thread: 'not-needed',
+    response: 'not-needed',
   }
 
   if (owned.response !== undefined) {
     try {
       await transport.deleteResponse(owned.response.id)
-      result.response = "deleted"
+      result.response = 'deleted'
     } catch {
-      result.response = "failed"
+      result.response = 'failed'
     }
   }
   if (owned.thread !== undefined && owned.source !== undefined) {
     try {
       await transport.deleteThread(owned.thread.id)
-      result.thread = "deleted"
+      result.thread = 'deleted'
     } catch {
-      result.thread = "failed"
+      result.thread = 'failed'
     }
   }
   if (owned.source !== undefined) {
     try {
       await transport.deleteMessage(target.channelId, owned.source.id)
-      result.sourceMessage = "deleted"
+      result.sourceMessage = 'deleted'
     } catch {
-      result.sourceMessage = "failed"
+      result.sourceMessage = 'failed'
     }
   }
   return result
@@ -107,11 +111,11 @@ const runScenario = async (input: {
     markerHash: opaqueHash(marker),
   } as const
 
-  if (scenario.executor === "human-assisted" && input.allowHumanAssisted === false) {
+  if (scenario.executor === 'human-assisted' && input.allowHumanAssisted === false) {
     return {
       ...base,
-      verdict: "UNRUN",
-      reason: "official-automation-unavailable",
+      verdict: 'UNRUN',
+      reason: 'official-automation-unavailable',
       artifactHashes: [],
       cleanup: noCleanup,
     }
@@ -119,7 +123,7 @@ const runScenario = async (input: {
 
   const owned: OwnedArtifacts = { source: undefined, thread: undefined, response: undefined }
   const createOwnedMessage = async (
-    request: Parameters<E2ETransport["createMessage"]>[0],
+    request: Parameters<E2ETransport['createMessage']>[0],
   ): Promise<MessageSnapshot> => {
     const candidate = await transport.createMessage(request)
     if (
@@ -127,7 +131,7 @@ const runScenario = async (input: {
       candidate.marker !== request.marker ||
       candidate.author !== request.author
     ) {
-      throw new Error("Created message did not correlate to the requested owner and scope")
+      throw new Error('Created message did not correlate to the requested owner and scope')
     }
     owned.source = candidate
     return candidate
@@ -140,12 +144,12 @@ const runScenario = async (input: {
   let passed = false
   try {
     switch (scenario.id) {
-      case "automatic-eligible": {
+      case 'automatic-eligible': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
           content: `${marker} How does LiveStore sync between clients?`,
-          author: "human",
+          author: 'human',
         })
         const candidate = await pollForThread(transport, target, source.id)
         if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
@@ -154,14 +158,14 @@ const runScenario = async (input: {
         }
         break
       }
-      case "automatic-filtered": {
+      case 'automatic-filtered': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
           // Keep this exact low-information payload: adding the marker to the
           // visible content would intentionally make it policy-eligible.
-          content: "thanks",
-          author: "human",
+          content: 'thanks',
+          author: 'human',
         })
         const candidate = await pollForThread(transport, target, source.id)
         if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
@@ -172,12 +176,12 @@ const runScenario = async (input: {
         passed = candidate === undefined
         break
       }
-      case "automated-author-rejected": {
+      case 'automated-author-rejected': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
           content: `${marker} How does LiveStore sync between clients?`,
-          author: "automated-actor",
+          author: 'automated-actor',
         })
         const candidate = await pollForThread(transport, target, source.id)
         if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
@@ -186,29 +190,29 @@ const runScenario = async (input: {
         passed = candidate === undefined
         break
       }
-      case "operator-retroactive": {
+      case 'operator-retroactive': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: "thanks",
-          author: "human",
+          content: 'thanks',
+          author: 'human',
         })
         const result = await transport.operatorCreateThread({
           sourceMessageId: source.id,
           reason: `Discord E2E ${marker}`,
         })
-        if (result._tag === "Created" && isOwnedThread(result.thread, source, target, marker) === true) {
+        if (result._tag === 'Created' && isOwnedThread(result.thread, source, target, marker) === true) {
           owned.thread = result.thread
           passed = true
         }
         break
       }
-      case "operator-idempotent": {
+      case 'operator-idempotent': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: "thanks",
-          author: "human",
+          content: 'thanks',
+          author: 'human',
         })
         const first = await transport.operatorCreateThread({
           sourceMessageId: source.id,
@@ -219,8 +223,8 @@ const runScenario = async (input: {
           reason: `Discord E2E repeat ${marker}`,
         })
         if (
-          first._tag === "Created" &&
-          second._tag === "AlreadySatisfied" &&
+          first._tag === 'Created' &&
+          second._tag === 'AlreadySatisfied' &&
           first.thread.id === second.thread.id &&
           isOwnedThread(first.thread, source, target, marker) === true
         ) {
@@ -229,12 +233,12 @@ const runScenario = async (input: {
         }
         break
       }
-      case "operator-concurrent": {
+      case 'operator-concurrent': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: "thanks",
-          author: "human",
+          content: 'thanks',
+          author: 'human',
         })
         const [first, second] = await Promise.all([
           transport.operatorCreateThread({
@@ -246,16 +250,15 @@ const runScenario = async (input: {
             reason: `Discord E2E concurrent B ${marker}`,
           }),
         ])
-        const created = [first, second].filter((result) => result._tag === "Created")
-        const satisfied = [first, second].filter(
-          (result) => result._tag === "AlreadySatisfied",
-        )
-        const thread = first._tag === "Created" ? first.thread : second._tag === "Created" ? second.thread : undefined
-        const satisfiedThread = first._tag === "AlreadySatisfied"
-          ? first.thread
-          : second._tag === "AlreadySatisfied"
-            ? second.thread
-            : undefined
+        const created = [first, second].filter((result) => result._tag === 'Created')
+        const satisfied = [first, second].filter((result) => result._tag === 'AlreadySatisfied')
+        const thread = first._tag === 'Created' ? first.thread : second._tag === 'Created' ? second.thread : undefined
+        const satisfiedThread =
+          first._tag === 'AlreadySatisfied'
+            ? first.thread
+            : second._tag === 'AlreadySatisfied'
+              ? second.thread
+              : undefined
         if (
           created.length === 1 &&
           satisfied.length === 1 &&
@@ -268,22 +271,22 @@ const runScenario = async (input: {
         }
         break
       }
-      case "message-action-authorized": {
+      case 'message-action-authorized': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: "thanks",
-          author: "human",
+          content: 'thanks',
+          author: 'human',
         })
         const result = await transport.invokeMessageAction({
           sourceMessageId: source.id,
           marker,
-          persona: "maintainer",
+          persona: 'maintainer',
         })
         const responseOwned = ownResponse(result.response)
         if (
           responseOwned === true &&
-          result._tag === "Created" &&
+          result._tag === 'Created' &&
           isOwnedThread(result.thread, source, target, marker) === true
         ) {
           owned.thread = result.thread
@@ -291,89 +294,94 @@ const runScenario = async (input: {
         }
         break
       }
-      case "message-action-denied": {
+      case 'message-action-denied': {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: "thanks",
-          author: "human",
+          content: 'thanks',
+          author: 'human',
         })
         const result = await transport.invokeMessageAction({
           sourceMessageId: source.id,
           marker,
-          persona: "member",
+          persona: 'member',
         })
         const responseOwned = ownResponse(result.response)
         const candidate = await transport.findThreadForMessage(target.guildId, source.id)
         if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
           owned.thread = candidate
         }
-        passed = responseOwned === true && result._tag === "Denied" && candidate === undefined
+        passed = responseOwned === true && result._tag === 'Denied' && candidate === undefined
         break
       }
-      case "docs-public": {
+      case 'docs-public': {
         const result = await transport.invokeDocs({
           marker,
           query: `${marker} How does syncing work?`,
-          location: "public",
-          persona: "member",
+          location: 'public',
+          persona: 'member',
         })
         const responseOwned = ownResponse(result.response)
-        passed = responseOwned === true && result._tag === "Answered" && result.response.hasAnswer === true && result.response.hasSources === true
+        passed =
+          responseOwned === true &&
+          result._tag === 'Answered' &&
+          result.response.hasAnswer === true &&
+          result.response.hasSources === true
         break
       }
-      case "docs-role-restricted": {
+      case 'docs-role-restricted': {
         const result = await transport.invokeDocs({
           marker,
           query: `${marker} How does syncing work?`,
-          location: "restricted",
-          persona: "contributor",
+          location: 'restricted',
+          persona: 'contributor',
         })
         const responseOwned = ownResponse(result.response)
-        passed = responseOwned === true && result._tag === "Answered" && result.response.hasAnswer === true && result.response.hasSources === true
+        passed =
+          responseOwned === true &&
+          result._tag === 'Answered' &&
+          result.response.hasAnswer === true &&
+          result.response.hasSources === true
         break
       }
-      case "docs-denied": {
+      case 'docs-denied': {
         const result = await transport.invokeDocs({
           marker,
           query: `${marker} How does syncing work?`,
-          location: "restricted",
-          persona: "member",
+          location: 'restricted',
+          persona: 'member',
         })
         const responseOwned = ownResponse(result.response)
-        passed = responseOwned === true && result._tag === "Denied"
+        passed = responseOwned === true && result._tag === 'Denied'
         break
       }
     }
   } catch (cause) {
     const cleanupResult = await cleanup(transport, target, owned)
-    if (
-      cause instanceof E2EPrerequisiteUnavailableError &&
-      Object.values(cleanupResult).includes("failed") === false
-    ) {
+    if (cause instanceof E2EPrerequisiteUnavailableError && Object.values(cleanupResult).includes('failed') === false) {
       return {
         ...base,
-        verdict: "UNRUN",
-        reason: "prerequisite-missing",
+        verdict: 'UNRUN',
+        reason: 'prerequisite-missing',
         artifactHashes: artifactHashes(owned),
         cleanup: cleanupResult,
       }
     }
     return {
       ...base,
-      verdict: "FAIL",
-      reason: Object.values(cleanupResult).includes("failed") === true ? "cleanup-failed" : "transport-failed",
+      verdict: 'FAIL',
+      reason: Object.values(cleanupResult).includes('failed') === true ? 'cleanup-failed' : 'transport-failed',
       artifactHashes: artifactHashes(owned),
       cleanup: cleanupResult,
     }
   }
 
   const cleanupResult = await cleanup(transport, target, owned)
-  const cleanupFailed = Object.values(cleanupResult).includes("failed")
+  const cleanupFailed = Object.values(cleanupResult).includes('failed')
   return {
     ...base,
-    verdict: passed === true && cleanupFailed === false ? "PASS" : "FAIL",
-    reason: cleanupFailed === true ? "cleanup-failed" : passed === true ? "assertions-passed" : "assertion-failed",
+    verdict: passed === true && cleanupFailed === false ? 'PASS' : 'FAIL',
+    reason: cleanupFailed === true ? 'cleanup-failed' : passed === true ? 'assertions-passed' : 'assertion-failed',
     artifactHashes: artifactHashes(owned),
     cleanup: cleanupResult,
   }
@@ -385,7 +393,7 @@ const artifactHashes = (owned: OwnedArtifacts): ReadonlyArray<string> =>
     .map(opaqueHash)
 
 export const runE2EMatrix = async (input: {
-  readonly environment: "fake" | "staging"
+  readonly environment: 'fake' | 'staging'
   readonly target: StagingTarget
   readonly transport: E2ETransport
   readonly allowHumanAssisted?: boolean
@@ -398,8 +406,8 @@ export const runE2EMatrix = async (input: {
     scenarios = scenarioMatrix.map((scenario) => ({
       scenario: scenario.id,
       executor: scenario.executor,
-      verdict: "FAIL",
-      reason: "target-denied",
+      verdict: 'FAIL',
+      reason: 'target-denied',
       targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
       markerHash: opaqueHash(makeMarker(runId, scenario.id)),
       artifactHashes: [],
@@ -416,8 +424,8 @@ export const runE2EMatrix = async (input: {
         scenarios = scenarioMatrix.map((scenario) => ({
           scenario: scenario.id,
           executor: scenario.executor,
-          verdict: "FAIL",
-          reason: "target-mismatch",
+          verdict: 'FAIL',
+          reason: 'target-mismatch',
           targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
           markerHash: opaqueHash(makeMarker(runId, scenario.id)),
           artifactHashes: [],
@@ -427,14 +435,14 @@ export const runE2EMatrix = async (input: {
         scenarios = []
         for (const scenario of scenarioMatrix) {
           const receipt = await runScenario({
-              scenario,
-              marker: makeMarker(runId, scenario.id),
-              transport: input.transport,
-              target: input.target,
-              allowHumanAssisted: input.allowHumanAssisted === true,
-            })
+            scenario,
+            marker: makeMarker(runId, scenario.id),
+            transport: input.transport,
+            target: input.target,
+            allowHumanAssisted: input.allowHumanAssisted === true,
+          })
           scenarios = [...scenarios, receipt]
-          if (receipt.reason === "cleanup-failed" || receipt.reason === "transport-failed") {
+          if (receipt.reason === 'cleanup-failed' || receipt.reason === 'transport-failed') {
             const completed = new Set(scenarios.map((item) => item.scenario))
             scenarios = [
               ...scenarios,
@@ -443,8 +451,8 @@ export const runE2EMatrix = async (input: {
                 .map((item) => ({
                   scenario: item.id,
                   executor: item.executor,
-                  verdict: "UNRUN" as const,
-                  reason: "prerequisite-missing" as const,
+                  verdict: 'UNRUN' as const,
+                  reason: 'prerequisite-missing' as const,
                   targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
                   markerHash: opaqueHash(makeMarker(runId, item.id)),
                   artifactHashes: [],
@@ -459,8 +467,8 @@ export const runE2EMatrix = async (input: {
       scenarios = scenarioMatrix.map((scenario) => ({
         scenario: scenario.id,
         executor: scenario.executor,
-        verdict: "FAIL",
-        reason: "transport-failed",
+        verdict: 'FAIL',
+        reason: 'transport-failed',
         targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
         markerHash: opaqueHash(makeMarker(runId, scenario.id)),
         artifactHashes: [],

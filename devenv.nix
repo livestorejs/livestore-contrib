@@ -225,7 +225,7 @@ in
   };
   tasks."discord-bot:lint" = {
     description = "Lint the Discord bot with warnings denied and type-aware rules enabled";
-    exec = "DEVENV_TASK_PASSTHROUGH=1 oxlint --import-plugin --deny-warnings --type-aware --tsconfig apps/discord-bot/tsconfig.json apps/discord-bot/src apps/discord-bot/e2e/src";
+    exec = "PATH=${lib.makeBinPath [ pkgs.tsgolint ]}:$PATH DEVENV_TASK_PASSTHROUGH=1 oxlint --import-plugin --deny-warnings --type-aware --tsconfig apps/discord-bot/tsconfig.json apps/discord-bot/src apps/discord-bot/e2e/src";
   };
   tasks."discord-bot:test" = {
     description = "Run the Discord bot unit, integration, and credential-free E2E suites";

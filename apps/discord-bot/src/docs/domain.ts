@@ -136,16 +136,18 @@ export const DocsTelemetryEvent = Schema.TaggedStruct('DocsQueryCompleted', {
   sourceCount: NonNegativeInt,
   inputTokens: NonNegativeInt,
   outputTokens: NonNegativeInt,
-  admissionDenial: Schema.optional(Schema.Literals([
-    'input_too_large',
-    'principal_concurrency',
-    'global_concurrency',
-    'principal_rate',
-    'global_rate',
-    'principal_tokens',
-    'global_tokens',
-    'monthly_cost',
-  ])),
+  admissionDenial: Schema.optional(
+    Schema.Literals([
+      'input_too_large',
+      'principal_concurrency',
+      'global_concurrency',
+      'principal_rate',
+      'global_rate',
+      'principal_tokens',
+      'global_tokens',
+      'monthly_cost',
+    ]),
+  ),
 })
 export type DocsTelemetryEvent = typeof DocsTelemetryEvent.Type
 

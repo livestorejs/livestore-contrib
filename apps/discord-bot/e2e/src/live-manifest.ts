@@ -1,38 +1,35 @@
-import { posix } from "node:path"
-import { topicSentinel, type Snowflake, type StagingTarget } from "./model.ts"
+import { posix } from 'node:path'
+
+import { topicSentinel, type Snowflake, type StagingTarget } from './model.ts'
 
 export interface LiveManifest {
   readonly schemaVersion: 1
-  readonly environment: "staging"
+  readonly environment: 'staging'
   readonly target: StagingTarget
   readonly actorBotTokenRef: `op://${string}`
   readonly botControlSocket: string
 }
 
 export class LiveManifestError extends Error {
-  override readonly name = "LiveManifestError"
+  override readonly name = 'LiveManifestError'
 }
 
 const snowflakePattern = /^\d{17,20}$/u
 
 const object = (value: unknown, label: string): Record<string, unknown> => {
-  if (typeof value !== "object" || value === null || Array.isArray(value) === true) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value) === true) {
     throw new LiveManifestError(`${label} must be an object`)
   }
   return value as Record<string, unknown>
 }
 
-const exactKeys = (
-  value: Record<string, unknown>,
-  admitted: ReadonlySet<string>,
-  label: string,
-): void => {
+const exactKeys = (value: Record<string, unknown>, admitted: ReadonlySet<string>, label: string): void => {
   const unknown = Object.keys(value).find((key) => !admitted.has(key))
   if (unknown !== undefined) throw new LiveManifestError(`${label}.${unknown} is not admitted`)
 }
 
 const string = (value: unknown, label: string): string => {
-  if (typeof value !== "string" || value.trim() === "") {
+  if (typeof value !== 'string' || value.trim() === '') {
     throw new LiveManifestError(`${label} must be a non-empty string`)
   }
   return value
@@ -45,7 +42,7 @@ const snowflake = (value: unknown, label: string): Snowflake => {
 }
 
 const positiveInteger = (value: unknown, label: string): number => {
-  if (typeof value !== "number" || Number.isSafeInteger(value) === false || value <= 0) {
+  if (typeof value !== 'number' || Number.isSafeInteger(value) === false || value <= 0) {
     throw new LiveManifestError(`${label} must be a positive integer`)
   }
   return value
@@ -53,72 +50,55 @@ const positiveInteger = (value: unknown, label: string): number => {
 
 /** Parses only non-secret configuration and enforces op:// credential indirection. */
 export const parseLiveManifest = (input: unknown): LiveManifest => {
-  const root = object(input, "manifest")
+  const root = object(input, 'manifest')
   exactKeys(
     root,
-    new Set([
-      "schemaVersion",
-      "environment",
-      "target",
-      "actorBotTokenRef",
-      "botControlSocket",
-    ]),
-    "manifest",
+    new Set(['schemaVersion', 'environment', 'target', 'actorBotTokenRef', 'botControlSocket']),
+    'manifest',
   )
-  if (root.schemaVersion !== 1) throw new LiveManifestError("schemaVersion must be 1")
-  if (root.environment !== "staging") {
-    throw new LiveManifestError("environment must be exactly staging")
+  if (root.schemaVersion !== 1) throw new LiveManifestError('schemaVersion must be 1')
+  if (root.environment !== 'staging') {
+    throw new LiveManifestError('environment must be exactly staging')
   }
 
-  const targetInput = object(root.target, "target")
+  const targetInput = object(root.target, 'target')
   exactKeys(
     targetInput,
-    new Set([
-      "guildId",
-      "channelId",
-      "allowedChannelIds",
-      "requiredTopicSentinel",
-      "pollIntervalMs",
-      "timeoutMs",
-    ]),
-    "target",
+    new Set(['guildId', 'channelId', 'allowedChannelIds', 'requiredTopicSentinel', 'pollIntervalMs', 'timeoutMs']),
+    'target',
   )
-  const guildId = snowflake(targetInput.guildId, "target.guildId")
-  const channelId = snowflake(targetInput.channelId, "target.channelId")
+  const guildId = snowflake(targetInput.guildId, 'target.guildId')
+  const channelId = snowflake(targetInput.channelId, 'target.channelId')
   if (Array.isArray(targetInput.allowedChannelIds) === false) {
-    throw new LiveManifestError("target.allowedChannelIds must be an array")
+    throw new LiveManifestError('target.allowedChannelIds must be an array')
   }
   const allowedChannelIds = new Set(
-    targetInput.allowedChannelIds.map((value, index) =>
-      snowflake(value, `target.allowedChannelIds[${index}]`),
-    ),
+    targetInput.allowedChannelIds.map((value, index) => snowflake(value, `target.allowedChannelIds[${index}]`)),
   )
   if (allowedChannelIds.has(channelId) === false) {
-    throw new LiveManifestError("target.channelId must be explicitly allowlisted")
+    throw new LiveManifestError('target.channelId must be explicitly allowlisted')
   }
   if (targetInput.requiredTopicSentinel !== topicSentinel) {
     throw new LiveManifestError(`target.requiredTopicSentinel must be ${topicSentinel}`)
   }
 
-  const actorBotTokenRef = string(root.actorBotTokenRef, "actorBotTokenRef")
+  const actorBotTokenRef = string(root.actorBotTokenRef, 'actorBotTokenRef')
   if (/^op:\/\/[^/]+\/[^/]+\/.+$/u.test(actorBotTokenRef) === false) {
-    throw new LiveManifestError("actorBotTokenRef must be an op:// reference")
+    throw new LiveManifestError('actorBotTokenRef must be an op:// reference')
   }
-  const botControlSocket = string(root.botControlSocket, "botControlSocket")
+  const botControlSocket = string(root.botControlSocket, 'botControlSocket')
   const normalizedSocket = posix.normalize(botControlSocket)
   if (
     normalizedSocket !== botControlSocket ||
-    normalizedSocket.startsWith("/run/discord-bot/staging/") === false ||
-    normalizedSocket.endsWith(".sock") === false
+    normalizedSocket.startsWith('/run/discord-bot/staging/') === false ||
+    normalizedSocket.endsWith('.sock') === false
   ) {
-    throw new LiveManifestError(
-      "botControlSocket must be a normalized .sock path inside /run/discord-bot/staging",
-    )
+    throw new LiveManifestError('botControlSocket must be a normalized .sock path inside /run/discord-bot/staging')
   }
 
   return {
     schemaVersion: 1,
-    environment: "staging",
+    environment: 'staging',
     actorBotTokenRef: actorBotTokenRef as `op://${string}`,
     botControlSocket,
     target: {
@@ -126,8 +106,8 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
       channelId,
       allowedChannelIds,
       requiredTopicSentinel: topicSentinel,
-      pollIntervalMs: positiveInteger(targetInput.pollIntervalMs, "target.pollIntervalMs"),
-      timeoutMs: positiveInteger(targetInput.timeoutMs, "target.timeoutMs"),
+      pollIntervalMs: positiveInteger(targetInput.pollIntervalMs, 'target.pollIntervalMs'),
+      timeoutMs: positiveInteger(targetInput.timeoutMs, 'target.timeoutMs'),
     },
   }
 }

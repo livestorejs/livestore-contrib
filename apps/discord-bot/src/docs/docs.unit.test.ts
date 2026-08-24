@@ -1,9 +1,10 @@
-import { expect, it } from '@effect/vitest'
-import { Duration, Effect, Layer, Schema } from 'effect'
-import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { expect, it } from '@effect/vitest'
+import { Duration, Effect, Layer, Schema } from 'effect'
+import { TestClock } from 'effect/testing'
 
 import { makeDocsAdmission, DocsAdmissionLimits } from './admission.ts'
 import { makeCachedCorpus, parseCanonicalCorpus } from './corpus.ts'
@@ -19,8 +20,8 @@ import { makeOpenAiRequest, openAiDocsConfiguration } from './openai.ts'
 import { renderDocsMessages } from './render.ts'
 import { selectDocumentationSources } from './retrieval.ts'
 import { AnswerEngine, DocsTelemetry, DocsWorkflow, DocumentationCorpus } from './services.ts'
-import { DocsWorkflowLive, makeDocsWorkflowLayer } from './workflow.ts'
 import { makeFileDocsStateStore } from './state.ts'
+import { DocsWorkflowLive, makeDocsWorkflowLayer } from './workflow.ts'
 
 const snapshot = Schema.decodeUnknownSync(DocumentationSnapshot)({
   digest: `sha256:${'a'.repeat(64)}`,
@@ -225,83 +226,101 @@ it('pins the no-storage Luna Responses request and strict output schema', () => 
   expect(aiTitleDataUseNotice).toContain('local title')
 })
 
-it.effect('bounds concurrent and rate-limited provider admission with one-way principals', () => Effect.gen(function* () {
-  let now = 1_000
-  const correlated: Array<string> = []
-  const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
-    maximumConcurrentPerPrincipal: 1,
-    maximumConcurrentGlobal: 2,
-    maximumRequestsPerPrincipalWindow: 1,
-    principalRequestWindowMillis: 1_000,
-    maximumRequestsGlobalWindow: 10,
-    globalRequestWindowMillis: 1_000,
-    maximumInputTokensPerRequest: 100,
-    maximumOutputTokensPerRequest: 10,
-    maximumTokensPerPrincipalWindow: 100,
-    maximumTokensGlobalWindow: 1_000,
-    tokenWindowMillis: 10_000,
-  })
-  const admission = makeDocsAdmission({
-    limits,
-    now: () => now,
-    correlatePrincipal: principalId => {
-      correlated.push(principalId)
-      return `opaque-${principalId.length}`
-    },
-  })
+it.effect('bounds concurrent and rate-limited provider admission with one-way principals', () =>
+  Effect.gen(function* () {
+    let now = 1_000
+    const correlated: Array<string> = []
+    const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
+      maximumConcurrentPerPrincipal: 1,
+      maximumConcurrentGlobal: 2,
+      maximumRequestsPerPrincipalWindow: 1,
+      principalRequestWindowMillis: 1_000,
+      maximumRequestsGlobalWindow: 10,
+      globalRequestWindowMillis: 1_000,
+      maximumInputTokensPerRequest: 100,
+      maximumOutputTokensPerRequest: 10,
+      maximumTokensPerPrincipalWindow: 100,
+      maximumTokensGlobalWindow: 1_000,
+      tokenWindowMillis: 10_000,
+    })
+    const admission = makeDocsAdmission({
+      limits,
+      now: () => now,
+      correlatePrincipal: (principalId) => {
+        correlated.push(principalId)
+        return `opaque-${principalId.length}`
+      },
+    })
 
-  const first = yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 20 })
-  expect(first._tag).toBe('Admitted')
-  expect(yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 20 }))
-    .toEqual({ _tag: 'Denied', reason: 'principal_concurrency' })
-  if (first._tag === 'Admitted') yield* first.complete({ inputTokens: 20, outputTokens: 5 })
-  expect(yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 20 }))
-    .toEqual({ _tag: 'Denied', reason: 'principal_rate' })
+    const first = yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 20 })
+    expect(first._tag).toBe('Admitted')
+    expect(yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 20 })).toEqual({
+      _tag: 'Denied',
+      reason: 'principal_concurrency',
+    })
+    if (first._tag === 'Admitted') yield* first.complete({ inputTokens: 20, outputTokens: 5 })
+    expect(yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 20 })).toEqual({
+      _tag: 'Denied',
+      reason: 'principal_rate',
+    })
 
-  now += 1_001
-  const afterWindow = yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 80 })
-  expect(afterWindow).toEqual({ _tag: 'Denied', reason: 'principal_tokens' })
-  expect(correlated).toHaveLength(4)
-}))
+    now += 1_001
+    const afterWindow = yield* admission.acquire({ principalId: 'private-member-sentinel', estimatedInputTokens: 80 })
+    expect(afterWindow).toEqual({ _tag: 'Denied', reason: 'principal_tokens' })
+    expect(correlated).toHaveLength(4)
+  }),
+)
 
-it.effect('shares global concurrency, rate, and token ceilings across principals', () => Effect.gen(function* () {
-  let now = 1_000
-  const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
-    ...defaultTestAdmissionLimits,
-    maximumConcurrentGlobal: 1,
-    maximumRequestsGlobalWindow: 1,
-    maximumTokensGlobalWindow: 100,
-  })
-  const admission = makeDocsAdmission({ limits, now: () => now, correlatePrincipal: value => value })
+it.effect('shares global concurrency, rate, and token ceilings across principals', () =>
+  Effect.gen(function* () {
+    let now = 1_000
+    const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
+      ...defaultTestAdmissionLimits,
+      maximumConcurrentGlobal: 1,
+      maximumRequestsGlobalWindow: 1,
+      maximumTokensGlobalWindow: 100,
+    })
+    const admission = makeDocsAdmission({ limits, now: () => now, correlatePrincipal: (value) => value })
 
-  const first = yield* admission.acquire({ principalId: 'first', estimatedInputTokens: 10 })
-  expect(first._tag).toBe('Admitted')
-  expect(yield* admission.acquire({ principalId: 'second', estimatedInputTokens: 10 }))
-    .toEqual({ _tag: 'Denied', reason: 'global_concurrency' })
-  if (first._tag === 'Admitted') yield* first.complete({ inputTokens: 20, outputTokens: 5 })
-  expect(yield* admission.acquire({ principalId: 'second', estimatedInputTokens: 10 }))
-    .toEqual({ _tag: 'Denied', reason: 'global_rate' })
+    const first = yield* admission.acquire({ principalId: 'first', estimatedInputTokens: 10 })
+    expect(first._tag).toBe('Admitted')
+    expect(yield* admission.acquire({ principalId: 'second', estimatedInputTokens: 10 })).toEqual({
+      _tag: 'Denied',
+      reason: 'global_concurrency',
+    })
+    if (first._tag === 'Admitted') yield* first.complete({ inputTokens: 20, outputTokens: 5 })
+    expect(yield* admission.acquire({ principalId: 'second', estimatedInputTokens: 10 })).toEqual({
+      _tag: 'Denied',
+      reason: 'global_rate',
+    })
 
-  now += 1_001
-  expect(yield* admission.acquire({ principalId: 'second', estimatedInputTokens: 70 }))
-    .toEqual({ _tag: 'Denied', reason: 'global_tokens' })
-}))
+    now += 1_001
+    expect(yield* admission.acquire({ principalId: 'second', estimatedInputTokens: 70 })).toEqual({
+      _tag: 'Denied',
+      reason: 'global_tokens',
+    })
+  }),
+)
 
-it.effect('charges the full reservation when provider usage is unknown', () => Effect.gen(function* () {
-  let now = 1_000
-  const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
-    ...defaultTestAdmissionLimits,
-    maximumTokensPerPrincipalWindow: 50,
-  })
-  const admission = makeDocsAdmission({ limits, now: () => now, correlatePrincipal: value => value })
-  const first = yield* admission.acquire({ principalId: 'member', estimatedInputTokens: 10 })
-  expect(first._tag).toBe('Admitted')
-  if (first._tag === 'Admitted') yield* first.complete()
+it.effect('charges the full reservation when provider usage is unknown', () =>
+  Effect.gen(function* () {
+    let now = 1_000
+    const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
+      ...defaultTestAdmissionLimits,
+      maximumTokensPerPrincipalWindow: 50,
+    })
+    const admission = makeDocsAdmission({ limits, now: () => now, correlatePrincipal: (value) => value })
+    const first = yield* admission.acquire({ principalId: 'member', estimatedInputTokens: 10 })
+    expect(first._tag).toBe('Admitted')
+    if (first._tag === 'Admitted') yield* first.complete()
 
-  now += 1_001
-  expect(yield* admission.acquire({ principalId: 'member', estimatedInputTokens: 21 }))
-    .toEqual({ _tag: 'Denied', reason: 'principal_tokens' })
-}))
+    now += 1_001
+    expect(yield* admission.acquire({ principalId: 'member', estimatedInputTokens: 21 })).toEqual({
+      _tag: 'Denied',
+      reason: 'principal_tokens',
+    })
+  }),
+)
 
 it.effect('denies oversized input before the provider and emits content-free telemetry', () => {
   const telemetry: Array<DocsTelemetryEvent> = []
@@ -316,19 +335,32 @@ it.effect('denies oversized input before the provider and emits content-free tel
   })
   const layer = makeDocsWorkflowLayer({ limits, correlatePrincipal: () => 'opaque-principal' }).pipe(
     Layer.provide([
-      Layer.succeed(DocumentationCorpus, DocumentationCorpus.of({
-        snapshot: () => Effect.succeed({ cacheStatus: 'hit', snapshot }),
-      })),
-      Layer.succeed(AnswerEngine, AnswerEngine.of({
-        configurationIdentity: 'fake:docs-v1',
-        answer: () => Effect.sync(() => {
-          providerCalls += 1
-          return oversizedCandidate
+      Layer.succeed(
+        DocumentationCorpus,
+        DocumentationCorpus.of({
+          snapshot: () => Effect.succeed({ cacheStatus: 'hit', snapshot }),
         }),
-      })),
-      Layer.succeed(DocsTelemetry, DocsTelemetry.of({
-        emit: event => Effect.sync(() => { telemetry.push(event) }),
-      })),
+      ),
+      Layer.succeed(
+        AnswerEngine,
+        AnswerEngine.of({
+          configurationIdentity: 'fake:docs-v1',
+          answer: () =>
+            Effect.sync(() => {
+              providerCalls += 1
+              return oversizedCandidate
+            }),
+        }),
+      ),
+      Layer.succeed(
+        DocsTelemetry,
+        DocsTelemetry.of({
+          emit: (event) =>
+            Effect.sync(() => {
+              telemetry.push(event)
+            }),
+        }),
+      ),
     ]),
   )
 
@@ -351,27 +383,41 @@ it.effect('denies oversized input before the provider and emits content-free tel
 it.effect('cancels a monthly reservation when local admission denies', () =>
   Effect.acquireUseRelease(
     Effect.promise(() => mkdtemp(join(tmpdir(), 'livestore-docs-workflow-budget-'))),
-    root => {
+    (root) => {
       const stateStore = makeFileDocsStateStore(root, () => 2_000_000)
       const layer = makeDocsWorkflowLayer({
-        limits: Schema.decodeUnknownSync(DocsAdmissionLimits)({ ...defaultTestAdmissionLimits, maximumInputTokensPerRequest: 1 }),
+        limits: Schema.decodeUnknownSync(DocsAdmissionLimits)({
+          ...defaultTestAdmissionLimits,
+          maximumInputTokensPerRequest: 1,
+        }),
         stateStore,
         monthlyCostUsdMicros: 1_000_000,
-      }).pipe(Layer.provide([
-        Layer.succeed(DocumentationCorpus, DocumentationCorpus.of({ snapshot: () => Effect.succeed({ cacheStatus: 'hit', snapshot }) })),
-        Layer.succeed(AnswerEngine, AnswerEngine.of({
-          configurationIdentity: 'fake:docs-v1',
-          answer: () => Effect.die('provider must not be called'),
-        })),
-        Layer.succeed(DocsTelemetry, DocsTelemetry.of({ emit: () => Effect.void })),
-      ]))
+      }).pipe(
+        Layer.provide([
+          Layer.succeed(
+            DocumentationCorpus,
+            DocumentationCorpus.of({ snapshot: () => Effect.succeed({ cacheStatus: 'hit', snapshot }) }),
+          ),
+          Layer.succeed(
+            AnswerEngine,
+            AnswerEngine.of({
+              configurationIdentity: 'fake:docs-v1',
+              answer: () => Effect.die('provider must not be called'),
+            }),
+          ),
+          Layer.succeed(DocsTelemetry, DocsTelemetry.of({ emit: () => Effect.void })),
+        ]),
+      )
       return Effect.gen(function* () {
         const workflow = yield* DocsWorkflow
-        expect(yield* workflow.query({ surface: 'cli', query: 'schema' })).toEqual({ _tag: 'Unavailable', reason: 'admission_denied' })
+        expect(yield* workflow.query({ surface: 'cli', query: 'schema' })).toEqual({
+          _tag: 'Unavailable',
+          reason: 'admission_denied',
+        })
         expect(yield* stateStore.monthlySpent(2_000_000)).toBe(0)
       }).pipe(Effect.provide(layer))
     },
-    root => Effect.promise(() => rm(root, { recursive: true, force: true })),
+    (root) => Effect.promise(() => rm(root, { recursive: true, force: true })),
   ),
 )
 

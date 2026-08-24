@@ -234,7 +234,8 @@ const parseSource = (
 }
 
 const parseMutationGuard = (args: readonly string[]) => {
-  if (args.includes('--apply') === false) return { _tag: 'UsageError', message: 'write command requires --apply' } as const
+  if (args.includes('--apply') === false)
+    return { _tag: 'UsageError', message: 'write command requires --apply' } as const
   const environment = decodeEnvironment(readFlag(args, '--environment'))
   if (environment._tag === 'UsageError') return environment
   const reason = decodeReason(readFlag(args, '--reason'))

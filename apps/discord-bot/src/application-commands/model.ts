@@ -1,10 +1,11 @@
-import * as Schema from "effect/Schema"
-import { DiscordSnowflake } from "../threading/model.ts"
+import * as Schema from 'effect/Schema'
 
-export const RetiredHistoricalApplicationId = "1310646763505582171" as const
+import { DiscordSnowflake } from '../threading/model.ts'
+
+export const RetiredHistoricalApplicationId = '1310646763505582171' as const
 
 export const ApplicationCommandKind = Schema.Literals([1, 2, 3, 4]).annotate({
-  identifier: "DiscordBot.ApplicationCommandKind",
+  identifier: 'DiscordBot.ApplicationCommandKind',
 })
 export type ApplicationCommandKind = typeof ApplicationCommandKind.Type
 
@@ -22,17 +23,21 @@ export const ApplicationCommandOption = Schema.Struct({
   choices: ApplicationCommandChoice.pipe(Schema.Array, Schema.optional),
   minLength: Schema.optional(Schema.Finite),
   maxLength: Schema.optional(Schema.Finite),
-}).pipe(Schema.annotate({ identifier: "DiscordBot.ApplicationCommandOption" }))
+}).pipe(Schema.annotate({ identifier: 'DiscordBot.ApplicationCommandOption' }))
 export type ApplicationCommandOption = typeof ApplicationCommandOption.Type
 
-export const ApplicationIntegrationType = Schema.Literals([0, 1]).pipe(Schema.annotate({
-  identifier: "DiscordBot.ApplicationIntegrationType",
-}))
+export const ApplicationIntegrationType = Schema.Literals([0, 1]).pipe(
+  Schema.annotate({
+    identifier: 'DiscordBot.ApplicationIntegrationType',
+  }),
+)
 export type ApplicationIntegrationType = typeof ApplicationIntegrationType.Type
 
-export const InteractionContextType = Schema.Literals([0, 1, 2]).pipe(Schema.annotate({
-  identifier: "DiscordBot.InteractionContextType",
-}))
+export const InteractionContextType = Schema.Literals([0, 1, 2]).pipe(
+  Schema.annotate({
+    identifier: 'DiscordBot.InteractionContextType',
+  }),
+)
 export type InteractionContextType = typeof InteractionContextType.Type
 
 /** Scope-independent command semantics owned by this bot. */
@@ -45,32 +50,28 @@ export const ApplicationCommand = Schema.Struct({
   nsfw: Schema.Boolean,
   integrationTypes: ApplicationIntegrationType.pipe(Schema.Array, Schema.optional),
   contexts: InteractionContextType.pipe(Schema.Array, Schema.optional),
-}).pipe(Schema.annotate({ identifier: "DiscordBot.ApplicationCommand" }))
+}).pipe(Schema.annotate({ identifier: 'DiscordBot.ApplicationCommand' }))
 export type ApplicationCommand = typeof ApplicationCommand.Type
 
-export const GuildCommandScope = Schema.TaggedStruct("GuildCommandScope", {
+export const GuildCommandScope = Schema.TaggedStruct('GuildCommandScope', {
   applicationId: DiscordSnowflake,
   guildId: DiscordSnowflake,
-}).annotate({ identifier: "DiscordBot.GuildCommandScope" })
+}).annotate({ identifier: 'DiscordBot.GuildCommandScope' })
 export type GuildCommandScope = typeof GuildCommandScope.Type
 
-export const GlobalCommandScope = Schema.TaggedStruct("GlobalCommandScope", {
+export const GlobalCommandScope = Schema.TaggedStruct('GlobalCommandScope', {
   applicationId: DiscordSnowflake,
-}).annotate({ identifier: "DiscordBot.GlobalCommandScope" })
+}).annotate({ identifier: 'DiscordBot.GlobalCommandScope' })
 export type GlobalCommandScope = typeof GlobalCommandScope.Type
 
-export const ApplicationCommandScope = Schema.Union([
-  GuildCommandScope,
-  GlobalCommandScope,
-]).annotate({ identifier: "DiscordBot.ApplicationCommandScope" })
+export const ApplicationCommandScope = Schema.Union([GuildCommandScope, GlobalCommandScope]).annotate({
+  identifier: 'DiscordBot.ApplicationCommandScope',
+})
 export type ApplicationCommandScope = typeof ApplicationCommandScope.Type
 
-export const ApplicationCommandChangeKind = Schema.Literals([
-  "create",
-  "update",
-  "delete",
-  "unchanged",
-]).annotate({ identifier: "DiscordBot.ApplicationCommandChangeKind" })
+export const ApplicationCommandChangeKind = Schema.Literals(['create', 'update', 'delete', 'unchanged']).annotate({
+  identifier: 'DiscordBot.ApplicationCommandChangeKind',
+})
 export type ApplicationCommandChangeKind = typeof ApplicationCommandChangeKind.Type
 
 export const ApplicationCommandChange = Schema.Struct({
@@ -78,18 +79,18 @@ export const ApplicationCommandChange = Schema.Struct({
   key: Schema.String,
   desired: Schema.optional(ApplicationCommand),
   actual: Schema.optional(ApplicationCommand),
-}).annotate({ identifier: "DiscordBot.ApplicationCommandChange" })
+}).annotate({ identifier: 'DiscordBot.ApplicationCommandChange' })
 export type ApplicationCommandChange = typeof ApplicationCommandChange.Type
 
 export const ApplicationCommandsDiff = Schema.Struct({
   changes: Schema.Array(ApplicationCommandChange),
   duplicateActualKeys: Schema.Array(Schema.String),
   hasChanges: Schema.Boolean,
-}).annotate({ identifier: "DiscordBot.ApplicationCommandsDiff" })
+}).annotate({ identifier: 'DiscordBot.ApplicationCommandsDiff' })
 export type ApplicationCommandsDiff = typeof ApplicationCommandsDiff.Type
 
 export class ApplicationCommandInventoryInvalid extends Schema.TaggedError<ApplicationCommandInventoryInvalid>()(
-  "ApplicationCommandInventoryInvalid",
+  'ApplicationCommandInventoryInvalid',
   {
     duplicateKeys: Schema.Array(Schema.String),
     message: Schema.String,
@@ -97,7 +98,7 @@ export class ApplicationCommandInventoryInvalid extends Schema.TaggedError<Appli
 ) {}
 
 export class ApplicationCommandRemoteShapeUnsupported extends Schema.TaggedError<ApplicationCommandRemoteShapeUnsupported>()(
-  "ApplicationCommandRemoteShapeUnsupported",
+  'ApplicationCommandRemoteShapeUnsupported',
   {
     commandKey: Schema.String,
     message: Schema.String,
@@ -105,7 +106,7 @@ export class ApplicationCommandRemoteShapeUnsupported extends Schema.TaggedError
 ) {}
 
 export class ApplicationCommandResidualDrift extends Schema.TaggedError<ApplicationCommandResidualDrift>()(
-  "ApplicationCommandResidualDrift",
+  'ApplicationCommandResidualDrift',
   {
     diff: ApplicationCommandsDiff,
     message: Schema.String,
@@ -113,7 +114,7 @@ export class ApplicationCommandResidualDrift extends Schema.TaggedError<Applicat
 ) {}
 
 export class ApplicationCommandScopeRejected extends Schema.TaggedError<ApplicationCommandScopeRejected>()(
-  "ApplicationCommandScopeRejected",
+  'ApplicationCommandScopeRejected',
   {
     applicationId: Schema.String,
     message: Schema.String,
@@ -121,24 +122,21 @@ export class ApplicationCommandScopeRejected extends Schema.TaggedError<Applicat
 ) {}
 
 export class ApplicationCommandRestError extends Schema.TaggedError<ApplicationCommandRestError>()(
-  "ApplicationCommandRestError",
+  'ApplicationCommandRestError',
   {
-    operation: Schema.Literals(["list", "replace"]),
-    scope: Schema.Literals(["guild", "global"]),
+    operation: Schema.Literals(['list', 'replace']),
+    scope: Schema.Literals(['guild', 'global']),
     message: Schema.String,
     cause: Schema.Defect(),
   },
 ) {}
 
-export const commandKey = (command: Pick<ApplicationCommand, "name" | "type">) =>
-  `${command.type}:${command.name}`
+export const commandKey = (command: Pick<ApplicationCommand, 'name' | 'type'>) => `${command.type}:${command.name}`
 
-export const assertAllowedApplicationId = (
-  applicationId: string,
-): ApplicationCommandScopeRejected | undefined =>
+export const assertAllowedApplicationId = (applicationId: string): ApplicationCommandScopeRejected | undefined =>
   applicationId === RetiredHistoricalApplicationId
     ? new ApplicationCommandScopeRejected({
         applicationId,
-        message: "The retired historical LiveStore application is fenced from command reads and writes",
+        message: 'The retired historical LiveStore application is fenced from command reads and writes',
       })
     : undefined

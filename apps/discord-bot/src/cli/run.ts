@@ -1,7 +1,12 @@
 import { Cause, Effect, Exit, Schema } from 'effect'
 
 import type { BotControlClient } from '../control/contract.ts'
-import { ControlError, ControlResult, type ControlError as ControlErrorType, type ControlResult as ControlResultType } from '../control/schema.ts'
+import {
+  ControlError,
+  ControlResult,
+  type ControlError as ControlErrorType,
+  type ControlResult as ControlResultType,
+} from '../control/schema.ts'
 import { CliExit, type CliIo, type OutputMode } from './model.ts'
 import { parseCli } from './parse.ts'
 
