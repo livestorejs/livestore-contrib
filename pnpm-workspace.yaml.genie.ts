@@ -1,4 +1,4 @@
-import { catalog, contribCoreReleaseVersion } from './genie/external.ts'
+import { catalog, contribCoreReleaseVersion, isMirroredDevRelease } from './genie/external.ts'
 import { commonPnpmPolicySettings, pnpmWorkspaceYaml, repoPnpmAllowBuilds } from './genie/repo.ts'
 import { rootWorkspaceExtraMembers, rootWorkspacePackages } from './package.json.genie.ts'
 
@@ -91,9 +91,10 @@ const contribCatalogDuplicateExceptions = [
   },
   {
     package: '@livestore/adapter-web',
-    versions: [contribCoreReleaseVersion, '0.4.0-dev.25'],
-    reason:
-      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing examples still consume the previous devtools cohort.',
+    versions: [contribCoreReleaseVersion, ...(isMirroredDevRelease ? ['0.4.0'] : []), '0.4.0-dev.25'],
+    reason: isMirroredDevRelease
+      ? 'The mirrored dev projection brings its matching core cohort, stable examples resolve the published 0.4.0 adapter because local contrib packages now carry the dev version, and older devtools examples retain 0.4.0-dev.25.'
+      : 'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing examples still consume the previous devtools cohort.',
   },
   {
     package: '@livestore/common',
