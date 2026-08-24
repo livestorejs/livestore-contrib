@@ -225,6 +225,7 @@ in
   };
   tasks."discord-bot:lint" = {
     description = "Lint the Discord bot with warnings denied and type-aware rules enabled";
+    after = [ "discord-bot:install" ];
     exec = "PATH=${lib.makeBinPath [ pkgs.tsgolint ]}:$PATH DEVENV_TASK_PASSTHROUGH=1 oxlint --import-plugin --deny-warnings --type-aware --tsconfig apps/discord-bot/tsconfig.json apps/discord-bot/src apps/discord-bot/e2e/src";
   };
   tasks."discord-bot:test" = {
