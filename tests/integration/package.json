@@ -9,7 +9,7 @@
   "dependencies": {
     "@livestore/adapter-node": "workspace:^",
     "@livestore/common": "link:../../repos/livestore/packages/@livestore/common",
-    "@livestore/devtools-vite": "0.4.0-dev.25",
+    "@livestore/devtools-vite": "0.5.0-dev.0",
     "@livestore/effect-playwright": "link:../../repos/livestore/packages/@livestore/effect-playwright",
     "@livestore/livestore": "link:../../repos/livestore/packages/@livestore/livestore",
     "@livestore/sync-cf": "link:../../repos/livestore/packages/@livestore/sync-cf",

@@ -1,3 +1,4 @@
+import { contribCoreReleaseVersion } from '../../../genie/external.ts'
 import {
   catalog,
   getUtilsPeerDeps,
@@ -19,11 +20,20 @@ const runtimeDeps = catalog.compose({
   peerDependencies: {
     external: {
       ...getUtilsPeerDeps(),
-      ...catalog.peers('@livestore/devtools-vite'),
+      ...catalog.pick('@livestore/devtools-vite'),
       expo: '^54.0.12',
     },
   },
 })
+
+const releaseRuntimeDeps = {
+  ...runtimeDeps,
+  // Mirrored dev publication requires an exact core cohort, while compose intentionally ranges peers.
+  peerDependencies: {
+    ...runtimeDeps.peerDependencies,
+    '@livestore/devtools-vite': contribCoreReleaseVersion,
+  },
+}
 
 export default packageJson(
   {
@@ -40,5 +50,5 @@ export default packageJson(
       test: 'echo No tests yet',
     },
   },
-  runtimeDeps,
+  releaseRuntimeDeps,
 )
