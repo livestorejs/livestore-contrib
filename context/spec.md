@@ -12,7 +12,8 @@ Draft.
 
 ## Node Layout
 
-One node per contrib package, grouped by the core dimension it realizes:
+One node per contrib package, grouped by the core dimension it realizes, plus
+nodes for independently deployed contrib-owned applications:
 
 ```
 context/
@@ -27,11 +28,16 @@ context/
   devtools/        realize core 02-system/07-devtools/ (surface contract)
     expo/
   cli/             standalone tool; realizes no core dimension
+  applications/    independently deployed applications
+    discord-bot/
+      01-runtime/  02-threading/  03-docs-assistant/  04-operations/  05-cli/
   release/         realizes core 03-delivery/02-release/ (snapshot publishing)
 ```
 
 Every contrib package has a node. `cli` realizes no core dimension and lives at
-the top level. `release/` is not a package: it describes how contrib realizes
+the top level. `applications/discord-bot/` is a composite application node, not
+a package realization or a second intent-layer root; its numbered children own
+runtime, feature, and operational contracts. `release/` is not a package: it describes how contrib realizes
 the core delivery contract for snapshot publishing, which spans every
 publishable package rather than any one of them. `graphql` is a query-surface (a new live-query kind), not a
 framework binding, so it lives under `query-surfaces/` and refines the core
@@ -55,6 +61,12 @@ IDs with links (see below).
 | `LSC.QS.GQL-*`        | `query-surfaces/graphql/` |
 | `LSC.DT.EXPO-*`       | `devtools/expo/`          |
 | `LSC.CLI-*`           | `cli/`                    |
+| `LSC.APP.DISCORD-*`   | `applications/discord-bot/` |
+| `LSC.APP.DISCORD.RT-*` | `applications/discord-bot/01-runtime/` |
+| `LSC.APP.DISCORD.THREAD-*` | `applications/discord-bot/02-threading/` |
+| `LSC.APP.DISCORD.DOCS-*` | `applications/discord-bot/03-docs-assistant/` |
+| `LSC.APP.DISCORD.OPS-*` | `applications/discord-bot/04-operations/` |
+| `LSC.APP.DISCORD.CLI-*` | `applications/discord-bot/05-cli/` |
 | `LSC.REL-*`           | `release/`                |
 
 Realization sub-nodes (if any) extend their namespace with one more segment and
@@ -64,6 +76,8 @@ live under the parent's directory. IDs are sequential per namespace.
 
 - Core contracts constrain realizations here; a contrib node states
   deviations explicitly rather than silently diverging.
+- Application nodes consume or automate core product surfaces. They link to
+  those contracts directly but do not enter plugin-realization registries.
 - The core registries
   (`context/02-system/<dimension>/realizations.md`) list every realization;
   when a node is added here, the corresponding registry row links it.
@@ -76,8 +90,9 @@ The mechanical invariants above are enforced by a Vitest suite at
 `tests/intent-layer/` (checks in `src/checks.ts`). It mirrors the core suite —
 ID uniqueness, namespace↔directory mapping (parsed from the ID Scheme table
 above), `refines:` target resolution, relative-link integrity, spec `Status`
-headers, absence of empty companion dirs, decision-record shape, and the
-maturity vocabulary — and adds the **cross-repo** half: a `refines:` marker may
+headers, absence of contrib-local `vision.md` files and empty companion dirs,
+decision-record shape, and the maturity vocabulary — and adds the
+**cross-repo** half: a `refines:` marker may
 target a core `LS.*` ID, resolved against the megarepo-pinned core intent layer
 at `repos/livestore/context/`. When the pinned core rev predates the intent
 layer, the cross-repo half is skipped with a logged notice (the LSC-local checks

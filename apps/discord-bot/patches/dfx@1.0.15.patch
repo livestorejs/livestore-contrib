@@ -1,0 +1,743 @@
+diff --git a/dist/DiscordGateway.d.ts b/dist/DiscordGateway.d.ts
+index ce01faf9de7a68797f835b7cd61077adee8de3e7..81db51b771193cef88ff258645838f1a9781741a 100644
+--- a/dist/DiscordGateway.d.ts
++++ b/dist/DiscordGateway.d.ts
+@@ -1,6 +1,6 @@
+ import type { WebSocketConstructor } from "effect/unstable/socket/Socket";
+ import type { DiscordConfig } from "./DiscordConfig.ts";
+-import type { DiscordWSCodec } from "./DiscordGateway/DiscordWS.ts";
++import type { DiscordWSCodec, TerminalGatewayCloseError } from "./DiscordGateway/DiscordWS.ts";
+ import type { Messsaging } from "./DiscordGateway/Messaging.ts";
+ import type { RunningShard } from "./DiscordGateway/Shard.ts";
+ import type { ShardStateStore } from "./DiscordGateway/Shard/StateStore.ts";
+@@ -13,6 +13,21 @@ import * as Layer from "effect/Layer";
+ import type * as Stream from "effect/Stream";
+ import type { HttpClient } from "effect/unstable/http/HttpClient";
+ import * as Context from "effect/Context";
++export type GatewayLifecycleEvent = {
++    readonly _tag: "Connecting";
++    readonly shardId: number;
++} | {
++    readonly _tag: "Ready";
++    readonly shardId: number;
++} | {
++    readonly _tag: "Resumed";
++    readonly shardId: number;
++} | {
++    readonly _tag: "Disconnected";
++    readonly shardId: number;
++    readonly code?: number;
++    readonly retryable: true;
++};
+ export declare const TypeId: unique symbol;
+ export type TypeId = typeof TypeId;
+ export interface DiscordGateway {
+@@ -26,6 +41,9 @@ export interface DiscordGateway {
+     }>["d"]) => Effect.Effect<A, E, R>) => Effect.Effect<never, E, R>;
+     readonly send: (payload: Discord.GatewaySendPayload) => Effect.Effect<boolean>;
+     readonly shards: Effect.Effect<ReadonlySet<RunningShard>>;
++    readonly lifecycle: Stream.Stream<GatewayLifecycleEvent>;
++    /** Fails when Discord rejects any shard with a non-retryable close code. */
++    readonly failure: Effect.Effect<never, TerminalGatewayCloseError>;
+ }
+ export declare const DiscordGateway: Context.Service<DiscordGateway, DiscordGateway>;
+ export declare const make: Effect.Effect<DiscordGateway, never, Messsaging | Sharder>;
+diff --git a/dist/DiscordGateway.d.ts.map b/dist/DiscordGateway.d.ts.map
+index 3d5c87d98e4fec6e8f3291d54b14e64e6ed13df7..cfc6a074f404c74005b28b9029ccadbdad81a900 100644
+--- a/dist/DiscordGateway.d.ts.map
++++ b/dist/DiscordGateway.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"DiscordGateway.d.ts","sourceRoot":"","sources":["../src/DiscordGateway.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,oBAAoB,EAAE,MAAM,+BAA+B,CAAA;AACzE,OAAO,KAAK,EAAE,aAAa,EAAE,MAAM,oBAAoB,CAAA;AACvD,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,+BAA+B,CAAA;AACnE,OAAO,KAAK,EAAE,UAAU,EAAE,MAAM,+BAA+B,CAAA;AAE/D,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,2BAA2B,CAAA;AAC7D,OAAO,KAAK,EAAE,eAAe,EAAE,MAAM,sCAAsC,CAAA;AAC3E,OAAO,EAAE,OAAO,EAAe,MAAM,6BAA6B,CAAA;AAClE,OAAO,KAAK,EAAE,UAAU,EAAE,MAAM,gCAAgC,CAAA;AAChE,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,gBAAgB,CAAA;AACpD,OAAO,KAAK,KAAK,OAAO,MAAM,YAAY,CAAA;AAC1C,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AACrC,OAAO,KAAK,KAAK,MAAM,MAAM,eAAe,CAAA;AAC5C,OAAO,KAAK,EAAE,UAAU,EAAE,MAAM,iCAAiC,CAAA;AACjE,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAEzC,eAAO,MAAM,MAAM,eAAmC,CAAA;AACtD,MAAM,MAAM,MAAM,GAAG,OAAO,MAAM,CAAA;AAElC,MAAM,WAAW,cAAc;IAC7B,QAAQ,CAAC,CAAC,MAAM,CAAC,EAAE,MAAM,CAAA;IAEzB,QAAQ,CAAC,QAAQ,EAAE,MAAM,CAAC,MAAM,CAAC,OAAO,CAAC,qBAAqB,CAAC,CAAA;IAC/D,QAAQ,CAAC,YAAY,EAAE,CAAC,CAAC,SAAS,GAAG,OAAO,CAAC,qBAAqB,EAAE,EAClE,KAAK,EAAE,CAAC,KACL,MAAM,CAAC,MAAM,CAChB,OAAO,CAAC,OAAO,CAAC,iCAAiC,EAAE;QAAE,QAAQ,CAAC,CAAC,EAAE,CAAC,CAAA;KAAE,CAAC,CAAC,GAAG,CAAC,CAC3E,CAAA;IACD,QAAQ,CAAC,cAAc,EAAE,CACvB,CAAC,SAAS,GAAG,OAAO,CAAC,qBAAqB,EAAE,EAC5C,CAAC,EACD,CAAC,EACD,CAAC,EAED,KAAK,EAAE,CAAC,EACR,MAAM,EAAE,CACN,KAAK,EAAE,OAAO,CACZ,OAAO,CAAC,iCAAiC,EACzC;QAAE,QAAQ,CAAC,CAAC,EAAE,CAAC,CAAA;KAAE,CAClB,CAAC,GAAG,CAAC,KACH,MAAM,CAAC,MAAM,CAAC,CAAC,EAAE,CAAC,EAAE,CAAC,CAAC,KACxB,MAAM,CAAC,MAAM,CAAC,KAAK,EAAE,CAAC,EAAE,CAAC,CAAC,CAAA;IAC/B,QAAQ,CAAC,IAAI,EAAE,CAAC,OAAO,EAAE,OAAO,CAAC,kBAAkB,KAAK,MAAM,CAAC,MAAM,CAAC,OAAO,CAAC,CAAA;IAC9E,QAAQ,CAAC,MAAM,EAAE,MAAM,CAAC,MAAM,CAAC,WAAW,CAAC,YAAY,CAAC,CAAC,CAAA;CAC1D;AAED,eAAO,MAAM,cAAc,iDAC4B,CAAA;AAEvD,eAAO,MAAM,IAAI,EAAE,MAAM,CAAC,MAAM,CAAC,cAAc,EAAE,KAAK,EAAE,UAAU,GAAG,OAAO,CAaxE,CAAA;AAEJ,eAAO,MAAM,kBAAkB,EAAE,KAAK,CAAC,KAAK,CAC1C,cAAc,EACd,KAAK,EACH,UAAU,GACV,aAAa,GACb,cAAc,GACd,cAAc,GACd,eAAe,GACf,oBAAoB,GACpB,UAAU,CAIb,CAAA"}
+\ No newline at end of file
++{"version":3,"file":"DiscordGateway.d.ts","sourceRoot":"","sources":["../src/DiscordGateway.ts"],"names":[],"mappings":"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"}
+\ No newline at end of file
+diff --git a/dist/DiscordGateway.js b/dist/DiscordGateway.js
+index 351996b285cc94b20f715e7937cb27cd582fb7ed..4afb2b3f63cecd9506b06e960a402546254efc60 100644
+--- a/dist/DiscordGateway.js
++++ b/dist/DiscordGateway.js
+@@ -15,6 +15,8 @@ export const make = Effect.gen(function* () {
+         handleDispatch: messaging.handleDispatch,
+         send: messaging.send,
+         shards: sharder.shards,
++        failure: sharder.failure,
++        lifecycle: sharder.lifecycle,
+     });
+ });
+ export const DiscordGatewayLive = Layer.effect(DiscordGateway, make).pipe(Layer.provide(MesssagingLive), Layer.provide(SharderLive));
+diff --git a/dist/DiscordGateway.js.map b/dist/DiscordGateway.js.map
+index 1de147f161e136d4c389887f289b0237771d7f36..55d2ed20af59679ff333c09812867566ee696a56 100644
+--- a/dist/DiscordGateway.js.map
++++ b/dist/DiscordGateway.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"DiscordGateway.js","sourceRoot":"","sources":["../src/DiscordGateway.ts"],"names":[],"mappings":"AAIA,OAAO,EAAE,SAAS,EAAE,cAAc,EAAE,MAAM,+BAA+B,CAAA;AAGzE,OAAO,EAAE,OAAO,EAAE,WAAW,EAAE,MAAM,6BAA6B,CAAA;AAIlE,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAGrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAEzC,MAAM,CAAC,MAAM,MAAM,GAAG,MAAM,CAAC,GAAG,CAAC,oBAAoB,CAAC,CAAA;AA8BtD,MAAM,CAAC,MAAM,cAAc,GACzB,OAAO,CAAC,OAAO,CAAiB,oBAAoB,CAAC,CAAA;AAEvD,MAAM,CAAC,MAAM,IAAI,GACf,MAAM,CAAC,GAAG,CAAC,QAAQ,CAAC;IAClB,MAAM,OAAO,GAAG,KAAK,CAAC,CAAC,OAAO,CAAA;IAC9B,MAAM,SAAS,GAAG,KAAK,CAAC,CAAC,SAAS,CAAA;IAElC,OAAO,cAAc,CAAC,EAAE,CAAC;QACvB,CAAC,MAAM,CAAC,EAAE,MAAM;QAChB,QAAQ,EAAE,SAAS,CAAC,QAAQ;QAC5B,YAAY,EAAE,SAAS,CAAC,YAAmB;QAC3C,cAAc,EAAE,SAAS,CAAC,cAAqB;QAC/C,IAAI,EAAE,SAAS,CAAC,IAAI;QACpB,MAAM,EAAE,OAAO,CAAC,MAAM;KACvB,CAAC,CAAA;AACJ,CAAC,CAAC,CAAA;AAEJ,MAAM,CAAC,MAAM,kBAAkB,GAU3B,KAAK,CAAC,MAAM,CAAC,cAAc,EAAE,IAAI,CAAC,CAAC,IAAI,CACzC,KAAK,CAAC,OAAO,CAAC,cAAc,CAAC,EAC7B,KAAK,CAAC,OAAO,CAAC,WAAW,CAAC,CAC3B,CAAA"}
+\ No newline at end of file
++{"version":3,"file":"DiscordGateway.js","sourceRoot":"","sources":["../src/DiscordGateway.ts"],"names":[],"mappings":"AAOA,OAAO,EAAE,SAAS,EAAE,cAAc,EAAE,MAAM,+BAA+B,CAAA;AAGzE,OAAO,EAAE,OAAO,EAAE,WAAW,EAAE,MAAM,6BAA6B,CAAA;AAIlE,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAGrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAazC,MAAM,CAAC,MAAM,MAAM,GAAG,MAAM,CAAC,GAAG,CAAC,oBAAoB,CAAC,CAAA;AAiCtD,MAAM,CAAC,MAAM,cAAc,GACzB,OAAO,CAAC,OAAO,CAAiB,oBAAoB,CAAC,CAAA;AAEvD,MAAM,CAAC,MAAM,IAAI,GACf,MAAM,CAAC,GAAG,CAAC,QAAQ,CAAC;IAClB,MAAM,OAAO,GAAG,KAAK,CAAC,CAAC,OAAO,CAAA;IAC9B,MAAM,SAAS,GAAG,KAAK,CAAC,CAAC,SAAS,CAAA;IAElC,OAAO,cAAc,CAAC,EAAE,CAAC;QACvB,CAAC,MAAM,CAAC,EAAE,MAAM;QAChB,QAAQ,EAAE,SAAS,CAAC,QAAQ;QAC5B,YAAY,EAAE,SAAS,CAAC,YAAmB;QAC3C,cAAc,EAAE,SAAS,CAAC,cAAqB;QAC/C,IAAI,EAAE,SAAS,CAAC,IAAI;QACpB,MAAM,EAAE,OAAO,CAAC,MAAM;QACtB,OAAO,EAAE,OAAO,CAAC,OAAO;QACxB,SAAS,EAAE,OAAO,CAAC,SAAS;KAC7B,CAAC,CAAA;AACJ,CAAC,CAAC,CAAA;AAEJ,MAAM,CAAC,MAAM,kBAAkB,GAU3B,KAAK,CAAC,MAAM,CAAC,cAAc,EAAE,IAAI,CAAC,CAAC,IAAI,CACzC,KAAK,CAAC,OAAO,CAAC,cAAc,CAAC,EAC7B,KAAK,CAAC,OAAO,CAAC,WAAW,CAAC,CAC3B,CAAA"}
+\ No newline at end of file
+diff --git a/dist/DiscordGateway/DiscordWS.d.ts b/dist/DiscordGateway/DiscordWS.d.ts
+index 5d57bd2da833d71c730c684b781b8a6b96778111..77438923b37b389d4dbebcc7dba9d499793e4c08 100644
+--- a/dist/DiscordGateway/DiscordWS.d.ts
++++ b/dist/DiscordGateway/DiscordWS.d.ts
+@@ -1,6 +1,7 @@
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+ import type * as Discord from "../types.ts";
++import * as Cause from "effect/Cause";
+ import * as Context from "effect/Context";
+ import * as Socket from "effect/unstable/socket/Socket";
+ import type * as Scope from "effect/Scope";
+@@ -8,11 +9,28 @@ export type Message = Discord.GatewayReceivePayload;
+ export type MessageSend = Discord.GatewaySendPayload | Reconnect;
+ export declare const Reconnect: unique symbol;
+ export type Reconnect = typeof Reconnect;
++declare const TerminalGatewayCloseError_base: new <A extends Record<string, any> = {}>(args: import("effect/Types").VoidIfEmpty<{ readonly [P in keyof A as P extends "_tag" ? never : P]: A[P]; }>) => Cause.YieldableError & {
++    readonly _tag: "TerminalGatewayCloseError";
++} & Readonly<A>;
++export declare class TerminalGatewayCloseError extends TerminalGatewayCloseError_base<{
++    readonly code: number;
++    readonly reason?: string;
++}> {
++}
++/**
++ * Discord requires configuration or credential changes before these close
++ * codes can succeed, so reconnecting only consumes identify capacity.
++ */
++export declare const isTerminalGatewayCloseCode: (code: number) => boolean;
+ export interface OpenOpts {
+     url?: string;
+     version?: number;
+     encoding?: DiscordWSCodec;
+     onConnecting: Effect.Effect<void>;
++    onDisconnected?: (event: {
++        readonly code?: number;
++        readonly retryable: true;
++    }) => Effect.Effect<void>;
+ }
+ export interface DiscordWSCodecService {
+     type: "json" | "etf";
+@@ -25,7 +43,8 @@ export declare class DiscordWSCodec extends DiscordWSCodec_base {
+ export declare const JsonDiscordWSCodecLive: Layer.Layer<DiscordWSCodec, never, never>;
+ declare const DiscordWS_base: Context.ServiceClass<DiscordWS, "dfx/DiscordGateway/DiscordWS", {
+     readonly connect: (args_0: OpenOpts) => Effect.Effect<{
+-        readonly take: Effect.Effect<Discord.GatewayReceivePayload, never, never>;
++        readonly take: Effect.Effect<Discord.GatewayReceivePayload, TerminalGatewayCloseError, never>;
++        readonly failure: Effect.Effect<never, TerminalGatewayCloseError>;
+         readonly setUrl: (url: string) => Effect.Effect<void, never, never>;
+         readonly write: (message: MessageSend) => Effect.Effect<void>;
+     }, never, Socket.WebSocketConstructor | Scope.Scope>;
+diff --git a/dist/DiscordGateway/DiscordWS.d.ts.map b/dist/DiscordGateway/DiscordWS.d.ts.map
+index e586eb67d8e0313e20ff109ba8056148fc07486b..4e67cae3cf881052e44370d62e1d9600fd249236 100644
+--- a/dist/DiscordGateway/DiscordWS.d.ts.map
++++ b/dist/DiscordGateway/DiscordWS.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"DiscordWS.d.ts","sourceRoot":"","sources":["../../src/DiscordGateway/DiscordWS.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAErC,OAAO,KAAK,KAAK,OAAO,MAAM,aAAa,CAAA;AAG3C,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAEzC,OAAO,KAAK,MAAM,MAAM,+BAA+B,CAAA;AACvD,OAAO,KAAK,KAAK,KAAK,MAAM,cAAc,CAAA;AAK1C,MAAM,MAAM,OAAO,GAAG,OAAO,CAAC,qBAAqB,CAAA;AACnD,MAAM,MAAM,WAAW,GAAG,OAAO,CAAC,kBAAkB,GAAG,SAAS,CAAA;AAEhE,eAAO,MAAM,SAAS,eAAgD,CAAA;AACtE,MAAM,MAAM,SAAS,GAAG,OAAO,SAAS,CAAA;AAExC,MAAM,WAAW,QAAQ;IACvB,GAAG,CAAC,EAAE,MAAM,CAAA;IACZ,OAAO,CAAC,EAAE,MAAM,CAAA;IAChB,QAAQ,CAAC,EAAE,cAAc,CAAA;IACzB,YAAY,EAAE,MAAM,CAAC,MAAM,CAAC,IAAI,CAAC,CAAA;CAClC;AAED,MAAM,WAAW,qBAAqB;IACpC,IAAI,EAAE,MAAM,GAAG,KAAK,CAAA;IACpB,MAAM,EAAE,CAAC,CAAC,EAAE,OAAO,CAAC,kBAAkB,KAAK,UAAU,GAAG,MAAM,CAAA;IAC9D,MAAM,EAAE,CAAC,CAAC,EAAE,UAAU,GAAG,MAAM,KAAK,OAAO,CAAC,qBAAqB,CAAA;CAClE;;AAID,qBAAa,cAAe,SAAQ,mBAGK;CAAG;AAE5C,eAAO,MAAM,sBAAsB,2CAIjC,CAAA;;sBA8FoB,CAAC,MAAM,EAAE,QAAQ,KAAK,MAAM,CAAC,MAAM,CACnD;QACE,QAAQ,CAAC,IAAI,EAAE,MAAM,CAAC,MAAM,CAC1B,OAAO,CAAC,qBAAqB,EAC7B,KAAK,EACL,KAAK,CACN,CAAA;QACD,QAAQ,CAAC,MAAM,EAAE,CAAC,GAAG,EAAE,MAAM,KAAK,MAAM,CAAC,MAAM,CAAC,IAAI,EAAE,KAAK,EAAE,KAAK,CAAC,CAAA;QACnE,QAAQ,CAAC,KAAK,EAAE,CAAC,OAAO,EAAE,WAAW,KAAK,MAAM,CAAC,MAAM,CAAC,IAAI,CAAC,CAAA;KAC9D,EACD,KAAK,EACL,MAAM,CAAC,oBAAoB,GAAG,KAAK,CAAC,KAAK,CAC1C;;AAfL,qBAAa,SAAU,SAAQ,cAiBI;CAAG;AAEtC,eAAO,MAAM,aAAa,+CAAgC,CAAA"}
+\ No newline at end of file
++{"version":3,"file":"DiscordWS.d.ts","sourceRoot":"","sources":["../../src/DiscordGateway/DiscordWS.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAErC,OAAO,KAAK,KAAK,OAAO,MAAM,aAAa,CAAA;AAE3C,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AACrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAEzC,OAAO,KAAK,MAAM,MAAM,+BAA+B,CAAA;AACvD,OAAO,KAAK,KAAK,KAAK,MAAM,cAAc,CAAA;AAO1C,MAAM,MAAM,OAAO,GAAG,OAAO,CAAC,qBAAqB,CAAA;AACnD,MAAM,MAAM,WAAW,GAAG,OAAO,CAAC,kBAAkB,GAAG,SAAS,CAAA;AAEhE,eAAO,MAAM,SAAS,eAAgD,CAAA;AACtE,MAAM,MAAM,SAAS,GAAG,OAAO,SAAS,CAAA;;;;AAExC,qBAAa,yBAA0B,SAAQ,+BAE7C;IACA,QAAQ,CAAC,IAAI,EAAE,MAAM,CAAA;IACrB,QAAQ,CAAC,MAAM,CAAC,EAAE,MAAM,CAAA;CACzB,CAAC;CAAG;AAEL;;;GAGG;AACH,eAAO,MAAM,0BAA0B,GAAI,MAAM,MAAM,KAAG,OACT,CAAA;AAEjD,MAAM,WAAW,QAAQ;IACvB,GAAG,CAAC,EAAE,MAAM,CAAA;IACZ,OAAO,CAAC,EAAE,MAAM,CAAA;IAChB,QAAQ,CAAC,EAAE,cAAc,CAAA;IACzB,YAAY,EAAE,MAAM,CAAC,MAAM,CAAC,IAAI,CAAC,CAAA;IACjC,cAAc,CAAC,EAAE,CAAC,KAAK,EAAE;QACvB,QAAQ,CAAC,IAAI,CAAC,EAAE,MAAM,CAAA;QACtB,QAAQ,CAAC,SAAS,EAAE,IAAI,CAAA;KACzB,KAAK,MAAM,CAAC,MAAM,CAAC,IAAI,CAAC,CAAA;CAC1B;AAED,MAAM,WAAW,qBAAqB;IACpC,IAAI,EAAE,MAAM,GAAG,KAAK,CAAA;IACpB,MAAM,EAAE,CAAC,CAAC,EAAE,OAAO,CAAC,kBAAkB,KAAK,UAAU,GAAG,MAAM,CAAA;IAC9D,MAAM,EAAE,CAAC,CAAC,EAAE,UAAU,GAAG,MAAM,KAAK,OAAO,CAAC,qBAAqB,CAAA;CAClE;;AAID,qBAAa,cAAe,SAAQ,mBAGK;CAAG;AAE5C,eAAO,MAAM,sBAAsB,2CAIjC,CAAA;;sBAuIoB,CAAC,MAAM,EAAE,QAAQ,KAAK,MAAM,CAAC,MAAM,CACnD;QACE,QAAQ,CAAC,IAAI,EAAE,MAAM,CAAC,MAAM,CAC1B,OAAO,CAAC,qBAAqB,EAC7B,yBAAyB,EACzB,KAAK,CACN,CAAA;QACD,QAAQ,CAAC,OAAO,EAAE,MAAM,CAAC,MAAM,CAAC,KAAK,EAAE,yBAAyB,CAAC,CAAA;QACjE,QAAQ,CAAC,MAAM,EAAE,CAAC,GAAG,EAAE,MAAM,KAAK,MAAM,CAAC,MAAM,CAAC,IAAI,EAAE,KAAK,EAAE,KAAK,CAAC,CAAA;QACnE,QAAQ,CAAC,KAAK,EAAE,CAAC,OAAO,EAAE,WAAW,KAAK,MAAM,CAAC,MAAM,CAAC,IAAI,CAAC,CAAA;KAC9D,EACD,KAAK,EACL,MAAM,CAAC,oBAAoB,GAAG,KAAK,CAAC,KAAK,CAC1C;;AAhBL,qBAAa,SAAU,SAAQ,cAkBI;CAAG;AAEtC,eAAO,MAAM,aAAa,+CAAgC,CAAA"}
+\ No newline at end of file
+diff --git a/dist/DiscordGateway/DiscordWS.js b/dist/DiscordGateway/DiscordWS.js
+index d1989cb4415e8a6f6f8a993cfb1c9ee1f3ca04a2..4c28d314ec26f6fded37697f4903797d9edd07ea 100644
+--- a/dist/DiscordGateway/DiscordWS.js
++++ b/dist/DiscordGateway/DiscordWS.js
+@@ -6,10 +6,19 @@ import * as Cause from "effect/Cause";
+ import * as Context from "effect/Context";
+ import * as Queue from "effect/Queue";
+ import * as Socket from "effect/unstable/socket/Socket";
++import * as Deferred from "effect/Deferred";
++import * as Data from "effect/Data";
+ import { CurrentLoggers } from "effect/Logger";
+ import * as LogLevel from "effect/LogLevel";
+ import { MinimumLogLevel } from "effect/References";
+ export const Reconnect = Symbol.for("dfx/DiscordGateway/WS/Reconnect");
++export class TerminalGatewayCloseError extends Data.TaggedError("TerminalGatewayCloseError") {
++}
++/**
++ * Discord requires configuration or credential changes before these close
++ * codes can succeed, so reconnecting only consumes identify capacity.
++ */
++export const isTerminalGatewayCloseCode = (code) => code === 4004 || (code >= 4010 && code <= 4014);
+ const decoder = new TextDecoder();
+ export class DiscordWSCodec extends Context.Service()("dfx/DiscordGateway/DiscordWS/Codec") {
+ }
+@@ -20,10 +29,11 @@ export const JsonDiscordWSCodecLive = Layer.succeed(DiscordWSCodec, {
+ });
+ const make = Effect.gen(function* () {
+     const encoding = yield* DiscordWSCodec;
+-    const connect = Effect.fnUntraced(function* ({ onConnecting, url = "wss://gateway.discord.gg/", version = 10, }) {
++    const connect = Effect.fnUntraced(function* ({ onConnecting, onDisconnected, url = "wss://gateway.discord.gg/", version = 10, }) {
+         const urlRef = yield* Ref.make(`${url}?v=${version}&encoding=${encoding.type}`);
+         const setUrl = (nextUrl) => Ref.set(urlRef, `${nextUrl}?v=${version}&encoding=${encoding.type}`);
+         const messages = yield* Queue.make();
++        const terminalFailure = yield* Deferred.make();
+         const socket = yield* Socket.makeWebSocket(Ref.get(urlRef), {
+             closeCodeIsError: _ => true,
+             openTimeout: 5000,
+@@ -33,6 +43,22 @@ const make = Effect.gen(function* () {
+             module: "DiscordGateway/DiscordWS",
+             channel: "outbound",
+         });
++        const handleSocketError = (error) => {
++            if (error.reason._tag !== "SocketCloseError" ||
++                !isTerminalGatewayCloseCode(error.reason.code)) {
++                return Effect.andThen(onDisconnected?.({
++                    code: error.reason._tag === "SocketCloseError"
++                        ? error.reason.code
++                        : undefined,
++                    retryable: true,
++                }) ?? Effect.void, Effect.logDebug("Got socket error, reconnecting", error));
++            }
++            const terminal = new TerminalGatewayCloseError({
++                code: error.reason.code,
++                reason: error.reason.closeReason,
++            });
++            return Deferred.fail(terminalFailure, terminal).pipe(Effect.andThen(Effect.annotateLogs(Effect.logError("Discord rejected the gateway connection", terminal), { closeCode: terminal.code })), Effect.andThen(Effect.never));
++        };
+         const write = (message) => {
+             if (message === Reconnect) {
+                 return Effect.catchCause(writeRaw(new Socket.CloseEvent(3000, "reconnecting")), logWriteError);
+@@ -57,9 +83,10 @@ const make = Effect.gen(function* () {
+             });
+         }))), Effect.retry({
+             while: e => e.reason._tag === "SocketCloseError" && e.reason.code === 3000,
+-        }), Effect.catchCause(cause => Effect.logDebug("Got socket error, reconnecting", cause)), Effect.repeat(Schedule.min([Schedule.exponential(500), Schedule.spaced(10000)])), Effect.annotateLogs("channel", "inbound"), Effect.forkScoped);
++        }), Effect.catch(handleSocketError), Effect.repeat(Schedule.min([Schedule.exponential(500), Schedule.spaced(10000)])), Effect.annotateLogs("channel", "inbound"), Effect.forkScoped);
+         return {
+-            take: Queue.take(messages),
++            take: Effect.raceFirst(Queue.take(messages), Deferred.await(terminalFailure)),
++            failure: Deferred.await(terminalFailure),
+             setUrl,
+             write,
+         };
+diff --git a/dist/DiscordGateway/DiscordWS.js.map b/dist/DiscordGateway/DiscordWS.js.map
+index 2eb790ca6698a4d6812e5471196734fe588b514b..1a56162cd93c0fd7f4074295fdb2616a1fd234fa 100644
+--- a/dist/DiscordGateway/DiscordWS.js.map
++++ b/dist/DiscordGateway/DiscordWS.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"DiscordWS.js","sourceRoot":"","sources":["../../src/DiscordGateway/DiscordWS.ts"],"names":[],"mappings":"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"}
+\ No newline at end of file
++{"version":3,"file":"DiscordWS.js","sourceRoot":"","sources":["../../src/DiscordGateway/DiscordWS.ts"],"names":[],"mappings":"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"}
+\ No newline at end of file
+diff --git a/dist/DiscordGateway/Shard.d.ts b/dist/DiscordGateway/Shard.d.ts
+index f3abfd470680823b878b4ee68fe4b2f454a81186..b7f7541749c9e54e5f43cb87cd87a7fd60fe39a8 100644
+--- a/dist/DiscordGateway/Shard.d.ts
++++ b/dist/DiscordGateway/Shard.d.ts
+@@ -7,10 +7,14 @@ import { RateLimiter } from "../RateLimit.ts";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+ import * as Context from "effect/Context";
++import type { GatewayLifecycleEvent } from "../DiscordGateway.ts";
++import * as Stream from "effect/Stream";
+ export declare const make: Effect.Effect<{
+     readonly connect: (shard: [id: number, count: number]) => Effect.Effect<{
+         readonly id: [id: number, count: number];
+         readonly write: (p: MessageSend) => Effect.Effect<void, never, never>;
++        readonly failure: Effect.Effect<never, import("./DiscordWS.ts").TerminalGatewayCloseError, never>;
++        readonly lifecycle: Stream.Stream<GatewayLifecycleEvent, never, never>;
+     }, never, import("effect/Scope").Scope | import("effect/unstable/socket/Socket").WebSocketConstructor>;
+ }, never, DiscordConfig | DiscordWS | Messaging | ShardStateStore | RateLimiter>;
+ type ShardService = Effect.Success<typeof make>;
+@@ -18,6 +22,8 @@ declare const Shard_base: Context.ServiceClass<Shard, "dfx/DiscordGateway/Shard"
+     readonly connect: (shard: [id: number, count: number]) => Effect.Effect<{
+         readonly id: [id: number, count: number];
+         readonly write: (p: MessageSend) => Effect.Effect<void, never, never>;
++        readonly failure: Effect.Effect<never, import("./DiscordWS.ts").TerminalGatewayCloseError, never>;
++        readonly lifecycle: Stream.Stream<GatewayLifecycleEvent, never, never>;
+     }, never, import("effect/Scope").Scope | import("effect/unstable/socket/Socket").WebSocketConstructor>;
+ }>;
+ export declare class Shard extends Shard_base {
+diff --git a/dist/DiscordGateway/Shard.d.ts.map b/dist/DiscordGateway/Shard.d.ts.map
+index 540e8abcb9c451318862a78de06b2411a6a5cfa9..a3333a65135232ab8542876f99f87b1ee7df1d7d 100644
+--- a/dist/DiscordGateway/Shard.d.ts.map
++++ b/dist/DiscordGateway/Shard.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"Shard.d.ts","sourceRoot":"","sources":["../../src/DiscordGateway/Shard.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,qBAAqB,CAAA;AACnD,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,gBAAgB,CAAA;AACjD,OAAO,EAAE,SAAS,EAA4B,MAAM,gBAAgB,CAAA;AACpE,OAAO,EAAE,SAAS,EAAkB,MAAM,gBAAgB,CAAA;AAE1D,OAAO,EAAE,eAAe,EAAE,MAAM,uBAAuB,CAAA;AAGvD,OAAO,EAAE,WAAW,EAAmB,MAAM,iBAAiB,CAAA;AAG9D,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAOrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAWzC,eAAO,MAAM,IAAI;;;4BAiDO,WAAW;;gFA6GjC,CAAA;AAEF,KAAK,YAAY,GAAG,MAAM,CAAC,OAAO,CAAC,OAAO,IAAI,CAAC,CAAA;;;;4BA/GvB,WAAW;;;AAiHnC,qBAAa,KAAM,SAAQ,UAE1B;CAAG;AACJ,eAAO,MAAM,SAAS,iJAIrB,CAAA;AAGD,MAAM,WAAW,YAAa,SAAQ,MAAM,CAAC,OAAO,CAClD,UAAU,CAAC,YAAY,CAAC,SAAS,CAAC,CAAC,CACpC;CAAG"}
+\ No newline at end of file
++{"version":3,"file":"Shard.d.ts","sourceRoot":"","sources":["../../src/DiscordGateway/Shard.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,qBAAqB,CAAA;AACnD,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,gBAAgB,CAAA;AACjD,OAAO,EAAE,SAAS,EAA4B,MAAM,gBAAgB,CAAA;AACpE,OAAO,EAAE,SAAS,EAAkB,MAAM,gBAAgB,CAAA;AAE1D,OAAO,EAAE,eAAe,EAAE,MAAM,uBAAuB,CAAA;AAGvD,OAAO,EAAE,WAAW,EAAmB,MAAM,iBAAiB,CAAA;AAG9D,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAOrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAIzC,OAAO,KAAK,EAAE,qBAAqB,EAAE,MAAM,sBAAsB,CAAA;AACjE,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AAQvC,eAAO,MAAM,IAAI;;;4BAkEO,WAAW;;;;gFAsHjC,CAAA;AAEF,KAAK,YAAY,GAAG,MAAM,CAAC,OAAO,CAAC,OAAO,IAAI,CAAC,CAAA;;;;4BAxHvB,WAAW;;;;;AA0HnC,qBAAa,KAAM,SAAQ,UAE1B;CAAG;AACJ,eAAO,MAAM,SAAS,iJAIrB,CAAA;AAGD,MAAM,WAAW,YAAa,SAAQ,MAAM,CAAC,OAAO,CAClD,UAAU,CAAC,YAAY,CAAC,SAAS,CAAC,CAAC,CACpC;CAAG"}
+\ No newline at end of file
+diff --git a/dist/DiscordGateway/Shard.js b/dist/DiscordGateway/Shard.js
+index 87f633a9b7f57b3f37a2e17815148209439a4da7..118feab1dceb0f1d030e1ec1a545bf3d2d431ac2 100644
+--- a/dist/DiscordGateway/Shard.js
++++ b/dist/DiscordGateway/Shard.js
+@@ -18,6 +18,7 @@ import * as Context from "effect/Context";
+ import * as PubSub from "effect/PubSub";
+ import * as LogLevel from "effect/LogLevel";
+ import { MinimumLogLevel } from "effect/References";
++import * as Stream from "effect/Stream";
+ export const make = Effect.gen(function* () {
+     const { gateway, token } = yield* DiscordConfig;
+     const limiter = yield* RateLimiter;
+@@ -29,6 +30,8 @@ export const make = Effect.gen(function* () {
+         const reconnectHandle = yield* FiberHandle.make();
+         let phase = 0 /* Phase.Connecting */;
+         const stateStore = shardState.forShard(shard);
++        const lifecycleQueue = yield* Effect.acquireRelease(Queue.unbounded(), Queue.shutdown);
++        const publishLifecycle = (event) => Queue.offer(lifecycleQueue, event).pipe(Effect.asVoid);
+         const resumeState = Option.getOrElse(yield* stateStore.get, () => ({
+             resumeUrl: "",
+             sessionId: "",
+@@ -46,8 +49,15 @@ export const make = Effect.gen(function* () {
+             return write(p);
+         });
+         const resume = Effect.andThen(FiberHandle.clear(reconnectHandle), setPhase(2 /* Phase.Connected */));
+-        const onConnecting = setPhase(0 /* Phase.Connecting */);
+-        const socket = yield* dws.connect({ onConnecting });
++        const onConnecting = Effect.andThen(publishLifecycle({ _tag: "Connecting", shardId: shard[0] }), setPhase(0 /* Phase.Connecting */));
++        const socket = yield* dws.connect({
++            onConnecting,
++            onDisconnected: event => publishLifecycle({
++                _tag: "Disconnected",
++                shardId: shard[0],
++                ...event,
++            }),
++        });
+         const write = (p) => Effect.andThen(limiter.maybeWait("dfx.shard.send", Duration.minutes(1), 120), socket.write(p));
+         const hellos = yield* Effect.acquireRelease(Queue.make(), Queue.shutdown);
+         const acks = yield* Effect.acquireRelease(Queue.make(), Queue.shutdown);
+@@ -99,6 +109,10 @@ export const make = Effect.gen(function* () {
+                 }
+                 case Discord.GatewayOpcodes.Dispatch: {
+                     if (p.t === "READY" || p.t === "RESUMED") {
++                        yield* publishLifecycle({
++                            _tag: p.t === "READY" ? "Ready" : "Resumed",
++                            shardId: shard[0],
++                        });
+                         yield* resume;
+                     }
+                     PubSub.publishUnsafe(hub, p);
+@@ -120,7 +134,12 @@ export const make = Effect.gen(function* () {
+                 yield* onPayload(yield* socket.take);
+             }
+         }).pipe(Effect.forkScoped);
+-        return { id: shard, write };
++        return {
++            id: shard,
++            write,
++            failure: socket.failure,
++            lifecycle: Stream.fromQueue(lifecycleQueue),
++        };
+     }, (effect, shard) => Effect.annotateLogs(effect, {
+         package: "dfx",
+         module: "DiscordGateway/Shard",
+diff --git a/dist/DiscordGateway/Shard.js.map b/dist/DiscordGateway/Shard.js.map
+index 9aeb385fc0fde11b133e275ae00db9747c5ab0f5..826b4989eabd77362b95aa943e65b93f889dadb3 100644
+--- a/dist/DiscordGateway/Shard.js.map
++++ b/dist/DiscordGateway/Shard.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"Shard.js","sourceRoot":"","sources":["../../src/DiscordGateway/Shard.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,qBAAqB,CAAA;AAEnD,OAAO,EAAE,SAAS,EAAE,aAAa,EAAE,SAAS,EAAE,MAAM,gBAAgB,CAAA;AACpE,OAAO,EAAE,SAAS,EAAE,cAAc,EAAE,MAAM,gBAAgB,CAAA;AAE1D,OAAO,EAAE,eAAe,EAAE,MAAM,uBAAuB,CAAA;AACvD,OAAO,KAAK,UAAU,MAAM,uBAAuB,CAAA;AACnD,OAAO,KAAK,QAAQ,MAAM,qBAAqB,CAAA;AAC/C,OAAO,EAAE,WAAW,EAAE,eAAe,EAAE,MAAM,iBAAiB,CAAA;AAC9D,OAAO,KAAK,OAAO,MAAM,aAAa,CAAA;AACtC,OAAO,KAAK,QAAQ,MAAM,iBAAiB,CAAA;AAC3C,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AACrC,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,QAAQ,MAAM,iBAAiB,CAAA;AAE3C,OAAO,KAAK,WAAW,MAAM,oBAAoB,CAAA;AACjD,OAAO,EAAE,QAAQ,EAAE,SAAS,EAAE,SAAS,EAAE,MAAM,iBAAiB,CAAA;AAChE,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AACrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AACzC,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,QAAQ,MAAM,iBAAiB,CAAA;AAC3C,OAAO,EAAE,eAAe,EAAE,MAAM,mBAAmB,CAAA;AAQnD,MAAM,CAAC,MAAM,IAAI,GAAG,MAAM,CAAC,GAAG,CAAC,QAAQ,CAAC;IACtC,MAAM,EAAE,OAAO,EAAE,KAAK,EAAE,GAAG,KAAK,CAAC,CAAC,aAAa,CAAA;IAC/C,MAAM,OAAO,GAAG,KAAK,CAAC,CAAC,WAAW,CAAA;IAClC,MAAM,GAAG,GAAG,KAAK,CAAC,CAAC,SAAS,CAAA;IAC5B,MAAM,EAAE,GAAG,EAAE,WAAW,EAAE,GAAG,KAAK,CAAC,CAAC,SAAS,CAAA;IAC7C,MAAM,UAAU,GAAG,KAAK,CAAC,CAAC,eAAe,CAAA;IAEzC,MAAM,OAAO,GAAG,MAAM,CAAC,UAAU,CAC/B,QAAQ,CAAC,EAAE,KAAkC;QAC3C,MAAM,YAAY,GAAG,QAAQ,CAAC,mBAAmB,CAC/C,KAAK,CAAC,CAAC,eAAe,EACtB,OAAO,CACR,CAAA;QACD,MAAM,eAAe,GAAG,KAAK,CAAC,CAAC,WAAW,CAAC,IAAI,EAAE,CAAA;QACjD,IAAI,KAAK,2BAAmB,CAAA;QAC5B,MAAM,UAAU,GAAG,UAAU,CAAC,QAAQ,CAAC,KAAK,CAAC,CAAA;QAC7C,MAAM,WAAW,GAA8B,MAAM,CAAC,SAAS,CAC7D,KAAK,CAAC,CAAC,UAAU,CAAC,GAAG,EACrB,GAAG,EAAE,CAAC,CAAC;YACL,SAAS,EAAE,EAAE;YACb,SAAS,EAAE,EAAE;YACb,QAAQ,EAAE,CAAC;SACZ,CAAC,CACH,CAAA;QACD,MAAM,QAAQ,GAAG,CAAC,CAAQ,EAAuB,EAAE,CACjD,MAAM,CAAC,OAAO,CAAC,GAAG,EAAE;YAClB,KAAK,GAAG,CAAC,CAAA;YACT,IAAI,CAAC,YAAY;gBAAE,OAAO,MAAM,CAAC,IAAI,CAAA;YACrC,OAAO,MAAM,CAAC,YAAY,CACxB,MAAM,CAAC,QAAQ,CAAC,kBAAkB,CAAC,EACnC,OAAO,EACP,CAAC,CACF,CAAA;QACH,CAAC,CAAC,CAAA;QAEJ,MAAM,aAAa,GAAG,CAAC,CAAc,EAAE,EAAE,CACvC,MAAM,CAAC,OAAO,CAAC,GAAG,EAAE;YAClB,IAAI,KAAK,6BAAqB;gBAAE,OAAO,MAAM,CAAC,IAAI,CAAA;YAClD,OAAO,KAAK,CAAC,CAAC,CAAC,CAAA;QACjB,CAAC,CAAC,CAAA;QAEJ,MAAM,MAAM,GAAG,MAAM,CAAC,OAAO,CAC3B,WAAW,CAAC,KAAK,CAAC,eAAe,CAAC,EAClC,QAAQ,yBAAiB,CAC1B,CAAA;QAED,MAAM,YAAY,GAAG,QAAQ,0BAAkB,CAAA;QAE/C,MAAM,MAAM,GAAG,KAAK,CAAC,CAAC,GAAG,CAAC,OAAO,CAAC,EAAE,YAAY,EAAE,CAAC,CAAA;QACnD,MAAM,KAAK,GAAG,CAAC,CAAc,EAAE,EAAE,CAC/B,MAAM,CAAC,OAAO,CACZ,OAAO,CAAC,SAAS,CAAC,gBAAgB,EAAE,QAAQ,CAAC,OAAO,CAAC,CAAC,CAAC,EAAE,GAAG,CAAC,EAC7D,MAAM,CAAC,KAAK,CAAC,CAAC,CAAC,CAChB,CAAA;QAEH,MAAM,MAAM,GAAG,KAAK,CAAC,CAAC,MAAM,CAAC,cAAc,CACzC,KAAK,CAAC,IAAI,EAA4B,EACtC,KAAK,CAAC,QAAQ,CACf,CAAA;QACD,MAAM,IAAI,GAAG,KAAK,CAAC,CAAC,MAAM,CAAC,cAAc,CACvC,KAAK,CAAC,IAAI,EAAQ,EAClB,KAAK,CAAC,QAAQ,CACf,CAAA;QAED,aAAa;QACb,KAAK,CAAC,CAAC,UAAU,CAAC,IAAI,CAAC,MAAM,EAAE,IAAI,EAAE,UAAU,CAAC,GAAG,EAAE,aAAa,CAAC,CAAC,IAAI,CACtE,MAAM,CAAC,UAAU,EACjB,MAAM,CAAC,aAAa,CACrB,CAAA;QAED,WAAW;QACX,MAAM,QAAQ,GAAG,QAAQ,CAAC,gBAAgB,CACxC;YACE,KAAK,EAAE,QAAQ,CAAC,KAAK,CAAC,KAAK,CAAC;YAC5B,KAAK;YACL,OAAO,EAAE,OAAO,CAAC,OAAO;YACxB,QAAQ,EAAE,OAAO,CAAC,QAAQ;SAC3B,EACD,UAAU,CAAC,GAAG,CACf,CAAA;QAED,oBAAoB;QACpB,MAAM,gBAAgB,GAAG,MAAM,CAAC,KAAK,CAAC,MAAM,CAAC,KAAK,CAAC,SAAS,CAAC,EAAE,MAAM,CAAC,CAAA;QAEtE,QAAQ,CAAC,CAAC,SAAS,CAAC,CAAgC;YAClD,IAAI,OAAO,CAAC,CAAC,CAAC,KAAK,QAAQ,EAAE,CAAC;gBAC5B,WAAW,CAAC,QAAQ,GAAG,CAAC,CAAC,CAAC,CAAA;YAC5B,CAAC;YACD,IAAI,CAAC,CAAC,EAAE,KAAK,OAAO,CAAC,cAAc,CAAC,QAAQ,IAAI,CAAC,CAAC,CAAC,KAAK,OAAO,EAAE,CAAC;gBAChE,MAAM,OAAO,GAAG,CAAC,CAAC,CAAC,CAAA;gBACnB,WAAW,CAAC,SAAS,GAAG,OAAO,CAAC,UAAU,CAAA;gBAC1C,WAAW,CAAC,SAAS,GAAG,OAAO,CAAC,kBAAkB,CAAA;gBAClD,KAAK,CAAC,CAAC,UAAU,CAAC,GAAG,CAAC,WAAW,CAAC,CAAA;gBAClC,KAAK,CAAC,CAAC,MAAM,CAAC,MAAM,CAAC,OAAO,CAAC,kBAAkB,CAAC,CAAA;YAClD,CAAC;iBAAM,IACL,WAAW,CAAC,SAAS,KAAK,EAAE;gBAC5B,WAAW,CAAC,SAAS,KAAK,EAAE,EAC5B,CAAC;gBACD,KAAK,CAAC,CAAC,UAAU,CAAC,GAAG,CAAC,WAAW,CAAC,CAAA;YACpC,CAAC;YAED,QAAQ,CAAC,CAAC,EAAE,EAAE,CAAC;gBACb,KAAK,OAAO,CAAC,cAAc,CAAC,KAAK,CAAC,CAAC,CAAC;oBAClC,KAAK,CAAC,CAAC,KAAK,CAAC,KAAK,CAAC,CAAC,QAAQ,CAAC,CAAA;oBAC7B,KAAK,CAAC,CAAC,QAAQ,yBAAiB,CAAA;oBAChC,KAAK,CAAC,WAAW,CAAC,MAAM,EAAE,CAAC,CAAC,CAAC,CAAC,CAAA;oBAC9B,KAAK,CAAC,CAAC,WAAW,CAAC,GAAG,CAAC,eAAe,EAAE,gBAAgB,CAAC,CAAA;oBACzD,OAAM;gBACR,CAAC;gBACD,KAAK,OAAO,CAAC,cAAc,CAAC,YAAY,CAAC,CAAC,CAAC;oBACzC,KAAK,CAAC,WAAW,CAAC,IAAI,EAAE,KAAK,CAAC,CAAC,CAAA;oBAC/B,OAAM;gBACR,CAAC;gBACD,KAAK,OAAO,CAAC,cAAc,CAAC,cAAc,CAAC,CAAC,CAAC;oBAC3C,IAAI,CAAC,CAAC,CAAC,CAAC,EAAE,CAAC;wBACT,WAAW,CAAC,SAAS,GAAG,EAAE,CAAA;wBAC1B,KAAK,CAAC,CAAC,UAAU,CAAC,KAAK,CAAA;oBACzB,CAAC;oBACD,KAAK,CAAC,CAAC,MAAM,CAAC,KAAK,CAAC,SAAS,CAAC,CAAA;oBAC9B,OAAM;gBACR,CAAC;gBACD,KAAK,OAAO,CAAC,cAAc,CAAC,QAAQ,CAAC,CAAC,CAAC;oBACrC,IAAI,CAAC,CAAC,CAAC,KAAK,OAAO,IAAI,CAAC,CAAC,CAAC,KAAK,SAAS,EAAE,CAAC;wBACzC,KAAK,CAAC,CAAC,MAAM,CAAA;oBACf,CAAC;oBACD,MAAM,CAAC,aAAa,CAAC,GAAG,EAAE,CAAC,CAAC,CAAA;oBAC5B,OAAM;gBACR,CAAC;gBACD,KAAK,OAAO,CAAC,cAAc,CAAC,SAAS,CAAC,CAAC,CAAC;oBACtC,KAAK,CAAC,CAAC,MAAM,CAAC,KAAK,CAAC,SAAS,CAAC,CAAA;oBAC9B,OAAM;gBACR,CAAC;YACH,CAAC;QACH,CAAC;QAED,KAAK,CAAC,CAAC,MAAM,CAAC,SAAS,CAAC;YACtB,KAAK,EAAE,SAAS;YAChB,IAAI,EAAE,QAAQ,CAAC,MAAM,CAAC,OAAO,CAAC,KAAK,CAAC,IAAI,CAAC,WAAW,CAAC,EAAE,KAAK,CAAC,CAAC;YAC9D,IAAI,EAAE,SAAS;SAChB,CAAC,CAAC,IAAI,CAAC,MAAM,CAAC,UAAU,CAAC,CAAA;QAE1B,KAAK,CAAC,CAAC,MAAM,CAAC,GAAG,CAAC,QAAQ,CAAC;YACzB,OAAO,IAAI,EAAE,CAAC;gBACZ,KAAK,CAAC,CAAC,SAAS,CAAC,KAAK,CAAC,CAAC,MAAM,CAAC,IAAI,CAAC,CAAA;YACtC,CAAC;QACH,CAAC,CAAC,CAAC,IAAI,CAAC,MAAM,CAAC,UAAU,CAAC,CAAA;QAE1B,OAAO,EAAE,EAAE,EAAE,KAAK,EAAE,KAAK,EAAW,CAAA;IACtC,CAAC,EACD,CAAC,MAAM,EAAE,KAAK,EAAE,EAAE,CAChB,MAAM,CAAC,YAAY,CAAC,MAAM,EAAE;QAC1B,OAAO,EAAE,KAAK;QACd,MAAM,EAAE,sBAAsB;QAC9B,KAAK;KACN,CAAC,CACL,CAAA;IAED,OAAO,EAAE,OAAO,EAAW,CAAA;AAC7B,CAAC,CAAC,CAAA;AAIF,MAAM,OAAO,KAAM,SAAQ,OAAO,CAAC,OAAO,EAAuB,CAC/D,0BAA0B,CAC3B;CAAG;AACJ,MAAM,CAAC,MAAM,SAAS,GAAG,KAAK,CAAC,MAAM,CAAC,KAAK,EAAE,IAAI,CAAC,CAAC,IAAI,CACrD,KAAK,CAAC,OAAO,CAAC,aAAa,CAAC,EAC5B,KAAK,CAAC,OAAO,CAAC,cAAc,CAAC,EAC7B,KAAK,CAAC,OAAO,CAAC,eAAe,CAAC,CAC/B,CAAA"}
+\ No newline at end of file
++{"version":3,"file":"Shard.js","sourceRoot":"","sources":["../../src/DiscordGateway/Shard.ts"],"names":[],"mappings":"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"}
+\ No newline at end of file
+diff --git a/dist/DiscordGateway/Sharder.d.ts b/dist/DiscordGateway/Sharder.d.ts
+index 28ede5a41bd215c5cf737913952782d07a31fa64..9ded42dbfba5dbed800aa608e795629dcaf80385 100644
+--- a/dist/DiscordGateway/Sharder.d.ts
++++ b/dist/DiscordGateway/Sharder.d.ts
+@@ -4,8 +4,13 @@ import { ShardStore } from "./ShardStore.ts";
+ import * as Effect from "effect/Effect";
+ import * as Layer from "effect/Layer";
+ import * as Context from "effect/Context";
++import type { TerminalGatewayCloseError } from "./DiscordWS.ts";
++import * as Stream from "effect/Stream";
++import type { GatewayLifecycleEvent } from "../DiscordGateway.ts";
+ declare const Sharder_base: Context.ServiceClass<Sharder, "dfx/DiscordGateway/Sharder", {
+     readonly shards: Effect.Effect<ReadonlySet<RunningShard>, never, never>;
++    readonly failure: Effect.Effect<never, TerminalGatewayCloseError>;
++    readonly lifecycle: Stream.Stream<GatewayLifecycleEvent>;
+ }>;
+ export declare class Sharder extends Sharder_base {
+ }
+diff --git a/dist/DiscordGateway/Sharder.d.ts.map b/dist/DiscordGateway/Sharder.d.ts.map
+index 4d4c9b6e641d2891e93a738f0aed43041c7b211b..bc120cb3eb6e67984bb35bdea5a4f6ee9c00f6e8 100644
+--- a/dist/DiscordGateway/Sharder.d.ts.map
++++ b/dist/DiscordGateway/Sharder.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"Sharder.d.ts","sourceRoot":"","sources":["../../src/DiscordGateway/Sharder.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,qBAAqB,CAAA;AACnD,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,YAAY,CAAA;AAE9C,OAAO,EAAE,UAAU,EAAE,MAAM,iBAAiB,CAAA;AAK5C,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AAEvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAIrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;;qBAkGpB,MAAM,CAAC,MAAM,CAAC,WAAW,CAAC,YAAY,CAAC,EAAE,KAAK,EAAE,KAAK,CAAC;;AAH3E,qBAAa,OAAQ,SAAQ,YAKI;CAAG;AAEpC,eAAO,MAAM,WAAW,sTAIvB,CAAA"}
+\ No newline at end of file
++{"version":3,"file":"Sharder.d.ts","sourceRoot":"","sources":["../../src/DiscordGateway/Sharder.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,qBAAqB,CAAA;AACnD,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,YAAY,CAAA;AAE9C,OAAO,EAAE,UAAU,EAAE,MAAM,iBAAiB,CAAA;AAK5C,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AAEvC,OAAO,KAAK,KAAK,MAAM,cAAc,CAAA;AAIrC,OAAO,KAAK,OAAO,MAAM,gBAAgB,CAAA;AAEzC,OAAO,KAAK,EAAE,yBAAyB,EAAE,MAAM,gBAAgB,CAAA;AAE/D,OAAO,KAAK,MAAM,MAAM,eAAe,CAAA;AACvC,OAAO,KAAK,EAAE,qBAAqB,EAAE,MAAM,sBAAsB,CAAA;;qBAsH5C,MAAM,CAAC,MAAM,CAAC,WAAW,CAAC,YAAY,CAAC,EAAE,KAAK,EAAE,KAAK,CAAC;sBACrD,MAAM,CAAC,MAAM,CAAC,KAAK,EAAE,yBAAyB,CAAC;wBAC7C,MAAM,CAAC,MAAM,CAAC,qBAAqB,CAAC;;AAL5D,qBAAa,OAAQ,SAAQ,YAOI;CAAG;AAEpC,eAAO,MAAM,WAAW,sTAIvB,CAAA"}
+\ No newline at end of file
+diff --git a/dist/DiscordGateway/Sharder.js b/dist/DiscordGateway/Sharder.js
+index 8a9e09c40e54b665058cb32d3970f2fd5c6232e2..d7b2a2216d10d5420c90315cb3020c673af19d2f 100644
+--- a/dist/DiscordGateway/Sharder.js
++++ b/dist/DiscordGateway/Sharder.js
+@@ -10,6 +10,9 @@ import * as Layer from "effect/Layer";
+ import * as Ref from "effect/Ref";
+ import * as Schedule from "effect/Schedule";
+ import * as Context from "effect/Context";
++import * as Deferred from "effect/Deferred";
++import * as PubSub from "effect/PubSub";
++import * as Stream from "effect/Stream";
+ const claimRepeatPolicy = Schedule.max([
+     Schedule.identity(),
+     Schedule.spaced("3 minutes"),
+@@ -21,6 +24,10 @@ const make = Effect.gen(function* () {
+     const limiter = yield* RateLimiter;
+     const shard = yield* Shard;
+     const currentShards = new Set();
++    const terminalFailure = yield* Deferred.make();
++    // Replay the bounded lifecycle history so a consumer acquired after READY
++    // still receives the startup transitions and cannot miss readiness.
++    const lifecycleHub = yield* Effect.acquireRelease(PubSub.bounded({ capacity: 1024, replay: 1024 }), PubSub.shutdown);
+     const gateway = yield* rest.getBotGateway().pipe(Effect.catch(() => Effect.succeed({
+         url: "wss://gateway.discord.gg/",
+         shards: 1,
+@@ -44,11 +51,16 @@ const make = Effect.gen(function* () {
+         concurrency: gateway.session_start_limit.max_concurrency,
+     })), Effect.tap(({ concurrency, id }) => limiter.maybeWait(`dfx.sharder.${id % concurrency}`, Duration.millis(gatewayConfig.identifyRateLimit[0]), gatewayConfig.identifyRateLimit[1])), Effect.flatMap(c => shard.connect([c.id, c.totalCount])), Effect.tap(runningShard => {
+         currentShards.add(runningShard);
+-        return Effect.void;
++        return Effect.all([
++            runningShard.failure.pipe(Effect.catch(error => Deferred.fail(terminalFailure, error)), Effect.forkScoped),
++            Stream.runForEach(runningShard.lifecycle, event => PubSub.publish(lifecycleHub, event)).pipe(Effect.forkScoped),
++        ]).pipe(Effect.asVoid);
+     }), Effect.forever);
+     yield* Effect.replicateEffect(spawner, gateway.session_start_limit.max_concurrency, { concurrency: "unbounded", discard: true }).pipe(Effect.scoped, Effect.catchCause(Effect.logError), Effect.ensuring(Effect.sync(() => currentShards.clear())), Effect.forever, Effect.forkScoped);
+     return {
+         shards: Effect.sync(() => currentShards),
++        failure: Deferred.await(terminalFailure),
++        lifecycle: Stream.fromPubSub(lifecycleHub),
+     };
+ }).pipe(Effect.annotateLogs({
+     package: "dfx",
+diff --git a/dist/DiscordGateway/Sharder.js.map b/dist/DiscordGateway/Sharder.js.map
+index f03f30495c8e419733986d07ec69f2046f51cb1f..8b873b254f800352bcd80b956bf524e1935afed7 100644
+--- a/dist/DiscordGateway/Sharder.js.map
++++ b/dist/DiscordGateway/Sharder.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"Sharder.js","sourceRoot":"","sources":["../../src/DiscordGateway/Sharder.ts"],"names":[],"mappings":"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"}
+\ No newline at end of file
++{"version":3,"file":"Sharder.js","sourceRoot":"","sources":["../../src/DiscordGateway/Sharder.ts"],"names":[],"mappings":"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"}
+\ No newline at end of file
+diff --git a/src/DiscordGateway.ts b/src/DiscordGateway.ts
+index 0a5a9415c0642ccdcc2a781f8ab8d1703ec331e1..b9752bc54a56d62ba671060a15815c9a3305bd73 100644
+--- a/src/DiscordGateway.ts
++++ b/src/DiscordGateway.ts
+@@ -1,6 +1,9 @@
+ import type { WebSocketConstructor } from "effect/unstable/socket/Socket"
+ import type { DiscordConfig } from "./DiscordConfig.ts"
+-import type { DiscordWSCodec } from "./DiscordGateway/DiscordWS.ts"
++import type {
++  DiscordWSCodec,
++  TerminalGatewayCloseError,
++} from "./DiscordGateway/DiscordWS.ts"
+ import type { Messsaging } from "./DiscordGateway/Messaging.ts"
+ import { Messaging, MesssagingLive } from "./DiscordGateway/Messaging.ts"
+ import type { RunningShard } from "./DiscordGateway/Shard.ts"
+@@ -15,6 +18,17 @@ import type * as Stream from "effect/Stream"
+ import type { HttpClient } from "effect/unstable/http/HttpClient"
+ import * as Context from "effect/Context"
+
++export type GatewayLifecycleEvent =
++  | { readonly _tag: "Connecting"; readonly shardId: number }
++  | { readonly _tag: "Ready"; readonly shardId: number }
++  | { readonly _tag: "Resumed"; readonly shardId: number }
++  | {
++      readonly _tag: "Disconnected"
++      readonly shardId: number
++      readonly code?: number
++      readonly retryable: true
++    }
++
+ export const TypeId = Symbol.for("dfx/DiscordGateway")
+ export type TypeId = typeof TypeId
+
+@@ -43,6 +57,9 @@ export interface DiscordGateway {
+   ) => Effect.Effect<never, E, R>
+   readonly send: (payload: Discord.GatewaySendPayload) => Effect.Effect<boolean>
+   readonly shards: Effect.Effect<ReadonlySet<RunningShard>>
++  readonly lifecycle: Stream.Stream<GatewayLifecycleEvent>
++  /** Fails when Discord rejects any shard with a non-retryable close code. */
++  readonly failure: Effect.Effect<never, TerminalGatewayCloseError>
+ }
+
+ export const DiscordGateway =
+@@ -60,6 +77,8 @@ export const make: Effect.Effect<DiscordGateway, never, Messsaging | Sharder> =
+       handleDispatch: messaging.handleDispatch as any,
+       send: messaging.send,
+       shards: sharder.shards,
++      failure: sharder.failure,
++      lifecycle: sharder.lifecycle,
+     })
+   })
+
+diff --git a/src/DiscordGateway/DiscordWS.ts b/src/DiscordGateway/DiscordWS.ts
+index 79bf2f0e1a59e1ba3b8c9c95a4b94072d67f7b4c..103af1ae8abc26d288319e158c0fdd133e97744e 100644
+--- a/src/DiscordGateway/DiscordWS.ts
++++ b/src/DiscordGateway/DiscordWS.ts
+@@ -8,6 +8,8 @@ import * as Context from "effect/Context"
+ import * as Queue from "effect/Queue"
+ import * as Socket from "effect/unstable/socket/Socket"
+ import type * as Scope from "effect/Scope"
++import * as Deferred from "effect/Deferred"
++import * as Data from "effect/Data"
+ import { CurrentLoggers } from "effect/Logger"
+ import * as LogLevel from "effect/LogLevel"
+ import { MinimumLogLevel } from "effect/References"
+@@ -18,11 +20,29 @@ export type MessageSend = Discord.GatewaySendPayload | Reconnect
+ export const Reconnect = Symbol.for("dfx/DiscordGateway/WS/Reconnect")
+ export type Reconnect = typeof Reconnect
+
++export class TerminalGatewayCloseError extends Data.TaggedError(
++  "TerminalGatewayCloseError",
++)<{
++  readonly code: number
++  readonly reason?: string
++}> {}
++
++/**
++ * Discord requires configuration or credential changes before these close
++ * codes can succeed, so reconnecting only consumes identify capacity.
++ */
++export const isTerminalGatewayCloseCode = (code: number): boolean =>
++  code === 4004 || (code >= 4010 && code <= 4014)
++
+ export interface OpenOpts {
+   url?: string
+   version?: number
+   encoding?: DiscordWSCodec
+   onConnecting: Effect.Effect<void>
++  onDisconnected?: (event: {
++    readonly code?: number
++    readonly retryable: true
++  }) => Effect.Effect<void>
+ }
+
+ export interface DiscordWSCodecService {
+@@ -50,6 +70,7 @@ const make = Effect.gen(function* () {
+   const connect = Effect.fnUntraced(
+     function* ({
+       onConnecting,
++      onDisconnected,
+       url = "wss://gateway.discord.gg/",
+       version = 10,
+     }: OpenOpts) {
+@@ -59,6 +80,10 @@ const make = Effect.gen(function* () {
+       const setUrl = (nextUrl: string) =>
+         Ref.set(urlRef, `${nextUrl}?v=${version}&encoding=${encoding.type}`)
+       const messages = yield* Queue.make<Message>()
++      const terminalFailure = yield* Deferred.make<
++        never,
++        TerminalGatewayCloseError
++      >()
+       const socket = yield* Socket.makeWebSocket(Ref.get(urlRef), {
+         closeCodeIsError: _ => true,
+         openTimeout: 5000,
+@@ -69,6 +94,40 @@ const make = Effect.gen(function* () {
+           module: "DiscordGateway/DiscordWS",
+           channel: "outbound",
+         })
++      const handleSocketError = (error: Socket.SocketError) => {
++        if (
++          error.reason._tag !== "SocketCloseError" ||
++          !isTerminalGatewayCloseCode(error.reason.code)
++        ) {
++          return Effect.andThen(
++            onDisconnected?.({
++              code:
++                error.reason._tag === "SocketCloseError"
++                  ? error.reason.code
++                  : undefined,
++              retryable: true,
++            }) ?? Effect.void,
++            Effect.logDebug("Got socket error, reconnecting", error),
++          )
++        }
++
++        const terminal = new TerminalGatewayCloseError({
++          code: error.reason.code,
++          reason: error.reason.closeReason,
++        })
++        return Deferred.fail(terminalFailure, terminal).pipe(
++          Effect.andThen(
++            Effect.annotateLogs(
++              Effect.logError(
++                "Discord rejected the gateway connection",
++                terminal,
++              ),
++              { closeCode: terminal.code },
++            ),
++          ),
++          Effect.andThen(Effect.never),
++        )
++      }
+       const write = (message: MessageSend): Effect.Effect<void> => {
+         if (message === Reconnect) {
+           return Effect.catchCause(
+@@ -109,9 +168,7 @@ const make = Effect.gen(function* () {
+           while: e =>
+             e.reason._tag === "SocketCloseError" && e.reason.code === 3000,
+         }),
+-        Effect.catchCause(cause =>
+-          Effect.logDebug("Got socket error, reconnecting", cause),
+-        ),
++        Effect.catch(handleSocketError),
+         Effect.repeat(
+           Schedule.min([Schedule.exponential(500), Schedule.spaced(10000)]),
+         ),
+@@ -120,7 +177,11 @@ const make = Effect.gen(function* () {
+       )
+
+       return {
+-        take: Queue.take(messages),
++        take: Effect.raceFirst(
++          Queue.take(messages),
++          Deferred.await(terminalFailure),
++        ),
++        failure: Deferred.await(terminalFailure),
+         setUrl,
+         write,
+       } as const
+@@ -140,9 +201,10 @@ export class DiscordWS extends Context.Service<
+       {
+         readonly take: Effect.Effect<
+           Discord.GatewayReceivePayload,
+-          never,
++          TerminalGatewayCloseError,
+           never
+         >
++        readonly failure: Effect.Effect<never, TerminalGatewayCloseError>
+         readonly setUrl: (url: string) => Effect.Effect<void, never, never>
+         readonly write: (message: MessageSend) => Effect.Effect<void>
+       },
+diff --git a/src/DiscordGateway/Shard.ts b/src/DiscordGateway/Shard.ts
+index e6cb971e0179c87de93746e9bb3fb613dea23fc7..007bbc4312339915715dfdd9cf1a3cb93c76f55e 100644
+--- a/src/DiscordGateway/Shard.ts
++++ b/src/DiscordGateway/Shard.ts
+@@ -21,6 +21,8 @@ import * as Context from "effect/Context"
+ import * as PubSub from "effect/PubSub"
+ import * as LogLevel from "effect/LogLevel"
+ import { MinimumLogLevel } from "effect/References"
++import type { GatewayLifecycleEvent } from "../DiscordGateway.ts"
++import * as Stream from "effect/Stream"
+
+ const enum Phase {
+   Connecting,
+@@ -44,6 +46,12 @@ export const make = Effect.gen(function* () {
+       const reconnectHandle = yield* FiberHandle.make()
+       let phase = Phase.Connecting
+       const stateStore = shardState.forShard(shard)
++      const lifecycleQueue = yield* Effect.acquireRelease(
++        Queue.unbounded<GatewayLifecycleEvent>(),
++        Queue.shutdown,
++      )
++      const publishLifecycle = (event: GatewayLifecycleEvent) =>
++        Queue.offer(lifecycleQueue, event).pipe(Effect.asVoid)
+       const resumeState: Types.Mutable<ShardState> = Option.getOrElse(
+         yield* stateStore.get,
+         () => ({
+@@ -74,9 +82,20 @@ export const make = Effect.gen(function* () {
+         setPhase(Phase.Connected),
+       )
+
+-      const onConnecting = setPhase(Phase.Connecting)
++      const onConnecting = Effect.andThen(
++        publishLifecycle({ _tag: "Connecting", shardId: shard[0] }),
++        setPhase(Phase.Connecting),
++      )
+
+-      const socket = yield* dws.connect({ onConnecting })
++      const socket = yield* dws.connect({
++        onConnecting,
++        onDisconnected: event =>
++          publishLifecycle({
++            _tag: "Disconnected",
++            shardId: shard[0],
++            ...event,
++          }),
++      })
+       const write = (p: MessageSend) =>
+         Effect.andThen(
+           limiter.maybeWait("dfx.shard.send", Duration.minutes(1), 120),
+@@ -151,6 +170,10 @@ export const make = Effect.gen(function* () {
+           }
+           case Discord.GatewayOpcodes.Dispatch: {
+             if (p.t === "READY" || p.t === "RESUMED") {
++              yield* publishLifecycle({
++                _tag: p.t === "READY" ? "Ready" : "Resumed",
++                shardId: shard[0],
++              })
+               yield* resume
+             }
+             PubSub.publishUnsafe(hub, p)
+@@ -175,7 +198,12 @@ export const make = Effect.gen(function* () {
+         }
+       }).pipe(Effect.forkScoped)
+
+-      return { id: shard, write } as const
++      return {
++        id: shard,
++        write,
++        failure: socket.failure,
++        lifecycle: Stream.fromQueue(lifecycleQueue),
++      } as const
+     },
+     (effect, shard) =>
+       Effect.annotateLogs(effect, {
+diff --git a/src/DiscordGateway/Sharder.ts b/src/DiscordGateway/Sharder.ts
+index fa4e26efb5cc29f9454ac7ef3f902ef92cd267d4..3a29c6784698e83908b32938f5b5a4fea7d0b98c 100644
+--- a/src/DiscordGateway/Sharder.ts
++++ b/src/DiscordGateway/Sharder.ts
+@@ -13,6 +13,11 @@ import type * as Option from "effect/Option"
+ import * as Ref from "effect/Ref"
+ import * as Schedule from "effect/Schedule"
+ import * as Context from "effect/Context"
++import * as Deferred from "effect/Deferred"
++import type { TerminalGatewayCloseError } from "./DiscordWS.ts"
++import * as PubSub from "effect/PubSub"
++import * as Stream from "effect/Stream"
++import type { GatewayLifecycleEvent } from "../DiscordGateway.ts"
+
+ const claimRepeatPolicy = Schedule.max([
+   Schedule.identity<Option.Option<number>>(),
+@@ -30,6 +35,16 @@ const make = Effect.gen(function* () {
+   const limiter = yield* RateLimiter
+   const shard = yield* Shard
+   const currentShards = new Set<RunningShard>()
++  const terminalFailure = yield* Deferred.make<
++    never,
++    TerminalGatewayCloseError
++  >()
++  // Replay the bounded lifecycle history so a consumer acquired after READY
++  // still receives the startup transitions and cannot miss readiness.
++  const lifecycleHub = yield* Effect.acquireRelease(
++    PubSub.bounded<GatewayLifecycleEvent>({ capacity: 1024, replay: 1024 }),
++    PubSub.shutdown,
++  )
+
+   const gateway = yield* rest.getBotGateway().pipe(
+     Effect.catch(() =>
+@@ -80,7 +95,15 @@ const make = Effect.gen(function* () {
+     Effect.flatMap(c => shard.connect([c.id, c.totalCount])),
+     Effect.tap(runningShard => {
+       currentShards.add(runningShard)
+-      return Effect.void
++      return Effect.all([
++        runningShard.failure.pipe(
++          Effect.catch(error => Deferred.fail(terminalFailure, error)),
++          Effect.forkScoped,
++        ),
++        Stream.runForEach(runningShard.lifecycle, event =>
++          PubSub.publish(lifecycleHub, event),
++        ).pipe(Effect.forkScoped),
++      ]).pipe(Effect.asVoid)
+     }),
+     Effect.forever,
+   )
+@@ -99,6 +122,8 @@ const make = Effect.gen(function* () {
+
+   return {
+     shards: Effect.sync(() => currentShards as ReadonlySet<RunningShard>),
++    failure: Deferred.await(terminalFailure),
++    lifecycle: Stream.fromPubSub(lifecycleHub),
+   } as const
+ }).pipe(
+   Effect.annotateLogs({
+@@ -111,10 +136,12 @@ export class Sharder extends Context.Service<
+   Sharder,
+   {
+     readonly shards: Effect.Effect<ReadonlySet<RunningShard>, never, never>
++    readonly failure: Effect.Effect<never, TerminalGatewayCloseError>
++    readonly lifecycle: Stream.Stream<GatewayLifecycleEvent>
+   }
+ >()("dfx/DiscordGateway/Sharder") {}
+
+ export const SharderLive = Layer.effect(Sharder, make).pipe(
+   Layer.provide(DiscordRESTLive),
+   Layer.provide(RateLimiterLive),
+   Layer.provide(ShardLive),
