@@ -13,7 +13,12 @@ export const CursorState = Schema.Struct({
   name: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.Struct({ x: Schema.Finite, y: Schema.Finite })),
   dragging: Schema.optional(
-    Schema.Struct({ cardId: Schema.String, deltaX: Schema.Finite, deltaY: Schema.Finite }),
+    Schema.Struct({
+      cardId: Schema.String,
+      /** Offset from the card's top-left to the grab point within the card. */
+      grabX: Schema.Finite,
+      grabY: Schema.Finite,
+    }),
   ),
 })
 

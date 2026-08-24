@@ -91,15 +91,20 @@ const KanbanColumn: React.FC<{
   onNewCardTitle: (title: string) => void
   hoverColor: string | undefined
   activeDragId: string | null
-}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle, hoverColor, activeDragId }) => {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: 'column' as const, columnId: column.id } })
+  remoteHoverColumnId: string | undefined
+  columnId: string
+}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle, hoverColor, activeDragId, remoteHoverColumnId, columnId }) => {
+  const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: 'column' as const, columnId } })
+  // Column is highlighted when: local dnd-kit says it's over, OR a remote
+  // peer's cursor is over this column
+  const highlighted = isOver || remoteHoverColumnId === columnId
 
   return (
     <div
       ref={setNodeRef}
       className="kanban-column"
       data-column-id={column.id}
-      style={{ outline: isOver && hoverColor !== undefined ? `2px solid ${hoverColor}` : undefined }}
+      style={{ outline: highlighted && hoverColor !== undefined ? `2px solid ${hoverColor}` : undefined }}
     >
       <div className="kanban-column-header">
         <h3 className="kanban-column-title">{column.title}</h3>
@@ -303,7 +308,12 @@ const KanbanBoard: React.FC = () => {
       setActiveCard(card)
       setActiveDragId(id)
       if (card !== null) {
-        Effect.runFork(presence.setState('cursor', { dragging: { cardId: card.id, deltaX: 0, deltaY: 0 } }))
+        // Compute grab offset: where on the card the user grabbed it
+        const rect = document.querySelector(`[data-card-id="${card.id}"]`)?.getBoundingClientRect()
+        const activator = event.activatorEvent as PointerEvent
+        const grabX = rect !== undefined ? activator.clientX - rect.left : 0
+        const grabY = rect !== undefined ? activator.clientY - rect.top : 0
+        Effect.runFork(presence.setState('cursor', { dragging: { cardId: card.id, grabX, grabY } }))
       }
     },
     [cards, presence],
@@ -313,7 +323,7 @@ const KanbanBoard: React.FC = () => {
     (event: DragMoveEvent) => {
       const id = String(event.active.id)
       const { x, y } = event.delta
-      Effect.runFork(presence.setState('cursor', { dragging: { cardId: id, deltaX: x, deltaY: y } }))
+
 
     },
     [presence],
@@ -375,17 +385,32 @@ const KanbanBoard: React.FC = () => {
   )
 
   // Column hover color follows the currently-dragging client's assigned color.
-  // Column hover color: the currently-dragging client's assigned color
-  // (works for both local and remote drags).
+  // Column hover: the currently-dragging client's color + cursor position.
+  // For local drags, dnd-kit's useDroppable handles it. For remote drags,
+  // we compute which column the peer's cursor is over.
   const activeDraggerColor = (() => {
     if (activeCard !== null) {
-      // Local user is dragging — use their color
       return COLORS[Math.abs(hashString(presence.clientId)) % COLORS.length] ?? '#3b82f6'
     }
     if (remoteDrags.length > 0) {
       return remoteDrags[0]?.color ?? '#3b82f6'
     }
     return undefined
+  })()
+
+  // For remote drags: which column the peer's cursor is over (for hover highlight)
+  const remoteDragHoverColumnId = (() => {
+    if (remoteDrags.length === 0) return undefined
+    const drag = remoteDrags[0]!
+    const cursor = cursorByClient.get(drag.clientId)
+    if (cursor === undefined) return undefined
+    const col = columns.find((c) => {
+      const el = document.querySelector(`[data-column-id="${c.id}"]`)
+      if (el === null) return false
+      const rect = el.getBoundingClientRect()
+      return cursor.x >= rect.left && cursor.x <= rect.right && cursor.y >= rect.top && cursor.y <= rect.bottom
+    })
+    return col?.id
   })()
 
   return (
@@ -466,10 +491,12 @@ const KanbanBoard: React.FC = () => {
                 className="kanban-card kanban-card-dragging remote-drag-card"
                 data-testid={`drag-${cid}`}
                 style={{
-                  left: cursor.x,
-                  top: cursor.y,
+                  // Ghost top-left = peer's pointer position minus where they
+                  // grabbed the card, so the card sits exactly where the
+                  // dragger sees it.
+                  left: cursor.x - dragging.grabX,
+                  top: cursor.y - dragging.grabY,
                   width: cardWidth(dragging.cardId),
-                  transform: 'translate(-50%, -50%)',
                   outline: `2px solid ${color}`,
                 }}
               >
@@ -491,6 +518,8 @@ const KanbanBoard: React.FC = () => {
               onDelete={() => deleteColumn(column.id)}
               hoverColor={activeDraggerColor}
               activeDragId={activeDragId}
+              remoteHoverColumnId={remoteDragHoverColumnId}
+              columnId={column.id}
             />
           ))}
         </div>
