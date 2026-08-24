@@ -59,8 +59,13 @@ const innermostCollisionDetection: CollisionDetection = (args) => {
   return closestCorners(args)
 }
 
-const SortableCard: React.FC<{ card: Card }> = ({ card }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+const SortableCard: React.FC<{
+  card: Card
+  isActiveDrag: boolean
+  isDropTarget: boolean
+  dropColor: string | undefined
+}> = ({ card, isActiveDrag, isDropTarget, dropColor }) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: card.id,
     data: { type: 'card' as const, columnId: card.columnId, cardId: card.id },
   })
@@ -70,7 +75,13 @@ const SortableCard: React.FC<{ card: Card }> = ({ card }) => {
       ref={setNodeRef}
       className="kanban-card"
       data-card-id={card.id}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isActiveDrag ? 0.4 : 1,
+        outline: isDropTarget ? `2px dashed ${dropColor ?? '#3b82f6'}` : undefined,
+        outlineOffset: '-2px',
+      }}
       {...attributes}
       {...listeners}
     >
@@ -87,7 +98,9 @@ const KanbanColumn: React.FC<{
   newCardTitle: string
   onNewCardTitle: (title: string) => void
   hoverColor: string | undefined
-}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle, hoverColor }) => {
+  activeDragId: string | null
+  overCardId: string | null
+}> = ({ column, cards, onAddCard, onDelete, newCardTitle, onNewCardTitle, hoverColor, activeDragId, overCardId }) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: 'column' as const, columnId: column.id } })
 
   return (
@@ -106,7 +119,13 @@ const KanbanColumn: React.FC<{
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div className="kanban-cards">
           {cards.map((card) => (
-            <SortableCard key={card.id} card={card} />
+            <SortableCard
+              key={card.id}
+              card={card}
+              isActiveDrag={activeDragId === card.id}
+              isDropTarget={overCardId === card.id}
+              dropColor={hoverColor}
+            />
           ))}
         </div>
       </SortableContext>
@@ -251,6 +270,8 @@ const KanbanBoard: React.FC = () => {
   const [newColumnTitle, setNewColumnTitle] = useState('')
   const [newCardTitles, setNewCardTitles] = useState<Record<string, string>>({})
   const [activeCard, setActiveCard] = useState<Card | null>(null)
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const [overCardId, setOverCardId] = useState<string | null>(null)
   const boardRef = useRef<HTMLDivElement>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -296,6 +317,7 @@ const KanbanBoard: React.FC = () => {
       const id = String(event.active.id)
       const card = cards.find((c) => c.id === id) ?? null
       setActiveCard(card)
+      setActiveDragId(id)
       if (card !== null) {
         Effect.runFork(presence.setState('cursor', { dragging: { cardId: card.id, deltaX: 0, deltaY: 0 } }))
       }
@@ -308,6 +330,12 @@ const KanbanBoard: React.FC = () => {
       const id = String(event.active.id)
       const { x, y } = event.delta
       Effect.runFork(presence.setState('cursor', { dragging: { cardId: id, deltaX: x, deltaY: y } }))
+      // Track drop-target card for outline highlight
+      if (event.over !== null && event.over.data.current?.type === 'card' && String(event.over.id) !== id) {
+        setOverCardId(String(event.over.id))
+      } else {
+        setOverCardId(null)
+      }
     },
     [presence],
   )
@@ -315,6 +343,8 @@ const KanbanBoard: React.FC = () => {
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveCard(null)
+      setActiveDragId(null)
+      setOverCardId(null)
       Effect.runFork(presence.setState('cursor', { dragging: undefined }))
       const { active, over } = event
       if (over === null) return
@@ -376,6 +406,12 @@ const KanbanBoard: React.FC = () => {
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
+      onDragCancel={() => {
+        setActiveCard(null)
+        setActiveDragId(null)
+        setOverCardId(null)
+        Effect.runFork(presence.setState('cursor', { dragging: undefined }))
+      }}
     >
       <DragTracker onChange={(id) => { /* no-op: dragger tracked via presence */ }} />
       <div className="kanban" ref={boardRef} onPointerMove={handlePointerMove}>
@@ -465,6 +501,8 @@ const KanbanBoard: React.FC = () => {
               onAddCard={(title) => addCard(column.id, title)}
               onDelete={() => deleteColumn(column.id)}
               hoverColor={activeDraggerColor}
+              activeDragId={activeDragId}
+              overCardId={overCardId}
             />
           ))}
         </div>

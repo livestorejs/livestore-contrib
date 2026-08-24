@@ -143,7 +143,8 @@ button {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 100;
+  /* Above all cards/columns (which create stacking contexts via transform) */
+  z-index: 1000;
 }
 
 .cursor {
@@ -176,7 +177,7 @@ button {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 101;
+  z-index: 1001;
 }
 
 .remote-drag-card {
