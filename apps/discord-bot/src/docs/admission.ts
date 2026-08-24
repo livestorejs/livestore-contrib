@@ -1,4 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto'
+
 import { Effect, Schema } from 'effect'
 
 const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0))
@@ -8,13 +9,9 @@ export const DocsAdmissionLimits = Schema.Struct({
   maximumConcurrentPerPrincipal: PositiveInt,
   maximumConcurrentGlobal: PositiveInt,
   maximumRequestsPerPrincipalWindow: PositiveInt,
-  principalRequestWindowMillis: PositiveInt.check(
-    Schema.isLessThanOrEqualTo(maximumRetainedWindowMillis),
-  ),
+  principalRequestWindowMillis: PositiveInt.check(Schema.isLessThanOrEqualTo(maximumRetainedWindowMillis)),
   maximumRequestsGlobalWindow: PositiveInt,
-  globalRequestWindowMillis: PositiveInt.check(
-    Schema.isLessThanOrEqualTo(maximumRetainedWindowMillis),
-  ),
+  globalRequestWindowMillis: PositiveInt.check(Schema.isLessThanOrEqualTo(maximumRetainedWindowMillis)),
   maximumInputTokensPerRequest: PositiveInt,
   maximumOutputTokensPerRequest: PositiveInt,
   maximumTokensPerPrincipalWindow: PositiveInt,
@@ -29,13 +26,14 @@ export const docsAdmissionLimitsFromDeployment = (limits: {
   readonly requestsPerMinute: number
   readonly inputTokensPerRequest: number
   readonly outputTokensPerRequest: number
-}) => Schema.decodeUnknownSync(DocsAdmissionLimits)({
-  ...defaultDocsAdmissionLimits,
-  maximumRequestsPerPrincipalWindow: limits.requestsPerMemberPerHour,
-  maximumRequestsGlobalWindow: Math.max(1, limits.requestsPerMinute),
-  maximumInputTokensPerRequest: limits.inputTokensPerRequest,
-  maximumOutputTokensPerRequest: limits.outputTokensPerRequest,
-})
+}) =>
+  Schema.decodeUnknownSync(DocsAdmissionLimits)({
+    ...defaultDocsAdmissionLimits,
+    maximumRequestsPerPrincipalWindow: limits.requestsPerMemberPerHour,
+    maximumRequestsGlobalWindow: Math.max(1, limits.requestsPerMinute),
+    maximumInputTokensPerRequest: limits.inputTokensPerRequest,
+    maximumOutputTokensPerRequest: limits.outputTokensPerRequest,
+  })
 
 export const defaultDocsAdmissionLimits = Schema.decodeUnknownSync(DocsAdmissionLimits)({
   maximumConcurrentPerPrincipal: 1,
@@ -103,7 +101,8 @@ export const makeDocsAdmission = (options: DocsAdmissionOptions = {}): DocsAdmis
   const limits = options.limits ?? defaultDocsAdmissionLimits
   const now = options.now ?? Date.now
   const correlationKey = options.correlationKey ?? randomBytes(32)
-  const correlatePrincipal = options.correlatePrincipal ??
+  const correlatePrincipal =
+    options.correlatePrincipal ??
     ((principalId: string) => createHmac('sha256', correlationKey).update(principalId).digest('hex'))
   const principals = new Map<string, PrincipalState>()
   const globalState: MutableAdmissionState = { inFlight: 0, reservedTokens: 0, requestTimes: [], tokenSamples: [] }
@@ -142,26 +141,26 @@ export const makeDocsAdmission = (options: DocsAdmissionOptions = {}): DocsAdmis
       let completed = false
       return {
         _tag: 'Admitted',
-        complete: usage => Effect.sync(() => {
-          if (completed === true) return
-          completed = true
-          const completedAt = now()
-          // Unknown usage is charged at the full reservation so post-submit failures cannot bypass ceilings.
-          const actualTokens = usage === undefined
-            ? reservedTokens
-            : Math.max(0, usage.inputTokens) + Math.max(0, usage.outputTokens)
-          principal.inFlight -= 1
-          principal.reservedTokens -= reservedTokens
-          principal.tokenSamples.push({ at: completedAt, tokens: actualTokens })
-          globalState.inFlight -= 1
-          globalState.reservedTokens -= reservedTokens
-          globalState.tokenSamples.push({ at: completedAt, tokens: actualTokens })
-          prune(principal, completedAt, limits.principalRequestWindowMillis, limits.tokenWindowMillis)
-          prune(globalState, completedAt, limits.globalRequestWindowMillis, limits.tokenWindowMillis)
-          if (isEmpty(principal) === true) {
-            principals.delete(principalKey)
-          }
-        }),
+        complete: (usage) =>
+          Effect.sync(() => {
+            if (completed === true) return
+            completed = true
+            const completedAt = now()
+            // Unknown usage is charged at the full reservation so post-submit failures cannot bypass ceilings.
+            const actualTokens =
+              usage === undefined ? reservedTokens : Math.max(0, usage.inputTokens) + Math.max(0, usage.outputTokens)
+            principal.inFlight -= 1
+            principal.reservedTokens -= reservedTokens
+            principal.tokenSamples.push({ at: completedAt, tokens: actualTokens })
+            globalState.inFlight -= 1
+            globalState.reservedTokens -= reservedTokens
+            globalState.tokenSamples.push({ at: completedAt, tokens: actualTokens })
+            prune(principal, completedAt, limits.principalRequestWindowMillis, limits.tokenWindowMillis)
+            prune(globalState, completedAt, limits.globalRequestWindowMillis, limits.tokenWindowMillis)
+            if (isEmpty(principal) === true) {
+              principals.delete(principalKey)
+            }
+          }),
       }
     })
   })
@@ -204,18 +203,12 @@ const assessAdmission = (
   return undefined
 }
 
-const prune = (
-  state: MutableAdmissionState,
-  at: number,
-  requestWindowMillis: number,
-  tokenWindowMillis: number,
-) => {
-  state.requestTimes = state.requestTimes.filter(timestamp => timestamp > at - requestWindowMillis)
-  state.tokenSamples = state.tokenSamples.filter(sample => sample.at > at - tokenWindowMillis)
+const prune = (state: MutableAdmissionState, at: number, requestWindowMillis: number, tokenWindowMillis: number) => {
+  state.requestTimes = state.requestTimes.filter((timestamp) => timestamp > at - requestWindowMillis)
+  state.tokenSamples = state.tokenSamples.filter((sample) => sample.at > at - tokenWindowMillis)
 }
 
-const tokenTotal = (state: MutableAdmissionState) =>
-  state.tokenSamples.reduce((sum, sample) => sum + sample.tokens, 0)
+const tokenTotal = (state: MutableAdmissionState) => state.tokenSamples.reduce((sum, sample) => sum + sample.tokens, 0)
 
 const isEmpty = (state: MutableAdmissionState) =>
   state.inFlight === 0 && state.requestTimes.length === 0 && state.tokenSamples.length === 0

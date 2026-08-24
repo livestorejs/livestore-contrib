@@ -5,13 +5,8 @@ import type {
   Snowflake,
   StagingTarget,
   ThreadSnapshot,
-} from "./model.ts"
-import type {
-  DocsResult,
-  E2ETransport,
-  InteractionResult,
-  OperatorResult,
-} from "./transport.ts"
+} from './model.ts'
+import type { DocsResult, E2ETransport, InteractionResult, OperatorResult } from './transport.ts'
 
 interface MutationCounts {
   createdMessages: number
@@ -31,8 +26,8 @@ export interface FakeWorld {
 }
 
 const isFiltered = (content: string): boolean => {
-  const normalized = content.trim().toLocaleLowerCase("en")
-  return normalized === "thanks" || normalized === "hello" || normalized === ""
+  const normalized = content.trim().toLocaleLowerCase('en')
+  return normalized === 'thanks' || normalized === 'hello' || normalized === ''
 }
 
 export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
@@ -91,49 +86,46 @@ export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
       const message = { id: id(), channelId, marker, author } satisfies MessageSnapshot
       messages.set(message.id, message)
       counts.createdMessages += 1
-      if (author === "human" && isFiltered(content) === false) await createThread(message)
+      if (author === 'human' && isFiltered(content) === false) await createThread(message)
       return message
     },
     findThreadForMessage: async (_guildId, sourceMessageId) => threads.get(sourceMessageId),
     operatorCreateThread: async ({ sourceMessageId }): Promise<OperatorResult> => {
       const source = messages.get(sourceMessageId)
-      if (source === undefined) return { _tag: "Denied" }
+      if (source === undefined) return { _tag: 'Denied' }
       const existing = threads.get(sourceMessageId)
-      if (existing !== undefined) return { _tag: "AlreadySatisfied", thread: existing }
+      if (existing !== undefined) return { _tag: 'AlreadySatisfied', thread: existing }
       const wasPending = pendingCreates.has(sourceMessageId)
       const thread = await createThread(source)
-      return wasPending === true
-        ? { _tag: "AlreadySatisfied", thread }
-        : { _tag: "Created", thread }
+      return wasPending === true ? { _tag: 'AlreadySatisfied', thread } : { _tag: 'Created', thread }
     },
     invokeMessageAction: async ({ sourceMessageId, marker, persona }): Promise<InteractionResult> => {
       const source = messages.get(sourceMessageId)
-      if (persona !== "maintainer" || source === undefined) {
-        return { _tag: "Denied", response: response(marker, false, false) }
+      if (persona !== 'maintainer' || source === undefined) {
+        return { _tag: 'Denied', response: response(marker, false, false) }
       }
       return {
-        _tag: "Created",
+        _tag: 'Created',
         thread: await createThread(source),
         response: response(marker, false, false),
       }
     },
     invokeDocs: async ({ marker, location, persona }): Promise<DocsResult> => {
-      const authorized =
-        location === "public" || persona === "contributor" || persona === "maintainer"
+      const authorized = location === 'public' || persona === 'contributor' || persona === 'maintainer'
       return authorized === true
-        ? { _tag: "Answered", response: response(marker, true, true) }
-        : { _tag: "Denied", response: response(marker, false, false) }
+        ? { _tag: 'Answered', response: response(marker, true, true) }
+        : { _tag: 'Denied', response: response(marker, false, false) }
     },
     deleteThread: async (threadId) => {
-      if (threads.delete(threadId) === false) throw new Error("thread not found")
+      if (threads.delete(threadId) === false) throw new Error('thread not found')
       counts.deletedThreads += 1
     },
     deleteMessage: async (_channelId, messageId) => {
-      if (messages.delete(messageId) === false) throw new Error("message not found")
+      if (messages.delete(messageId) === false) throw new Error('message not found')
       counts.deletedMessages += 1
     },
     deleteResponse: async (responseId) => {
-      if (responses.delete(responseId) === false) throw new Error("response not found")
+      if (responses.delete(responseId) === false) throw new Error('response not found')
       counts.deletedResponses += 1
     },
   }

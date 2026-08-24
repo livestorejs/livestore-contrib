@@ -1,7 +1,9 @@
-import { execFile } from "node:child_process"
-import { NodeHttpClient } from "@effect/platform-node"
-import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from "dfx"
-import { Effect, Layer, ManagedRuntime, Redacted } from "effect"
+import { execFile } from 'node:child_process'
+
+import { NodeHttpClient } from '@effect/platform-node'
+import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
+import { Effect, Layer, ManagedRuntime, Redacted } from 'effect'
+
 import type {
   ChannelSnapshot,
   MessageSnapshot,
@@ -9,12 +11,8 @@ import type {
   Snowflake,
   StagingTarget,
   ThreadSnapshot,
-} from "./model.ts"
-import {
-  E2EPrerequisiteUnavailableError,
-  type E2ETransport,
-  type OperatorResult,
-} from "./transport.ts"
+} from './model.ts'
+import { E2EPrerequisiteUnavailableError, type E2ETransport, type OperatorResult } from './transport.ts'
 
 export interface CommandResult {
   readonly exitCode: number
@@ -22,10 +20,7 @@ export interface CommandResult {
   readonly stderr: string
 }
 
-export type CommandRunner = (
-  executable: string,
-  args: ReadonlyArray<string>,
-) => Promise<CommandResult>
+export type CommandRunner = (executable: string, args: ReadonlyArray<string>) => Promise<CommandResult>
 
 export interface DfxLiveTransportInput {
   /** Resolved only in process by the approved op-proxy invocation. */
@@ -41,8 +36,8 @@ export interface DfxLiveTransportInput {
     readonly marker: string
     readonly content: string
   }) => Promise<MessageSnapshot>
-  readonly invokeMessageAction?: E2ETransport["invokeMessageAction"]
-  readonly invokeDocs?: E2ETransport["invokeDocs"]
+  readonly invokeMessageAction?: E2ETransport['invokeMessageAction']
+  readonly invokeDocs?: E2ETransport['invokeDocs']
   readonly deleteHumanResponse?: (response: ResponseSnapshot) => Promise<void>
   readonly deleteHumanMessage?: (message: MessageSnapshot) => Promise<void>
 }
@@ -54,14 +49,9 @@ export interface DfxLiveTransport {
 
 export const defaultRunCommand: CommandRunner = (executable, args) =>
   new Promise((resolve) => {
-    execFile(executable, args, { encoding: "utf8" }, (error, stdout, stderr) => {
+    execFile(executable, args, { encoding: 'utf8' }, (error, stdout, stderr) => {
       resolve({
-        exitCode:
-          error === null
-            ? 0
-            : typeof error.code === "number"
-              ? error.code
-              : 1,
+        exitCode: error === null ? 0 : typeof error.code === 'number' ? error.code : 1,
         stdout,
         stderr,
       })
@@ -73,17 +63,17 @@ const asSnowflake = (value: string, operation: string): Snowflake => {
   return value as Snowflake
 }
 
-const parseControlResult = (result: CommandResult): "Created" | "AlreadySatisfied" => {
+const parseControlResult = (result: CommandResult): 'Created' | 'AlreadySatisfied' => {
   if (result.exitCode !== 0) {
     throw new Error(`Bot control CLI exited ${result.exitCode}: ${result.stderr.trim()}`)
   }
   const decoded: unknown = JSON.parse(result.stdout)
-  if (typeof decoded !== "object" || decoded === null || !("_tag" in decoded)) {
-    throw new Error("Bot control CLI returned an invalid JSON result")
+  if (typeof decoded !== 'object' || decoded === null || !('_tag' in decoded)) {
+    throw new Error('Bot control CLI returned an invalid JSON result')
   }
   const tag = (decoded as { readonly _tag: unknown })._tag
-  if (tag === "Success") return "Created"
-  if (tag === "AlreadySatisfied") return "AlreadySatisfied"
+  if (tag === 'Success') return 'Created'
+  if (tag === 'AlreadySatisfied') return 'AlreadySatisfied'
   throw new Error(`Bot control CLI returned unexpected result ${String(tag)}`)
 }
 
@@ -93,18 +83,18 @@ export const operatorCreateThreadArguments = (input: {
   readonly reason: string
   readonly botControlSocket: string
 }): ReadonlyArray<string> => [
-  "thread",
-  "create",
+  'thread',
+  'create',
   `https://discord.com/channels/${input.target.guildId}/${input.target.channelId}/${input.sourceMessageId}`,
-  "--environment",
-  "staging",
-  "--socket",
+  '--environment',
+  'staging',
+  '--socket',
   input.botControlSocket,
-  "--apply",
-  "--reason",
+  '--apply',
+  '--reason',
   input.reason,
-  "--output",
-  "json",
+  '--output',
+  'json',
 ]
 
 /**
@@ -118,36 +108,26 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
   )
   const runtime = ManagedRuntime.make(DiscordLive)
   const sourceMarkers = new Map<Snowflake, string>()
-  const sourceAuthors = new Map<Snowflake, MessageSnapshot["author"]>()
+  const sourceAuthors = new Map<Snowflake, MessageSnapshot['author']>()
   const sources = new Map<Snowflake, MessageSnapshot>()
   const responses = new Map<Snowflake, ResponseSnapshot>()
   const runCommand = input.runCommand ?? defaultRunCommand
-  const cliExecutable = input.cliExecutable ?? "livestore-discord"
+  const cliExecutable = input.cliExecutable ?? 'livestore-discord'
 
-  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> =>
-    runtime.runPromise(effect)
+  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> => runtime.runPromise(effect)
 
-  const findThread = async (
-    guildId: Snowflake,
-    sourceMessageId: Snowflake,
-  ): Promise<ThreadSnapshot | undefined> => {
-    const response = await rest(
-      Effect.flatMap(DiscordREST, (discord) => discord.getActiveGuildThreads(guildId)),
-    )
+  const findThread = async (guildId: Snowflake, sourceMessageId: Snowflake): Promise<ThreadSnapshot | undefined> => {
+    const response = await rest(Effect.flatMap(DiscordREST, (discord) => discord.getActiveGuildThreads(guildId)))
     const candidate = response.threads.find((thread) => thread.id === sourceMessageId)
-    if (
-      candidate === undefined ||
-      candidate.guild_id == null ||
-      candidate.parent_id == null
-    ) {
+    if (candidate === undefined || candidate.guild_id == null || candidate.parent_id == null) {
       return undefined
     }
     return {
-      id: asSnowflake(candidate.id, "find-thread"),
-      guildId: asSnowflake(candidate.guild_id, "find-thread"),
-      parentChannelId: asSnowflake(candidate.parent_id, "find-thread"),
+      id: asSnowflake(candidate.id, 'find-thread'),
+      guildId: asSnowflake(candidate.guild_id, 'find-thread'),
+      parentChannelId: asSnowflake(candidate.parent_id, 'find-thread'),
       sourceMessageId,
-      marker: sourceMarkers.get(sourceMessageId) ?? "",
+      marker: sourceMarkers.get(sourceMessageId) ?? '',
     }
   }
 
@@ -158,30 +138,25 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
       if (thread !== undefined) return thread
       await new Promise<void>((resolve) => setTimeout(resolve, input.target.pollIntervalMs))
     }
-    throw new Error("Bot control CLI succeeded but no correlated Discord thread appeared")
+    throw new Error('Bot control CLI succeeded but no correlated Discord thread appeared')
   }
 
   const transport: E2ETransport = {
     inspectChannel: async (channelId): Promise<ChannelSnapshot> => {
-      const channel = await rest(
-        Effect.flatMap(DiscordREST, (discord) => discord.getChannel(channelId)),
-      )
-      if (!("guild_id" in channel) || channel.guild_id === undefined) {
-        throw new Error("E2E target is not a guild channel")
+      const channel = await rest(Effect.flatMap(DiscordREST, (discord) => discord.getChannel(channelId)))
+      if (!('guild_id' in channel) || channel.guild_id === undefined) {
+        throw new Error('E2E target is not a guild channel')
       }
       return {
-        id: asSnowflake(channel.id, "inspect-channel"),
-        guildId: asSnowflake(channel.guild_id, "inspect-channel"),
-        topic:
-          "topic" in channel && typeof channel.topic === "string" ? channel.topic : undefined,
+        id: asSnowflake(channel.id, 'inspect-channel'),
+        guildId: asSnowflake(channel.guild_id, 'inspect-channel'),
+        topic: 'topic' in channel && typeof channel.topic === 'string' ? channel.topic : undefined,
       }
     },
     createMessage: async ({ channelId, marker, content, author }): Promise<MessageSnapshot> => {
-      if (author === "human") {
+      if (author === 'human') {
         if (input.createHumanMessage === undefined) {
-          throw new E2EPrerequisiteUnavailableError(
-            "A human-authored staging source fixture is required",
-          )
+          throw new E2EPrerequisiteUnavailableError('A human-authored staging source fixture is required')
         }
         const snapshot = await input.createHumanMessage({ channelId, marker, content })
         sourceMarkers.set(snapshot.id, marker)
@@ -193,8 +168,8 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
         Effect.flatMap(DiscordREST, (discord) => discord.createMessage(channelId, { content })),
       )
       const snapshot = {
-        id: asSnowflake(message.id, "create-message"),
-        channelId: asSnowflake(message.channel_id, "create-message"),
+        id: asSnowflake(message.id, 'create-message'),
+        channelId: asSnowflake(message.channel_id, 'create-message'),
         marker,
         author,
       } satisfies MessageSnapshot
@@ -205,17 +180,18 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     },
     findThreadForMessage: findThread,
     operatorCreateThread: async ({ sourceMessageId, reason }): Promise<OperatorResult> => {
-      const result = await runCommand(cliExecutable, operatorCreateThreadArguments({
-        target: input.target,
-        sourceMessageId,
-        reason,
-        botControlSocket: input.botControlSocket,
-      }))
+      const result = await runCommand(
+        cliExecutable,
+        operatorCreateThreadArguments({
+          target: input.target,
+          sourceMessageId,
+          reason,
+          botControlSocket: input.botControlSocket,
+        }),
+      )
       const tag = parseControlResult(result)
       const thread = await awaitThread(sourceMessageId)
-      return tag === "Created"
-        ? { _tag: "Created", thread }
-        : { _tag: "AlreadySatisfied", thread }
+      return tag === 'Created' ? { _tag: 'Created', thread } : { _tag: 'AlreadySatisfied', thread }
     },
     invokeMessageAction: async (request) => {
       if (input.invokeMessageAction !== undefined) {
@@ -223,9 +199,7 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
         responses.set(result.response.id, result.response)
         return result
       }
-      throw new E2EPrerequisiteUnavailableError(
-        "Discord has no official API for initiating a message-context action",
-      )
+      throw new E2EPrerequisiteUnavailableError('Discord has no official API for initiating a message-context action')
     },
     invokeDocs: async (request) => {
       if (input.invokeDocs !== undefined) {
@@ -233,23 +207,19 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
         responses.set(result.response.id, result.response)
         return result
       }
-      throw new E2EPrerequisiteUnavailableError(
-        "Discord has no official API for initiating an application command",
-      )
+      throw new E2EPrerequisiteUnavailableError('Discord has no official API for initiating an application command')
     },
     deleteThread: async (threadId) => {
       await rest(Effect.flatMap(DiscordREST, (discord) => discord.deleteChannel(threadId)))
     },
     deleteMessage: async (channelId, messageId) => {
-      if (sourceAuthors.get(messageId) === "human") {
+      if (sourceAuthors.get(messageId) === 'human') {
         if (input.deleteHumanMessage === undefined) {
-          throw new E2EPrerequisiteUnavailableError(
-            "Human-authored source cleanup is not configured",
-          )
+          throw new E2EPrerequisiteUnavailableError('Human-authored source cleanup is not configured')
         }
         const source = sources.get(messageId)
         if (source === undefined || source.channelId !== channelId) {
-          throw new Error("Human source cleanup lost its correlation record")
+          throw new Error('Human source cleanup lost its correlation record')
         }
         await input.deleteHumanMessage(source)
         sourceMarkers.delete(messageId)
@@ -257,9 +227,7 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
         sources.delete(messageId)
         return
       }
-      await rest(
-        Effect.flatMap(DiscordREST, (discord) => discord.deleteMessage(channelId, messageId)),
-      )
+      await rest(Effect.flatMap(DiscordREST, (discord) => discord.deleteMessage(channelId, messageId)))
       sourceMarkers.delete(messageId)
       sourceAuthors.delete(messageId)
       sources.delete(messageId)
@@ -267,14 +235,12 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     deleteResponse: async (responseId) => {
       if (input.deleteHumanResponse !== undefined) {
         const response = responses.get(responseId)
-        if (response === undefined) throw new Error("Response cleanup lost its correlation record")
+        if (response === undefined) throw new Error('Response cleanup lost its correlation record')
         await input.deleteHumanResponse(response)
         responses.delete(responseId)
         return
       }
-      throw new E2EPrerequisiteUnavailableError(
-        "Human-assisted response cleanup is not configured",
-      )
+      throw new E2EPrerequisiteUnavailableError('Human-assisted response cleanup is not configured')
     },
   }
 

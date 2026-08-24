@@ -1,8 +1,9 @@
 #!/usr/bin/env -S node --experimental-strip-types
 
-import { NodeFileSystem } from "@effect/platform-node"
-import { Effect, FileSystem, ManagedRuntime } from "effect"
-import { runStagingCli } from "./staging-cli.ts"
+import { NodeFileSystem } from '@effect/platform-node'
+import { Effect, FileSystem, ManagedRuntime } from 'effect'
+
+import { runStagingCli } from './staging-cli.ts'
 
 const fileSystemRuntime = ManagedRuntime.make(NodeFileSystem.layer)
 

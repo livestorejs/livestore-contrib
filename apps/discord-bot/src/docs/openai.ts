@@ -3,8 +3,8 @@ import type { Redacted } from 'effect'
 import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/unstable/http'
 
 import { AnswerCandidate, AnswerEngineFailure, AnswerUsage, type DocumentationSource } from './domain.ts'
-import { AnswerEngine } from './services.ts'
 import { DocsProviderReadinessError, type DocsProviderReadinessPort } from './readiness.ts'
+import { AnswerEngine } from './services.ts'
 
 export const openAiDocsConfiguration = {
   api: 'responses',
@@ -20,7 +20,7 @@ export const openAiDocsConfiguration = {
 
 /** Luna standard short-context list pricing, represented as integer USD micros. */
 export const lunaCostUsdMicros = (usage: { readonly inputTokens: number; readonly outputTokens: number }) =>
-  Math.ceil((usage.inputTokens * 0.20 + usage.outputTokens * 1.20) / 1_000_000 * 1_000_000)
+  Math.ceil(((usage.inputTokens * 0.2 + usage.outputTokens * 1.2) / 1_000_000) * 1_000_000)
 
 export const openAiDocsConfigurationIdentity =
   'openai.responses:gpt-5.6-luna:reasoning-medium:store-false:livestore_docs_answer_v1'
@@ -145,23 +145,50 @@ export const makeOpenAiAnswerEngineLayer = (config: OpenAiAnswerEngineConfig) =>
   )
 
 /** Credential-authenticated smoke probe. OpenAI does not expose a portable project-info endpoint. */
-export const makeOpenAiProviderReadinessPort = (config: OpenAiAnswerEngineConfig & {
-  readonly projectId: string
-}) => (client: HttpClient.HttpClient): DocsProviderReadinessPort => ({
-  inspect: HttpClientRequest.get(`https://api.openai.com/v1/models/${openAiDocsConfiguration.model}`).pipe(
-    HttpClientRequest.bearerToken(config.apiKey),
-    HttpClientRequest.setHeader('OpenAI-Project', config.projectId),
-    client.execute,
-    Effect.flatMap(response => response.status >= 200 && response.status < 300
-      ? HttpClientResponse.schemaBodyJson(Schema.Struct({ id: Schema.String }))(response).pipe(
-          Effect.flatMap(model => model.id === openAiDocsConfiguration.model
-            ? Effect.succeed({ projectId: config.projectId, model: model.id, store: false as const, admitted: true })
-            : Effect.fail(new DocsProviderReadinessError({ reason: 'wrong_project', message: 'Provider returned an unexpected model' }))),
-        )
-      : Effect.fail(new DocsProviderReadinessError({ reason: 'unavailable', message: `Provider readiness returned HTTP ${response.status}` }))),
-    Effect.mapError(error => error instanceof DocsProviderReadinessError ? error : new DocsProviderReadinessError({ reason: 'unavailable', message: 'Provider smoke probe failed' })),
-  ),
-})
+export const makeOpenAiProviderReadinessPort =
+  (
+    config: OpenAiAnswerEngineConfig & {
+      readonly projectId: string
+    },
+  ) =>
+  (client: HttpClient.HttpClient): DocsProviderReadinessPort => ({
+    inspect: HttpClientRequest.get(`https://api.openai.com/v1/models/${openAiDocsConfiguration.model}`).pipe(
+      HttpClientRequest.bearerToken(config.apiKey),
+      HttpClientRequest.setHeader('OpenAI-Project', config.projectId),
+      client.execute,
+      Effect.flatMap((response) =>
+        response.status >= 200 && response.status < 300
+          ? HttpClientResponse.schemaBodyJson(Schema.Struct({ id: Schema.String }))(response).pipe(
+              Effect.flatMap((model) =>
+                model.id === openAiDocsConfiguration.model
+                  ? Effect.succeed({
+                      projectId: config.projectId,
+                      model: model.id,
+                      store: false as const,
+                      admitted: true,
+                    })
+                  : Effect.fail(
+                      new DocsProviderReadinessError({
+                        reason: 'wrong_project',
+                        message: 'Provider returned an unexpected model',
+                      }),
+                    ),
+              ),
+            )
+          : Effect.fail(
+              new DocsProviderReadinessError({
+                reason: 'unavailable',
+                message: `Provider readiness returned HTTP ${response.status}`,
+              }),
+            ),
+      ),
+      Effect.mapError((error) =>
+        error instanceof DocsProviderReadinessError
+          ? error
+          : new DocsProviderReadinessError({ reason: 'unavailable', message: 'Provider smoke probe failed' }),
+      ),
+    ),
+  })
 
 export const makeOpenAiRequest = (input: {
   readonly query: string

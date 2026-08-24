@@ -1,6 +1,7 @@
-import { Discord } from "dfx"
-import { docsCommandDescription } from "../docs/disclosure.ts"
-import type { ApplicationCommand, ApplicationCommandScope } from "./model.ts"
+import { Discord } from 'dfx'
+
+import { docsCommandDescription } from '../docs/disclosure.ts'
+import type { ApplicationCommand, ApplicationCommandScope } from './model.ts'
 
 const createPublicThreadsPermission = String(1n << 35n)
 
@@ -8,13 +9,13 @@ const createPublicThreadsPermission = String(1n << 35n)
 export const desiredApplicationCommands = [
   {
     type: Discord.ApplicationCommandType.CHAT,
-    name: "docs",
+    name: 'docs',
     description: docsCommandDescription,
     options: [
       {
         type: Discord.ApplicationCommandOptionType.STRING,
-        name: "query",
-        description: "Question to answer from the LiveStore documentation",
+        name: 'query',
+        description: 'Question to answer from the LiveStore documentation',
         required: true,
       },
     ],
@@ -23,8 +24,8 @@ export const desiredApplicationCommands = [
   },
   {
     type: Discord.ApplicationCommandType.MESSAGE,
-    name: "Create Thread",
-    description: "",
+    name: 'Create Thread',
+    description: '',
     options: [],
     defaultMemberPermissions: createPublicThreadsPermission,
     nsfw: false,
@@ -39,7 +40,7 @@ export const toDiscordCommandRequest = (
   type: command.type,
   name: command.name,
   description: command.description,
-  options: command.options.map(option => ({
+  options: command.options.map((option) => ({
     type: option.type,
     name: option.name,
     description: option.description,
@@ -50,10 +51,8 @@ export const toDiscordCommandRequest = (
     ...(option.maxLength === undefined ? {} : { max_length: option.maxLength }),
   })),
   default_member_permissions:
-    command.defaultMemberPermissions === null
-      ? null
-      : Number(command.defaultMemberPermissions),
-  ...(scope._tag === "GlobalCommandScope"
+    command.defaultMemberPermissions === null ? null : Number(command.defaultMemberPermissions),
+  ...(scope._tag === 'GlobalCommandScope'
     ? {
         integration_types: command.integrationTypes ?? [Discord.ApplicationIntegrationType.GUILD_INSTALL],
         contexts: command.contexts ?? [Discord.InteractionContextType.GUILD],

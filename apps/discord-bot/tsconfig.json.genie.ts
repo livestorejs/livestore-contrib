@@ -1,8 +1,5 @@
-import {
-  baseTsconfigCompilerOptions,
-  tsconfigJson,
-} from '../../repos/effect-utils/genie/external.ts'
 import { packageTsconfigExclude } from '../../genie/repo.ts'
+import { baseTsconfigCompilerOptions, tsconfigJson } from '../../repos/effect-utils/genie/external.ts'
 
 /** Use effect-utils' strict gate directly; contrib's temporary advisory waiver does not apply here. */
 export const discordBotCompilerOptions = {
