@@ -147,7 +147,9 @@ echo "LIVESTORE_RELEASE_VERSION=0.0.0-snapshot-$core_sha.$contrib_sha" >> "$GITH
       if: "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.mode == 'publish-dev'",
       'runs-on': 'ubuntu-24.04',
       concurrency: {
-        group: 'publish-dev-${{ inputs.contrib_version }}',
+        // Every dev version mutates the same package-wide `dev` tags, so all dev publications
+        // must share one lock rather than allowing different versions to interleave.
+        group: 'publish-dev',
         'cancel-in-progress': false,
       },
       permissions: {

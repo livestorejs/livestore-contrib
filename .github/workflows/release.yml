@@ -913,7 +913,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.mode == 'publish-dev'
     runs-on: ubuntu-24.04
     concurrency:
-      group: 'publish-dev-${{ inputs.contrib_version }}'
+      group: publish-dev
       cancel-in-progress: false
     permissions:
       contents: read
