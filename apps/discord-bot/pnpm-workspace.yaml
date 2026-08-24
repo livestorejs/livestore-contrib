@@ -1,0 +1,17 @@
+packages:
+  - .
+
+# DFX 1.0.15 is admitted only against this exact Effect 4 beta graph. This
+# private application stays isolated until contrib's root workspace catches up.
+overrides:
+  effect: 4.0.0-beta.105
+  '@effect/platform-node': 4.0.0-beta.105
+  '@effect/platform-node-shared': 4.0.0-beta.105
+  '@effect/vitest': 4.0.0-beta.105
+  discord-api-types: 0.38.40
+
+patchedDependencies:
+  dfx@1.0.15: patches/dfx@1.0.15.patch
+
+ignoreScripts: true
+strictPeerDependencies: false
