@@ -212,7 +212,6 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
     // environment (secrets) once; both are plain services here.
     const doState = yield* Cloudflare.DurableObjectState
     const env = yield* WorkerEnvironment
-    const token = readSecret(env, 'DISCORD_BOT_TOKEN')
 
     // Runtime phase: storage methods are RuntimeContext-colored and may only
     // run inside these handlers.
@@ -223,7 +222,9 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
 
       const ensureRuntime = Effect.suspend((): Effect.Effect<BotRuntime> => {
         if (runtime !== undefined) return Effect.succeed(runtime)
-        return Effect.map(buildRuntime(doState, token), (built) => {
+        // Secret reads stay lazy: the deploy phase evaluates this class with
+        // placeholder bindings, so tokens resolve only at runtime.
+        return Effect.map(buildRuntime(doState, readSecret(env, 'DISCORD_BOT_TOKEN')), (built) => {
           runtime = built
           return built
         })

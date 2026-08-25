@@ -27,7 +27,11 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
     // nodejs_compat must stay OFF: the worker graph is node-builtin-free by
     // construction and bundle-check.unit.test.ts enforces it (source recrawl
     // plus post-build dist scan when dist/ exists).
-    compatibility: { date: '2026-08-01', flags: [] },
+    // Local workerd binaries lag the edge; ALCHEMY_LOCAL=1 clamps the date
+    // so credential-free local runs work. Flags stay empty either way.
+    ...(process.env['ALCHEMY_LOCAL'] === '1'
+      ? { compatibility: { date: '2026-07-11', flags: [] } }
+      : { compatibility: { date: '2026-08-01', flags: [] } }),
     // Secret bindings: every `effect/Config` value resolves at deploy time
     // and is bound as `secret_text` on Cloudflare regardless of constructor.
     env: {
@@ -44,12 +48,20 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
     const botState = yield* BotState
 
     const env = yield* WorkerEnvironment
-    const adminHandler = toFetchHandler(
-      runAdminRouter(makeAdminRouter({
-        runtimeStatus: () => botState.getByName('gateway').status(),
-      })),
-      Context.make(AdminToken, { token: readSecret(env, 'ADMIN_TOKEN') }),
-    )
+    // Secret reads stay lazy: the deploy phase evaluates this init with
+    // placeholder bindings, so ADMIN_TOKEN resolves on first request.
+    let adminHandler: ReturnType<typeof toFetchHandler> | undefined
+    const getAdminHandler = () => {
+      if (adminHandler === undefined) {
+        adminHandler = toFetchHandler(
+          runAdminRouter(makeAdminRouter({
+            runtimeStatus: () => botState.getByName('gateway').status(),
+          })),
+          Context.make(AdminToken, { token: readSecret(env, 'ADMIN_TOKEN') }),
+        )
+      }
+      return adminHandler
+    }
 
     yield* Cloudflare.Workers.cron('* * * * *', () =>
       Effect.asVoid(botState.getByName('gateway').tick())).pipe(
@@ -59,7 +71,10 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
     return {
       fetch: Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        const pathname = new URL(request.url).pathname
+        // Local workerd may deliver a non-absolute request URL; normalize so
+        // URL parsing and the web-Request bridge always see an absolute form.
+        const requestUrl = new URL(request.url, 'http://localhost').toString()
+        const pathname = new URL(requestUrl).pathname
 
         if (pathname === '/readyz') {
           // Unauthenticated probe: body carries ONLY the boolean verdict —
@@ -75,9 +90,9 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
         if (pathname.startsWith('/admin/rpc/')) {
           // A malformed incoming request degrades to a plain 400 instead of
           // leaking the driver's parse-error channel through fetch.
-          const response = yield* Effect.matchEffect(HttpServerRequest.toWeb(request), {
+          const response = yield* Effect.matchEffect(HttpServerRequest.toWeb({ ...request, url: requestUrl }), {
             onFailure: () => Effect.succeed(new Response('bad request', { status: 400 })),
-            onSuccess: (web) => Effect.promise(() => adminHandler(web)),
+            onSuccess: (web) => Effect.promise(() => getAdminHandler()(web)),
           })
           return HttpServerResponse.fromWeb(response)
         }
