@@ -37,11 +37,19 @@ export const terminalRetentionMs = 30 * 24 * 60 * 60 * 1_000
  * DO `SqlStorage.exec` surface (and the hardened test fake) rejects
  * multi-statement strings, unlike node:sqlite's `exec`.
  */
+const readMetaVersion = (
+  client: SqliteClient,
+): Effect.Effect<ReadonlyArray<Record<string, unknown>>, SqlErrorShape> =>
+  exec(client, "SELECT value FROM journal_meta WHERE key = 'user_version'")
+
 export const migrateJournal = (
   client: SqliteClient,
 ): Effect.Effect<void, JournalUnavailableError> =>
   Effect.gen(function* () {
-    const observedVersion = readUserVersion(yield* exec(client, 'PRAGMA user_version').pipe(
+    yield* exec(client,
+      'CREATE TABLE IF NOT EXISTS journal_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+    ).pipe(Effect.catchIf(isSqlError, (cause) => unavailable('initialize', cause)))
+    const observedVersion = readUserVersion(yield* readMetaVersion(client).pipe(
       Effect.catchIf(isSqlError, (cause) => unavailable('initialize', cause)),
     ))
     if (observedVersion > schemaVersion) {
@@ -57,7 +65,7 @@ export const migrateJournal = (
       Effect.gen(function* () {
         // The DO serializes writers per object, so the multi-process re-check
         // under the write lock collapses to a plain re-read.
-        const lockedVersion = readUserVersion(yield* exec(client, 'PRAGMA user_version'))
+        const lockedVersion = readUserVersion(yield* readMetaVersion(client))
         if (lockedVersion > schemaVersion) {
           return yield* unavailable(
             'initialize',
@@ -87,7 +95,9 @@ export const migrateJournal = (
         ) STRICT`)
         yield* exec(client, 'CREATE INDEX IF NOT EXISTS thread_actions_recovery ON thread_actions(state, claimed_at)')
         yield* exec(client, 'CREATE INDEX IF NOT EXISTS thread_actions_retention ON thread_actions(state, updated_at)')
-        yield* exec(client, `PRAGMA user_version = ${schemaVersion}`)
+        // DO SQL storage rejects PRAGMA statements, so the schema version
+        // lives in a meta table instead of SQLite's user_version header.
+        yield* exec(client, "INSERT INTO journal_meta (key, value) VALUES ('user_version', '" + String(schemaVersion) + "')")
       }),
     ).pipe(Effect.mapError((cause: JournalUnavailableError | SqlErrorShape) =>
       isSqlError(cause) ? unavailable('initialize', cause) : cause,
@@ -95,7 +105,10 @@ export const migrateJournal = (
   }).pipe(Effect.withSpan('discord.journal.initialize'))
 
 /**
- * Builds the journal service over a DO SQLite client. Construct the client
+ * Builds the journal service over a DO SQLite client.
+ *
+ * The schema version lives in the journal_meta table: DO SQL storage rejects
+ * PRAGMA statements, so SQLite's user_version header is unavailable here. Construct the client
  * with the FULL DurableObjectStorage — `withTransaction` breaks on bare
  * `.sql`. Transition conflicts are detected by read-back instead of SQLite
  * rowcount: the DO driver surfaces result rows only, never mutation counts,
@@ -253,7 +266,7 @@ export const makeSqliteDoThreadActionJournal = (
    * at runtime are guarantees here, so only the schema version is verified.
    */
   inspectStorage: Effect.map(
-    exec(client, 'PRAGMA user_version'),
+    readMetaVersion(client),
     (rows): JournalStorageSettings => ({
       busyTimeoutMs: 0,
       journalMode: 'wal',
@@ -436,9 +449,12 @@ const transition = (
   )
 
 const readUserVersion = (rows: ReadonlyArray<Record<string, unknown>>): number => {
-  const first = rows[0]
-  if (typeof first?.user_version !== 'number') {
-    throw new Error('SQLite returned an invalid user_version pragma')
+  // Absent row means fresh storage at version 0.
+  if (rows.length === 0) return 0
+  const first = rows[0] as { readonly value?: unknown }
+  const parsed = typeof first.value === 'string' ? Number(first.value) : Number.NaN
+  if (Number.isInteger(parsed) === false || parsed < 0) {
+    throw new Error('journal_meta has an invalid user_version value')
   }
-  return first.user_version
+  return parsed
 }
