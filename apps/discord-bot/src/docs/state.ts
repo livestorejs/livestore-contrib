@@ -30,7 +30,7 @@ export const DocsQuotaSample = Schema.Struct({
 })
 export type DocsQuotaSample = typeof DocsQuotaSample.Type
 
-const StateFile = Schema.Struct({
+export const StateFile = Schema.Struct({
   version: Schema.Literal(1),
   provenance: Schema.Array(AnswerProvenance),
   quota: Schema.Array(DocsQuotaSample),
@@ -43,7 +43,7 @@ const StateFile = Schema.Struct({
     }),
   ),
 })
-type StateFile = typeof StateFile.Type
+export type StateFile = typeof StateFile.Type
 
 export type MonthlyReservation = { readonly _tag: 'Reserved'; readonly id: string } | { readonly _tag: 'Denied' }
 

@@ -14,6 +14,9 @@ import {
   makeDfxApplicationCommandsPort,
   type ApplicationCommandsPort,
 } from '../application-commands/index.ts'
+import { gatewayIntents } from '../discord/events.ts'
+
+export { gatewayIntents }
 import {
   DiscordActions,
   DiscordActionsDfxLive,
@@ -89,9 +92,6 @@ export class GatewayReadinessError extends Schema.TaggedError<GatewayReadinessEr
 const FakeDocsWorkflowLive = makeDocsWorkflowLayer().pipe(Layer.provide(FakeDocsPortsLive))
 const FakeServiceLayer = Layer.merge(FakeDiscordActionsLive, FakeDocsWorkflowLive)
 
-/** The only Gateway intents admitted by LSC.APP.DISCORD.RT-R03. */
-export const gatewayIntents =
-  Discord.GatewayIntentBits.Guilds | Discord.GatewayIntentBits.GuildMessages | Discord.GatewayIntentBits.MessageContent
 
 /** Acquires the complete fake-composable tracer bullet in one Effect scope. */
 export const acquireRuntime = Effect.fn('runtime.acquire')(function* (
