@@ -41,6 +41,10 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
       : makeCommandHumanHandoffBroker({
           executable: input.humanHandoffBrokerExecutable,
           runCommand: input.runCommand ?? defaultRunCommand,
+          context: {
+            guildId: input.manifest.target.guildId,
+            channelId: input.manifest.target.channelId,
+          },
         })
   const createHumanMessage = input.createHumanMessage ?? humanBroker?.createMessage
   const invokeMessageAction = input.invokeMessageAction ?? humanBroker?.invokeMessageAction

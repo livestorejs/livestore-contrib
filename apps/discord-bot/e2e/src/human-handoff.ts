@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import type { CommandRunner } from './dfx-live-transport.ts'
 import type { MessageSnapshot, ResponseSnapshot, Snowflake, ThreadSnapshot } from './model.ts'
 import { E2EPrerequisiteUnavailableError, type DocsResult, type InteractionResult } from './transport.ts'
@@ -14,6 +18,7 @@ export interface HumanHandoffBroker {
     readonly persona: 'maintainer' | 'member'
   }) => Promise<InteractionResult>
   readonly invokeDocs: (input: {
+    readonly channelId: Snowflake
     readonly marker: string
     readonly query: string
     readonly location: 'public' | 'restricted'
@@ -30,9 +35,28 @@ export interface HumanHandoffBroker {
 export const makeCommandHumanHandoffBroker = (input: {
   readonly executable: string
   readonly runCommand: CommandRunner
+  /** Staging target context appended to every payload so the broker can correlate. */
+  readonly context?: { readonly guildId: string; readonly channelId: string }
+  /** Durable ledger override; defaults to a private temp file per broker run. */
+  readonly ledgerPath?: string
 }): HumanHandoffBroker => {
+  // Payload IDs are lane-specific (e.g. restricted docs channel); the target
+  // context only fills fields some operations omit entirely.
+  const withContext = (payload: object): object => ({ ...input.context, ...payload })
+  // One run-scoped identity and ledger path for every invocation of this
+  // broker: per-process ids would make record/resolve pairs unmatchable.
+  const runId = randomUUID()
+  const ledgerPath = input.ledgerPath ?? join(tmpdir(), `livestore-discord-e2e-ledger-${runId}.jsonl`)
   const request = async (operation: string, payload: object): Promise<unknown> => {
-    const result = await input.runCommand(input.executable, [operation, '--request-json', JSON.stringify(payload)])
+    const result = await input.runCommand(input.executable, [
+      operation,
+      '--request-json',
+      JSON.stringify(withContext(payload)),
+      '--run-id',
+      runId,
+      '--ledger',
+      ledgerPath,
+    ])
     if (result.exitCode === 7) {
       throw new E2EPrerequisiteUnavailableError('No human accepted the handoff request')
     }
@@ -65,7 +89,10 @@ const record = (value: unknown, label: string): Record<string, unknown> => {
 }
 
 const attended = (decoded: Record<string, unknown>, label: string): void => {
-  if (decoded.attendedByHuman !== true) {
+  // A broker may either attest a human performed the gesture or that it drove
+  // an authenticated official-client session; receipts record which executor
+  // ran the scenario, so neither mode can masquerade as the other.
+  if (decoded.attendedByHuman !== true && decoded.performedBy !== 'official-client-session') {
     throw new E2EPrerequisiteUnavailableError(`Human handoff broker did not attest an attended ${label}`)
   }
 }
@@ -134,7 +161,12 @@ const docs = (value: unknown): DocsResult => {
   if (decoded._tag !== 'Answered' && decoded._tag !== 'Denied') {
     throw new Error('Human handoff broker returned invalid docs tag')
   }
-  return { _tag: decoded._tag, response: response(decoded.response) }
+  if (Array.isArray(decoded.responses) === false || decoded.responses.length === 0) {
+    throw new Error('Human handoff broker returned no docs response artifacts')
+  }
+  const first = response(decoded.responses[0])
+  const rest = decoded.responses.slice(1).map(response)
+  return { _tag: decoded._tag, responses: [first, ...rest] }
 }
 
 const deleted = (value: unknown, expectedId: Snowflake): void => {

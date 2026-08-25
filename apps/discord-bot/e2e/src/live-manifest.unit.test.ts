@@ -11,7 +11,8 @@ const valid = {
   target: {
     guildId: '111111111111111111',
     channelId: '222222222222222222',
-    allowedChannelIds: ['222222222222222222'],
+    docsChannelIds: { public: '222222222222222222', restricted: '333333333333333333' },
+    allowedChannelIds: ['222222222222222222', '333333333333333333'],
     requiredTopicSentinel: topicSentinel,
     pollIntervalMs: 1_000,
     timeoutMs: 30_000,
@@ -23,12 +24,27 @@ describe('live staging manifest', () => {
     const manifest = parseLiveManifest(valid)
     expect(manifest.environment).toBe('staging')
     expect(manifest.target.allowedChannelIds.has(manifest.target.channelId)).toBe(true)
+    expect(manifest.target.allowedChannelIds.has(manifest.target.docsChannelIds.restricted)).toBe(true)
   })
 
   it.each([
     ['production target', { ...valid, environment: 'production' }],
     ['inline credential', { ...valid, actorBotTokenRef: 'raw-token' }],
     ['non-allowlisted channel', { ...valid, target: { ...valid.target, allowedChannelIds: [] } }],
+    [
+      'non-allowlisted restricted docs channel',
+      { ...valid, target: { ...valid.target, allowedChannelIds: ['222222222222222222'] } },
+    ],
+    [
+      'ambiguous docs channels',
+      {
+        ...valid,
+        target: {
+          ...valid.target,
+          docsChannelIds: { public: '222222222222222222', restricted: '222222222222222222' },
+        },
+      },
+    ],
     ['wrong topic sentinel', { ...valid, target: { ...valid.target, requiredTopicSentinel: 'general' } }],
     ['production socket', { ...valid, botControlSocket: '/run/discord-bot/prod/control.sock' }],
     ['socket traversal', { ...valid, botControlSocket: '/run/discord-bot/staging/../production/control.sock' }],

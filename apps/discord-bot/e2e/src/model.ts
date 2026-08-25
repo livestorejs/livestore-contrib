@@ -118,7 +118,12 @@ export interface ResponseSnapshot {
 
 export interface StagingTarget {
   readonly guildId: Snowflake
+  /** Threading, message-action, and operator-control target. */
   readonly channelId: Snowflake
+  readonly docsChannelIds: {
+    readonly public: Snowflake
+    readonly restricted: Snowflake
+  }
   readonly allowedChannelIds: ReadonlySet<Snowflake>
   readonly requiredTopicSentinel: string
   readonly pollIntervalMs: number

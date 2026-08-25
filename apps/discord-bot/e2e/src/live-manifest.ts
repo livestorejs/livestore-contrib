@@ -64,19 +64,37 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
   const targetInput = object(root.target, 'target')
   exactKeys(
     targetInput,
-    new Set(['guildId', 'channelId', 'allowedChannelIds', 'requiredTopicSentinel', 'pollIntervalMs', 'timeoutMs']),
+    new Set([
+      'guildId',
+      'channelId',
+      'docsChannelIds',
+      'allowedChannelIds',
+      'requiredTopicSentinel',
+      'pollIntervalMs',
+      'timeoutMs',
+    ]),
     'target',
   )
   const guildId = snowflake(targetInput.guildId, 'target.guildId')
   const channelId = snowflake(targetInput.channelId, 'target.channelId')
+  const docsChannelIdsInput = object(targetInput.docsChannelIds, 'target.docsChannelIds')
+  exactKeys(docsChannelIdsInput, new Set(['public', 'restricted']), 'target.docsChannelIds')
+  const docsChannelIds = {
+    public: snowflake(docsChannelIdsInput.public, 'target.docsChannelIds.public'),
+    restricted: snowflake(docsChannelIdsInput.restricted, 'target.docsChannelIds.restricted'),
+  }
+  if (docsChannelIds.public === docsChannelIds.restricted) {
+    throw new LiveManifestError('target docs channels must be distinct')
+  }
   if (Array.isArray(targetInput.allowedChannelIds) === false) {
     throw new LiveManifestError('target.allowedChannelIds must be an array')
   }
   const allowedChannelIds = new Set(
     targetInput.allowedChannelIds.map((value, index) => snowflake(value, `target.allowedChannelIds[${index}]`)),
   )
-  if (allowedChannelIds.has(channelId) === false) {
-    throw new LiveManifestError('target.channelId must be explicitly allowlisted')
+  const requiredChannelIds = [channelId, docsChannelIds.public, docsChannelIds.restricted]
+  if (requiredChannelIds.some((requiredChannelId) => allowedChannelIds.has(requiredChannelId) === false) === true) {
+    throw new LiveManifestError('every target channel must be explicitly allowlisted')
   }
   if (targetInput.requiredTopicSentinel !== topicSentinel) {
     throw new LiveManifestError(`target.requiredTopicSentinel must be ${topicSentinel}`)
@@ -104,6 +122,7 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
     target: {
       guildId,
       channelId,
+      docsChannelIds,
       allowedChannelIds,
       requiredTopicSentinel: topicSentinel,
       pollIntervalMs: positiveInteger(targetInput.pollIntervalMs, 'target.pollIntervalMs'),

@@ -14,8 +14,8 @@ export type InteractionResult =
   | { readonly _tag: 'Denied'; readonly response: ResponseSnapshot }
 
 export type DocsResult =
-  | { readonly _tag: 'Answered'; readonly response: ResponseSnapshot }
-  | { readonly _tag: 'Denied'; readonly response: ResponseSnapshot }
+  | { readonly _tag: 'Answered'; readonly responses: readonly [ResponseSnapshot, ...ResponseSnapshot[]] }
+  | { readonly _tag: 'Denied'; readonly responses: readonly [ResponseSnapshot, ...ResponseSnapshot[]] }
 
 /**
  * Black-box surface shared by the in-memory tracer and live-staging adapters.
@@ -40,6 +40,7 @@ export interface E2ETransport {
     readonly persona: 'maintainer' | 'member'
   }) => Promise<InteractionResult>
   readonly invokeDocs: (input: {
+    readonly channelId: Snowflake
     readonly marker: string
     readonly query: string
     readonly location: 'public' | 'restricted'

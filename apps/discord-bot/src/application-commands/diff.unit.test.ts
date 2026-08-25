@@ -27,7 +27,7 @@ describe('application command desired state', () => {
         name: 'Create Thread',
         description: '',
         options: [],
-        defaultMemberPermissions: '34359738368',
+        defaultMemberPermissions: null,
         nsfw: false,
       },
     ])

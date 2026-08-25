@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest'
 
 import { makeFakeWorld } from './fake-transport.ts'
 import { runE2EMatrix } from './harness.ts'
-import { topicSentinel, type Snowflake, type StagingTarget } from './model.ts'
+import { topicSentinel, type ResponseSnapshot, type Snowflake, type StagingTarget } from './model.ts'
 
 const guildId = '111111111111111111' as Snowflake
 const channelId = '222222222222222222' as Snowflake
+const restrictedDocsChannelId = '333333333333333333' as Snowflake
 
 const target: StagingTarget = {
   guildId,
   channelId,
-  allowedChannelIds: new Set([channelId]),
+  docsChannelIds: { public: channelId, restricted: restrictedDocsChannelId },
+  allowedChannelIds: new Set([channelId, restrictedDocsChannelId]),
   requiredTopicSentinel: topicSentinel,
   pollIntervalMs: 1,
   timeoutMs: 4,
@@ -46,10 +48,10 @@ describe('Discord bot composed E2E tracer bullet', () => {
     expect(world.counts).toEqual({
       createdMessages: 8,
       createdThreads: 5,
-      createdResponses: 5,
+      createdResponses: 7,
       deletedMessages: 8,
       deletedThreads: 5,
-      deletedResponses: 5,
+      deletedResponses: 7,
     })
     expect(world.messages.size).toBe(0)
     expect(world.threads.size).toBe(0)
@@ -58,6 +60,7 @@ describe('Discord bot composed E2E tracer bullet', () => {
     const serialized = JSON.stringify(receipt)
     expect(serialized).not.toContain(guildId)
     expect(serialized).not.toContain(channelId)
+    expect(serialized).not.toContain(restrictedDocsChannelId)
     expect(serialized).not.toContain('How does LiveStore')
     expect(serialized).not.toContain('syncing work')
   })
@@ -161,7 +164,14 @@ describe('Discord bot composed E2E tracer bullet', () => {
       ...world.transport,
       invokeDocs: async (input: Parameters<typeof world.transport.invokeDocs>[0]) => {
         const result = await world.transport.invokeDocs(input)
-        return { ...result, response: { ...result.response, marker: 'unrelated' } }
+        const responses: [ResponseSnapshot, ...ResponseSnapshot[]] = [
+          { ...result.responses[0], marker: 'unrelated' },
+          ...result.responses.slice(1).map((response) => ({ ...response, marker: 'unrelated' })),
+        ]
+        return {
+          ...result,
+          responses,
+        }
       },
     }
 
@@ -176,5 +186,37 @@ describe('Discord bot composed E2E tracer bullet', () => {
     expect(docs?.verdict).toBe('FAIL')
     expect(docs?.cleanup.response).toBe('not-needed')
     expect(world.responses.size).toBeGreaterThan(0)
+  })
+
+  it('preflights and owns docs responses in their explicitly declared channels', async () => {
+    const world = makeFakeWorld(target)
+    const inspected: Snowflake[] = []
+    const invoked: Array<{ readonly channelId: Snowflake; readonly location: 'public' | 'restricted' }> = []
+    const transport = {
+      ...world.transport,
+      inspectChannel: async (channelId: Snowflake) => {
+        inspected.push(channelId)
+        return world.transport.inspectChannel(channelId)
+      },
+      invokeDocs: async (input: Parameters<typeof world.transport.invokeDocs>[0]) => {
+        invoked.push({ channelId: input.channelId, location: input.location })
+        return world.transport.invokeDocs(input)
+      },
+    }
+
+    const receipt = await runE2EMatrix({
+      environment: 'fake',
+      target,
+      transport,
+      allowHumanAssisted: true,
+    })
+
+    expect(receipt.verdict).toBe('PASS')
+    expect(new Set(inspected)).toEqual(new Set([channelId, restrictedDocsChannelId]))
+    expect(invoked).toEqual([
+      { channelId, location: 'public' },
+      { channelId: restrictedDocsChannelId, location: 'restricted' },
+      { channelId: restrictedDocsChannelId, location: 'restricted' },
+    ])
   })
 })

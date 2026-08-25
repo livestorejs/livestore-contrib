@@ -117,12 +117,14 @@ thread, authorization, naming, or reconciliation constraints.
 
 ## Discord Manual Authorization
 
-The **Create Thread** application command declares
-`CREATE_PUBLIC_THREADS` as its default member permission. At execution, the
-interaction adapter derives the member's effective permission in the selected
-target channel from Discord-authoritative interaction/resolved permission data,
-performing a bounded read when the payload is insufficient. It never trusts a
-user ID, role list, or permission flag supplied outside that boundary.
+The **Create Thread** application command declares no Discord-level default
+member permission: a non-null gate would hide the action from unprivileged
+members entirely, making the denial UX unreachable. Authorization is instead
+enforced at execution: the interaction adapter derives the member's effective
+permission in the selected target channel from Discord-authoritative
+interaction/resolved permission data, performing a bounded read when the payload
+is insufficient. It never trusts a user ID, role list, or permission flag
+supplied outside that boundary.
 
 Missing member identity, missing target channel, indeterminate permission, or
 absence of `CREATE_PUBLIC_THREADS` yields `AuthorizationRejected` and an

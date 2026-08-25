@@ -12,10 +12,11 @@ drift from the server's authority.
 ## Decision
 
 Allow the Discord **Create Thread** message action only when the invoking member
-has effective `CREATE_PUBLIC_THREADS` permission in the target channel. Set the
-application command's default member permission consistently and recheck the
-effective channel permission during execution. If the effective permission
-cannot be established, fail closed.
+has effective `CREATE_PUBLIC_THREADS` permission in the target channel. The
+application command declares no Discord-level default member permission: a
+non-null gate would hide the action from unprivileged members entirely, making
+the ephemeral denial UX unreachable. The effective channel permission is checked
+during execution instead. If it cannot be established, fail closed.
 
 Authorization never comes from a caller-supplied user ID or an application
 configuration allowlist. Denial is an ephemeral interaction response. The bot

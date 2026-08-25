@@ -12,7 +12,7 @@ import type { CliInvocation, OutputMode, ParseResult } from './model.ts'
 
 const rootHelp = `livestore-discord - operate the LiveStore Discord bot through Bot control
 
-Usage: livestore-discord <scope> <command> [arguments] [--output auto|log|json|ndjson]
+Usage: livestore-discord <scope> <command> [arguments] [--socket /absolute/path.sock] [--output auto|log|json|ndjson]
 
 Scopes:
   thread   inspect, plan, create, status, or reconcile a source message
@@ -32,7 +32,7 @@ export const CliOperationNames = BotControlOperationNames
 
 const helpFor = (scope: string, action?: string) => {
   if (scope === 'thread' && action === 'create') {
-    return 'Usage: livestore-discord thread create MESSAGE_URL --environment staging|production --apply --reason TEXT [--name TEXT]'
+    return 'Usage: livestore-discord thread create MESSAGE_URL --environment staging|production --apply --reason TEXT [--name TEXT] [--socket /absolute/path.sock]'
   }
   if (scope === 'thread' && action === 'reconcile') {
     return 'Usage: livestore-discord thread reconcile MESSAGE_URL|--all [--state STATE --limit N] [--environment ENV --apply] --reason TEXT'

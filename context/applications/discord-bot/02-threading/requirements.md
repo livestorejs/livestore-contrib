@@ -98,10 +98,15 @@ the contract ([`.reference/`](./.reference/)).
 
 - **LSC.APP.DISCORD.THREAD-R14 Discord-native manual authorization:** The
   **Create Thread** action requires the invoker's effective
-  `CREATE_PUBLIC_THREADS` permission in the target channel, both in command
-  defaults and at execution. Missing/indeterminate permission fails closed and
-  denial is ephemeral. No hard-coded user or bot-specific role allowlist is an
-  authorization source.
+  `CREATE_PUBLIC_THREADS` permission at execution time. The command declares no
+  Discord-level default member permission: hiding the action would make denial
+  UX unreachable, so unauthorized invocations receive an explicit ephemeral
+  denial. Missing/indeterminate permission fails closed. No hard-coded user or
+  bot-specific role allowlist is an authorization source.
+  **Amendment 2026-08-25:** dropped the command-defaults half of this
+  requirement; confirmed by Johannes Schickling (decision-tree Q4) before the
+  change. Execution-time enforcement and fail-closed behavior are unchanged
+  (decision 0007).
 
 ## Resolved technical decisions
 
