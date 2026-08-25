@@ -10,7 +10,8 @@
   ],
   "type": "module",
   "scripts": {
-    "check": "tsc --noEmit && tsc -p e2e/tsconfig.json --noEmit",
+    "check": "tsc --noEmit && tsc -p e2e/tsconfig.json --noEmit && tsc -p cf/tsconfig.json --noEmit",
+    "check:cf": "tsc -p cf/tsconfig.json --noEmit",
     "check:effect": "tsgo --build --force tsconfig.json && tsgo --build --force e2e/tsconfig.json",
     "check:e2e": "tsc -p e2e/tsconfig.json --noEmit",
     "e2e:live": "node --experimental-strip-types e2e/src/live-main.ts",
@@ -21,19 +22,23 @@
   "dependencies": {
     "@effect/platform-node": "4.0.0-beta.105",
     "@effect/platform-node-shared": "4.0.0-beta.105",
+    "@effect/sql-sqlite-do": "4.0.0-beta.105",
     "dfx": "1.0.15",
     "discord-api-types": "0.38.40",
     "effect": "4.0.0-beta.105"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260825.1",
     "@effect/vitest": "4.0.0-beta.105",
     "@types/node": "25.3.3",
+    "alchemy": "next",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   },
   "overrides": {
     "@effect/platform-node": "4.0.0-beta.105",
     "@effect/platform-node-shared": "4.0.0-beta.105",
+    "@effect/sql-sqlite-do": "4.0.0-beta.105",
     "@effect/vitest": "4.0.0-beta.105",
     "discord-api-types": "0.38.40",
     "effect": "4.0.0-beta.105"

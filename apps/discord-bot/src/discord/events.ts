@@ -1,9 +1,15 @@
+import { GatewayIntentBits } from 'dfx/types'
+
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
 import { SourceChannelKind } from '../threading/model.ts'
 import { DiscordSnowflake, InteractionRoute } from './actions.ts'
+
+/** The only Gateway intents admitted by LSC.APP.DISCORD.RT-R03. */
+export const gatewayIntents =
+  GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages | GatewayIntentBits.MessageContent
 
 export const AutomaticMessage = Schema.Struct({
   guildId: DiscordSnowflake,

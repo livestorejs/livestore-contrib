@@ -1,0 +1,97 @@
+import * as Cloudflare from 'alchemy/Cloudflare'
+import { WorkerEnvironment } from 'alchemy/Cloudflare'
+
+import * as Config from 'effect/Config'
+import * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
+import * as HttpServerRequest from 'effect/unstable/http/HttpServerRequest'
+import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse'
+
+import { AdminToken, makeAdminRouter, runAdminRouter, toFetchHandler } from './admin.ts'
+import { readSecret } from './env.ts'
+import { schemaVersion } from './journal.ts'
+import { BotState } from './bot-state.ts'
+
+
+/**
+ * Discord bot Worker — the main module. Hosts one Durable Object class
+ * (SQLite-backed by default for new classes), binds five secrets, attaches a
+ * 1-minute cron trigger, and dispatches fetches between the authenticated
+ * admin RPC plane (`POST /admin/rpc/*`) and the readiness probe (`/readyz`).
+ */
+export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
+  'DiscordBot',
+  {
+    // This module is its own entry; rolldown bundles it before upload.
+    main: import.meta.url,
+    // nodejs_compat must stay OFF: the worker graph is node-builtin-free by
+    // construction and bundle-check.unit.test.ts enforces it (source recrawl
+    // plus post-build dist scan when dist/ exists).
+    compatibility: { date: '2026-08-01', flags: [] },
+    // Secret bindings: every `effect/Config` value resolves at deploy time
+    // and is bound as `secret_text` on Cloudflare regardless of constructor.
+    env: {
+      DISCORD_BOT_TOKEN: Config.redacted('DISCORD_BOT_TOKEN'),
+      OPENAI_API_KEY: Config.redacted('OPENAI_API_KEY'),
+      DOCS_CORRELATION_KEY: Config.redacted('DOCS_CORRELATION_KEY'),
+      E2E_ACTOR_TOKEN: Config.redacted('E2E_ACTOR_TOKEN'),
+      ADMIN_TOKEN: Config.redacted('ADMIN_TOKEN'),
+    },
+  },
+  Effect.gen(function* () {
+    // Yielding the DO class here binds it to this same Worker (same-worker
+    // host); the class migration is derived from bindings automatically.
+    const botState = yield* BotState
+
+    const env = yield* WorkerEnvironment
+    const adminHandler = toFetchHandler(
+      runAdminRouter(makeAdminRouter({
+        runtimeStatus: () => botState.getByName('gateway').status(),
+      })),
+      Context.make(AdminToken, { token: readSecret(env, 'ADMIN_TOKEN') }),
+    )
+
+    yield* Cloudflare.Workers.cron('* * * * *', () =>
+      Effect.asVoid(botState.getByName('gateway').tick())).pipe(
+        Effect.provide(Cloudflare.Workers.CronEventSourceLive),
+      )
+
+    return {
+      fetch: Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest
+        const pathname = new URL(request.url).pathname
+
+        if (pathname === '/readyz') {
+          // Unauthenticated probe: body carries ONLY the boolean verdict —
+          // session lifecycle and spend figures stay behind the admin plane.
+          const status = yield* botState.getByName('gateway').status()
+          const ready = status.journalSchemaVersion === schemaVersion
+          return HttpServerResponse.text(ready ? 'ok' : 'not ready', {
+            status: ready ? 200 : 503,
+            contentType: 'text/plain',
+          })
+        }
+
+        if (pathname.startsWith('/admin/rpc/')) {
+          // A malformed incoming request degrades to a plain 400 instead of
+          // leaking the driver's parse-error channel through fetch.
+          const response = yield* Effect.matchEffect(HttpServerRequest.toWeb(request), {
+            onFailure: () => Effect.succeed(new Response('bad request', { status: 400 })),
+            onSuccess: (web) => Effect.promise(() => adminHandler(web)),
+          })
+          return HttpServerResponse.fromWeb(response)
+        }
+
+        return HttpServerResponse.text('not found', { status: 404 })
+      }),
+    }
+  }),
+) {}
+
+// The local runtime and bundler import the entrypoint as the module's
+// default export.
+export default DiscordBot
+
+// Re-exported so the bundled worker module keeps the DO class in its export
+// surface for Cloudflare's runtime to discover.
+export { BotState }
