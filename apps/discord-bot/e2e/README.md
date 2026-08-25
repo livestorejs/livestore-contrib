@@ -74,13 +74,24 @@ The non-secret manifest shape is:
   "target": {
     "guildId": "111111111111111111",
     "channelId": "222222222222222222",
-    "allowedChannelIds": ["222222222222222222"],
+    "docsChannelIds": {
+      "public": "222222222222222222",
+      "restricted": "333333333333333333"
+    },
+    "allowedChannelIds": ["222222222222222222", "333333333333333333"],
     "requiredTopicSentinel": "livestore-discord-e2e-only",
     "pollIntervalMs": 1000,
     "timeoutMs": 30000
   }
 }
 ```
+
+`target.channelId` owns threading, message actions, and operator-control flows.
+The docs lanes use their explicit `public` and `restricted` channel IDs. Every
+distinct target is allowlisted and independently checked for the configured
+guild and topic sentinel before the first write. The attended broker receives
+the exact channel ID for each docs gesture; `location` remains descriptive and
+does not grant routing authority.
 
 Only the runtime's `StagingE2ERun` control operation is intentionally gated; the
 runtime does not self-authorize E2E writes. Peer authentication and source
@@ -93,6 +104,10 @@ pnpm e2e:live -- \
   --manifest ./staging.json \
   --confirm-live-write I_UNDERSTAND_THIS_WRITES_TO_DISCORD_STAGING
 ```
+
+The Nix package exposes the same source entrypoint as
+`livestore-discord-e2e`, so a deployed immutable package does not require pnpm
+or a source checkout.
 
 The executable never calls 1Password. An approved `op-proxy` wrapper must
 resolve the manifest's `actorBotTokenRef` and inject the value as
@@ -109,6 +124,10 @@ livestore-discord thread create MESSAGE_URL \
   --apply --reason TEXT --output json
 ```
 
+`--socket` is a process-level transport override parsed before the CLI creates
+its RPC client. It takes precedence over `LIVESTORE_DISCORD_CONTROL_SOCKET` and
+the environment default; malformed or duplicate overrides fail before connect.
+
 ### Attended human handoff
 
 Pass `--human-handoff-broker EXECUTABLE` only while a named human is available
@@ -118,15 +137,37 @@ not a user-account automation API: the broker must pause for a human using the
 official Discord client and must never accept, resolve, or use a Discord user
 token.
 
-The runner invokes the executable as `EXECUTABLE OPERATION --request-json JSON`.
-Supported operations are `create-message`, `invoke-message-action`,
-`invoke-docs`, `delete-message`, and `delete-response`. Each successful action
-response must contain `"attendedByHuman": true` plus the correlated IDs, marker,
-and channel fields represented by the E2E snapshots. Cleanup additionally
-returns `{ "attendedByHuman": true, "deleted": true, "id": "..." }` for the
-exact requested artifact. Exit `7`, a missing attestation, or no human produces
+The runner invokes the executable as
+`EXECUTABLE OPERATION --request-json JSON --run-id ID --ledger FILE`; the
+run-scoped id keeps the crash ledger's record/resolve pairs matchable across
+per-gesture invocations, and `recover-ledger --ledger FILE` validates and
+deletes any unresolved artifacts after a crash. Supported operations are
+`create-message`, `invoke-message-action`, `invoke-docs`, `delete-message`, and
+`delete-response`. Docs results return a
+non-empty `responses` array because one interaction can produce multiple
+follow-up messages; every correlated response is independently cleaned. Each
+successful action response must attest its performer with either
+`"attendedByHuman": true` or `"performedBy": "official-client-session"`, plus
+the correlated IDs, marker, and channel fields represented by the E2E snapshots.
+Cleanup additionally returns
+`{ "attendedByHuman": true, "deleted": true, "id": "..." }` for the exact
+requested artifact. Exit `7`, a missing attestation, or no human produces
 `UNRUN`; invalid correlation or cleanup confirmation cannot produce `PASS`.
 The broker receives no credentials from the runner.
+
+A reference broker ships as `livestore-discord-e2e-broker` (source runner:
+`node --experimental-strip-types e2e/src/attended-broker-main.ts`). It drives
+the official Discord web client through the
+`http-capture` browser-control seam, correlates exact artifact IDs through the
+actor-bot REST read seam, and journals every created artifact into a private
+mode-0600 per-run cleanup ledger (`--ledger FILE`) before acknowledging it. A
+crash mid-run is recoverable: unresolved ledger entries validate against exact
+recorded IDs before any delete, never by message content.
+
+The broker attests each gesture with either `"attendedByHuman": true` or
+`"performedBy": "official-client-session"`; receipts never overclaim which
+executor ran a lane. Gesture locators are calibrated against the live client in
+the attended window before the matrix runs.
 
 ```text
 pnpm e2e:live -- \

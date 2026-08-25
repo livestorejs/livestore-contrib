@@ -3,8 +3,6 @@ import { Discord } from 'dfx'
 import { docsCommandDescription } from '../docs/disclosure.ts'
 import type { ApplicationCommand, ApplicationCommandScope } from './model.ts'
 
-const createPublicThreadsPermission = String(1n << 35n)
-
 /** The sole desired-state declaration for every Discord command served by the bot. */
 export const desiredApplicationCommands = [
   {
@@ -27,7 +25,10 @@ export const desiredApplicationCommands = [
     name: 'Create Thread',
     description: '',
     options: [],
-    defaultMemberPermissions: createPublicThreadsPermission,
+    // Discord-level gate intentionally absent: a non-null default member permission would hide
+    // the action entirely from unprivileged members, making the server-side ephemeral denial in
+    // runtime/handlers.ts unreachable UX. Authorization is enforced at execution instead.
+    defaultMemberPermissions: null,
     nsfw: false,
   },
 ] as const satisfies ReadonlyArray<ApplicationCommand>

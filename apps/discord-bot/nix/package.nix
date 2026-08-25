@@ -95,9 +95,13 @@ stdenvNoCC.mkDerivation {
     app="$out/lib/livestore-discord"
     mkdir -p "$app" "$out/bin"
     cp package.json pnpm-lock.yaml pnpm-workspace.yaml "$app/"
-    cp -R src node_modules "$app/"
+    cp -R e2e src node_modules "$app/"
     makeWrapper ${nodejs_24}/bin/node "$out/bin/livestore-discord" \
       --add-flags "--experimental-strip-types $app/src/main.ts"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/livestore-discord-e2e" \
+      --add-flags "--experimental-strip-types $app/e2e/src/live-main.ts"
+    makeWrapper ${nodejs_24}/bin/node "$out/bin/livestore-discord-e2e-broker" \
+      --add-flags "--experimental-strip-types $app/e2e/src/attended-broker-main.ts"
 
     runHook postInstall
   '';
@@ -106,7 +110,18 @@ stdenvNoCC.mkDerivation {
   installCheckPhase = ''
     runHook preInstallCheck
     bash ${./runtime-e2e.sh} "$out/bin/livestore-discord"
-    runHook postInstallCheck
+    set +e
+    "$out/bin/livestore-discord-e2e" >e2e-usage.stdout 2>e2e-usage.stderr
+    e2e_status=$?
+    set -e
+    test "$e2e_status" -eq 2
+    grep -F 'Usage: pnpm e2e:live' e2e-usage.stderr >/dev/null
+    set +e
+    "$out/bin/livestore-discord-e2e-broker" bogus-op >broker.stdout 2>broker.stderr
+    broker_status=$?
+    set -e
+    test "$broker_status" -eq 2
+    grep -F 'Usage:' broker.stderr >/dev/null
   '';
 
   meta = {

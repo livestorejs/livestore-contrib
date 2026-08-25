@@ -204,7 +204,7 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     invokeDocs: async (request) => {
       if (input.invokeDocs !== undefined) {
         const result = await input.invokeDocs(request)
-        responses.set(result.response.id, result.response)
+        for (const response of result.responses) responses.set(response.id, response)
         return result
       }
       throw new E2EPrerequisiteUnavailableError('Discord has no official API for initiating an application command')

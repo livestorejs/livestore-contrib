@@ -19,7 +19,7 @@ import { E2EPrerequisiteUnavailableError, type E2ETransport } from './transport.
 interface OwnedArtifacts {
   source: MessageSnapshot | undefined
   thread: ThreadSnapshot | undefined
-  response: ResponseSnapshot | undefined
+  responses: ReadonlyArray<ResponseSnapshot>
 }
 
 const noCleanup: ArtifactCleanup = {
@@ -69,13 +69,9 @@ const cleanup = async (
     response: 'not-needed',
   }
 
-  if (owned.response !== undefined) {
-    try {
-      await transport.deleteResponse(owned.response.id)
-      result.response = 'deleted'
-    } catch {
-      result.response = 'failed'
-    }
+  if (owned.responses.length > 0) {
+    const outcomes = await Promise.allSettled(owned.responses.map((response) => transport.deleteResponse(response.id)))
+    result.response = outcomes.some((outcome) => outcome.status === 'rejected') === true ? 'failed' : 'deleted'
   }
   if (owned.thread !== undefined && owned.source !== undefined) {
     try {
@@ -121,7 +117,7 @@ const runScenario = async (input: {
     }
   }
 
-  const owned: OwnedArtifacts = { source: undefined, thread: undefined, response: undefined }
+  const owned: OwnedArtifacts = { source: undefined, thread: undefined, responses: [] }
   const createOwnedMessage = async (
     request: Parameters<E2ETransport['createMessage']>[0],
   ): Promise<MessageSnapshot> => {
@@ -136,10 +132,12 @@ const runScenario = async (input: {
     owned.source = candidate
     return candidate
   }
-  const ownResponse = (candidate: ResponseSnapshot): boolean => {
-    if (candidate.channelId !== target.channelId || candidate.marker !== marker) return false
-    owned.response = candidate
-    return true
+  const ownResponses = (candidates: ReadonlyArray<ResponseSnapshot>, expectedChannelId = target.channelId): boolean => {
+    const correlated = candidates.filter(
+      (candidate) => candidate.channelId === expectedChannelId && candidate.marker === marker,
+    )
+    owned.responses = [...owned.responses, ...correlated]
+    return candidates.length > 0 && correlated.length === candidates.length
   }
   let passed = false
   try {
@@ -283,7 +281,7 @@ const runScenario = async (input: {
           marker,
           persona: 'maintainer',
         })
-        const responseOwned = ownResponse(result.response)
+        const responseOwned = ownResponses([result.response])
         if (
           responseOwned === true &&
           result._tag === 'Created' &&
@@ -306,7 +304,7 @@ const runScenario = async (input: {
           marker,
           persona: 'member',
         })
-        const responseOwned = ownResponse(result.response)
+        const responseOwned = ownResponses([result.response])
         const candidate = await transport.findThreadForMessage(target.guildId, source.id)
         if (candidate !== undefined && isOwnedThread(candidate, source, target, marker) === true) {
           owned.thread = candidate
@@ -315,43 +313,49 @@ const runScenario = async (input: {
         break
       }
       case 'docs-public': {
+        const channelId = target.docsChannelIds.public
         const result = await transport.invokeDocs({
+          channelId,
           marker,
           query: `${marker} How does syncing work?`,
           location: 'public',
           persona: 'member',
         })
-        const responseOwned = ownResponse(result.response)
+        const responseOwned = ownResponses(result.responses, channelId)
         passed =
           responseOwned === true &&
           result._tag === 'Answered' &&
-          result.response.hasAnswer === true &&
-          result.response.hasSources === true
+          result.responses.every((response) => response.hasAnswer === true) &&
+          result.responses.some((response) => response.hasSources === true)
         break
       }
       case 'docs-role-restricted': {
+        const channelId = target.docsChannelIds.restricted
         const result = await transport.invokeDocs({
+          channelId,
           marker,
           query: `${marker} How does syncing work?`,
           location: 'restricted',
           persona: 'contributor',
         })
-        const responseOwned = ownResponse(result.response)
+        const responseOwned = ownResponses(result.responses, channelId)
         passed =
           responseOwned === true &&
           result._tag === 'Answered' &&
-          result.response.hasAnswer === true &&
-          result.response.hasSources === true
+          result.responses.every((response) => response.hasAnswer === true) &&
+          result.responses.some((response) => response.hasSources === true)
         break
       }
       case 'docs-denied': {
+        const channelId = target.docsChannelIds.restricted
         const result = await transport.invokeDocs({
+          channelId,
           marker,
           query: `${marker} How does syncing work?`,
           location: 'restricted',
           persona: 'member',
         })
-        const responseOwned = ownResponse(result.response)
+        const responseOwned = ownResponses(result.responses, channelId)
         passed = responseOwned === true && result._tag === 'Denied'
         break
       }
@@ -388,7 +392,7 @@ const runScenario = async (input: {
 }
 
 const artifactHashes = (owned: OwnedArtifacts): ReadonlyArray<string> =>
-  [owned.source?.id, owned.thread?.id, owned.response?.id]
+  [owned.source?.id, owned.thread?.id, ...owned.responses.map((response) => response.id)]
     .filter((value): value is Snowflake => value !== undefined)
     .map(opaqueHash)
 
@@ -402,7 +406,10 @@ export const runE2EMatrix = async (input: {
   const startedAt = new Date().toISOString()
   let scenarios: ReadonlyArray<ScenarioReceipt>
 
-  if (input.target.allowedChannelIds.has(input.target.channelId) === false) {
+  const targetChannelIds = [
+    ...new Set([input.target.channelId, input.target.docsChannelIds.public, input.target.docsChannelIds.restricted]),
+  ]
+  if (targetChannelIds.some((channelId) => input.target.allowedChannelIds.has(channelId) === false) === true) {
     scenarios = scenarioMatrix.map((scenario) => ({
       scenario: scenario.id,
       executor: scenario.executor,
@@ -415,11 +422,13 @@ export const runE2EMatrix = async (input: {
     }))
   } else {
     try {
-      const channel = await input.transport.inspectChannel(input.target.channelId)
-      const targetMatches =
-        channel.id === input.target.channelId &&
-        channel.guildId === input.target.guildId &&
-        channel.topic?.includes(input.target.requiredTopicSentinel) === true
+      const channels = await Promise.all(targetChannelIds.map(input.transport.inspectChannel))
+      const targetMatches = channels.every(
+        (channel, index) =>
+          channel.id === targetChannelIds[index] &&
+          channel.guildId === input.target.guildId &&
+          channel.topic?.includes(input.target.requiredTopicSentinel) === true,
+      )
       if (targetMatches === false) {
         scenarios = scenarioMatrix.map((scenario) => ({
           scenario: scenario.id,

@@ -7,6 +7,7 @@ import * as Layer from 'effect/Layer'
 import * as Otlp from 'effect/unstable/observability/Otlp'
 
 import { runCli } from './cli/index.ts'
+import { selectControlSocketPath } from './cli/socket-option.ts'
 import { defaultControlSocket } from './control/transport.ts'
 import { gatewayIntents, loadRuntimeConfig, makeUnixBotControlClient, runRuntime } from './runtime/index.ts'
 
@@ -23,8 +24,17 @@ export const program =
       }).pipe(Effect.scoped)
     : Effect.gen(function* () {
         const environment = args.includes('production') === true ? 'production' : 'staging'
-        const socketPath = process.env.LIVESTORE_DISCORD_CONTROL_SOCKET ?? defaultControlSocket(environment).path
-        const client = yield* makeUnixBotControlClient(socketPath)
+        const socketOption = selectControlSocketPath({
+          args,
+          environmentPath: process.env.LIVESTORE_DISCORD_CONTROL_SOCKET,
+          defaultPath: defaultControlSocket(environment).path,
+        })
+        if (socketOption._tag === 'UsageError') {
+          process.stderr.write(`CRITICAL usage: ${socketOption.message}\n`)
+          process.exitCode = 2
+          return
+        }
+        const client = yield* makeUnixBotControlClient(socketOption.path)
         const code = yield* runCli(args, client, {
           stdout: (line) => process.stdout.write(`${line}\n`),
           stderr: (line) => process.stderr.write(`${line}\n`),

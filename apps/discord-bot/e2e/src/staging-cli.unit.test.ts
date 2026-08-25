@@ -11,7 +11,8 @@ const manifest = JSON.stringify({
   target: {
     guildId: '111111111111111111',
     channelId: '222222222222222222',
-    allowedChannelIds: ['222222222222222222'],
+    docsChannelIds: { public: '222222222222222222', restricted: '333333333333333333' },
+    allowedChannelIds: ['222222222222222222', '333333333333333333'],
     requiredTopicSentinel: topicSentinel,
     pollIntervalMs: 1_000,
     timeoutMs: 30_000,

@@ -6,7 +6,11 @@ import { topicSentinel, type Snowflake, type StagingTarget } from './model.ts'
 const target: StagingTarget = {
   guildId: '111111111111111111' as Snowflake,
   channelId: '222222222222222222' as Snowflake,
-  allowedChannelIds: new Set(['222222222222222222' as Snowflake]),
+  docsChannelIds: {
+    public: '222222222222222222' as Snowflake,
+    restricted: '333333333333333333' as Snowflake,
+  },
+  allowedChannelIds: new Set(['222222222222222222' as Snowflake, '333333333333333333' as Snowflake]),
   requiredTopicSentinel: topicSentinel,
   pollIntervalMs: 1,
   timeoutMs: 4,

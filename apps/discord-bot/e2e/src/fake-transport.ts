@@ -46,8 +46,13 @@ export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
   let nextId = 300_000_000_000_000_000n
 
   const id = (): Snowflake => String(nextId++) as Snowflake
-  const response = (marker: string, hasAnswer: boolean, hasSources: boolean): ResponseSnapshot => {
-    const value = { id: id(), channelId: target.channelId, marker, hasAnswer, hasSources }
+  const response = (
+    channelId: Snowflake,
+    marker: string,
+    hasAnswer: boolean,
+    hasSources: boolean,
+  ): ResponseSnapshot => {
+    const value = { id: id(), channelId, marker, hasAnswer, hasSources }
     responses.set(value.id, value)
     counts.createdResponses += 1
     return value
@@ -102,19 +107,22 @@ export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
     invokeMessageAction: async ({ sourceMessageId, marker, persona }): Promise<InteractionResult> => {
       const source = messages.get(sourceMessageId)
       if (persona !== 'maintainer' || source === undefined) {
-        return { _tag: 'Denied', response: response(marker, false, false) }
+        return { _tag: 'Denied', response: response(target.channelId, marker, false, false) }
       }
       return {
         _tag: 'Created',
         thread: await createThread(source),
-        response: response(marker, false, false),
+        response: response(target.channelId, marker, false, false),
       }
     },
-    invokeDocs: async ({ marker, location, persona }): Promise<DocsResult> => {
+    invokeDocs: async ({ channelId, marker, location, persona }): Promise<DocsResult> => {
       const authorized = location === 'public' || persona === 'contributor' || persona === 'maintainer'
       return authorized === true
-        ? { _tag: 'Answered', response: response(marker, true, true) }
-        : { _tag: 'Denied', response: response(marker, false, false) }
+        ? {
+            _tag: 'Answered',
+            responses: [response(channelId, marker, true, true), response(channelId, marker, true, false)],
+          }
+        : { _tag: 'Denied', responses: [response(channelId, marker, false, false)] }
     },
     deleteThread: async (threadId) => {
       if (threads.delete(threadId) === false) throw new Error('thread not found')
