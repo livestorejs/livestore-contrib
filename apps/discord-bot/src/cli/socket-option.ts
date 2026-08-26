@@ -4,10 +4,6 @@ export type ControlSocketOption =
   | { readonly _tag: 'Parsed'; readonly path: string | undefined }
   | { readonly _tag: 'UsageError'; readonly message: string }
 
-export type SelectedControlSocketOption =
-  | { readonly _tag: 'Parsed'; readonly path: string }
-  | { readonly _tag: 'UsageError'; readonly message: string }
-
 /** Parses the process-level transport override before the RPC client exists. */
 export const parseControlSocketOption = (args: ReadonlyArray<string>): ControlSocketOption => {
   const occurrences = args.flatMap((value, index) => (value === '--socket' ? [index] : []))
@@ -26,13 +22,3 @@ export const parseControlSocketOption = (args: ReadonlyArray<string>): ControlSo
   return { _tag: 'Parsed', path }
 }
 
-export const selectControlSocketPath = (input: {
-  readonly args: ReadonlyArray<string>
-  readonly environmentPath: string | undefined
-  readonly defaultPath: string
-}): SelectedControlSocketOption => {
-  const parsed = parseControlSocketOption(input.args)
-  return parsed._tag === 'UsageError'
-    ? parsed
-    : { _tag: 'Parsed', path: parsed.path ?? input.environmentPath ?? input.defaultPath }
-}

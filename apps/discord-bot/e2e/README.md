@@ -128,6 +128,21 @@ livestore-discord thread create MESSAGE_URL \
 its RPC client. It takes precedence over `LIVESTORE_DISCORD_CONTROL_SOCKET` and
 the environment default; malformed or duplicate overrides fail before connect.
 
+
+### Deploy targets
+
+The manifest selects one operator transport, never both:
+
+- **Unix control socket** (default): `botControlSocket` names an exact
+  `.sock` under `/run/discord-bot/staging/`; retroactive creation crosses the
+  installed `livestore-discord` CLI as described above.
+- **Cloudflare edge admin plane**: set `botAdminEndpoint` instead of
+  `botControlSocket` (see `fixtures/staging-cf.example.json`). Operator lanes
+  then POST `{endpoint}/admin/rpc/ThreadCreate` with
+  `Authorization: Bearer $LIVESTORE_DISCORD_ADMIN_TOKEN` — the token is read
+  only from that environment variable, never a flag. A missing token produces
+  `UNRUN`; there is no socket fallback.
+
 ### Attended human handoff
 
 Pass `--human-handoff-broker EXECUTABLE` only while a named human is available

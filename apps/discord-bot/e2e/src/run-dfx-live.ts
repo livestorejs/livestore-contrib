@@ -9,6 +9,8 @@ export interface RunDfxLiveInput {
   readonly confirmation: string | undefined
   /** Resolved from manifest.actorBotTokenRef only by an approved op-proxy wrapper. */
   readonly actorBotToken: string | undefined
+  /** Resolved from LIVESTORE_DISCORD_ADMIN_TOKEN only when the manifest names an admin endpoint. */
+  readonly adminToken?: string | undefined
   readonly cliExecutable?: string
   readonly runCommand?: CommandRunner
   /** Explicit attended broker executable; absence keeps every human lane UNRUN. */
@@ -34,7 +36,18 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
       humanAssisted: false,
     })
   }
-
+  // An admin-endpoint manifest without its injected credential is UNRUN, never a socket fallback.
+  if (
+    input.manifest.botAdminEndpoint !== undefined &&
+    (input.adminToken === undefined || input.adminToken.trim() === '')
+  ) {
+    return runLiveStaging({
+      manifest: input.manifest,
+      confirmation: input.confirmation,
+      transport: undefined,
+      humanAssisted: false,
+    })
+  }
   const humanBroker =
     input.humanHandoffBrokerExecutable === undefined
       ? undefined
@@ -53,7 +66,9 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
   const live = makeDfxLiveTransport({
     actorBotToken: input.actorBotToken,
     target: input.manifest.target,
-    botControlSocket: input.manifest.botControlSocket,
+    ...(input.manifest.botControlSocket === undefined ? {} : { botControlSocket: input.manifest.botControlSocket }),
+    ...(input.manifest.botAdminEndpoint === undefined ? {} : { botAdminEndpoint: input.manifest.botAdminEndpoint }),
+    ...(input.adminToken === undefined ? {} : { adminToken: input.adminToken }),
     ...(input.cliExecutable === undefined ? {} : { cliExecutable: input.cliExecutable }),
     ...(input.runCommand === undefined ? {} : { runCommand: input.runCommand }),
     ...(createHumanMessage === undefined ? {} : { createHumanMessage }),
