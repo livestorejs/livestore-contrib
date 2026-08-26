@@ -1,3 +1,3 @@
 export * from './contract.ts'
 export * from './schema.ts'
-export * from './transport.ts'
+export * from './http-client.ts'

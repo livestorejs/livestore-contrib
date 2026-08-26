@@ -4,6 +4,7 @@ import { NodeHttpClient } from '@effect/platform-node'
 import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
 import { Effect, Layer, ManagedRuntime, Redacted } from 'effect'
 
+import { makeHttpsBotControlClient } from './admin-http-client.ts'
 import type {
   ChannelSnapshot,
   MessageSnapshot,
@@ -26,8 +27,15 @@ export interface DfxLiveTransportInput {
   /** Resolved only in process by the approved op-proxy invocation. */
   readonly actorBotToken: string
   readonly target: StagingTarget
-  /** Exact staging control socket admitted by the manifest; no default is allowed. */
-  readonly botControlSocket: string
+  /** Exact staging control socket admitted by the manifest; absent with botAdminEndpoint. */
+  readonly botControlSocket?: string
+  /**
+   * Present with adminToken: the operator lane crosses the authenticated HTTPS
+   * admin plane instead of the control socket + CLI executable.
+   */
+  readonly botAdminEndpoint?: string
+  /** Resolved only from LIVESTORE_DISCORD_ADMIN_TOKEN by the entrypoint wiring. */
+  readonly adminToken?: string
   readonly cliExecutable?: string
   readonly runCommand?: CommandRunner
   /** Human-assisted fixture provider; never implemented with a user token. */
@@ -81,15 +89,14 @@ export const operatorCreateThreadArguments = (input: {
   readonly target: StagingTarget
   readonly sourceMessageId: Snowflake
   readonly reason: string
-  readonly botControlSocket: string
+  readonly botControlSocket?: string
 }): ReadonlyArray<string> => [
   'thread',
   'create',
   `https://discord.com/channels/${input.target.guildId}/${input.target.channelId}/${input.sourceMessageId}`,
   '--environment',
   'staging',
-  '--socket',
-  input.botControlSocket,
+  ...(input.botControlSocket === undefined ? [] : ['--socket', input.botControlSocket]),
   '--apply',
   '--reason',
   input.reason,
@@ -113,7 +120,10 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
   const responses = new Map<Snowflake, ResponseSnapshot>()
   const runCommand = input.runCommand ?? defaultRunCommand
   const cliExecutable = input.cliExecutable ?? 'livestore-discord'
-
+  const adminClient =
+    input.botAdminEndpoint === undefined || input.adminToken === undefined
+      ? undefined
+      : makeHttpsBotControlClient({ endpoint: input.botAdminEndpoint, adminToken: input.adminToken })
   const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> => runtime.runPromise(effect)
 
   const findThread = async (guildId: Snowflake, sourceMessageId: Snowflake): Promise<ThreadSnapshot | undefined> => {
@@ -180,16 +190,33 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     },
     findThreadForMessage: findThread,
     operatorCreateThread: async ({ sourceMessageId, reason }): Promise<OperatorResult> => {
-      const result = await runCommand(
-        cliExecutable,
-        operatorCreateThreadArguments({
-          target: input.target,
-          sourceMessageId,
-          reason,
-          botControlSocket: input.botControlSocket,
-        }),
-      )
-      const tag = parseControlResult(result)
+      const tag =
+        adminClient === undefined
+          ? parseControlResult(
+              await runCommand(
+                cliExecutable,
+                operatorCreateThreadArguments({
+                  target: input.target,
+                  sourceMessageId,
+                  reason,
+                  ...(input.botControlSocket === undefined
+                    ? {}
+                    : { botControlSocket: input.botControlSocket }),
+                }),
+              ),
+            )
+          : await (async () => {
+              const result = await adminClient.threadCreate({
+                guildId: input.target.guildId,
+                channelId: input.target.channelId,
+                sourceMessageId,
+                reason,
+              })
+              if (result._tag !== 'Success' && result._tag !== 'AlreadySatisfied') {
+                throw new Error(`Bot control admin plane returned unexpected result ${result._tag}`)
+              }
+              return result._tag === 'Success' ? ('Created' as const) : ('AlreadySatisfied' as const)
+            })()
       const thread = await awaitThread(sourceMessageId)
       return tag === 'Created' ? { _tag: 'Created', thread } : { _tag: 'AlreadySatisfied', thread }
     },

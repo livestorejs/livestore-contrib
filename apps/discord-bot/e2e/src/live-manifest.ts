@@ -7,7 +7,14 @@ export interface LiveManifest {
   readonly environment: 'staging'
   readonly target: StagingTarget
   readonly actorBotTokenRef: `op://${string}`
-  readonly botControlSocket: string
+  /**
+   * Present: operator lanes cross the authenticated HTTPS admin plane of a
+   * Cloudflare edge deployment (`POST {endpoint}/admin/rpc/{Operation}` with
+   * LIVESTORE_DISCORD_ADMIN_TOKEN) instead of the Unix control socket + CLI.
+   * Mutually exclusive with botControlSocket.
+   */
+  readonly botAdminEndpoint?: string
+  readonly botControlSocket?: string
 }
 
 export class LiveManifestError extends Error {
@@ -48,19 +55,45 @@ const positiveInteger = (value: unknown, label: string): number => {
   return value
 }
 
+const httpsEndpoint = (value: unknown, label: string): string => {
+  const parsed = string(value, label)
+  let url: URL
+  try {
+    url = new URL(parsed)
+  } catch {
+    throw new LiveManifestError(`${label} must be an HTTPS URL`)
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.search !== '' ||
+    url.hash !== ''
+  ) {
+    throw new LiveManifestError(`${label} must be a bare HTTPS origin/path without credentials, query, or fragment`)
+  }
+  return parsed
+}
+
 /** Parses only non-secret configuration and enforces op:// credential indirection. */
 export const parseLiveManifest = (input: unknown): LiveManifest => {
   const root = object(input, 'manifest')
   exactKeys(
     root,
-    new Set(['schemaVersion', 'environment', 'target', 'actorBotTokenRef', 'botControlSocket']),
+    new Set([
+      'schemaVersion',
+      'environment',
+      'target',
+      'actorBotTokenRef',
+      'botControlSocket',
+      'botAdminEndpoint',
+    ]),
     'manifest',
   )
   if (root.schemaVersion !== 1) throw new LiveManifestError('schemaVersion must be 1')
   if (root.environment !== 'staging') {
     throw new LiveManifestError('environment must be exactly staging')
   }
-
   const targetInput = object(root.target, 'target')
   exactKeys(
     targetInput,
@@ -104,21 +137,32 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
   if (/^op:\/\/[^/]+\/[^/]+\/.+$/u.test(actorBotTokenRef) === false) {
     throw new LiveManifestError('actorBotTokenRef must be an op:// reference')
   }
-  const botControlSocket = string(root.botControlSocket, 'botControlSocket')
-  const normalizedSocket = posix.normalize(botControlSocket)
-  if (
-    normalizedSocket !== botControlSocket ||
-    normalizedSocket.startsWith('/run/discord-bot/staging/') === false ||
-    normalizedSocket.endsWith('.sock') === false
-  ) {
-    throw new LiveManifestError('botControlSocket must be a normalized .sock path inside /run/discord-bot/staging')
+
+  if (root.botControlSocket !== undefined && root.botAdminEndpoint !== undefined) {
+    throw new LiveManifestError('manifest must not combine botControlSocket with botAdminEndpoint')
+  }
+  const botAdminEndpoint =
+    root.botAdminEndpoint === undefined ? undefined : httpsEndpoint(root.botAdminEndpoint, 'botAdminEndpoint')
+  let botControlSocket: string | undefined
+  if (botAdminEndpoint === undefined) {
+    const socket = string(root.botControlSocket, 'botControlSocket')
+    const normalizedSocket = posix.normalize(socket)
+    if (
+      normalizedSocket !== socket ||
+      normalizedSocket.startsWith('/run/discord-bot/staging/') === false ||
+      normalizedSocket.endsWith('.sock') === false
+    ) {
+      throw new LiveManifestError('botControlSocket must be a normalized .sock path inside /run/discord-bot/staging')
+    }
+    botControlSocket = socket
   }
 
   return {
     schemaVersion: 1,
     environment: 'staging',
     actorBotTokenRef: actorBotTokenRef as `op://${string}`,
-    botControlSocket,
+    ...(botAdminEndpoint === undefined ? {} : { botAdminEndpoint }),
+    ...(botControlSocket === undefined ? {} : { botControlSocket }),
     target: {
       guildId,
       channelId,

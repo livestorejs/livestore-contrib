@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
 import { parseLiveManifest } from './live-manifest.ts'
@@ -27,6 +29,44 @@ describe('live staging manifest', () => {
     expect(manifest.target.allowedChannelIds.has(manifest.target.docsChannelIds.restricted)).toBe(true)
   })
 
+  it('accepts an HTTPS admin endpoint manifest without a control socket', () => {
+    const manifest = parseLiveManifest({
+      ...valid,
+      botControlSocket: undefined,
+      botAdminEndpoint: 'https://discordbot-discordbot-staging.example.workers.dev',
+    })
+    expect(manifest.botAdminEndpoint).toBe('https://discordbot-discordbot-staging.example.workers.dev')
+    expect(manifest.botControlSocket).toBeUndefined()
+  })
+
+  it.each([
+    ['insecure admin endpoint', { ...valid, botAdminEndpoint: 'http://discordbot-staging.workers.dev' }],
+    ['admin endpoint with query', { ...valid, botAdminEndpoint: 'https://host.workers.dev/?x=1' }],
+    ['admin endpoint with credentials', { ...valid, botAdminEndpoint: 'https://u:p@host.workers.dev' }],
+    ['non-URL admin endpoint', { ...valid, botAdminEndpoint: 'not-a-url' }],
+    [
+      'endpoint combined with socket',
+      {
+        ...valid,
+        botAdminEndpoint: 'https://discordbot-discordbot-staging.example.workers.dev',
+        botControlSocket: '/run/discord-bot/staging/control.sock',
+      },
+    ],
+  ])('rejects %s', (_label, manifest) => {
+    expect(() => parseLiveManifest(manifest)).toThrow()
+  })
+
+  it('validates both shipped example fixtures', () => {
+    for (const name of ['staging.example.json', 'staging-cf.example.json']) {
+      const raw = readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8')
+      const manifest = parseLiveManifest(JSON.parse(raw))
+      expect(manifest.environment).toBe('staging')
+      if (name === 'staging-cf.example.json') {
+        expect(manifest.botAdminEndpoint).toMatch(/^https:\//u)
+        expect(manifest.botControlSocket).toBeUndefined()
+      }
+    }
+  })
   it.each([
     ['production target', { ...valid, environment: 'production' }],
     ['inline credential', { ...valid, actorBotTokenRef: 'raw-token' }],

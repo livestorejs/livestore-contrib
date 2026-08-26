@@ -11,6 +11,9 @@ export const stagingCliExit = {
 
 export const actorTokenEnvironmentVariable = 'LIVESTORE_DISCORD_E2E_ACTOR_TOKEN'
 
+/** Only consulted when the manifest names a botAdminEndpoint; never a CLI flag. */
+export const adminTokenEnvironmentVariable = 'LIVESTORE_DISCORD_ADMIN_TOKEN'
+
 export interface StagingCliDependencies {
   readonly readTextFile: (path: string) => Promise<string>
   readonly run: (input: RunDfxLiveInput) => Promise<RunReceipt>
@@ -130,6 +133,7 @@ export const runStagingCli = async (input: {
       manifest,
       confirmation: parsed.value.confirmation,
       actorBotToken: input.environment[actorTokenEnvironmentVariable],
+      adminToken: input.environment[adminTokenEnvironmentVariable],
       humanAssisted: parsed.value.humanHandoffBrokerExecutable !== undefined,
       ...(parsed.value.humanHandoffBrokerExecutable === undefined
         ? {}
