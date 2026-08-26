@@ -17,7 +17,8 @@ import { BotState } from './bot-state.ts'
  * Discord bot Worker — the main module. Hosts one Durable Object class
  * (SQLite-backed by default for new classes), binds five secrets, attaches a
  * 1-minute cron trigger, and dispatches fetches between the authenticated
- * admin RPC plane (`POST /admin/rpc/*`) and the readiness probe (`/readyz`).
+ * admin plane (`POST /admin/rpc/*`, `GET|PUT /admin/config`,
+ * `POST /admin/commands-sync`) and the readiness probe (`/readyz`).
  */
 export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
   'DiscordBot',
@@ -49,13 +50,21 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
 
     const env = yield* WorkerEnvironment
     // Secret reads stay lazy: the deploy phase evaluates this init with
-    // placeholder bindings, so ADMIN_TOKEN resolves on first request.
-    let adminHandler: ReturnType<typeof toFetchHandler> | undefined
+    // placeholder bindings, so ADMIN_TOKEN resolves on first request. Every
+    // admin operation delegates into the gateway DO, which owns the runtime
+    // (config store, journal, thread workflow, command sync).
+    let adminHandler: ((request: globalThis.Request) => Promise<Response>) | undefined
     const getAdminHandler = () => {
       if (adminHandler === undefined) {
+        const gateway = botState.getByName('gateway')
         adminHandler = toFetchHandler(
           runAdminRouter(makeAdminRouter({
-            runtimeStatus: () => botState.getByName('gateway').status(),
+            runtimeStatus: () => gateway.status(),
+            threadCreate: (payload) => gateway.threadCreate(payload),
+            configGet: gateway.configGet(),
+            configPut: (payload) => gateway.configPut(payload),
+            commandsSync: gateway.commandsSync(),
+            threadReconcile: (payload) => gateway.threadReconcile(payload),
           })),
           Context.make(AdminToken, { token: readSecret(env, 'ADMIN_TOKEN') }),
         )
@@ -87,7 +96,9 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
           })
         }
 
-        if (pathname.startsWith('/admin/rpc/')) {
+        // The whole /admin plane (rpc operations, config GET/PUT, command
+        // sync) is bearer-authenticated by the router's global middleware.
+        if (pathname.startsWith('/admin/')) {
           // A malformed incoming request degrades to a plain 400 instead of
           // leaking the driver's parse-error channel through fetch.
           const response = yield* Effect.matchEffect(HttpServerRequest.toWeb({ ...request, url: requestUrl }), {

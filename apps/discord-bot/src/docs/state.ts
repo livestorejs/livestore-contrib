@@ -5,68 +5,11 @@ import { dirname, join } from 'node:path'
 import { Effect, Schema } from 'effect'
 
 import type { DocsTelemetryEvent } from './domain.ts'
+import { type DocsQuotaSample, type DocsStateStore, StateFile } from './state-schema.ts'
 
-const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
-const Correlation = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/))
-
-export const AnswerProvenance = Schema.Struct({
-  correlation: Correlation,
-  atMillis: NonNegativeInt,
-  corpusDigest: Schema.String,
-  engineConfiguration: Schema.String,
-  sourceCount: NonNegativeInt,
-  inputTokens: NonNegativeInt,
-  outputTokens: NonNegativeInt,
-  estimatedCostUsdMicros: NonNegativeInt,
-})
-export type AnswerProvenance = typeof AnswerProvenance.Type
-
-export const DocsQuotaSample = Schema.Struct({
-  atMillis: NonNegativeInt,
-  principal: Correlation,
-  inputTokens: NonNegativeInt,
-  outputTokens: NonNegativeInt,
-  costUsdMicros: NonNegativeInt,
-})
-export type DocsQuotaSample = typeof DocsQuotaSample.Type
-
-export const StateFile = Schema.Struct({
-  version: Schema.Literal(1),
-  provenance: Schema.Array(AnswerProvenance),
-  quota: Schema.Array(DocsQuotaSample),
-  monthly: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      atMillis: NonNegativeInt,
-      costUsdMicros: NonNegativeInt,
-      status: Schema.Literals(['reserved', 'charged', 'cancelled']),
-    }),
-  ),
-})
-export type StateFile = typeof StateFile.Type
-
-export type MonthlyReservation = { readonly _tag: 'Reserved'; readonly id: string } | { readonly _tag: 'Denied' }
-
-export interface DocsStateStore {
-  readonly record: (input: {
-    readonly provenance: AnswerProvenance
-    readonly quota: DocsQuotaSample
-  }) => Effect.Effect<void>
-  readonly recent: (nowMillis: number) => Effect.Effect<StateFile>
-  readonly monthlySpent: (nowMillis: number) => Effect.Effect<number>
-  /** Atomically reserves the worst-case cost before a provider request. */
-  readonly reserveMonthly: (input: {
-    readonly atMillis: number
-    readonly costUsdMicros: number
-    readonly ceilingUsdMicros: number
-  }) => Effect.Effect<MonthlyReservation>
-  /** Settles a reservation; unknown provider usage deliberately keeps its reservation. */
-  readonly settleMonthly: (input: {
-    readonly id: string
-    readonly outcome: 'cancel' | 'charge'
-    readonly costUsdMicros?: number
-  }) => Effect.Effect<void>
-}
+// The schemas and store contract live in the node-free `state-schema.ts`;
+// re-exported so every existing importer (and the docs barrel) is unchanged.
+export * from './state-schema.ts'
 
 const queues = new Map<string, Promise<void>>()
 const serialized = <A>(path: string, operation: () => Promise<A>): Promise<A> => {

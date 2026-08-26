@@ -2,7 +2,7 @@ import * as Effect from 'effect/Effect'
 import * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
 import * as Schema from 'effect/Schema'
 
-import { StateFile, type DocsStateStore, type MonthlyReservation } from '../../src/docs/state.ts'
+import { StateFile, type DocsStateStore, type MonthlyReservation } from '../../src/docs/state-schema.ts'
 
 import type { CryptoService } from './crypto.ts'
 

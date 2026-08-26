@@ -509,3 +509,53 @@ it.effect('acquire seam syncs the shared store and translates lifecycle into Ses
       }
     }
   }))
+
+it.effect('acquire seam forwards dispatch payloads to onDispatch and stops with the session', () =>
+  Effect.gen(function* () {
+    const seen: Array<unknown> = []
+    type FakeLifecycle = LifecycleEventLike | { readonly _tag: 'Stop' }
+    const lifecycle = yield* Queue.unbounded<FakeLifecycle>()
+    const dispatches = yield* Queue.unbounded<unknown>()
+
+    let handle: SessionHandle = yield* makeShardAcquire({
+      shard: [0, 1] as const,
+      connect: () =>
+        Effect.succeed({
+          lifecycle: Stream.takeWhile(
+            Stream.fromQueue(lifecycle),
+            (event): event is LifecycleEventLike => event._tag !== 'Stop',
+          ),
+          dispatches: Stream.fromQueue(dispatches),
+        }),
+      loadShardState: Effect.succeed(undefined),
+      saveShardState: () => Effect.void,
+      clearShardState: Effect.void,
+      onDispatch: (payload) =>
+        Effect.sync(() => {
+          seen.push(payload)
+        }),
+    })({ _tag: 'Identify' }, () => Effect.void)
+
+    const joined = yield* Effect.forkScoped(handle.join)
+    yield* Queue.offer(dispatches, { t: 'MESSAGE_CREATE', d: { id: '1' } })
+    yield* Queue.offer(dispatches, { t: 'TYPING_START', d: {} })
+    // The dispatch pump runs concurrently; spin until both payloads landed.
+    let spins = 0
+    while (seen.length < 2 && spins < 100) {
+      yield* Effect.yieldNow
+      spins += 1
+    }
+    expect(seen).toEqual([
+      { t: 'MESSAGE_CREATE', d: { id: '1' } },
+      { t: 'TYPING_START', d: {} },
+    ])
+
+    // Session end interrupts the dispatch pump: no payload survives the socket.
+    yield* Queue.offer(lifecycle, { _tag: 'Disconnected', shardId: 0, code: 1006 })
+    yield* Queue.offer(lifecycle, { _tag: 'Stop' })
+    yield* Effect.exit(Fiber.join(joined))
+    const countBefore = seen.length
+    yield* Queue.offer(dispatches, { t: 'MESSAGE_CREATE', d: { id: '2' } })
+    for (let n = 0; n < 20; n++) yield* Effect.yieldNow
+    expect(seen.length).toBe(countBefore)
+  }))

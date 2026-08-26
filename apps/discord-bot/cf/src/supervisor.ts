@@ -420,6 +420,14 @@ export const make = Effect.fnUntraced(function* (
 export interface RunningShardLike {
   /** Ends when the session terminates; elements carry close classification inputs. */
   readonly lifecycle: Stream.Stream<LifecycleEventLike>
+  /**
+   * Raw gateway payloads (dfx Messaging hub) when the host wires event
+   * handlers; forwarded verbatim to `onDispatch` while the session lives.
+   * Delivery is AT-LEAST-ONCE: a payload may be observed again after a
+   * resume replay, so downstream handlers must be idempotent per gateway
+   * event (the journal claims give thread creation exactly that).
+   */
+  readonly dispatches?: Stream.Stream<unknown> | undefined
 }
 
 export interface LifecycleEventLike {
@@ -446,6 +454,13 @@ export interface MakeShardAcquireOptions {
     state: { readonly resumeUrl: string; readonly sequence: number | null; readonly sessionId: string },
   ) => Effect.Effect<void>
   readonly clearShardState: Effect.Effect<void>
+  /**
+   * Receives every raw gateway payload of the live session while it lasts.
+   * Optional: hosts without event handlers omit it and the acquire seam only
+   * manages the socket. Handlers must be idempotent — delivery is
+   * at-least-once across resumes.
+   */
+  readonly onDispatch?: ((payload: unknown) => Effect.Effect<void>) | undefined
 }
 
 /**
@@ -470,12 +485,17 @@ export const makeShardAcquire = (options: MakeShardAcquireOptions): Acquire =>
 
       const fiber = yield* Effect.forkScoped(
         Effect.gen(function* () {
-          // A connect failure (layer build, socket setup) is reported through
-          // the same join channel as any other session end: retryable.
           const running = yield* Effect.mapError(
             options.connect(),
             () => new DisconnectedError({ reason: 'connect-failed' }),
           )
+          // The dispatch pump shares the session fiber's fate: it is forked
+          // under the same per-attempt scope and interrupted the moment the
+          // lifecycle stream ends, so no handler ever observes a dead socket.
+          const dispatchFiber =
+            options.onDispatch !== undefined && running.dispatches !== undefined
+              ? yield* Effect.forkScoped(Stream.runForEach(running.dispatches, options.onDispatch))
+              : undefined
           let end: SessionFailure | undefined
           yield* Stream.runForEach(running.lifecycle, (event) => {
             if (event._tag === 'Ready' || event._tag === 'Resumed') {
@@ -493,6 +513,7 @@ export const makeShardAcquire = (options: MakeShardAcquireOptions): Acquire =>
             }
             return Effect.void
           })
+          if (dispatchFiber !== undefined) yield* Fiber.interrupt(dispatchFiber)
           return yield* Effect.fail(end ?? new DisconnectedError({}))
         }),
       )
