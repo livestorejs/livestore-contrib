@@ -12,10 +12,12 @@ export default Alchemy.Stack(
   'DiscordBot',
   {
     providers: Cloudflare.providers(),
-    // Cloudflare-hosted remote state store (team/CI default).
-    // For credential-free local experiments swap in:
-    //   state: localState()          // from "alchemy" — .alchemy/ on disk
-    state: Cloudflare.state(),
+    // Remote KV-backed state is the team/CI end state but requires the
+    // token to hold Workers KV Storage Edit; until that permission exists,
+    // stage locally on disk (.alchemy/, gitignored).
+    ...(process.env['CF_STATE'] === 'remote'
+      ? { state: Cloudflare.state() }
+      : { state: Alchemy.localState() }),
   },
   Effect.gen(function* () {
     const worker = yield* DiscordBot
