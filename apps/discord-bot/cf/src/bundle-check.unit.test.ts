@@ -5,36 +5,52 @@ import { dirname, join, resolve } from 'node:path'
 
 const workerEntry = resolve(import.meta.dirname, './worker.ts')
 
-/** Recursively collects module specifiers from static + dynamic `import`/`from` clauses. */
-const collectSpecifiers = (file: string, seen: Set<string>): string[] => {
-  if (seen.has(file)) return []
-  seen.add(file)
-  const source = readFileSync(file, 'utf8')
-  const specifiers = new Set<string>()
-  const patterns = [
-    /(?:^|\n)\s*import\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
-    /(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g,
-    /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g,
-    /(?:^|\n)\s*export\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
-  ]
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) {
-      specifiers.add(match[1] ?? '')
+/**
+ * Recursively collects module specifiers from static + dynamic `import`/`from`
+ * clauses into ONE shared set. Accumulating per-file and merging on return
+ * would either drop everything below depth 1 or re-resolve child specifiers
+ * against the parent directory — both let node-tainted transitives escape.
+ */
+const collectSpecifiers = (entryFile: string): string[] => {
+  const seenFiles = new Set<string>()
+  const allSpecifiers = new Set<string>()
+
+  const walk = (file: string): void => {
+    if (seenFiles.has(file) === true) return
+    seenFiles.add(file)
+    const source = readFileSync(file, 'utf8')
+    const patterns = [
+      /(?:^|\n)\s*import\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
+      /(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g,
+      /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g,
+      /(?:^|\n)\s*export\s+[^'"]*?from\s+['"]([^'"]+)['"]/g,
+    ]
+    const localRelative: string[] = []
+    for (const pattern of patterns) {
+      for (const match of source.matchAll(pattern)) {
+        const specifier = match[1] ?? ''
+        allSpecifiers.add(specifier)
+        if (specifier.startsWith('.') === true && localRelative.includes(specifier) === false) {
+          localRelative.push(specifier)
+        }
+      }
+    }
+
+    // Relative imports inside the worker graph are followed; bare specifiers
+    // stop here (package internals are not part of the worker's own code).
+    for (const specifier of localRelative) {
+      const resolved =
+        specifier.endsWith('.ts') ? join(dirname(file), specifier) : `${join(dirname(file), specifier)}.ts`
+      walk(resolved)
     }
   }
 
-  // Relative imports inside the worker graph are followed; bare specifiers
-  // stop here (package internals are not part of the worker's own code).
-  for (const specifier of specifiers) {
-    if (specifier.startsWith('.') === false) continue
-    const resolved = specifier.endsWith('.ts') ? join(dirname(file), specifier) : `${join(dirname(file), specifier)}.ts`
-    collectSpecifiers(resolved, seen)
-  }
-  return [...specifiers]
+  walk(entryFile)
+  return [...allSpecifiers]
 }
 
 it('the worker dependency graph contains no node: builtins and no test fakes', () => {
-  const reachable = collectSpecifiers(workerEntry, new Set())
+  const reachable = collectSpecifiers(workerEntry)
   expect(reachable.length).toBeGreaterThan(0)
 
   const nodeBuiltins = reachable.filter((specifier) => specifier.startsWith('node:'))

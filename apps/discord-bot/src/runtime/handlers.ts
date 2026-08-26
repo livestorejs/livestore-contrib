@@ -7,9 +7,14 @@ import {
   type CreateThreadInteraction,
   type DocsInteraction,
 } from '../discord/index.ts'
-import { DocsWorkflow, renderDocsMessages } from '../docs/index.ts'
+// Selective imports: the docs barrel re-exports node-bound modules
+// (admission/workflow crypto, file state store), which would drag `node:*`
+// into node-free hosts that share this layer (Cloudflare worker). The config
+// type comes from the portable schema module for the same reason.
+import { renderDocsMessages } from '../docs/render.ts'
+import { DocsWorkflow } from '../docs/services.ts'
 import { EnvironmentName, type ThreadCandidate, type ThreadOutcome } from '../threading/index.ts'
-import type { RuntimeConfigPayload } from './config.ts'
+import type { RuntimeConfigPayload } from './config-schema.ts'
 
 const createPublicThreads = 1n << 35n
 const useApplicationCommands = 1n << 31n

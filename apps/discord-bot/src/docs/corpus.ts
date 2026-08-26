@@ -64,7 +64,9 @@ export const parseCanonicalCorpus = (content: string): ReadonlyArray<Documentati
 export const digestCorpus = Effect.fn('docs.corpus.digest')(function* (content: string) {
   const bytes = new TextEncoder().encode(content)
   const digest = yield* Effect.tryPromise({
-    try: () => globalThis.crypto.subtle.digest('SHA-256', bytes),
+        // Bare global `crypto` (not `globalThis.crypto`): the Workers types
+    // declare it as a global binding, which `typeof globalThis` does not see.
+    try: () => crypto.subtle.digest('SHA-256', bytes),
     catch: (cause) =>
       new CorpusUnavailable({
         reason: 'invalid',

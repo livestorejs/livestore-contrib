@@ -17,14 +17,12 @@ import { Context, Effect, Layer, Schema } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerError } from 'effect/unstable/http'
 import { HttpMiddleware, HttpServerResponse } from 'effect/unstable/http'
 
-import {
-  DeploymentEnvironment,
-  DiscordMessageRef,
-  EmptyPayload,
-  OperatorReason,
-} from '../../src/control/schema.ts'
+import { EmptyPayload } from '../../src/control/schema.ts'
+import { OperatorThreadCreatePayload } from './admin-ops.ts'
 import type { ControlResult } from '../../src/control/schema.ts'
 import { schemaVersion as journalSchemaVersion } from './journal.ts'
+import type { AdminOperationOutcome } from './admin-ops.ts'
+import type { RuntimeConfigSummary } from './runtime-config.ts'
 
 // ---------------------------------------------------------------------------
 // Bridge: worker fetch Request <-> Effect HttpRouter
@@ -145,13 +143,6 @@ export type ControlResultJson = ControlResult
 const json = (body: ControlResultJson, status: number): HttpServerResponse.HttpServerResponse =>
   HttpServerResponse.text(JSON.stringify(body), { status, contentType: 'application/json' })
 
-export const ThreadCreatePayload = Schema.Struct({
-  source: DiscordMessageRef,
-  environment: DeploymentEnvironment,
-  apply: Schema.Literal(true),
-  reason: OperatorReason,
-})
-
 /**
  * Validates a decoded JSON body against a payload schema. Returns the parsed
  * value, or fails with a 422 response carrying `InvalidControlInput` — never
@@ -184,11 +175,10 @@ const readJsonBody = (request: HttpServerRequest.HttpServerRequest): Effect.Effe
   request.json.pipe(Effect.catchIf(() => true, () => Effect.succeed({})))
 
 /**
- * Thread creation is NOT wired to the Cloudflare host yet: the runtime that
- * performs the Discord mutation lives behind the socket control plane. The
- * route validates the payload (same schema as the CLI) and then reports the
- * operation as unavailable — it NEVER fabricates a Success/AlreadySatisfied
- * result for work that did not happen.
+ * Fallback when no thread-creation runtime is wired into this admin plane
+ * instance (standalone use, tests of other routes): the route validates the
+ * payload and reports the operation unavailable — it NEVER fabricates a
+ * Success/AlreadySatisfied result for work that did not happen.
  */
 const threadCreateUnavailable = errorJson(
   {
@@ -206,6 +196,8 @@ export interface RuntimeStatusSnapshot {
   readonly hasSession: boolean
   readonly journalSchemaVersion: number
   readonly docsMonthlySpentUsdMicros: number
+  /** Config projection (`encodeConfigSummary`); present once the runtime loaded its config. */
+  readonly configSummary?: RuntimeConfigSummary | undefined
 }
 
 const runtimeStatusResponse = (
@@ -218,6 +210,7 @@ const runtimeStatusResponse = (
       summary: healthy
         ? `supervisor=${snapshot.supervisor} session=${snapshot.hasSession} docsSpendUsdMicros=${snapshot.docsMonthlySpentUsdMicros}`
         : `journal unreadable (schemaVersion=${snapshot.journalSchemaVersion})`,
+      ...(snapshot.configSummary === undefined ? {} : { configSummary: snapshot.configSummary }),
     },
     healthy ? 200 : 503,
   )
@@ -232,8 +225,35 @@ const runtimeStatusUnavailable = errorJson(
   503,
 )
 
-const parseThreadCreate = decodePayload(ThreadCreatePayload)
+const parseThreadCreate = decodePayload(OperatorThreadCreatePayload)
 const parseEmpty = decodePayload(EmptyPayload)
+
+const configUnavailable = errorJson(
+  {
+    _tag: 'ControlDependencyUnavailable',
+    dependency: 'runtime-config-store',
+    message: 'No runtime config store is wired into this admin plane instance',
+  },
+  503,
+)
+
+const threadReconcileUnavailable = errorJson(
+  {
+    _tag: 'ControlDependencyUnavailable',
+    dependency: 'thread-reconciliation-runtime',
+    message: 'No thread reconciliation is wired into this admin plane instance',
+  },
+  503,
+)
+
+const commandsSyncUnavailable = errorJson(
+  {
+    _tag: 'ControlDependencyUnavailable',
+    dependency: 'application-command-sync',
+    message: 'No application-command sync is wired into this admin plane instance',
+  },
+  503,
+)
 
 // ---------------------------------------------------------------------------
 // Router assembly
@@ -253,7 +273,28 @@ export interface AdminRouterOptions {
    * reports ControlDependencyUnavailable instead of a fabricated snapshot.
    */
   readonly runtimeStatus?: () => Effect.Effect<RuntimeStatusSnapshot>
+  /**
+   * Real operator thread creation through the journal-claimed thread workflow.
+   * Receives the already schema-validated payload; returns the plain JSON
+   * outcome (`AdminOperationOutcome`). Absent ⇒ 503 unavailable, never a
+   * fabricated Success.
+   */
+  readonly threadCreate?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
+  /** Config store read: validated summary plus the stored payload. Absent ⇒ 503. */
+  readonly configGet?: Effect.Effect<AdminOperationOutcome> | undefined
+  /** Validated config write through `RuntimeConfigStore.write`. Absent ⇒ 503. */
+  readonly configPut?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
+  /** Application-command sync against the RUNNING config's command scope. Absent ⇒ 503. */
+  readonly commandsSync?: Effect.Effect<AdminOperationOutcome> | undefined
+  /** Journal reconciliation (Plan or Apply). Absent ⇒ 503. */
+  readonly threadReconcile?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
 }
+
+/** Renders a plain JSON operation outcome as an HTTP response. */
+const outcomeResponse = (outcome: AdminOperationOutcome): HttpServerResponse.HttpServerResponse =>
+  HttpServerResponse.text(JSON.stringify(outcome.body), { status: outcome.status, contentType: 'application/json' })
+
+
 /**
  * Builds the admin router. The returned effect carries dispatch-time phantom
  * markers (global bearer auth needs AdminToken; handler failures surface as
@@ -268,17 +309,48 @@ export const makeAdminRouter = (options: AdminRouterOptions = {}): AdminRouterEf
     // answer 401 to unauthenticated callers instead of leaking route
     // existence through a 404 oracle.
     yield* router.addGlobalMiddleware(bearerAuth)
-
-
+    // ThreadCreate: validated against the same schema the CLI encodes, then
+    // executed by the REAL operator trigger (journal claim → Discord API →
+    // outcome) when the runtime is wired; absent ⇒ 503 unavailable — never a
+    // fabricated Success.
     yield* router.add('POST', '/admin/rpc/ThreadCreate', (request) =>
       Effect.flatMap(readJsonBody(request), (body) =>
-        Effect.flatMap(parseThreadCreate(body), () => Effect.succeed(threadCreateUnavailable))))
+        Effect.flatMap(parseThreadCreate(body), () =>
+          options.threadCreate === undefined
+            ? Effect.succeed(threadCreateUnavailable)
+            : Effect.map(options.threadCreate(body), outcomeResponse))))
+    // Real reconciliation over ambiguous journal entries (Node control-plane
+    // parity); absent runtime ⇒ 503 unavailable.
+    yield* router.add('POST', '/admin/rpc/ThreadReconcile', (request) =>
+      Effect.flatMap(readJsonBody(request), (body) =>
+        options.threadReconcile === undefined
+          ? Effect.succeed(threadReconcileUnavailable)
+          : Effect.map(options.threadReconcile(body), outcomeResponse)))
     yield* router.add('POST', '/admin/rpc/RuntimeStatus', (request) =>
       Effect.flatMap(readJsonBody(request), (body) =>
         Effect.flatMap(parseEmpty(body), () =>
           options.runtimeStatus === undefined
             ? Effect.succeed(runtimeStatusUnavailable)
             : Effect.map(options.runtimeStatus(), runtimeStatusResponse))))
+    yield* router.add('POST', '/admin/commands-sync', (request) =>
+      Effect.flatMap(readJsonBody(request), (body) =>
+        Effect.flatMap(parseEmpty(body), () =>
+          options.commandsSync === undefined
+            ? Effect.succeed(commandsSyncUnavailable)
+            : Effect.map(options.commandsSync, outcomeResponse))))
+
+    // Policy/config plane over the SAME durable config document the handlers
+    // consume: GET returns the validated summary plus the stored payload,
+    // PUT validates through RuntimeConfigStore.write before persisting.
+    yield* router.add('GET', '/admin/config', () =>
+      options.configGet === undefined
+        ? Effect.succeed(configUnavailable)
+        : Effect.map(options.configGet, outcomeResponse))
+    yield* router.add('PUT', '/admin/config', (request) =>
+      Effect.flatMap(readJsonBody(request), (body) =>
+        options.configPut === undefined
+          ? Effect.succeed(configUnavailable)
+          : Effect.map(options.configPut(body), outcomeResponse)))
 
     return router
   }).pipe(Effect.provide(Layer.succeed(HttpRouter.RouterConfig, {}))) as unknown as AdminRouterEffect
