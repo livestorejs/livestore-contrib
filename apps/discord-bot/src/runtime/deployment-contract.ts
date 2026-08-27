@@ -5,7 +5,15 @@ const Snowflake = Schema.String.check(Schema.isPattern(/^\d{17,20}$/))
 const SecretRef = NonEmpty.check(Schema.isMaxLength(512))
 const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0))
 
-export const DeploymentTelemetry = Schema.Struct({
+export const DeploymentDiagnostics = Schema.Struct({
+  sink: Schema.Literal('cloudflare-provider'),
+  delivery: Schema.Literal('best-effort'),
+  accessPolicyId: SecretRef,
+  retentionDays: PositiveInt.check(Schema.isLessThanOrEqualTo(30)),
+})
+
+/** Read-only migration adapter for pre-Cloudflare persisted config documents. */
+export const DeprecatedDeploymentTelemetry = Schema.Struct({
   sink: Schema.Literal('dev3-tempo'),
   delivery: Schema.Literal('best-effort'),
   accessBoundary: Schema.Literal('tailnet-trusted-grafana'),
@@ -41,7 +49,8 @@ export const DeploymentBase = {
   botTokenSecretRef: SecretRef,
   openAi: DeploymentOpenAi,
   releaseId: NonEmpty.check(Schema.isMaxLength(256)),
-  telemetry: DeploymentTelemetry,
+  diagnostics: Schema.optional(DeploymentDiagnostics),
+  telemetry: Schema.optional(DeprecatedDeploymentTelemetry),
 } as const
 
 export const BotDeploymentConfig = Schema.Union([
@@ -62,14 +71,34 @@ export const BotDeploymentConfig = Schema.Union([
 ]).annotate({ identifier: 'DiscordBot.Runtime.BotDeploymentConfig.v1' })
 export type BotDeploymentConfig = typeof BotDeploymentConfig.Type
 
+export type DeploymentDiagnostics = typeof DeploymentDiagnostics.Type
+
+/** Canonical diagnostics projection; legacy telemetry is accepted only so persisted config remains repairable. */
+export const resolveDeploymentDiagnostics = (
+  config: Pick<BotDeploymentConfig, 'diagnostics' | 'telemetry'>,
+): DeploymentDiagnostics => {
+  if (config.diagnostics !== undefined) return config.diagnostics
+  if (config.telemetry !== undefined) {
+    return {
+      sink: 'cloudflare-provider',
+      delivery: config.telemetry.delivery,
+      retentionDays: config.telemetry.retentionDays,
+      accessPolicyId: 'legacy-tailnet-policy-migration-required',
+    }
+  }
+  throw new Error('diagnostics must declare the Cloudflare provider sink and access policy')
+}
+
 /**
  * Applies the cross-field rules that cannot be expressed by the JSON shape.
  * Arrays are canonicalized here so deployment controllers do not accidentally
  * create duplicate action or audience targets.
  */
 export const normalizeDeploymentConfig = (config: BotDeploymentConfig): BotDeploymentConfig => {
+  const diagnostics = resolveDeploymentDiagnostics(config)
   const normalized = {
     ...config,
+    diagnostics,
     actionChannelIds: unique(config.actionChannelIds),
     aiTitleChannelIds: unique(config.aiTitleChannelIds),
     stagingOnlyChannelIds: unique(config.stagingOnlyChannelIds),

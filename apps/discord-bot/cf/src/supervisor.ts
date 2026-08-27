@@ -32,6 +32,8 @@ import { isTerminalGatewayCloseCode } from 'dfx/DiscordGateway/DiscordWS'
 
 import type { Scope } from 'effect/Scope'
 
+import type { GatewayTelemetryRecorder } from './gateway-telemetry.ts'
+
 // ---------------------------------------------------------------------------
 // Errors & data
 // ---------------------------------------------------------------------------
@@ -71,6 +73,7 @@ export type SupervisorState =
 export type SessionEvent =
   | { readonly _tag: 'Ready'; readonly session: GatewaySession }
   | { readonly _tag: 'Resumed'; readonly session: GatewaySession }
+  | { readonly _tag: 'Disconnected' }
 
 // Persistence ownership is SINGLE: the supervisor persists session_id +
 // sequence at READY/RESUMED checkpoints; intra-session replay-sequence
@@ -120,7 +123,7 @@ export const sessionEndFromClose = (
    */
   closeCodeIsError: (code: number) => boolean = defaultCloseCodeIsError,
 ): SessionFailure =>
-  code !== undefined && closeCodeIsError(code) && isTerminalGatewayCloseCode(code)
+  code !== undefined && closeCodeIsError(code) === true && isTerminalGatewayCloseCode(code) === true
     ? new TerminalCloseError({
         code,
         ...(reason === undefined ? {} : { reason }),
@@ -177,6 +180,11 @@ export interface SupervisorOptions {
   readonly gracePeriod?: Duration.Input | undefined
   /** Jitter source in [0, 1). Defaults to Math.random; inject for tests. */
   readonly random?: Effect.Effect<number> | undefined
+  /**
+   * Content-free durable observations for attempts and session lifecycle.
+   * The owning runtime records `activated` only after installation.
+   */
+  readonly telemetry?: GatewayTelemetryRecorder | undefined
 }
 
 export const defaultGracePeriod = Duration.seconds(30)
@@ -228,6 +236,8 @@ interface AttemptOutcome {
   readonly failure: SessionFailure
   /** Clock millis at which the session became ready/resumed, if it did. */
   readonly establishedAt: number | undefined
+  /** A lifecycle disconnect was already recorded inside this attempt. */
+  readonly disconnectObserved: boolean
 }
 
 export const make = Effect.fnUntraced(function* (
@@ -235,9 +245,7 @@ export const make = Effect.fnUntraced(function* (
   options: SupervisorOptions,
 ) {
   const capMillis = Duration.toMillis(options.maxBackoff)
-  const graceMillis = options.gracePeriod
-    ? Duration.toMillis(options.gracePeriod)
-    : Duration.toMillis(defaultGracePeriod)
+  const graceMillis = options.gracePeriod !== undefined ? Duration.toMillis(options.gracePeriod) : Duration.toMillis(defaultGracePeriod)
   const random = options.random ?? Effect.sync(() => Math.random())
   const stateRef = yield* Ref.make<SupervisorState>('disconnected')
   const transitions = yield* Queue.unbounded<Transition>()
@@ -259,6 +267,9 @@ export const make = Effect.fnUntraced(function* (
   const recordEstablished = (
     latest: Ref.Ref<GatewaySession | null>,
     setEstablishedAt: (millis: number) => void,
+    markReady: (
+      event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>,
+    ) => Effect.Effect<void>,
     event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>,
   ) =>
     Effect.gen(function* () {
@@ -268,87 +279,152 @@ export const make = Effect.fnUntraced(function* (
       }
       yield* Ref.set(latest, event.session)
       setEstablishedAt(yield* Clock.currentTimeMillis)
-      yield* setState('ready')
+      yield* markReady(event)
       yield* deps.saveSession(event.session)
     }).pipe(Effect.uninterruptible)
 
   // One connect attempt: load session → acquire → pump events until the
   // session ends. Never fails or dies; every ending becomes a classified
   // AttemptOutcome (crashes included, as retryable disconnects).
-  const attemptOnce = Effect.gen(function* () {
-    const session = yield* deps.loadSession
-    const mode: ConnectMode = session ? { _tag: 'Resume', session } : { _tag: 'Identify' }
-    yield* setState(session ? 'resuming' : 'connecting')
-
-    const latest = yield* Ref.make<GatewaySession | null>(session)
-    let establishedAt: number | undefined
-
-    const inbox = yield* Queue.unbounded<SessionEvent>()
-    const emit = (event: SessionEvent) => Queue.offer(inbox, event).pipe(Effect.asVoid)
-
-    const onEvent = (event: SessionEvent) =>
-      event._tag === 'Ready' || event._tag === 'Resumed'
-        ? recordEstablished(
-          latest,
-          (millis) => {
-            establishedAt = millis
-          },
-          event,
+  const attemptOnce = (attemptNumber: number) =>
+    Effect.gen(function* () {
+      const session = yield* deps.loadSession
+      const mode: ConnectMode = session !== null ? { _tag: 'Resume', session } : { _tag: 'Identify' }
+      yield* setState(session !== null ? 'resuming' : 'connecting')
+      if (options.telemetry !== undefined) {
+        yield* options.telemetry.attemptStarted(
+          attemptNumber,
+          mode._tag === 'Identify' ? 'identify' : 'resume',
         )
-        : Effect.void
+      }
 
-    const pump = yield* Effect.forkScoped(
-      Effect.whileLoop({
-        while: () => true,
-        body: () => Effect.flatMap(Queue.take(inbox), onEvent),
-        step: () => undefined,
-      }),
-    )
+      const latest = yield* Ref.make<GatewaySession | null>(session)
+      let establishedAt: number | undefined
+      let disconnectObserved = false
+      const live = yield* Ref.make(true)
+      const readinessLock = yield* Semaphore.make(1)
+      const markReady = (
+        event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>,
+      ) =>
+        Semaphore.withPermits(readinessLock, 1)(
+          Effect.gen(function* () {
+            if ((yield* Ref.get(live)) === false) return
+            // Append before publishing readiness: if the durable sink is slow,
+            // the status remains connecting rather than falsely ready.
+            if (options.telemetry !== undefined) {
+              yield* event._tag === 'Ready'
+                ? options.telemetry.ready(attemptNumber)
+                : options.telemetry.resumed(attemptNumber)
+            }
+            yield* setState('ready')
+          }),
+        )
+      const markDisconnected = Semaphore.withPermits(readinessLock, 1)(
+        Effect.gen(function* () {
+          if ((yield* Ref.get(live)) === false) return
+          disconnectObserved = true
+          // Withdraw process-local readiness first, then durably publish the
+          // content-free reconnect observation for BotStatus.
+          yield* setState('disconnected')
+          if (options.telemetry !== undefined) {
+            yield* options.telemetry.disconnected(attemptNumber)
+          }
+        }),
+      )
 
-    const end = yield* Effect.exit(
-      deps.acquire(mode, emit).pipe(Effect.flatMap((handle) => handle.join)),
-    )
+      const inbox = yield* Queue.unbounded<SessionEvent>()
+      const emit = (event: SessionEvent) =>
+        event._tag === 'Disconnected'
+          ? markDisconnected
+          : Queue.offer(inbox, event).pipe(Effect.asVoid)
 
-    yield* Fiber.interrupt(pump)
-    // A session may emit READY/RESUMED right before it ends; process anything
-    // still buffered so persistence and `establishedAt` cannot lose the race.
-    // Uninterruptible: a half-applied checkpoint is worse than a late one.
-    yield* Effect.uninterruptible(
-      Effect.gen(function* () {
-        const pending = yield* Queue.size(inbox)
-        for (let n = 0; n < pending; n++) {
-          yield* onEvent(yield* Queue.take(inbox))
+      const onEvent = (event: SessionEvent) =>
+        event._tag === 'Ready' || event._tag === 'Resumed'
+          ? recordEstablished(
+            latest,
+            (millis) => {
+              establishedAt = millis
+            },
+            markReady,
+            event,
+          )
+          : Effect.void
+
+      const pump = yield* Effect.forkScoped(
+        Effect.whileLoop({
+          while: () => true,
+          body: () => Effect.flatMap(Queue.take(inbox), onEvent),
+          step: () => undefined,
+        }),
+      )
+
+      const end = yield* Effect.exit(
+        deps.acquire(mode, emit).pipe(Effect.flatMap((handle) => handle.join)),
+      )
+
+      // Serialize with READY publication, permanently close the live gate,
+      // and withdraw readiness before waiting for an in-flight durable
+      // checkpoint. A late buffered event may still persist resume state, but
+      // can never publish `ready` for this dead attempt.
+      yield* Semaphore.withPermits(readinessLock, 1)(
+        Ref.set(live, false).pipe(
+          Effect.andThen(setState('disconnected')),
+        ),
+      )
+      yield* Fiber.interrupt(pump)
+      // A session may emit READY/RESUMED right before it ends; process anything
+      // still buffered so persistence and `establishedAt` cannot lose the race.
+      // Uninterruptible: a half-applied checkpoint is worse than a late one.
+      yield* Effect.uninterruptible(
+        Effect.gen(function* () {
+          const pending = yield* Queue.size(inbox)
+          for (let n = 0; n < pending; n++) {
+            yield* onEvent(yield* Queue.take(inbox))
+          }
+        }),
+      )
+      yield* Queue.shutdown(inbox)
+
+      // Classify the ending: clean success → retryable; failed cause → its
+      // error; died cause (crash-in-connecting) → retryable disconnect.
+      // `establishedAt` flows through EVERY branch: the deploy-churn grace in
+      // the run loop depends on knowing when this attempt got established.
+      let outcome: AttemptOutcome
+      if (end._tag === 'Success') {
+        outcome = {
+          failure: new DisconnectedError({}),
+          establishedAt,
+          disconnectObserved,
         }
-      }),
-    )
-    yield* Queue.shutdown(inbox)
-
-    // Classify the ending: clean success → retryable; failed cause → its
-    // error; died cause (crash-in-connecting) → retryable disconnect.
-    // `establishedAt` flows through EVERY branch: the deploy-churn grace in
-    // the run loop depends on knowing when this attempt got established.
-    let outcome: AttemptOutcome
-    if (end._tag === 'Success') {
-      outcome = { failure: new DisconnectedError({}), establishedAt }
-    } else {
-      const foundFail = Cause.findFail(end.cause)
-      outcome = Result.isSuccess(foundFail)
-        ? { failure: foundFail.success.error, establishedAt }
-        : { failure: new DisconnectedError({ reason: 'crash' }), establishedAt }
-    }
-    return outcome
-  })
+      } else {
+        const foundFail = Cause.findFail(end.cause)
+        outcome = Result.isSuccess(foundFail) === true
+          ? { failure: foundFail.success.error, establishedAt, disconnectObserved }
+          : {
+              failure: new DisconnectedError({ reason: 'crash' }),
+              establishedAt,
+              disconnectObserved,
+            }
+      }
+      return outcome
+    })
 
   const run: Effect.Effect<void> = Effect.gen(function* () {
     yield* setState('disconnected')
     let attempt = 0
+    let attemptNumber = 0
 
     while (true) {
       // Own scope per attempt: acquire-side `forkScoped` resources finalize
       // the moment the session ends instead of leaking through backoff waits.
-      const { establishedAt, failure } = yield* Effect.scoped(attemptOnce)
+      attemptNumber++
+      const { disconnectObserved, establishedAt, failure } =
+        yield* Effect.scoped(attemptOnce(attemptNumber))
 
       if (failure._tag === 'TerminalCloseError') {
+        if (options.telemetry !== undefined) {
+          yield* options.telemetry.terminalClose(attemptNumber, failure.code)
+        }
         // Retry policy: halt permanently — reconnecting only consumes identify
         // capacity. Drop the dead session so the next boot (after the operator
         // fixes config/token/shard layout) identifies freshly.
@@ -360,6 +436,9 @@ export const make = Effect.fnUntraced(function* (
           ...(failure.reason === undefined ? {} : { reason: failure.reason }),
         })
         return
+      }
+      if (disconnectObserved === false && options.telemetry !== undefined) {
+        yield* options.telemetry.disconnected(attemptNumber)
       }
 
       // Deploy-churn grace: a disconnect right after establishment is a
@@ -378,7 +457,6 @@ export const make = Effect.fnUntraced(function* (
         attempt,
         delayMillis,
       })
-      yield* setState('disconnected')
       yield* Effect.sleep(Duration.millis(delayMillis))
     }
   }).pipe(Effect.ensuring(Queue.shutdown(transitions)))
@@ -420,6 +498,14 @@ export const make = Effect.fnUntraced(function* (
 export interface RunningShardLike {
   /** Ends when the session terminates; elements carry close classification inputs. */
   readonly lifecycle: Stream.Stream<LifecycleEventLike>
+  /**
+   * DFX's terminal-failure channel is independent of `lifecycle`; the latter
+   * stays open after Discord rejects the connection.
+   */
+  readonly failure: Effect.Effect<
+    never,
+    { readonly code: number; readonly reason?: string | undefined }
+  >
   /**
    * Raw gateway payloads (dfx Messaging hub) when the host wires event
    * handlers; forwarded verbatim to `onDispatch` while the session lives.
@@ -490,31 +576,48 @@ export const makeShardAcquire = (options: MakeShardAcquireOptions): Acquire =>
             () => new DisconnectedError({ reason: 'connect-failed' }),
           )
           // The dispatch pump shares the session fiber's fate: it is forked
-          // under the same per-attempt scope and interrupted the moment the
-          // lifecycle stream ends, so no handler ever observes a dead socket.
+          // under the same per-attempt scope and interrupted the moment either
+          // lifecycle ends or DFX's independent terminal-failure channel wins.
           const dispatchFiber =
             options.onDispatch !== undefined && running.dispatches !== undefined
               ? yield* Effect.forkScoped(Stream.runForEach(running.dispatches, options.onDispatch))
               : undefined
           let end: SessionFailure | undefined
-          yield* Stream.runForEach(running.lifecycle, (event) => {
+          const consumeLifecycle = Stream.runForEach(running.lifecycle, (event) => {
             if (event._tag === 'Ready' || event._tag === 'Resumed') {
               return Effect.flatMap(options.loadShardState, (state) => {
                 const session: GatewaySession = {
                   sessionId: state?.sessionId ?? '',
                   sequence: state?.sequence ?? 0,
-                  ...(state?.resumeUrl ? { resumeUrl: state.resumeUrl } : {}),
+                  ...(state !== undefined && state.resumeUrl !== '' ? { resumeUrl: state.resumeUrl } : {}),
                 }
                 return emit(event._tag === 'Ready' ? { _tag: 'Ready', session } : { _tag: 'Resumed', session })
               })
             }
             if (event._tag === 'Disconnected') {
               end = sessionEndFromClose(event.code, undefined)
+              return emit({ _tag: 'Disconnected' })
             }
             return Effect.void
-          })
-          if (dispatchFiber !== undefined) yield* Fiber.interrupt(dispatchFiber)
-          return yield* Effect.fail(end ?? new DisconnectedError({}))
+          }).pipe(
+            Effect.andThen(
+              Effect.suspend(() =>
+                Effect.fail(end ?? new DisconnectedError({})),
+              ),
+            ),
+          )
+          const terminalFailure = running.failure.pipe(
+            Effect.mapError((failure) =>
+              sessionEndFromClose(failure.code, failure.reason),
+            ),
+          )
+          yield* Effect.raceFirst(consumeLifecycle, terminalFailure).pipe(
+            Effect.ensuring(
+              dispatchFiber === undefined
+                ? Effect.void
+                : Effect.asVoid(Fiber.interrupt(dispatchFiber)),
+            ),
+          )
         }),
       )
       return { join: Fiber.join(fiber) } satisfies SessionHandle

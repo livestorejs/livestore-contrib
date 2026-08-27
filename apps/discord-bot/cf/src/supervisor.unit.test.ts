@@ -141,7 +141,7 @@ const makeSupervisor = (gateway: FakeGateway, store: SessionStore) =>
 const waitFor = (check: Effect.Effect<boolean>) =>
   Effect.gen(function* () {
     for (;;) {
-      if (yield* check) break
+      if ((yield* check) === true) break
       yield* Effect.yieldNow
     }
   })
@@ -474,6 +474,7 @@ it.effect('acquire seam syncs the shared store and translates lifecycle into Ses
             Stream.fromQueue(lifecycle),
             (event): event is LifecycleEventLike => event._tag !== 'Stop',
           ),
+          failure: Effect.never,
         }),
       loadShardState: Ref.get(state),
       saveShardState: (next) => Ref.set(state, next),
@@ -504,7 +505,7 @@ it.effect('acquire seam syncs the shared store and translates lifecycle into Ses
       // v4 Cause has no failureOption; findFail surfaces the failed error.
       const foundFail = Cause.findFail(exit.cause)
       expect(Result.isSuccess(foundFail)).toBe(true)
-      if (Result.isSuccess(foundFail)) {
+      if (Result.isSuccess(foundFail) === true) {
         expect(foundFail.success.error._tag).toBe('TerminalCloseError')
       }
     }
@@ -525,6 +526,7 @@ it.effect('acquire seam forwards dispatch payloads to onDispatch and stops with 
             Stream.fromQueue(lifecycle),
             (event): event is LifecycleEventLike => event._tag !== 'Stop',
           ),
+          failure: Effect.never,
           dispatches: Stream.fromQueue(dispatches),
         }),
       loadShardState: Effect.succeed(undefined),

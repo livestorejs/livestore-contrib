@@ -4,130 +4,192 @@ import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
 import { makeFakeDoStorage } from './fake-do-storage.ts'
-import { encodeConfigSummary, makeRuntimeConfigStore, runtimeConfigKey } from './runtime-config.ts'
-import { RuntimeConfigPayload } from './runtime-config.ts'
+import {
+  encodeConfigSummary,
+  makeRuntimeConfigStore,
+  RuntimeConfigPayload,
+  runtimeConfigKey,
+} from './runtime-config.ts'
 
-const makeStore = () => {
+const makeStore = (releaseId?: string) => {
   const storage = makeFakeDoStorage()
-  return { storage, store: makeRuntimeConfigStore(storage) }
+  return { storage, store: makeRuntimeConfigStore(storage, releaseId) }
 }
 
-it.effect('read falls back to the accepted staging default on empty storage', () =>
+it.effect('empty storage exposes the AI-off dedicated-actor default at revision zero', () =>
   Effect.gen(function* () {
-    const previousReleaseId = process.env['RELEASE_ID']
-    delete process.env['RELEASE_ID']
-    try {
-      const { store } = makeStore()
-      const config = yield* store.read
+    const { store } = makeStore('cf-deploy-42')
+    const document = yield* store.read
 
-      // The default itself must satisfy the full schema contract, cross-field
-      // filter included — otherwise boot would hand downstream handlers an
-      // invalid payload that `write` would reject.
-      expect(Schema.is(RuntimeConfigPayload)(config)).toBe(true)
-      expect(config._tag).toBe('real')
-      if (config._tag !== 'real') return
-      expect(config.environment).toBe('staging')
-      expect(config.applicationId).toBe('1541431832195633232')
-      expect(config.guildId).toBe('1154415661842452532')
-      expect(config.commandScope).toEqual({
-        _tag: 'GuildCommandScope',
-        applicationId: '1541431832195633232',
-        guildId: '1154415661842452532',
-      })
-      expect(config.actionChannelIds).toEqual(['1373597443798859776'])
-      expect(config.stagingOnlyChannelIds).toEqual(['1373597443798859776'])
-      expect(config.aiTitleChannelIds).toEqual(['1373597443798859776'])
-      expect(config.legacyCommands).toEqual([])
-      expect(config.docsAudience).toEqual({
-        publicChannelIds: ['1373597443798859776'],
-        roleRestrictedChannelIds: ['1541442247864623114'],
-        contributorMaintainerRoleIds: ['1373662624948162570', '1310653672786755584'],
-      })
-      expect(config.releaseId).toBe('dev')
-    } finally {
-      if (previousReleaseId !== undefined) process.env['RELEASE_ID'] = previousReleaseId
-    }
+    expect(document.revision).toBe(0)
+    expect(Schema.is(RuntimeConfigPayload)(document.config)).toBe(true)
+    expect(document.config.environment).toBe('staging')
+    expect(document.config.applicationId).toBe('1541431832195633232')
+    expect(document.config.commandScope).toEqual({
+      _tag: 'GuildCommandScope',
+      applicationId: '1541431832195633232',
+      guildId: '1154415661842452532',
+    })
+    expect(document.config.aiTitleChannelIds).toEqual([])
+    expect(document.config.legacyCommands).toEqual([])
+    if (document.config._tag !== 'real') return
+    expect(document.config.e2e?.actorApplicationId).toBe('1541440368212705380')
+    expect(document.config.releaseId).toBe('cf-deploy-42')
+    expect(document.config.diagnostics).toEqual({
+      sink: 'cloudflare-provider',
+      delivery: 'best-effort',
+      accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
+      retentionDays: 30,
+    })
+    expect(document.config.telemetry).toBeUndefined()
   }))
 
-it.effect('releaseId prefers the RELEASE_ID env binding over the dev fallback', () =>
+it.effect('write persists one revisioned document and keeps release identity deploy-owned', () =>
   Effect.gen(function* () {
-    const previousReleaseId = process.env['RELEASE_ID']
-    process.env['RELEASE_ID'] = 'cf-deploy-42'
-    try {
-      const { store } = makeStore()
-      const config = yield* store.read
-      expect(config.releaseId).toBe('cf-deploy-42')
-    } finally {
-      if (previousReleaseId === undefined) delete process.env['RELEASE_ID']
-      else process.env['RELEASE_ID'] = previousReleaseId
-    }
+    const { storage, store } = makeStore('current-release')
+    const initial = yield* store.read
+    const written = yield* store.write({
+      expectedRevision: initial.revision,
+      config: { ...structuredClone(initial.config), releaseId: 'admin-supplied-release' },
+    })
+
+    expect(written.revision).toBe(1)
+    expect(written.config.releaseId).toBe('current-release')
+    expect([...((yield* Effect.promise(() => storage.list())).keys())]).toEqual([runtimeConfigKey])
+    expect(yield* store.read).toEqual(written)
   }))
 
-it.effect('write persists under the single namespaced key and reads back equal', () =>
-  Effect.gen(function* () {
-    const { storage, store } = makeStore()
-
-    // A minimal mutation of the default keeps every schema invariant intact.
-    const payload: RuntimeConfigPayload = {
-      ...structuredClone(yield* store.read),
-      releaseId: 'admin-written-release',
-    }
-    yield* store.write(payload)
-
-    // Exactly one key, holding one JSON document.
-    const entries = yield* Effect.promise(() => storage.list())
-    expect([...entries.keys()]).toEqual([runtimeConfigKey])
-
-    const roundTripped = yield* store.read
-    expect(roundTripped).toEqual(payload)
-  }))
-
-it.effect('write rejects payloads failing schema decode, leaving storage untouched', () =>
-  Effect.gen(function* () {
-    const { storage, store } = makeStore()
-
-    // Fails structural decode.
-    const garbageError = yield* Effect.flip(store.write({ nope: true }))
-    expect(garbageError).toBeInstanceOf(Error)
-
-    // Well-typed-looking but violating the cross-field filter: guild scope
-    // pointing at a different guild than the declared one.
-    const mismatchedError = yield* Effect.flip(
-      store.write({
-        ...structuredClone(yield* store.read),
-        commandScope: { _tag: 'GuildCommandScope', applicationId: '1541431832195633232', guildId: '999' },
-      }),
-    )
-    expect(mismatchedError).toBeInstanceOf(Error)
-
-    expect(yield* Effect.promise(() => storage.list())).toHaveLength(0)
-  }))
-
-it.effect('encodeConfigSummary projects the JSON-safe admin shape', () =>
+it.effect('stale expectedRevision is rejected without changing the durable document', () =>
   Effect.gen(function* () {
     const { store } = makeStore()
-    const summary = encodeConfigSummary(yield* store.read)
+    const initial = yield* store.read
+    const revisionOne = yield* store.write({ expectedRevision: 0, config: initial.config })
 
-    // Round-trips through JSON unchanged: safe for RuntimeStatus/policy-get bodies.
-    expect(JSON.parse(JSON.stringify(summary))).toEqual(summary)
-    expect(summary.mode).toBe('real')
-    expect(summary.environment).toBe('staging')
-    expect(summary.applicationId).toBe('1541431832195633232')
-    expect(summary.actionChannelCount).toBe(1)
-    expect(summary.restrictedDocsChannelCount).toBe(1)
-    expect(summary.docsRoleCount).toBe(2)
-    expect(summary.health).toEqual({ host: '127.0.0.1', port: 8787 })
+    const error = yield* Effect.flip(store.write({ expectedRevision: 0, config: initial.config }))
+    expect(error).toMatchObject({
+      _tag: 'RuntimeConfigRevisionConflict',
+      expectedRevision: 0,
+      actualRevision: 1,
+    })
+    expect(yield* store.read).toEqual(revisionOne)
   }))
 
-it.effect('a present-but-corrupt document fails LOUDLY (never silently defaults)', () =>
+it.effect('validation precedes CAS and invalid candidates leave storage untouched', () =>
+  Effect.gen(function* () {
+    const { storage, store } = makeStore()
+    const invalid = {
+      ...structuredClone((yield* store.read).config),
+      commandScope: {
+        _tag: 'GuildCommandScope',
+        applicationId: '1541431832195633232',
+        guildId: '999',
+      },
+    }
+
+    expect((yield* Effect.exit(store.write({ expectedRevision: 0, config: invalid })))._tag).toBe('Failure')
+    expect(yield* Effect.promise(() => storage.list())).toHaveLength(0)
+  }))
+it('serializes concurrent CAS writers so only one can advance a revision', async () => {
+  const backing = makeFakeDoStorage()
+  let releaseReads: () => void = () => {}
+  const readGate = new Promise<void>((resolve) => {
+    releaseReads = resolve
+  })
+  let signalFirstRead: () => void = () => {}
+  const firstReadStarted = new Promise<void>((resolve) => {
+    signalFirstRead = resolve
+  })
+  let reads = 0
+  const storage = {
+    get: async <T>(key: string) => {
+      reads += 1
+      if (reads === 1) signalFirstRead()
+      await readGate
+      return backing.get<T>(key)
+    },
+    put: <T>(key: string, value: T) => backing.put(key, value),
+    delete: (key: string) => backing.delete(key),
+    list: <T>(options?: { readonly prefix?: string }) => backing.list<T>(options),
+  }
+  const store = makeRuntimeConfigStore(storage)
+  // Seed the candidate without going through the gated read.
+  const config = (await Effect.runPromise(makeRuntimeConfigStore(backing).read)).config
+  const first = Effect.runPromise(Effect.exit(store.write({ expectedRevision: 0, config })))
+  const second = Effect.runPromise(Effect.exit(store.write({ expectedRevision: 0, config })))
+  await firstReadStarted
+  releaseReads()
+  const exits = await Promise.all([first, second])
+  expect(exits.filter((exit) => exit._tag === 'Success')).toHaveLength(1)
+  expect(exits.filter((exit) => exit._tag === 'Failure')).toHaveLength(1)
+  expect((await Effect.runPromise(store.read)).revision).toBe(1)
+})
+
+
+it.effect('stored release identity is rebound to the current Worker release on read', () =>
+  Effect.gen(function* () {
+    const storage = makeFakeDoStorage()
+    const oldStore = makeRuntimeConfigStore(storage, 'old-release')
+    yield* oldStore.write({ expectedRevision: 0, config: (yield* oldStore.read).config })
+
+    const current = yield* makeRuntimeConfigStore(storage, 'current-release').read
+    expect(current.revision).toBe(1)
+    expect(current.config.releaseId).toBe('current-release')
+  }))
+
+it.effect('reads a legacy telemetry payload as revision zero and reports canonical diagnostics', () =>
+  Effect.gen(function* () {
+    const storage = makeFakeDoStorage()
+    const canonical = (yield* makeRuntimeConfigStore(storage, 'legacy-release').read).config
+    const { diagnostics: _diagnostics, ...withoutDiagnostics } = canonical
+    yield* Effect.promise(() =>
+      storage.put(runtimeConfigKey, JSON.stringify({
+        ...withoutDiagnostics,
+        telemetry: {
+          sink: 'dev3-tempo',
+          delivery: 'best-effort',
+          accessBoundary: 'tailnet-trusted-grafana',
+          retentionDays: 30,
+        },
+      })))
+
+    const currentStore = makeRuntimeConfigStore(storage, 'current-release')
+    const document = yield* currentStore.read
+    expect(document.revision).toBe(0)
+    expect(document.config.releaseId).toBe('current-release')
+    expect(document.config.diagnostics?.sink).toBe('cloudflare-provider')
+    expect(document.config.telemetry).toBeUndefined()
+    expect(encodeConfigSummary(document.config).diagnostics).toEqual({
+      sink: 'cloudflare-provider',
+      delivery: 'best-effort',
+      accessPolicyId: 'legacy-tailnet-policy-migration-required',
+      retentionDays: 30,
+    })
+
+    const upgraded = yield* currentStore.write({ expectedRevision: 0, config: document.config })
+    expect(upgraded.revision).toBe(1)
+  }))
+
+it.effect('a corrupt revisioned document fails loudly instead of defaulting', () =>
   Effect.gen(function* () {
     const { storage, store } = makeStore()
     yield* Effect.promise(() => storage.put(runtimeConfigKey, '{ not valid json'))
-    const exit = yield* Effect.exit(store.read)
-    expect(exit._tag).toBe('Failure')
+    expect((yield* Effect.exit(store.read))._tag).toBe('Failure')
 
-    // Structurally-decodable-but-policy-invalid documents fail the same way.
-    yield* Effect.promise(() => storage.put(runtimeConfigKey, JSON.stringify({ _tag: 'nonsense' })))
-    const exit2 = yield* Effect.exit(store.read)
-    expect(exit2._tag).toBe('Failure')
+    yield* Effect.promise(() => storage.put(runtimeConfigKey, JSON.stringify({ revision: 2, config: { _tag: 'bad' } })))
+    expect((yield* Effect.exit(store.read))._tag).toBe('Failure')
+  }))
+
+it.effect('encodeConfigSummary projects a JSON-safe running/stored view', () =>
+  Effect.gen(function* () {
+    const summary = encodeConfigSummary((yield* makeStore().store.read).config)
+    expect(JSON.parse(JSON.stringify(summary))).toEqual(summary)
+    expect(summary.environment).toBe('staging')
+    expect(summary.applicationId).toBe('1541431832195633232')
+    expect(summary.aiTitleChannelCount).toBe(0)
+    expect(summary.diagnostics).toEqual({
+      sink: 'cloudflare-provider',
+      delivery: 'best-effort',
+      accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
+      retentionDays: 30,
+    })
   }))

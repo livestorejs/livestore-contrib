@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 
 import { ApplicationCommandScope, RetiredHistoricalApplicationId } from '../application-commands/index.ts'
-import { DeploymentBase, normalizeDeploymentConfig } from './deployment-contract.ts'
+import { DeploymentBase, normalizeDeploymentConfig, resolveDeploymentDiagnostics } from './deployment-contract.ts'
 import type { BotDeploymentConfig } from './deployment-contract.ts'
 
 /**
@@ -83,6 +83,12 @@ export const RuntimeConfigPayload = Schema.Union([FakeConfig, RealConfig])
   .annotate({ identifier: 'DiscordBot.Runtime.ConfigPayload' })
 export type RuntimeConfigPayload = typeof RuntimeConfigPayload.Type
 
+/** Canonicalizes the deprecated Node/dev4 telemetry adapter at every load boundary. */
+export const canonicalizeRuntimeConfig = (config: RuntimeConfigPayload): RuntimeConfigPayload => {
+  const { telemetry: _deprecatedTelemetry, ...canonical } = config
+  return { ...canonical, diagnostics: resolveDeploymentDiagnostics(config) }
+}
+
 export const RuntimeConfigFile = Schema.Struct({
   apiVersion: Schema.Literal(1),
   payload: RuntimeConfigPayload,
@@ -107,6 +113,7 @@ export const summarizeConfig = (config: RuntimeConfigPayload) => ({
   restrictedDocsChannelCount: config.docsAudience.roleRestrictedChannelIds.length,
   docsRoleCount: config.docsAudience.contributorMaintainerRoleIds.length,
   releaseId: config.releaseId,
+  diagnostics: resolveDeploymentDiagnostics(config),
   stateDirectory: config.stateDirectory,
   controlSocketPath: config.controlSocketPath,
   health: config.health,

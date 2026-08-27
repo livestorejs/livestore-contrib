@@ -30,10 +30,10 @@ const base = {
     },
   },
   releaseId: 'sha256:release',
-  telemetry: {
-    sink: 'dev3-tempo' as const,
+  diagnostics: {
+    sink: 'cloudflare-provider' as const,
     delivery: 'best-effort' as const,
-    accessBoundary: 'tailnet-trusted-grafana' as const,
+    accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
     retentionDays: 30,
   },
   e2e: {

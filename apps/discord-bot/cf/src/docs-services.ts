@@ -1,12 +1,13 @@
 import { Array as Arr, Effect, Layer, Redacted, Result, Schema } from 'effect'
-import { FetchHttpClient, HttpClient } from 'effect/unstable/http'
+import { FetchHttpClient } from 'effect/unstable/http'
+import type { HttpClient } from 'effect/unstable/http'
 
-import {
-  type DocsQueryInput,
-  type DocsQueryResult,
+import type {
+  DocsOutcome,
+  DocsQueryInput,
+  DocsQueryResult,
   DocsTelemetryEvent,
-  type DocsOutcome,
-  type DocumentationSnapshot,
+  DocumentationSnapshot,
 } from '../../src/docs/domain.ts'
 import {
   estimateOpenAiRequestTokenUpperBound,

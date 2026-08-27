@@ -40,9 +40,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^5.20260825.1
         version: 5.20260825.1
-      '@effect/platform-bun':
-        specifier: 4.0.0-beta.105
-        version: 4.0.0-beta.105(effect@4.0.0-beta.105)
       '@effect/vitest':
         specifier: 4.0.0-beta.105
         version: 4.0.0-beta.105(effect@4.0.0-beta.105)(vitest@4.1.11(@types/node@25.3.3)(vite@8.2.2(@types/node@25.3.3)(yaml@2.9.0)))
@@ -2461,6 +2458,7 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+    optional: true
 
   '@effect/platform-node-shared@4.0.0-beta.105(effect@4.0.0-beta.105)':
     dependencies:

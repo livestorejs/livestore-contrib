@@ -44,7 +44,7 @@ const config = {
       limits: { requestsPerMemberPerHour: 10, requestsPerMinute: 2, inputTokensPerRequest: 40000, outputTokensPerRequest: 2000, monthlyCostUsdMicros: 1000000 },
     },
     releaseId: "nix-e2e",
-    telemetry: { sink: "dev3-tempo", delivery: "best-effort", accessBoundary: "tailnet-trusted-grafana", retentionDays: 30 },
+    diagnostics: { sink: "cloudflare-provider", delivery: "best-effort", accessPolicyId: "cloudflare-access-policy/discord-bot-admin", retentionDays: 30 },
     e2e: { actorApplicationId: "100000000000000011", actorTokenSecretRef: "op://vault/discord/e2e", targetChannelId: channelId, requiredPurposeMarker: "livestore-discord-e2e-only" },
     legacyCommands: ["!help"],
     stateDirectory,
