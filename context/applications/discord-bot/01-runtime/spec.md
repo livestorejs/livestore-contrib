@@ -1,6 +1,6 @@
 # Discord Bot Runtime — Spec
 
-Specifies the target Discord process and protocol boundary. Builds on
+Specifies the target Discord host and protocol boundary. Builds on
 [requirements.md](./requirements.md) and uses the language in
 [ontology.md](./ontology.md). Source realization is not a production verdict.
 
@@ -36,14 +36,27 @@ The canonical Cloudflare graph provides:
 6. a health projection derived from Gateway session state and terminal failure.
 
 Worker fetch and scheduled ingress address one fixed Durable Object name per
-environment. That singleton owns Gateway supervision, session persistence,
-health, and mutation authority. Gradual Worker version overlap cannot create a
-second Gateway actor because every version reaches the same environment object.
-The runtime does not implement active/active leases.
+environment. That singleton owns Gateway supervision, mutation authority,
+health, the resumable session, the action journal, and validated runtime
+configuration. Gradual Worker version overlap cannot create a second Gateway
+actor because every version reaches the same environment object. The runtime
+does not implement active/active leases.
 
-The Node graph remains buildable fallback source with its Node HTTP/WebSocket
-transports. It is not a running dev4 service or a parallel production topology;
-reactivation requires a new operations host decision.
+After an isolate or release restart, the object validates its durable state
+before connecting or admitting mutation. It resumes a valid persisted session
+or establishes the one replacement session, then reconciles the durable journal
+before accepting new actions. Missing, invalid, or unreconciled recovery state
+keeps the runtime not ready and fails closed rather than starting an
+uncoordinated actor.
+
+[Operations](../04-operations/requirements.md) realizes this boundary through
+the canonical Alchemy v2 Cloudflare stack and independently owns production
+admission. The Node graph remains buildable fallback source with its Node
+HTTP/WebSocket transports; it is not a running dev4 service or parallel
+production topology. The host history is retained by
+[Cloudflare decision 0007](../04-operations/.decisions/0007-use-cloudflare-canonical-host.md)
+and its superseded
+[dev4 decision 0002](../04-operations/.decisions/0002-run-on-dev4.md).
 
 Feature nodes own message eligibility, thread naming, command authorization,
 and response content. This node owns only their Discord transport, lifecycle,

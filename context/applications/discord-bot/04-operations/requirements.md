@@ -2,8 +2,9 @@
 
 Role: the operational contract that turns the Discord bot application into an
 owned, observable, safely deployable service. It specializes the parent
-[Discord bot requirements](../requirements.md) and owns the selected runtime
-host, deployment controller, environment isolation, and telemetry topology.
+[Discord bot requirements](../requirements.md) and owns deployment
+realization, environment isolation, production admission, and telemetry
+topology.
 
 ## Context
 
@@ -75,12 +76,12 @@ is the canonical live realization; current admission gaps remain tracked in
   without changing the application identity or release artifact. `refines:
   LS.DEL.INFRA-R02, LS.DEL.INFRA-R03, LS.DEL.INFRA-R06`
 
-- **LSC.APP.DISCORD.OPS-R04 Single active actor:** At most one runtime actor per
-  environment may consume Gateway events with mutation authority. Every Worker
-  route, schedule, and release version addresses one fixed singleton Durable
-  Object identity for that environment. Version rollout and rollback may not
-  create a second Gateway actor or depend on Discord delivery behavior to
-  suppress duplicate mutation.
+- **LSC.APP.DISCORD.OPS-R04 Runtime authority preservation:** Deployment
+  preserves the singleton runtime authority required by
+  `LSC.APP.DISCORD.RT-R09` across every Worker route, schedule, release version,
+  rollout, and rollback. No transition may expose another Gateway actor with
+  mutation authority or depend on Discord delivery behavior to suppress
+  duplicate mutation. `refines: LSC.APP.DISCORD.RT-R09`
 
 ### Must expose truthful service health
 
@@ -157,14 +158,14 @@ is the canonical live realization; current admission gaps remain tracked in
   to restore readiness is surfaced as a failed rollback rather than success.
 
 - **LSC.APP.DISCORD.OPS-R14 Declared Cloudflare realization:** Each environment
-  is one Alchemy v2 stack declaring a Cloudflare Worker, one SQLite-backed
-  singleton Durable Object, its bindings, secret slots, triggers, routes,
-  release versions, and traffic policy. Alchemy remote state is authoritative;
-  no Wrangler manifest, host module, or imperative deploy script may become a
-  second IaC source. Cloudflare is the canonical staging host and the production
-  host after admission. The retained Node host implementation is source fallback
-  only and carries no deployed or ready claim. `refines: LS.DEL.INFRA-R01,
-  LS.DEL.INFRA-R04`
+  is one Alchemy v2 stack realizing `LSC.APP.DISCORD.RT-R09` and declaring all
+  bindings, secret slots, triggers, routes, release versions, and traffic
+  policy. Alchemy remote state is authoritative; no Wrangler manifest, host
+  module, or imperative deploy script may become a second IaC source.
+  Cloudflare is the canonical staging host and the production host after
+  admission. The retained Node host implementation is source fallback only and
+  carries no deployed or ready claim. `refines: LSC.APP.DISCORD.RT-R09,
+  LS.DEL.INFRA-R01, LS.DEL.INFRA-R04`
 
 - **LSC.APP.DISCORD.OPS-R15 Isolated Discord environments:** Production and
   staging use fresh, distinct Discord applications and bot users. Production is
