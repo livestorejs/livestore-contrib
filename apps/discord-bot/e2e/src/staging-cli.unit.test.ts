@@ -54,7 +54,11 @@ describe('standalone staging E2E CLI', () => {
     expect(result.stderr).toEqual([])
     expect(JSON.parse(result.stdout[0]!)).toEqual(receipt(verdict))
     expect(run).toHaveBeenCalledWith(
-      expect.objectContaining({ actorBotToken: 'injected-secret', humanAssisted: false }),
+      expect.objectContaining({
+        actorBotToken: 'injected-secret',
+        humanAssisted: false,
+        selection: { _tag: 'Rung', rung: 'full' },
+      }),
     )
     expect(result.stdout.join('\n')).not.toContain('injected-secret')
     expect(result.stdout.join('\n')).not.toContain('op://')
@@ -71,6 +75,43 @@ describe('standalone staging E2E CLI', () => {
     })
 
     expect(result.exitCode).toBe(stagingCliExit.unrun)
+  })
+
+  it('forwards a selected rung', async () => {
+    const run = vi.fn(async () => receipt('UNRUN'))
+    await runStagingCli({
+      args: [...args, '--rung', 'tracer'],
+      environment: {},
+      dependencies: { readTextFile: async () => manifest, run },
+    })
+
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ selection: { _tag: 'Rung', rung: 'tracer' } }),
+    )
+  })
+
+  it('forwards repeatable explicit scenario selections in invocation order', async () => {
+    const run = vi.fn(async () => receipt('UNRUN'))
+    await runStagingCli({
+      args: [
+        ...args,
+        '--scenario',
+        'operator-retroactive',
+        '--scenario',
+        'automated-author-rejected',
+      ],
+      environment: {},
+      dependencies: { readTextFile: async () => manifest, run },
+    })
+
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selection: {
+          _tag: 'Scenarios',
+          scenarios: ['operator-retroactive', 'automated-author-rejected'],
+        },
+      }),
+    )
   })
 
   it('enables human lanes only with an explicit attended broker executable', async () => {
@@ -95,6 +136,12 @@ describe('standalone staging E2E CLI', () => {
     ['wrong confirmation', args.map((value) => (value.startsWith('I_UNDERSTAND') === true ? 'yes' : value))],
     ['missing manifest', args.slice(0, 1)],
     ['unknown token option', [...args, '--token', 'secret']],
+    ['duplicate rung', [...args, '--rung', 'tracer', '--rung', 'unattended']],
+    ['invalid rung', [...args, '--rung', 'automatic']],
+    ['mixed rung and scenario', [...args, '--rung', 'tracer', '--scenario', 'automated-author-rejected']],
+    ['duplicate scenario', [...args, '--scenario', 'operator-retroactive', '--scenario', 'operator-retroactive']],
+    ['invalid scenario', [...args, '--scenario', 'scenario-12']],
+    ['scenario without an id', [...args, '--scenario']],
   ])('rejects %s before reading configuration or running', async (_label, invalidArgs) => {
     const readTextFile = vi.fn(async () => manifest)
     const run = vi.fn(async () => receipt('PASS'))

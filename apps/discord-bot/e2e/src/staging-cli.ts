@@ -1,5 +1,13 @@
 import { parseLiveManifest } from './live-manifest.ts'
-import { liveWriteConfirmation, type RunReceipt } from './model.ts'
+import {
+  fullScenarioSelection,
+  isScenarioId,
+  isScenarioRung,
+  liveWriteConfirmation,
+  type RunReceipt,
+  type ScenarioId,
+  type ScenarioSelection,
+} from './model.ts'
 import { runDfxLiveStaging, type RunDfxLiveInput } from './run-dfx-live.ts'
 
 export const stagingCliExit = {
@@ -29,11 +37,13 @@ interface ParsedArguments {
   readonly manifestPath: string
   readonly confirmation: string
   readonly humanHandoffBrokerExecutable: string | undefined
+  readonly selection: ScenarioSelection
 }
 
 const usage =
   'Usage: pnpm e2e:live -- --live --manifest FILE --confirm-live-write ' +
-  `${liveWriteConfirmation} [--human-handoff-broker EXECUTABLE]`
+  `${liveWriteConfirmation} [--human-handoff-broker EXECUTABLE] ` +
+  '[--rung tracer|unattended|attended|full | --scenario ID [--scenario ID ...]]'
 
 const usageError = (message: string): StagingCliResult => ({
   exitCode: stagingCliExit.usage,
@@ -41,49 +51,91 @@ const usageError = (message: string): StagingCliResult => ({
   stderr: [`CRITICAL usage: ${message}`, usage],
 })
 
-const readFlag = (args: ReadonlyArray<string>, flag: string): string | undefined => {
-  const occurrences = args.flatMap((value, index) => (value === flag ? [index] : []))
-  if (occurrences.length !== 1) return undefined
-  const value = args[occurrences[0]! + 1]
-  return value === undefined || value.startsWith('--') === true ? undefined : value
-}
 
 const parseArguments = (
   args: ReadonlyArray<string>,
 ): { readonly _tag: 'Parsed'; readonly value: ParsedArguments } | StagingCliResult => {
-  const admitted = new Set(['--live', '--manifest', '--confirm-live-write', '--human-handoff-broker'])
-  const unknown = args.find((value) => value.startsWith('--') && !admitted.has(value))
-  if (unknown !== undefined) return usageError(`unknown option ${unknown}`)
-  if (args.filter((value) => value === '--live').length !== 1) {
-    return usageError('live execution requires exactly one --live flag')
+  const manifestPaths: string[] = []
+  const confirmations: string[] = []
+  const brokerExecutables: string[] = []
+  const rungs: string[] = []
+  const scenarios: string[] = []
+  let liveCount = 0
+
+  for (let index = 0; index < args.length; ) {
+    const argument = args[index]!
+    if (argument === '--live') {
+      liveCount += 1
+      index += 1
+      continue
+    }
+
+    const values =
+      argument === '--manifest'
+        ? manifestPaths
+        : argument === '--confirm-live-write'
+          ? confirmations
+          : argument === '--human-handoff-broker'
+            ? brokerExecutables
+            : argument === '--rung'
+              ? rungs
+              : argument === '--scenario'
+                ? scenarios
+                : undefined
+    if (values === undefined) {
+      return usageError(argument.startsWith('--') === true ? `unknown option ${argument}` : `unexpected argument ${argument}`)
+    }
+
+    const value = args[index + 1]
+    if (value === undefined || value.startsWith('--') === true) {
+      return usageError(`${argument} requires a value`)
+    }
+    values.push(value)
+    index += 2
   }
 
-  const manifestPath = readFlag(args, '--manifest')
-  if (manifestPath === undefined) return usageError('--manifest requires exactly one file path')
-  const confirmation = readFlag(args, '--confirm-live-write')
-  if (confirmation === undefined) {
+  if (liveCount !== 1) return usageError('live execution requires exactly one --live flag')
+  if (manifestPaths.length !== 1) return usageError('--manifest requires exactly one file path')
+  if (confirmations.length !== 1) {
     return usageError('--confirm-live-write requires the exact confirmation phrase')
   }
-  if (confirmation !== liveWriteConfirmation) {
-    return usageError('live-write confirmation does not match')
+  const manifestPath = manifestPaths[0]!
+  const confirmation = confirmations[0]!
+  if (confirmation !== liveWriteConfirmation) return usageError('live-write confirmation does not match')
+  if (brokerExecutables.length > 1) {
+    return usageError('--human-handoff-broker requires at most one executable path')
   }
-  const brokerFlags = args.filter((value) => value === '--human-handoff-broker')
-  const humanHandoffBrokerExecutable = brokerFlags.length === 0 ? undefined : readFlag(args, '--human-handoff-broker')
-  if (brokerFlags.length > 0 && humanHandoffBrokerExecutable === undefined) {
-    return usageError('--human-handoff-broker requires exactly one executable path')
+  if (rungs.length > 1) return usageError('--rung may be specified only once')
+  if (rungs.length > 0 && scenarios.length > 0) {
+    return usageError('--rung and --scenario are mutually exclusive')
+  }
+  if (new Set(scenarios).size !== scenarios.length) {
+    return usageError('each --scenario value may be selected only once')
   }
 
-  const consumed = new Set([
-    '--live',
-    '--manifest',
-    manifestPath,
-    '--confirm-live-write',
-    confirmation,
-    ...(humanHandoffBrokerExecutable === undefined ? [] : ['--human-handoff-broker', humanHandoffBrokerExecutable]),
-  ])
-  const positional = args.find((value) => !consumed.has(value))
-  if (positional !== undefined) return usageError(`unexpected argument ${positional}`)
-  return { _tag: 'Parsed', value: { manifestPath, confirmation, humanHandoffBrokerExecutable } }
+  let selection = fullScenarioSelection
+  const rung = rungs[0]
+  if (rung !== undefined) {
+    if (isScenarioRung(rung) === false) return usageError(`invalid rung ${rung}`)
+    selection = { _tag: 'Rung', rung }
+  } else if (scenarios.length > 0) {
+    const selectedScenarios: ScenarioId[] = []
+    for (const scenario of scenarios) {
+      if (isScenarioId(scenario) === false) return usageError(`invalid scenario ${scenario}`)
+      selectedScenarios.push(scenario)
+    }
+    selection = { _tag: 'Scenarios', scenarios: selectedScenarios }
+  }
+
+  return {
+    _tag: 'Parsed',
+    value: {
+      manifestPath,
+      confirmation,
+      humanHandoffBrokerExecutable: brokerExecutables[0],
+      selection,
+    },
+  }
 }
 
 const exitForReceipt = (receipt: RunReceipt): number => {
@@ -134,6 +186,7 @@ export const runStagingCli = async (input: {
       confirmation: parsed.value.confirmation,
       actorBotToken: input.environment[actorTokenEnvironmentVariable],
       adminToken: input.environment[adminTokenEnvironmentVariable],
+      selection: parsed.value.selection,
       humanAssisted: parsed.value.humanHandoffBrokerExecutable !== undefined,
       ...(parsed.value.humanHandoffBrokerExecutable === undefined
         ? {}

@@ -109,6 +109,21 @@ describe('cleanup ledger', () => {
     writer.close()
   })
 
+  it('does not let a resolve line erase the same artifact id recorded in another channel', () => {
+    const filePath = makeTmpPath()
+    const writer = openCleanupLedger({ filePath, runId })
+    const otherChannelId = '777777777777777777' as Snowflake
+
+    writer.record(identity())
+    writer.record(identity({ channelId: otherChannelId }))
+    writer.resolve(identity())
+
+    expect(readUnresolvedEntries(filePath).unresolved).toEqual([
+      expect.objectContaining({ channelId: otherChannelId }),
+    ])
+    writer.close()
+  })
+
   it('collects malformed lines as warnings without throwing or blocking good entries', () => {
     const filePath = makeTmpPath()
     const writer = openCleanupLedger({ filePath, runId })
@@ -144,7 +159,7 @@ describe('cleanup ledger', () => {
 
     const deletedMessages: Snowflake[] = []
     const deletedThreads: Snowflake[] = []
-    const deletedResponses: Snowflake[] = []
+    const deletedResponses: Array<readonly [Snowflake, Snowflake]> = []
     const outcomes = await recoverCleanupLedger({
       filePath,
       transport: makeTransportStub({
@@ -157,8 +172,8 @@ describe('cleanup ledger', () => {
         deleteThread: async (id) => {
           deletedThreads.push(id)
         },
-        deleteResponse: async (id) => {
-          deletedResponses.push(id)
+        deleteResponse: async (channel, id) => {
+          deletedResponses.push([channel, id])
         },
       }),
     })
@@ -166,7 +181,7 @@ describe('cleanup ledger', () => {
     expect(outcomes.map((outcome) => outcome.outcome)).toEqual(['deleted', 'deleted', 'deleted'])
     expect(deletedMessages).toEqual([messageId])
     expect(deletedThreads).toEqual([threadMessageId])
-    expect(deletedResponses).toEqual([responseId])
+    expect(deletedResponses).toEqual([['222222222222222222', responseId]])
     expect(readUnresolvedEntries(filePath).unresolved).toEqual([])
   })
 
@@ -193,35 +208,89 @@ describe('cleanup ledger', () => {
     expect(readUnresolvedEntries(filePath).unresolved).toEqual([])
   })
 
-  it('leaves a failed deletion unresolved and continues with the remaining entries', async () => {
+  it.each([
+    [
+      'guild',
+      {
+        guildId: '999999999999999999' as Snowflake,
+        parentChannelId: '222222222222222222' as Snowflake,
+      },
+    ],
+    [
+      'parent',
+      {
+        guildId: '111111111111111111' as Snowflake,
+        parentChannelId: '999999999999999999' as Snowflake,
+      },
+    ],
+  ])('refuses to delete a thread whose %s differs from the ledger', async (_field, mismatch) => {
+    const filePath = makeTmpPath()
+    const writer = openCleanupLedger({ filePath, runId })
+    const threadId = '555555555555555555' as Snowflake
+    writer.record(identity({ kind: 'thread', messageId: threadId }))
+    writer.close()
+    let deletes = 0
+
+    const outcomes = await recoverCleanupLedger({
+      filePath,
+      transport: makeTransportStub({
+        findThreadForMessage: async () => ({ ...threadSnapshot(threadId), ...mismatch }),
+        deleteThread: async () => {
+          deletes += 1
+        },
+      }),
+    })
+
+    expect(outcomes).toEqual([
+      {
+        entry: expect.objectContaining({ kind: 'thread', messageId: threadId }),
+        outcome: 'failed',
+        error: expect.objectContaining({ message: expect.stringContaining('recorded guild and parent') }),
+      },
+    ])
+    expect(deletes).toBe(0)
+    expect(readUnresolvedEntries(filePath).unresolved).toHaveLength(1)
+  })
+
+  it('retries only the unresolved entries after a partial recovery failure', async () => {
     const filePath = makeTmpPath()
     const writer = openCleanupLedger({ filePath, runId })
     const failingId = '333333333333333333' as Snowflake
     const survivingId = '444444444444444444' as Snowflake
     writer.record(identity({ messageId: failingId }))
-    writer.record(identity({
-      messageId: survivingId,
-      channelId: '777777777777777777' as Snowflake,
-    }))
+    writer.record(
+      identity({
+        messageId: survivingId,
+        channelId: '777777777777777777' as Snowflake,
+      }),
+    )
     writer.close()
 
     const failure = new Error('discord said no')
-    const outcomes = await recoverCleanupLedger({
-      filePath,
-      transport: makeTransportStub({
-        inspectChannel: async (channelId) => {
-          if (channelId === '222222222222222222') throw failure
-          return { id: channelId, guildId: '111111111111111111' as Snowflake, topic: undefined }
-        },
-        deleteMessage: async () => undefined,
-      }),
+    let failFirst = true
+    const deleted: Snowflake[] = []
+    const transport = makeTransportStub({
+      inspectChannel: async (channelId) => {
+        if (channelId === '222222222222222222' && failFirst === true) throw failure
+        return { id: channelId, guildId: '111111111111111111' as Snowflake, topic: undefined }
+      },
+      deleteMessage: async (_channelId, messageId) => {
+        deleted.push(messageId)
+      },
     })
+    const outcomes = await recoverCleanupLedger({ filePath, transport })
 
     expect(outcomes).toEqual([
       { entry: expect.objectContaining({ messageId: failingId }), outcome: 'failed', error: failure },
       { entry: expect.objectContaining({ messageId: survivingId }), outcome: 'deleted' },
     ])
     expect(readUnresolvedEntries(filePath).unresolved.map((entry) => entry.messageId)).toEqual([failingId])
+
+    failFirst = false
+    const retry = await recoverCleanupLedger({ filePath, transport })
+    expect(retry).toEqual([{ entry: expect.objectContaining({ messageId: failingId }), outcome: 'deleted' }])
+    expect(deleted).toEqual([survivingId, failingId])
+    expect(readUnresolvedEntries(filePath).unresolved).toEqual([])
   })
 })
 

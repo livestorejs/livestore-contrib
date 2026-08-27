@@ -7,11 +7,11 @@ import {
   parseBrokerInvocation,
   type AttendedBrokerDeps,
   type AttendedBrokerDriver,
-  makeDfxRecoveryTransport,
   type BrokerLedgerInput,
   type GesturePerformer,
 } from './attended-broker.ts'
 import { makeHttpCaptureBrokerDriver } from './attended-broker-driver.ts'
+import { makeDfxRecoveryTransport } from './attended-broker-recovery.ts'
 import { recoverCleanupLedger } from './cleanup-ledger.ts'
 import type { Snowflake } from './model.ts'
 
@@ -44,12 +44,17 @@ if (args[0] === 'recover-ledger') {
       if (token === undefined || token.trim() === '') {
         throw new Error('LIVESTORE_DISCORD_E2E_ACTOR_TOKEN must be injected through op-proxy')
       }
-      const outcomes = await recoverCleanupLedger({
-        filePath: ledgerPath,
-        transport: makeDfxRecoveryTransport({ actorBotToken: token }),
-      })
-      for (const outcome of outcomes) {
-        process.stdout.write(`${outcome.outcome} ${outcome.entry.kind}:${outcome.entry.messageId}\n`)
+      const recovery = makeDfxRecoveryTransport({ actorBotToken: token })
+      try {
+        const outcomes = await recoverCleanupLedger({
+          filePath: ledgerPath,
+          transport: recovery,
+        })
+        for (const outcome of outcomes) {
+          process.stdout.write(`${outcome.outcome} ${outcome.entry.kind}:${outcome.entry.messageId}\n`)
+        }
+      } finally {
+        await recovery.dispose()
       }
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : 'recovery failed'}\n`)

@@ -132,8 +132,10 @@ export const makeFakeWorld = (target: StagingTarget): FakeWorld => {
       if (messages.delete(messageId) === false) throw new Error('message not found')
       counts.deletedMessages += 1
     },
-    deleteResponse: async (responseId) => {
-      if (responses.delete(responseId) === false) throw new Error('response not found')
+    deleteResponse: async (channelId, responseId) => {
+      const candidate = responses.get(responseId)
+      if (candidate === undefined || candidate.channelId !== channelId) throw new Error('response not found')
+      responses.delete(responseId)
       counts.deletedResponses += 1
     },
   }

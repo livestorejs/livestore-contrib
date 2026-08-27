@@ -48,6 +48,8 @@ export interface DfxLiveTransportInput {
   readonly invokeDocs?: E2ETransport['invokeDocs']
   readonly deleteHumanResponse?: (response: ResponseSnapshot) => Promise<void>
   readonly deleteHumanMessage?: (message: MessageSnapshot) => Promise<void>
+  /** Appends a resolve line after the actor bot has deleted a broker-recorded thread. */
+  readonly resolveHumanThread?: (thread: ThreadSnapshot) => Promise<void>
 }
 
 export interface DfxLiveTransport {
@@ -118,6 +120,7 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
   const sourceAuthors = new Map<Snowflake, MessageSnapshot['author']>()
   const sources = new Map<Snowflake, MessageSnapshot>()
   const responses = new Map<Snowflake, ResponseSnapshot>()
+  const humanThreads = new Map<Snowflake, ThreadSnapshot>()
   const runCommand = input.runCommand ?? defaultRunCommand
   const cliExecutable = input.cliExecutable ?? 'livestore-discord'
   const adminClient =
@@ -224,6 +227,9 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
       if (input.invokeMessageAction !== undefined) {
         const result = await input.invokeMessageAction(request)
         responses.set(result.response.id, result.response)
+        if (result._tag === 'Created' && input.resolveHumanThread !== undefined) {
+          humanThreads.set(result.thread.id, result.thread)
+        }
         return result
       }
       throw new E2EPrerequisiteUnavailableError('Discord has no official API for initiating a message-context action')
@@ -238,6 +244,11 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     },
     deleteThread: async (threadId) => {
       await rest(Effect.flatMap(DiscordREST, (discord) => discord.deleteChannel(threadId)))
+      const humanThread = humanThreads.get(threadId)
+      if (humanThread !== undefined && input.resolveHumanThread !== undefined) {
+        await input.resolveHumanThread(humanThread)
+        humanThreads.delete(threadId)
+      }
     },
     deleteMessage: async (channelId, messageId) => {
       if (sourceAuthors.get(messageId) === 'human') {
@@ -259,10 +270,12 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
       sourceAuthors.delete(messageId)
       sources.delete(messageId)
     },
-    deleteResponse: async (responseId) => {
+    deleteResponse: async (channelId, responseId) => {
       if (input.deleteHumanResponse !== undefined) {
         const response = responses.get(responseId)
-        if (response === undefined) throw new Error('Response cleanup lost its correlation record')
+        if (response === undefined || response.channelId !== channelId) {
+          throw new Error('Response cleanup lost its correlation record')
+        }
         await input.deleteHumanResponse(response)
         responses.delete(responseId)
         return

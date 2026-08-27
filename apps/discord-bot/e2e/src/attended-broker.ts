@@ -5,7 +5,7 @@ import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
 import { Effect, Layer, ManagedRuntime, Redacted } from 'effect'
 
 import type { MessageSnapshot, ResponseSnapshot, Snowflake } from './model.ts'
-import { E2EPrerequisiteUnavailableError, type E2ETransport } from './transport.ts'
+import { E2EPrerequisiteUnavailableError } from './transport.ts'
 
 export interface CommandResult {
   readonly exitCode: number
@@ -55,6 +55,7 @@ export const brokerOperations = [
   'invoke-docs',
   'delete-message',
   'delete-response',
+  'resolve-thread',
 ] as const
 
 export type BrokerOperation = (typeof brokerOperations)[number]
@@ -124,7 +125,7 @@ const sleep = (ms: number): Promise<void> => new Promise<void>((resolve) => setT
 
 export const parseBrokerInvocation = (args: ReadonlyArray<string>): ParseBrokerResult => {
   const usage =
-    'Usage: livestore-discord-e2e-broker <create-message|invoke-message-action|invoke-docs|delete-message|delete-response> --request-json JSON [--ledger FILE]'
+    'Usage: livestore-discord-e2e-broker <create-message|invoke-message-action|invoke-docs|delete-message|delete-response|resolve-thread> --request-json JSON [--ledger FILE]'
   const flagValueIndices: number[] = []
   args.forEach((value, index) => {
     if (value === '--request-json' || value === '--ledger' || value === '--run-id') flagValueIndices.push(index, index + 1)
@@ -226,66 +227,6 @@ export const makeDfxBrokerCorrelator = (input: {
   }
 }
 
-/** REST seam for crash recovery: validates and deletes exact ledger-recorded artifacts. */
-export const makeDfxRecoveryTransport = (input: {
-  readonly actorBotToken: string
-}): E2ETransport => {
-  const DiscordLive = DiscordRESTMemoryLive.pipe(
-    Layer.provide(NodeHttpClient.layerUndici),
-    Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
-  )
-  const runtime = ManagedRuntime.make(DiscordLive)
-  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> => runtime.runPromise(effect)
-
-  const transport: E2ETransport = {
-    inspectChannel: async (channelId) => {
-      const channel = await rest(Effect.flatMap(DiscordREST, (discord) => discord.getChannel(channelId)))
-      if (!('guild_id' in channel) || channel.guild_id === undefined) throw new Error('not a guild channel')
-      return {
-        id: asSnowflake(channel.id, 'recover-inspect'),
-        guildId: asSnowflake(channel.guild_id, 'recover-inspect'),
-        topic: 'topic' in channel && typeof channel.topic === 'string' ? channel.topic : undefined,
-      }
-    },
-    createMessage: async () => {
-      throw new E2EPrerequisiteUnavailableError('recovery transport never creates messages')
-    },
-    findThreadForMessage: async (guildId, sourceMessageId) => {
-      const active = await rest(Effect.flatMap(DiscordREST, (discord) => discord.getActiveGuildThreads(guildId)))
-      const candidate = active.threads.find((thread) => thread.id === sourceMessageId)
-      if (candidate === undefined || candidate.guild_id == null || candidate.parent_id == null) return undefined
-      return {
-        id: asSnowflake(candidate.id, 'recover-thread'),
-        guildId: asSnowflake(candidate.guild_id, 'recover-thread'),
-        parentChannelId: asSnowflake(candidate.parent_id, 'recover-thread'),
-        sourceMessageId,
-        marker: '',
-      }
-    },
-    operatorCreateThread: async () => {
-      throw new E2EPrerequisiteUnavailableError('recovery transport never creates threads')
-    },
-    invokeMessageAction: async () => {
-      throw new E2EPrerequisiteUnavailableError('recovery transport never invokes actions')
-    },
-    invokeDocs: async () => {
-      throw new E2EPrerequisiteUnavailableError('recovery transport never invokes docs')
-    },
-    deleteThread: async (threadId) => {
-      await rest(Effect.flatMap(DiscordREST, (discord) => discord.deleteChannel(threadId)))
-    },
-    deleteMessage: async (channelId, messageId) => {
-      await rest(Effect.flatMap(DiscordREST, (discord) => discord.deleteMessage(channelId, messageId)))
-    },
-    deleteResponse: async (responseId) => {
-      // Interaction responses live in their origin channel; the ledger records
-      // that channelId under the response kind.
-      await rest(Effect.flatMap(DiscordREST, (discord) => discord.deleteMessage(responseId, responseId)))
-    },
-  }
-
-  return Object.assign(transport, { dispose: () => runtime.dispose() })
-}
 
 export interface BrokerDispatchResult {
   readonly payload: Record<string, unknown>
@@ -302,7 +243,10 @@ export const dispatchBrokerOperation = async (
   }
   const request = invocation.request as Record<string, unknown>
 
-  const evidence = await deps.driver.perform({ operation: invocation.operation, request })
+  // resolve-thread acknowledges a deletion already completed through the bot
+  // REST seam; it is ledger bookkeeping, not another official-client gesture.
+  const evidence =
+    invocation.operation === 'resolve-thread' ? {} : await deps.driver.perform({ operation: invocation.operation, request })
   if (evidence.declined === true) {
     return { payload: { declinedByOperator: true }, declineExitCode: 7 }
   }
@@ -427,13 +371,23 @@ const dispatchWithLedger = async (
     }
   }
 
-  // delete-message / delete-response: the ledger entry recorded at creation is
-  // resolved only after the client confirms the deletion.
   const expectedId = asSnowflake(
     typeof request.id === 'string' ? request.id : readRequestString(request, 'messageId', 'cleanup'),
     'cleanup',
   )
-  ledger?.resolve({ kind: invocation.operation === 'delete-response' ? 'response' : 'message', ...context, messageId: expectedId })
+  if (invocation.operation === 'resolve-thread') {
+    if (ledger === undefined) throw new Error('resolve-thread requires a cleanup ledger')
+    ledger.resolve({ kind: 'thread', ...context, messageId: expectedId })
+    return { payload: { resolved: true, id: expectedId }, declineExitCode: undefined }
+  }
+
+  // Client-confirmed response/source deletion resolves the exact identity that
+  // creation recorded, including the original guild and channel.
+  ledger?.resolve({
+    kind: invocation.operation === 'delete-response' ? 'response' : 'message',
+    ...context,
+    messageId: expectedId,
+  })
   return { payload: { deleted: true, id: expectedId, performedBy: deps.performer }, declineExitCode: undefined }
 }
 

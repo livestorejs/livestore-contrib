@@ -1,3 +1,7 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -13,6 +17,7 @@ import {
   type BrokerOperation,
   type GestureEvidence,
 } from './attended-broker.ts'
+import { openCleanupLedger, readUnresolvedEntries } from './cleanup-ledger.ts'
 import type { Snowflake } from './model.ts'
 
 const guildId = '111111111111111111' as Snowflake
@@ -166,6 +171,81 @@ describe('broker dispatch', () => {
     )
     expect(result.payload).toMatchObject({ deleted: true, id: '444444444444444444' })
     expect(recordOrder).toEqual(['resolve:response:444444444444444444', 'close'])
+  })
+
+  it('resolves thread cleanup without performing a second client gesture', async () => {
+    const recordOrder: string[] = []
+    const deps = makeDeps({ evidence: { declined: true }, recordOrder })
+    const result = await dispatchBrokerOperation(
+      makeInvocation(
+        'resolve-thread',
+        { ...baseRequest, id: '555555555555555555' },
+        '/tmp/broker-test-ledger.jsonl',
+      ),
+      deps,
+    )
+
+    expect(result.payload).toEqual({ resolved: true, id: '555555555555555555' })
+    expect(recordOrder).toEqual(['resolve:thread:555555555555555555', 'close'])
+  })
+
+  it('leaves no unresolved artifacts after normal response, thread, and source cleanup', async () => {
+    const ledgerPath = join(mkdtempSync(join(tmpdir(), 'broker-normal-cleanup-')), 'cleanup.jsonl')
+    const sourceId = '333333333333333333' as Snowflake
+    const responseId = '444444444444444444' as Snowflake
+    const threadId = '555555555555555555' as Snowflake
+    const deps: AttendedBrokerDeps = {
+      driver: {
+        perform: async ({ operation }) => {
+          if (operation === 'invoke-message-action') {
+            return { messageActionOutcome: 'created', responseMessageIds: [responseId] }
+          }
+          return {}
+        },
+      },
+      correlator: {
+        waitForMessage: async () => ({ id: sourceId, channelId, marker: 'm', author: 'human' }),
+        waitForThread: async () => threadId,
+        dispose: async () => undefined,
+      },
+      performer: 'official-client-session',
+      openLedger: ({ filePath, runId }) => {
+        const writer = openCleanupLedger({ filePath, runId })
+        const cleanupIdentity = (entry: BrokerLedgerInput) => ({
+          runId,
+          scenario: undefined,
+          kind: entry.kind,
+          guildId: entry.guildId as Snowflake,
+          channelId: entry.channelId as Snowflake,
+          messageId: entry.messageId as Snowflake,
+        })
+        return {
+          record: (entry) => writer.record(cleanupIdentity(entry)),
+          resolve: (entry) => writer.resolve(cleanupIdentity(entry)),
+          close: writer.close,
+        }
+      },
+    }
+
+    await dispatchBrokerOperation(
+      makeInvocation('create-message', { ...baseRequest, marker: 'm' }, ledgerPath),
+      deps,
+    )
+    await dispatchBrokerOperation(
+      makeInvocation('invoke-message-action', { ...baseRequest, marker: 'm', sourceMessageId: sourceId }, ledgerPath),
+      deps,
+    )
+    await dispatchBrokerOperation(
+      makeInvocation('delete-response', { ...baseRequest, id: responseId, marker: 'm' }, ledgerPath),
+      deps,
+    )
+    await dispatchBrokerOperation(makeInvocation('resolve-thread', { ...baseRequest, id: threadId }, ledgerPath), deps)
+    await dispatchBrokerOperation(
+      makeInvocation('delete-message', { ...baseRequest, id: sourceId, marker: 'm' }, ledgerPath),
+      deps,
+    )
+
+    expect(readUnresolvedEntries(ledgerPath).unresolved).toEqual([])
   })
 
   it('rejects non-object requests', async () => {

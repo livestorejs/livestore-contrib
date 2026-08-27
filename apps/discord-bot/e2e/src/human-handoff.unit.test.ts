@@ -90,6 +90,36 @@ describe('attended human handoff broker', () => {
     ).rejects.toThrow('correlated cleanup')
   })
 
+  it('appends exact thread identity after bot-confirmed deletion', async () => {
+    let requestArguments: ReadonlyArray<string> = []
+    const broker = makeCommandHumanHandoffBroker({
+      executable: '/opt/e2e/human-broker',
+      runCommand: async (_executable, args) => {
+        requestArguments = args
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify({ resolved: true, id: '333333333333333333' }),
+          stderr: '',
+        }
+      },
+    })
+
+    await broker.resolveThread({
+      id: '333333333333333333' as Snowflake,
+      guildId: '111111111111111111' as Snowflake,
+      parentChannelId: '222222222222222222' as Snowflake,
+      sourceMessageId: '333333333333333333' as Snowflake,
+      marker: 'marker',
+    })
+
+    expect(requestArguments[0]).toBe('resolve-thread')
+    expect(JSON.parse(requestArguments[2] ?? '{}')).toMatchObject({
+      id: '333333333333333333',
+      guildId: '111111111111111111',
+      channelId: '222222222222222222',
+    })
+  })
+
   it('preserves every correlated docs response artifact for cleanup', async () => {
     let requestArguments: ReadonlyArray<string> = []
     const runCommand = async (_executable: string, args: ReadonlyArray<string>) => {
