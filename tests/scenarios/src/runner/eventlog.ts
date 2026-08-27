@@ -202,7 +202,7 @@ export const syncObservationPayload = (observation: SyncObservation): SyncObserv
 })
 
 export const canonicalJson = (value: Schema.Json | undefined): string | undefined =>
-  value === undefined ? undefined : Schema.encodeUnknownSync(Schema.UnknownFromJsonString)(sortJson(value))
+  value === undefined ? undefined : Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown))(sortJson(value))
 
 const sortJson = (value: Schema.Json): Schema.Json => {
   if (Array.isArray(value) === true) return value.map(sortJson)

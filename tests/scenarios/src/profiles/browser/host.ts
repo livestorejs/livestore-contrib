@@ -753,7 +753,7 @@ const reconcileClientObservation =
     })),
   })
 
-const jsonStringify = Schema.encodeSync(Schema.UnknownFromJsonString)
+const jsonStringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 
