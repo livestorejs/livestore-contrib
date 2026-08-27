@@ -48,6 +48,11 @@ export type RecoveryOutcome =
   | { readonly entry: CleanupLedgerEntry; readonly outcome: 'already-gone' }
   | { readonly entry: CleanupLedgerEntry; readonly outcome: 'failed'; readonly error: unknown }
 
+/** Transport-level signal that an exact Discord artifact vanished between validation and deletion. */
+export class CleanupArtifactNotFoundError extends Error {
+  override readonly name = 'CleanupArtifactNotFoundError'
+}
+
 const kinds: Record<string, true> = { message: true, thread: true, response: true }
 
 const entryOf = (identity: CleanupLedgerIdentity, status: CleanupEntryStatus): CleanupLedgerEntry => ({
@@ -61,7 +66,8 @@ const entryOf = (identity: CleanupLedgerIdentity, status: CleanupEntryStatus): C
   status,
 })
 
-const entryKey = (entry: CleanupLedgerEntry): string => `${entry.runId}\u0000${entry.kind}\u0000${entry.messageId}`
+const entryKey = (entry: CleanupLedgerEntry): string =>
+  [entry.runId, entry.kind, entry.guildId, entry.channelId, entry.messageId].join('\u0000')
 
 /** Owner-only access regardless of umask or looser pre-existing bits. */
 const appendFd = (filePath: string): number => {
@@ -166,16 +172,24 @@ export const readUnresolvedEntries = (filePath: string): UnresolvedEntries => {
 const validatedAlive = async (transport: E2ETransport, entry: CleanupLedgerEntry): Promise<boolean> => {
   switch (entry.kind) {
     case 'thread': {
-      // Threads are exactly addressable through their source message id.
       const thread = await transport.findThreadForMessage(entry.guildId, entry.messageId)
-      return thread !== undefined && thread.id === entry.messageId
+      if (thread === undefined) return false
+      if (
+        thread.id !== entry.messageId ||
+        thread.sourceMessageId !== entry.messageId ||
+        thread.guildId !== entry.guildId ||
+        thread.parentChannelId !== entry.channelId
+      ) {
+        throw new Error(`Cleanup ledger thread ${entry.messageId} did not match its recorded guild and parent`)
+      }
+      return true
     }
     case 'message':
     case 'response': {
-      // The transport exposes no exact-ID read for these kinds; channel
-      // reachability is the strongest available gate and fails closed so an
-      // unreachable channel never turns into a speculative delete.
-      await transport.inspectChannel(entry.channelId)
+      const channel = await transport.inspectChannel(entry.channelId)
+      if (channel.id !== entry.channelId || channel.guildId !== entry.guildId) {
+        throw new Error(`Cleanup ledger ${entry.kind} ${entry.messageId} did not match its recorded channel and guild`)
+      }
       return true
     }
   }
@@ -188,7 +202,7 @@ const deleteArtifact = (transport: E2ETransport, entry: CleanupLedgerEntry): Pro
     case 'thread':
       return transport.deleteThread(entry.messageId)
     case 'response':
-      return transport.deleteResponse(entry.messageId)
+      return transport.deleteResponse(entry.channelId, entry.messageId)
   }
 }
 
@@ -221,7 +235,12 @@ export const recoverCleanupLedger = async (input: {
         appendLine(fd, entryOf(entry, 'resolved'))
         outcomes.push({ entry, outcome: 'deleted' })
       } catch (error) {
-        outcomes.push({ entry, outcome: 'failed', error })
+        if (error instanceof CleanupArtifactNotFoundError) {
+          appendLine(fd, entryOf(entry, 'resolved'))
+          outcomes.push({ entry, outcome: 'already-gone' })
+        } else {
+          outcomes.push({ entry, outcome: 'failed', error })
+        }
       }
     }
   } finally {

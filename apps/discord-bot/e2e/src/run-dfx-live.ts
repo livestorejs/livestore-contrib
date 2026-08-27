@@ -2,7 +2,13 @@ import { defaultRunCommand, makeDfxLiveTransport, type CommandRunner } from './d
 import { makeCommandHumanHandoffBroker } from './human-handoff.ts'
 import type { LiveManifest } from './live-manifest.ts'
 import { runLiveStaging } from './live-runner.ts'
-import type { MessageSnapshot, RunReceipt, Snowflake } from './model.ts'
+import {
+  fullScenarioSelection,
+  type MessageSnapshot,
+  type RunReceipt,
+  type ScenarioSelection,
+  type Snowflake,
+} from './model.ts'
 
 export interface RunDfxLiveInput {
   readonly manifest: LiveManifest | undefined
@@ -11,6 +17,7 @@ export interface RunDfxLiveInput {
   readonly actorBotToken: string | undefined
   /** Resolved from LIVESTORE_DISCORD_ADMIN_TOKEN only when the manifest names an admin endpoint. */
   readonly adminToken?: string | undefined
+  readonly selection?: ScenarioSelection
   readonly cliExecutable?: string
   readonly runCommand?: CommandRunner
   /** Explicit attended broker executable; absence keeps every human lane UNRUN. */
@@ -28,11 +35,13 @@ export interface RunDfxLiveInput {
 
 /** Runs configured lanes; absent human-assisted callbacks truthfully produce UNRUN. */
 export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunReceipt> => {
+  const selection = input.selection ?? fullScenarioSelection
   if (input.manifest === undefined || input.actorBotToken === undefined || input.actorBotToken.trim() === '') {
     return runLiveStaging({
       manifest: input.manifest,
       confirmation: input.confirmation,
       transport: undefined,
+      selection,
       humanAssisted: false,
     })
   }
@@ -45,6 +54,7 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
       manifest: input.manifest,
       confirmation: input.confirmation,
       transport: undefined,
+      selection,
       humanAssisted: false,
     })
   }
@@ -76,12 +86,14 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
     ...(invokeDocs === undefined ? {} : { invokeDocs }),
     ...(deleteHumanResponse === undefined ? {} : { deleteHumanResponse }),
     ...(humanBroker?.deleteMessage === undefined ? {} : { deleteHumanMessage: humanBroker.deleteMessage }),
+    ...(humanBroker?.resolveThread === undefined ? {} : { resolveHumanThread: humanBroker.resolveThread }),
   })
   try {
     return await runLiveStaging({
       manifest: input.manifest,
       confirmation: input.confirmation,
       transport: live.transport,
+      selection,
       humanAssisted: input.humanAssisted === true || input.humanHandoffBrokerExecutable !== undefined,
     })
   } finally {

@@ -87,6 +87,45 @@ export const scenarioMatrix: ReadonlyArray<ScenarioDefinition> = [
   },
 ]
 
+export type ScenarioRung = 'tracer' | 'unattended' | 'attended' | 'full'
+
+export type ScenarioSelection =
+  | { readonly _tag: 'Rung'; readonly rung: ScenarioRung }
+  | { readonly _tag: 'Scenarios'; readonly scenarios: ReadonlyArray<ScenarioId> }
+
+export const scenarioRungs: ReadonlyArray<ScenarioRung> = ['tracer', 'unattended', 'attended', 'full']
+
+export const fullScenarioSelection: ScenarioSelection = { _tag: 'Rung', rung: 'full' }
+
+export const isScenarioId = (value: string): value is ScenarioId =>
+  scenarioMatrix.some((scenario) => scenario.id === value)
+
+export const isScenarioRung = (value: string): value is ScenarioRung =>
+  scenarioRungs.some((rung) => rung === value)
+
+export const scenarioIdsForSelection = (selection: ScenarioSelection): ReadonlyArray<ScenarioId> => {
+  if (selection._tag === 'Scenarios') return selection.scenarios
+
+  switch (selection.rung) {
+    case 'tracer':
+      return ['automated-author-rejected', 'operator-retroactive']
+    case 'unattended':
+      return ['automated-author-rejected', 'operator-retroactive', 'operator-idempotent', 'operator-concurrent']
+    case 'attended':
+      return [
+        'automatic-eligible',
+        'automatic-filtered',
+        'message-action-authorized',
+        'message-action-denied',
+        'docs-public',
+        'docs-role-restricted',
+        'docs-denied',
+      ]
+    case 'full':
+      return scenarioMatrix.map((scenario) => scenario.id)
+  }
+}
+
 export interface ChannelSnapshot {
   readonly id: Snowflake
   readonly guildId: Snowflake
@@ -144,6 +183,7 @@ export interface ScenarioReceipt {
     | 'assertions-passed'
     | 'official-automation-unavailable'
     | 'prerequisite-missing'
+    | 'not-selected'
     | 'target-denied'
     | 'target-mismatch'
     | 'assertion-failed'
@@ -172,9 +212,14 @@ export const makeMarker = (runId: RunId, scenario: ScenarioId): string => `[live
 /** Produces receipt correlation without persisting Discord content or identifiers. */
 export const opaqueHash = (value: string): string => createHash('sha256').update(value).digest('hex').slice(0, 16)
 
-export const aggregateVerdict = (receipts: ReadonlyArray<ScenarioReceipt>): Verdict =>
-  receipts.some((receipt) => receipt.verdict === 'FAIL') === true
-    ? 'FAIL'
-    : receipts.some((receipt) => receipt.verdict === 'UNRUN') === true
-      ? 'UNRUN'
-      : 'PASS'
+export const aggregateVerdict = (receipts: ReadonlyArray<ScenarioReceipt>): Verdict => {
+  let hasSelectedReceipt = false
+  let hasUnrunReceipt = false
+  for (const receipt of receipts) {
+    if (receipt.reason === 'not-selected') continue
+    hasSelectedReceipt = true
+    if (receipt.verdict === 'FAIL') return 'FAIL'
+    if (receipt.verdict === 'UNRUN') hasUnrunReceipt = true
+  }
+  return hasSelectedReceipt === false || hasUnrunReceipt === true ? 'UNRUN' : 'PASS'
+}

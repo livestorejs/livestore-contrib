@@ -1,8 +1,10 @@
 import {
   aggregateVerdict,
+  fullScenarioSelection,
   makeMarker,
   makeRunId,
   opaqueHash,
+  scenarioIdsForSelection,
   scenarioMatrix,
   type ArtifactCleanup,
   type MessageSnapshot,
@@ -10,6 +12,7 @@ import {
   type RunReceipt,
   type ScenarioDefinition,
   type ScenarioReceipt,
+  type ScenarioSelection,
   type Snowflake,
   type StagingTarget,
   type ThreadSnapshot,
@@ -70,7 +73,9 @@ const cleanup = async (
   }
 
   if (owned.responses.length > 0) {
-    const outcomes = await Promise.allSettled(owned.responses.map((response) => transport.deleteResponse(response.id)))
+    const outcomes = await Promise.allSettled(
+      owned.responses.map((response) => transport.deleteResponse(response.channelId, response.id)),
+    )
     result.response = outcomes.some((outcome) => outcome.status === 'rejected') === true ? 'failed' : 'deleted'
   }
   if (owned.thread !== undefined && owned.source !== undefined) {
@@ -400,26 +405,41 @@ export const runE2EMatrix = async (input: {
   readonly environment: 'fake' | 'staging'
   readonly target: StagingTarget
   readonly transport: E2ETransport
+  readonly selection?: ScenarioSelection
   readonly allowHumanAssisted?: boolean
 }): Promise<RunReceipt> => {
   const runId = makeRunId()
   const startedAt = new Date().toISOString()
+  const selectedScenarioIds = new Set(scenarioIdsForSelection(input.selection ?? fullScenarioSelection))
+  const targetHash = opaqueHash(`${input.target.guildId}:${input.target.channelId}`)
   let scenarios: ReadonlyArray<ScenarioReceipt>
+
+  const makeEmptyReceipt = (
+    scenario: ScenarioDefinition,
+    verdict: ScenarioReceipt['verdict'],
+    reason: ScenarioReceipt['reason'],
+  ): ScenarioReceipt => ({
+    scenario: scenario.id,
+    executor: scenario.executor,
+    verdict,
+    reason,
+    targetHash,
+    markerHash: opaqueHash(makeMarker(runId, scenario.id)),
+    artifactHashes: [],
+    cleanup: noCleanup,
+  })
+  const receiptForUnselected = (scenario: ScenarioDefinition): ScenarioReceipt =>
+    makeEmptyReceipt(scenario, 'UNRUN', 'not-selected')
 
   const targetChannelIds = [
     ...new Set([input.target.channelId, input.target.docsChannelIds.public, input.target.docsChannelIds.restricted]),
   ]
   if (targetChannelIds.some((channelId) => input.target.allowedChannelIds.has(channelId) === false) === true) {
-    scenarios = scenarioMatrix.map((scenario) => ({
-      scenario: scenario.id,
-      executor: scenario.executor,
-      verdict: 'FAIL',
-      reason: 'target-denied',
-      targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
-      markerHash: opaqueHash(makeMarker(runId, scenario.id)),
-      artifactHashes: [],
-      cleanup: noCleanup,
-    }))
+    scenarios = scenarioMatrix.map((scenario) =>
+      selectedScenarioIds.has(scenario.id) === true
+        ? makeEmptyReceipt(scenario, 'FAIL', 'target-denied')
+        : receiptForUnselected(scenario),
+    )
   } else {
     try {
       const channels = await Promise.all(targetChannelIds.map(input.transport.inspectChannel))
@@ -430,19 +450,19 @@ export const runE2EMatrix = async (input: {
           channel.topic?.includes(input.target.requiredTopicSentinel) === true,
       )
       if (targetMatches === false) {
-        scenarios = scenarioMatrix.map((scenario) => ({
-          scenario: scenario.id,
-          executor: scenario.executor,
-          verdict: 'FAIL',
-          reason: 'target-mismatch',
-          targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
-          markerHash: opaqueHash(makeMarker(runId, scenario.id)),
-          artifactHashes: [],
-          cleanup: noCleanup,
-        }))
+        scenarios = scenarioMatrix.map((scenario) =>
+          selectedScenarioIds.has(scenario.id) === true
+            ? makeEmptyReceipt(scenario, 'FAIL', 'target-mismatch')
+            : receiptForUnselected(scenario),
+        )
       } else {
         scenarios = []
         for (const scenario of scenarioMatrix) {
+          if (selectedScenarioIds.has(scenario.id) === false) {
+            scenarios = [...scenarios, receiptForUnselected(scenario)]
+            continue
+          }
+
           const receipt = await runScenario({
             scenario,
             marker: makeMarker(runId, scenario.id),
@@ -457,32 +477,22 @@ export const runE2EMatrix = async (input: {
               ...scenarios,
               ...scenarioMatrix
                 .filter((item) => !completed.has(item.id))
-                .map((item) => ({
-                  scenario: item.id,
-                  executor: item.executor,
-                  verdict: 'UNRUN' as const,
-                  reason: 'prerequisite-missing' as const,
-                  targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
-                  markerHash: opaqueHash(makeMarker(runId, item.id)),
-                  artifactHashes: [],
-                  cleanup: noCleanup,
-                })),
+                .map((item) =>
+                  selectedScenarioIds.has(item.id) === true
+                    ? makeEmptyReceipt(item, 'UNRUN', 'prerequisite-missing')
+                    : receiptForUnselected(item),
+                ),
             ]
             break
           }
         }
       }
     } catch {
-      scenarios = scenarioMatrix.map((scenario) => ({
-        scenario: scenario.id,
-        executor: scenario.executor,
-        verdict: 'FAIL',
-        reason: 'transport-failed',
-        targetHash: opaqueHash(`${input.target.guildId}:${input.target.channelId}`),
-        markerHash: opaqueHash(makeMarker(runId, scenario.id)),
-        artifactHashes: [],
-        cleanup: noCleanup,
-      }))
+      scenarios = scenarioMatrix.map((scenario) =>
+        selectedScenarioIds.has(scenario.id) === true
+          ? makeEmptyReceipt(scenario, 'FAIL', 'transport-failed')
+          : receiptForUnselected(scenario),
+      )
     }
   }
 

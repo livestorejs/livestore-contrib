@@ -48,5 +48,5 @@ export interface E2ETransport {
   }) => Promise<DocsResult>
   readonly deleteThread: (threadId: Snowflake) => Promise<void>
   readonly deleteMessage: (channelId: Snowflake, messageId: Snowflake) => Promise<void>
-  readonly deleteResponse: (responseId: Snowflake) => Promise<void>
+  readonly deleteResponse: (channelId: Snowflake, responseId: Snowflake) => Promise<void>
 }

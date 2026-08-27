@@ -105,6 +105,40 @@ pnpm e2e:live -- \
   --confirm-live-write I_UNDERSTAND_THIS_WRITES_TO_DISCORD_STAGING
 ```
 
+With no lane option, the runner executes the full 11-scenario matrix. A staged
+rollout can select exactly one named rung:
+
+- `--rung tracer`: readiness preflight, then scenario 3
+  (`automated-author-rejected`) and scenario 4 (`operator-retroactive`).
+- `--rung unattended`: scenarios 3–6, the four automated lanes.
+- `--rung attended`: scenarios 1, 2, and 7–11. Use this only with
+  `--human-handoff-broker`; automatic eligible-message behavior requires an
+  attended human and is never part of the unattended rung.
+- `--rung full`: all 11 scenarios, equivalent to the default.
+
+For a narrower diagnostic run, repeat `--scenario ID`, for example:
+
+```text
+pnpm e2e:live -- \
+  --live \
+  --manifest ./staging.json \
+  --confirm-live-write I_UNDERSTAND_THIS_WRITES_TO_DISCORD_STAGING \
+  --scenario automated-author-rejected \
+  --scenario operator-retroactive
+```
+
+`--rung` and `--scenario` are mutually exclusive. Duplicate selections,
+duplicate rungs, and unknown values are rejected before the manifest is read.
+Every run still preflights each distinct target channel exactly once and emits
+all 11 scenario receipts in matrix order. Unselected lanes are `UNRUN` with
+reason `not-selected`. A transport or cleanup failure stops later selected
+lanes as before; those lanes are `UNRUN` with `prerequisite-missing`, while
+unselected lanes remain `not-selected`.
+
+The run verdict aggregates selected lanes only, so a successful partial rung is
+`PASS`; `not-selected` receipts preserve the full audit shape without changing
+that verdict.
+
 The Nix package exposes the same source entrypoint as
 `livestore-discord-e2e`, so a deployed immutable package does not require pnpm
 or a source checkout.
@@ -157,14 +191,17 @@ The runner invokes the executable as
 run-scoped id keeps the crash ledger's record/resolve pairs matchable across
 per-gesture invocations, and `recover-ledger --ledger FILE` validates and
 deletes any unresolved artifacts after a crash. Supported operations are
-`create-message`, `invoke-message-action`, `invoke-docs`, `delete-message`, and
-`delete-response`. Docs results return a
+`create-message`, `invoke-message-action`, `invoke-docs`, `delete-message`,
+`delete-response`, and `resolve-thread`. `resolve-thread` performs no client
+gesture: the runner calls it only after the actor-bot REST deletion succeeds,
+so normal response, thread, and source cleanup all append the same exact
+guild/channel/artifact identity as their creation record. Docs results return a
 non-empty `responses` array because one interaction can produce multiple
 follow-up messages; every correlated response is independently cleaned. Each
 successful action response must attest its performer with either
 `"attendedByHuman": true` or `"performedBy": "official-client-session"`, plus
 the correlated IDs, marker, and channel fields represented by the E2E snapshots.
-Cleanup additionally returns
+Client-driven cleanup additionally returns
 `{ "attendedByHuman": true, "deleted": true, "id": "..." }` for the exact
 requested artifact. Exit `7`, a missing attestation, or no human produces
 `UNRUN`; invalid correlation or cleanup confirmation cannot produce `PASS`.
@@ -175,9 +212,13 @@ A reference broker ships as `livestore-discord-e2e-broker` (source runner:
 the official Discord web client through the
 `http-capture` browser-control seam, correlates exact artifact IDs through the
 actor-bot REST read seam, and journals every created artifact into a private
-mode-0600 per-run cleanup ledger (`--ledger FILE`) before acknowledging it. A
-crash mid-run is recoverable: unresolved ledger entries validate against exact
-recorded IDs before any delete, never by message content.
+mode-0600 per-run cleanup ledger (`--ledger FILE`) before acknowledging it.
+Recovery addresses threads with `getChannel(threadId)`, which includes archived
+and private threads, and requires the exact recorded thread, guild, and parent
+before deletion. A `404` is resolved as already gone. Messages and responses
+require the exact recorded guild/channel before `deleteMessage(channelId, id)`.
+Each successful or already-gone artifact is resolved independently; failed
+entries remain open for the next recovery pass.
 
 The broker attests each gesture with either `"attendedByHuman": true` or
 `"performedBy": "official-client-session"`; receipts never overclaim which

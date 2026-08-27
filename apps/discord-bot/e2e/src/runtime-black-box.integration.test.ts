@@ -200,10 +200,10 @@ const makeConfig = ({
       },
     },
     releaseId: 'test-release',
-    telemetry: {
-      sink: 'dev3-tempo',
+    diagnostics: {
+      sink: 'cloudflare-provider',
       delivery: 'best-effort',
-      accessBoundary: 'tailnet-trusted-grafana',
+      accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
       retentionDays: 30,
     },
     e2e: {

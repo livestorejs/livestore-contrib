@@ -26,6 +26,8 @@ export interface HumanHandoffBroker {
   }) => Promise<DocsResult>
   readonly deleteMessage: (message: MessageSnapshot) => Promise<void>
   readonly deleteResponse: (response: ResponseSnapshot) => Promise<void>
+  /** Records a bot-confirmed thread deletion in the broker's crash ledger. */
+  readonly resolveThread: (thread: ThreadSnapshot) => Promise<void>
 }
 
 /**
@@ -77,6 +79,16 @@ export const makeCommandHumanHandoffBroker = (input: {
     },
     deleteResponse: async (response) => {
       deleted(await request('delete-response', response), response.id)
+    },
+    resolveThread: async (thread) => {
+      resolved(
+        await request('resolve-thread', {
+          id: thread.id,
+          guildId: thread.guildId,
+          channelId: thread.parentChannelId,
+        }),
+        thread.id,
+      )
     },
   }
 }
@@ -174,5 +186,12 @@ const deleted = (value: unknown, expectedId: Snowflake): void => {
   attended(decoded, 'cleanup')
   if (decoded.deleted !== true || snowflake(decoded.id, 'cleanup id') !== expectedId) {
     throw new Error('Human handoff broker did not confirm correlated cleanup')
+  }
+}
+
+const resolved = (value: unknown, expectedId: Snowflake): void => {
+  const decoded = record(value, 'thread resolution result')
+  if (decoded.resolved !== true || snowflake(decoded.id, 'thread resolution id') !== expectedId) {
+    throw new Error('Human handoff broker did not confirm correlated thread resolution')
   }
 }
