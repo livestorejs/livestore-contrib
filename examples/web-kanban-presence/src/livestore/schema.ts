@@ -1,7 +1,7 @@
 import { Events, makeSchema, Schema, State } from '@livestore/livestore'
 
 // Durable, synced state for the kanban board — persisted in SQLite via the
-// eventlog + sync backend. This is the "storage" half of the partykit model.
+// eventlog + sync backend. Durable board state.
 export const tables = {
   columns: State.SQLite.table({
     name: 'columns',

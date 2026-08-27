@@ -1,11 +1,10 @@
 import { Schema } from '@livestore/utils/effect'
 
 /**
- * Presence channel state schemas — defined once here and passed to BOTH the
- * party (`makeDurableObject({ presence: { schemas } })`) and the app's
- * `makePresenceClient({ channels })`, giving end-to-end typed updates that the
- * server validates before fan-out. More channels can be added later by adding
- * an entry here (e.g. a `chat` channel with typing indicators).
+ * Presence channel state schemas — defined once here and passed to both
+ * `makeDurableObject({ presence: { schemas } })` and
+ * `makePresenceClient({ channels })`. The Durable Object schema-decodes every
+ * update before fan-out.
  */
 
 /** Cursor + live-drag channel (Figma-style pointer tracking). */

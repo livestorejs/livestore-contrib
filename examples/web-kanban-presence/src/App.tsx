@@ -165,11 +165,7 @@ const KanbanBoard: React.FC = () => {
 
   // Ephemeral presence: online count + live cursors + live dragging.
   // Broadcast-only; never persisted to SQLite or the eventlog. Rides the same
-  // sync party (`/sync`) — single party hosts both the durable eventlog and
-  // the ephemeral presence room. The party evicts members on socket close.
-  //
-  // clientId is fresh per tab mount; the party's socket-close handler evicts
-  // the old member when this one replaces it.
+  // `/sync` WebSocket as the eventlog. Socket close evicts the member.
   const presenceOptions = useMemo(
     () => ({
       url: `${globalThis.location.origin}/sync`,
@@ -185,15 +181,6 @@ const KanbanBoard: React.FC = () => {
   const presenceSnapshot = usePresenceSnapshot(presence)
 
   const onlineCount = presenceSnapshot.members.filter((m) => m.online === true).length
-
-  // Assign a sequential default name once we know how many people are online.
-  const [nameAssigned, setNameAssigned] = useState(false)
-  useEffect(() => {
-    if (nameAssigned === false && onlineCount > 0) {
-      setNameAssigned(true)
-      Effect.runFork(presence.setState('cursor', { name: `Guest ${onlineCount}` }))
-    }
-  }, [onlineCount, nameAssigned, presence])
 
   // Leave explicitly on tab close so peers update instantly.
   useEffect(() => {
@@ -240,6 +227,30 @@ const KanbanBoard: React.FC = () => {
 
   const [userName, setUserName] = useState('')
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // Next unused "Guest N" among other members. Re-runs if two tabs raced and
+  // landed on the same number (the later clientId yields).
+  useEffect(() => {
+    if (presence.clientId === '') return
+    const taken = new Set<number>()
+    let myGuest: number | undefined
+    for (const m of presenceSnapshot.members) {
+      const label = ((m.state as CursorState | undefined)?.name ?? m.name ?? '').trim()
+      const match = /^Guest (\d+)$/.exec(label)
+      if (match === null) continue
+      const n = Number(match[1])
+      if (m.clientId === presence.clientId) myGuest = n
+      else taken.add(n)
+    }
+    if (userName.trim() !== '' && !userName.startsWith('Guest ')) return
+    if (myGuest !== undefined && taken.has(myGuest) === false) return
+    let n = 1
+    while (taken.has(n)) n += 1
+    const next = `Guest ${n}`
+    if (next === userName) return
+    setUserName(next)
+    Effect.runFork(presence.setState('cursor', { name: next }))
+  }, [presence, presenceSnapshot.members, userName])
 
   const changeUserName = useCallback(
     (name: string) => {

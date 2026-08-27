@@ -11,8 +11,8 @@ export class SyncBackendDO extends SyncBackend.makeDurableObject({
   onPull: async (message, context) => {
     console.log('onPull', message, 'storeId:', context.storeId)
   },
-  // Presence channels declared once here; every client patch is validated
-  // against these schemas before fan-out.
+  // Presence channels declared once here; every update is schema-decoded
+  // before fan-out. Rooms default to `default` (this board).
   presence: {
     schemas: presenceSchemas,
     room: { memberIdleTtlMs: 15_000, sweepIntervalMs: 5_000 },
