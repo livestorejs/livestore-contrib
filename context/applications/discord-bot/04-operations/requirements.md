@@ -119,10 +119,11 @@ is the canonical live realization; current admission gaps remain tracked in
 
 - **LSC.APP.DISCORD.OPS-R09 Production verification:** After deployment,
   verification proves the exact release, declared Discord identity, readiness,
-  and a currently healthy Gateway session. It does not
-  post a marker into an ordinary production channel. If an isolated production
-  canary target is later accepted, it must satisfy the same ownership and
-  cleanup constraints as staging.
+  and a currently healthy Gateway session. It does not post a marker into an
+  ordinary production channel. If an isolated production canary target is
+  later accepted, it must satisfy the same ownership and cleanup constraints as
+  staging; a percentage split of Worker traffic does not constitute or prove a
+  bot canary.
 
 ### Must minimize and retain operational data deliberately
 
@@ -144,27 +145,33 @@ is the canonical live realization; current admission gaps remain tracked in
 
 ### Must be deployable and recoverable
 
-- **LSC.APP.DISCORD.OPS-R12 Immutable release and receipt:** A deployment runs
-  an immutable Worker version identified by source revision and dependency
-  lock. Its receipt records environment, release, configuration digest, actor
-  identity, readiness result, functional-gate result, operational-gate result,
-  deploy time, and rollback target without recording secrets or raw Discord
-  object IDs.
+- **LSC.APP.DISCORD.OPS-R12 Immutable release and receipt:** Staging runs the
+  immutable release candidate identified by source revision and dependency
+  lock. After both gates pass, production deploys that same release identity
+  and artifact without rebuilding. Its receipt records environment, release,
+  configuration digest, actor identity, readiness result, functional-gate
+  result, operational-gate result, deploy time, and rollback target without
+  recording secrets or raw Discord object IDs.
 
-- **LSC.APP.DISCORD.OPS-R13 Bounded rollback:** An operator can restore the
-  previous known-good Worker version and configuration without rebuilding
-  either. Gradual rollout and rollback preserve the singleton Durable Object
-  authority, recheck gateway-aware readiness, and emit a new receipt; failure
-  to restore readiness is surfaced as a failed rollback rather than success.
+- **LSC.APP.DISCORD.OPS-R13 Bounded rollback:** An operator can redeploy the
+  previous known-good Worker version without rebuilding only while the current
+  and previous releases retain backward-compatible Durable Object schema and
+  API contracts. The redeploy preserves singleton authority, rechecks
+  gateway-aware readiness, and emits a new receipt; it does not rewind Durable
+  Object state or environment configuration. After an incompatible migration,
+  rollback means a forward fix or a disabled Gateway, never old code against
+  migrated state. Failure to restore readiness is reported as a failed rollback.
 
 - **LSC.APP.DISCORD.OPS-R14 Declared Cloudflare realization:** Each environment
   is one Alchemy v2 stack realizing `LSC.APP.DISCORD.RT-R09` and declaring all
-  bindings, secret slots, triggers, routes, release versions, and traffic
-  policy. Alchemy remote state is authoritative; no Wrangler manifest, host
-  module, or imperative deploy script may become a second IaC source.
-  Cloudflare is the canonical staging host and the production host after
-  admission. The retained Node host implementation is source fallback only and
-  carries no deployed or ready claim. `refines: LSC.APP.DISCORD.RT-R09,
+  bindings, secret slots, triggers, routes, release versions, and binary
+  rollout policy. Alchemy remote state is authoritative; no Wrangler manifest,
+  host module, or imperative deploy script may become a second IaC source.
+  Staging is the only candidate environment. Production is a separate
+  application, Worker, singleton Durable Object, secret projection, and state
+  boundary that receives the admitted immutable release in one binary deploy.
+  The retained Node host implementation is source fallback only and carries no
+  deployed or ready claim. `refines: LSC.APP.DISCORD.RT-R09,
   LS.DEL.INFRA-R01, LS.DEL.INFRA-R04`
 
 - **LSC.APP.DISCORD.OPS-R15 Isolated Discord environments:** Production and
@@ -205,13 +212,18 @@ is the canonical live realization; current admission gaps remain tracked in
   deterministic local titles. Live AI-title proof requires a later,
   independently authorized channel and experiment.
 
-- **LSC.APP.DISCORD.OPS-R19 Independent production gates:** Production remains
-  disabled until the same release has both a functional PASS and an operational
-  PASS. Operational PASS requires authoritative remote Alchemy state, externally
-  verified release identity, gateway-aware readiness, gradual rollout and
-  rollback proof, a CI-owned deployment path, and long-duration reconnect
-  observation. Neither verdict implies the other; missing evidence keeps
-  production BLOCKED rather than being reported as PASS.
+- **LSC.APP.DISCORD.OPS-R19 Staging candidate and binary production gate:**
+  Staging is the only candidate environment. Production remains disabled until
+  that immutable release has both a functional PASS and an operational PASS.
+  Operational PASS requires authoritative remote Alchemy state, externally
+  verified release identity, gateway-aware readiness, binary deployment and
+  backward-compatible known-good redeploy proof, a CI-owned deployment path,
+  and long-duration reconnect observation. After both verdicts pass,
+  production receives the same release identity in one binary deploy to its
+  disjoint application, Worker, singleton Durable Object, secrets, and state.
+  Percentage traffic is not a bot canary and must not be reported as one.
+  Neither verdict implies the other; missing evidence keeps production BLOCKED
+  rather than being reported as PASS.
 
 ## Resolved technical decisions
 
@@ -226,6 +238,12 @@ is the canonical live realization; current admission gaps remain tracked in
   ([decision 0007](./.decisions/0007-use-cloudflare-canonical-host.md), which
   supersedes [decision 0002](./.decisions/0002-run-on-dev4.md) and
   [decision 0005](./.decisions/0005-use-best-effort-central-traces.md)).
+- Staging is the only candidate environment. After both independent gates pass,
+  the same immutable release is deployed binary to the disjoint production
+  application and singleton Durable Object; compatible rollback is a
+  known-good code redeploy, never a percentage bot canary
+  ([decision 0010](./.decisions/0010-use-staging-candidate-binary-production-rollout.md),
+  which amends the rollout mechanism in decisions 0007 and 0008).
 - Production admission keeps functional and operational verdicts independent,
   and the canonical staging matrix uses the two-channel AI-off area
   ([decision 0008](./.decisions/0008-separate-rollout-evidence.md)).

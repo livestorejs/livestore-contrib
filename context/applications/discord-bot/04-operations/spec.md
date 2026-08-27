@@ -140,17 +140,18 @@ Cloudflare Worker                   secret bindings
 
 Each environment is one Alchemy v2 stack. It declares the Worker, one
 SQLite-backed `BotState` Durable Object binding, secret slots, schedule, routes,
-release versions, traffic policy, and authoritative remote state. Alchemy is
-the only IaC source: a Wrangler manifest, host module, or imperative deploy
-script may not independently define the stack.
+release versions, binary rollout policy, and authoritative remote state.
+Alchemy is the only IaC source: a Wrangler manifest, host module, or imperative
+deploy script may not independently define the stack.
 
 All fetch routes, schedules, and release versions address the fixed Durable
 Object name `gateway` inside their environment stack. That object owns Action
 Authority, Gateway supervision, runtime health, durable journal and receipts,
-and environment state. Cloudflare may overlap Worker versions during gradual
-traffic movement, but those versions cannot create a second authoritative
-actor. Durable Object storage is isolated by environment and never shared
-between staging and production.
+and environment state. A release change replaces the code addressing that
+singleton as one binary deployment. Percentage traffic does not exercise a
+second bot actor and is not a bot canary. Production and staging have disjoint
+Workers, Durable Objects, storage, configuration, and secret projections; no
+state or credential crosses the environment boundary.
 
 The Worker exposes the typed Bot control RPC below `/admin/rpc/` over HTTPS.
 Every request requires the environment-specific bearer credential from an
@@ -295,53 +296,71 @@ mutation.
 ## Deploy, Admission, and Rollback
 
 ```text
-             same immutable release
+       immutable release in staging
                     |
-          +---------+---------+
+                    v
+       staging candidate environment
           |                   |
           v                   v
  functional gate       operational gate
  11 lanes + zero       remote state + release/readiness
- artifacts             + CI + gradual rollback + duration
+ artifacts             + CI + binary deploy/redeploy + duration
           |                   |
           +------ both PASS --+
                     |
                     v
-          enable production rollout
+     same release identity and artifact
                     |
-            gradual version traffic
+                    v
+        binary production deployment
+   (disjoint app / Worker / DO / secrets)
               | pass       | fail
               v            v
-            receipt   restore prior version
-                            |
-                   readiness + rollback receipt
+           receipt    schema/API compatible?
+                         | yes       | no
+                         v           v
+               redeploy known-good  disable Gateway
+                      code          + forward fix
 ```
 
-Alchemy v2 deploys staging from authoritative remote state. The deploy receipt
-binds the Worker version to source/release ID, dependency-lock digest,
-configuration digest, sanitized application identity, and previous known-good
-Rollback Target (R12).
+Alchemy v2 deploys the immutable release to staging, the only candidate
+environment, from authoritative remote state. The staging receipt binds the
+Worker version to source/release ID, dependency-lock digest, configuration
+digest, sanitized application identity, and previous known-good Rollback Target
+(R12).
 
 Functional and Operational Verdicts are independent records for that exact
-release. Functional PASS requires all eleven live matrix lanes and zero owned
-artifacts. Operational PASS requires remote Alchemy state, externally verified
-release identity, gateway-aware readiness, gradual rollout and rollback proof,
-a CI-owned deploy path, and long-duration reconnect observation. Production
-remains disabled if either verdict is absent, FAIL, BLOCKED, or UNRUN (R19;
-decision 0008).
+staging release. Functional PASS requires all eleven live matrix lanes and zero
+owned artifacts. Operational PASS requires remote Alchemy state, externally
+verified release identity, gateway-aware readiness, binary deployment and
+backward-compatible known-good code redeploy proof, a CI-owned deploy path, and
+long-duration reconnect observation. Production remains disabled if either
+verdict is absent, FAIL, BLOCKED, or UNRUN (R19; decisions 0008 and 0010).
 
-Production rollout moves version traffic gradually. Every version addresses the
-same environment singleton, so traffic overlap does not create overlapping
-Gateway Action Authority. Verification checks exact release/configuration,
-declared identity, Worker reachability, and gateway-aware `/readyz`. A
-successful Deployment Receipt records both gate verdicts and the Rollback
-Target without secrets or raw Discord IDs.
+After both verdicts pass, Alchemy deploys the same immutable release identity
+and artifact to production without rebuilding. This is one binary change for
+the production Worker and its singleton Durable Object, not a percentage
+traffic ramp. Production has its own Discord application, Worker, Durable
+Object storage, configuration, and secret projection. A percentage split would
+only divide requests to the singleton bot deployment; it neither creates an
+independent bot candidate nor qualifies as canary evidence. Verification checks
+the exact release/configuration, declared identity, Worker reachability, and
+gateway-aware `/readyz`. A successful Deployment Receipt records both gate
+verdicts and the Rollback Target without secrets or raw Discord IDs.
 
-Rollback restores the recorded Worker version and configuration without
-rebuilding, redirects traffic, and reruns exact-release and gateway-aware
-readiness verification. A rollback receipt is emitted regardless of outcome.
-Only restored readiness is `PASS`; a reachable Worker without a healthy Gateway
-is `FAIL` (R04, R09, R13).
+Rollback is a binary redeploy of the recorded known-good Worker code without
+rebuilding. It is allowed only when the deployed Durable Object schema and
+administrative/runtime APIs remain backward compatible with that code. It does
+not rewind Durable Object state, environment configuration, schemas, or API
+contracts. The redeploy preserves singleton authority, reruns exact-release and
+gateway-aware readiness verification, and always emits a rollback receipt. Only
+restored readiness is `PASS`; a reachable Worker without a healthy Gateway is
+`FAIL`.
+
+Once an incompatible Durable Object migration or API contract is active, old
+code is not a valid Rollback Target. The operator keeps the Gateway disabled
+and deploys a forward fix rather than running the known-good release against
+incompatible state (R04, R09, R13; decision 0010).
 
 ## Operational Divergence
 

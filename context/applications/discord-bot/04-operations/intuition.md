@@ -39,15 +39,17 @@ Proof has two independent verdicts. The functional verdict comes from the
 eleven-lane staging matrix and its zero-artifact oracle. Its two channels use
 deterministic titles with AI titles disabled. The operational verdict comes
 from authoritative Alchemy remote state, release identity, gateway-aware
-readiness, gradual rollback, CI deployment, and long-duration reconnect
-observation. A pass in one never implies a pass in the other, and production
-stays disabled until both pass for the same release.
+readiness, binary deployment and compatible redeploy proof, CI deployment, and
+long-duration reconnect observation. A pass in one never implies a pass in the
+other, and production stays disabled until both pass for the same release.
 
-Cloudflare is the one deployment topology. Worker ingress and every release
-version address one environment singleton Durable Object, so gradual traffic
-movement cannot create a second Gateway actor. The Node implementation remains
-source fallback, not a parallel service. Reintroducing it as a host would
-require a new explicit decision.
+Cloudflare is the one deployment topology, and staging is its only candidate
+environment. After both verdicts pass, the same immutable release moves in one
+binary deployment to the disjoint production application, Worker, singleton
+Durable Object, and secrets. Percentage traffic cannot create a second Gateway
+actor and is not a bot canary. The Node implementation remains source fallback,
+not a parallel service. Reintroducing it as a host would require a new explicit
+decision.
 
 The old dev4 proposal remains useful design history, but it was never activated
 and is superseded. Cloudflare staging provides a current owned runtime while

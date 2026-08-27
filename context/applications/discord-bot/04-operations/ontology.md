@@ -29,8 +29,8 @@ the operational terms needed to run the LiveStore bot safely.
   durable operational state.
 
 - **Deployment Controller:** The Alchemy v2 stack that declares Cloudflare
-  resources, bindings, secrets, remote state, release traffic, and rollback for
-  a Bot Deployment.
+  resources, bindings, secrets, remote state, binary release deployment, and
+  rollback for a Bot Deployment.
 
 - **Environment Identity:** One environment's Discord application, bot user,
   and guild boundary. Production and staging have disjoint Environment
@@ -62,16 +62,18 @@ the operational terms needed to run the LiveStore bot safely.
   environment and immutable release to configuration, validation, health, and
   rollback outcomes.
 
-- **Rollback Target:** The previous immutable release and configuration digest
-  recorded before a deployment and available without rebuilding.
+- **Rollback Target:** The previous immutable code release recorded before a
+  deployment and available without rebuilding while schema and APIs remain
+  backward compatible.
 
 - **Functional Verdict:** The exact-release result of the canonical live
   staging matrix and zero-artifact oracle. It proves Discord behavior, not
   production operability.
 
 - **Operational Verdict:** The exact-release result of remote-state, release
-  identity, gateway-aware readiness, gradual rollback, CI deployment, and
-  long-duration reconnect proof. It does not prove feature behavior.
+  identity, gateway-aware readiness, binary deployment, compatible code
+  redeploy, CI deployment, and long-duration reconnect proof. It does not prove
+  feature behavior.
 
 ## Structure
 
