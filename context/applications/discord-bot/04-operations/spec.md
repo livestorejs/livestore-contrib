@@ -59,11 +59,11 @@ interface BotDeploymentConfigBaseV1 {
     }
   }
   readonly releaseId: string
-  readonly telemetry: {
-    readonly sink: 'dev3-tempo'
+  readonly diagnostics: {
+    readonly sink: 'cloudflare-provider'
     readonly delivery: 'best-effort'
-    readonly accessBoundary: 'tailnet-trusted-grafana'
-    readonly retentionDays: 30
+    readonly retentionDays: number
+    readonly accessPolicyId: string
   }
 }
 
@@ -86,13 +86,15 @@ type BotDeploymentConfigV1 =
 numeric JSON values are invalid because they can lose precision. IDs are
 deduplicated during decoding. `actionChannelIds` must be non-empty.
 `aiTitleChannelIds` must be a subset of public `actionChannelIds` and cannot
-overlap staging-only or declared private/moderator targets. Docs audience
-channels and roles must resolve inside the declared guild; the two channel sets
-are disjoint, and a role-restricted channel set requires at least one declared
-contributor/maintainer role. Production
-decoding rejects any member also listed in `stagingOnlyChannelIds`. Secret
-references identify a provider-owned secret slot; their URI/grammar is owned by
-the selected deployment controller and cannot contain the resolved value.
+overlap staging-only or declared private/moderator targets. The canonical
+staging configuration declares exactly `#staging-e2e` and
+`#staging-docs-restricted` as its two matrix channels and declares an empty
+`aiTitleChannelIds`; its thread titles are deterministic. Docs audience
+channels and roles must resolve inside the declared guild; public and
+role-restricted channel sets are disjoint, and a role-restricted set requires
+at least one declared contributor/maintainer role. Production decoding rejects
+any member also listed in `stagingOnlyChannelIds`. Secret references name
+Alchemy-declared Cloudflare secret bindings and cannot contain resolved values.
 
 The immutable release includes source revision, lockfile, application code,
 and runtime dependencies. It excludes environment configuration and projected
@@ -105,30 +107,62 @@ and rejects an `applicationId` mismatch, an environment-identity collision, or
 the reserved historical ID before opening mutation handlers (R01-R04, decision
 0006).
 
+The staging guild keeps three bot memberships through the full functional
+matrix: the staging runtime bot, the historical bot, and the E2E Actor. Matrix
+setup and execution never read the historical credential or modify its
+application, bot user, commands, or credentials. After Functional PASS and its
+zero-artifact receipt, an operator removes only the historical bot's membership
+from the staging guild. The historical application remains intact and
+unmodified. The purpose-scoped E2E Actor remains installed so recurring
+regression runs retain the same independent author and cleanup authority (R15;
+decision 0009).
+
 ## Host and Authority Realization
 
-The deployment target is dev4. One dedicated systemd unit and service user per
-environment runs the contrib-built immutable artifact. Dotfiles owns the NixOS
-module, `deploy-rs` activation, `op-proxy` credential projection, health
-observation, host state permissions, and rollback integration. Contrib owns the
-artifact, configuration decoder, health semantics, and deployment receipt
-schema.
+```text
+                      Alchemy v2 stack
+                            |
+              +-------------+-------------+
+              |                           |
+              v                           v
+Cloudflare Worker                   secret bindings
+ fetch / scheduled                       |
+              |                           |
+              +------------+--------------+
+                           v
+             BotState("gateway")
+             singleton Durable Object
+              |       |         |
+              |       |         +-- RuntimeHealth
+              |       +------------ Gateway supervisor/session
+              +-------------------- SQLite journal + receipts
+```
 
-Before opening a Gateway connection, the unit acquires an environment-specific
-host-local Action Authority lock. Deployment stops the old unit and observes
-lock release before the candidate may acquire it. systemd restart policy may
-replace a failed process, but it may not run a parked candidate that is already
-connected. Mutable runtime state lives below
-`/var/lib/discord-bot/<environment>/` and is not shared with other dev4
-applications.
+Each environment is one Alchemy v2 stack. It declares the Worker, one
+SQLite-backed `BotState` Durable Object binding, secret slots, schedule, routes,
+release versions, traffic policy, and authoritative remote state. Alchemy is
+the only IaC source: a Wrangler manifest, host module, or imperative deploy
+script may not independently define the stack.
 
-Each environment also owns a Unix-domain administrative socket below
-`/run/discord-bot/<environment>/control.sock`. The dedicated service and
-`discord-bot-operators` group are its only peers. The runtime derives operator
-identity/capabilities from the authenticated peer and never accepts an identity
-assertion from RPC input. Remote operators run `livestore-discord` through SSH
-on dev4; no public administrative listener or direct credential fallback is
-initial scope.
+All fetch routes, schedules, and release versions address the fixed Durable
+Object name `gateway` inside their environment stack. That object owns Action
+Authority, Gateway supervision, runtime health, durable journal and receipts,
+and environment state. Cloudflare may overlap Worker versions during gradual
+traffic movement, but those versions cannot create a second authoritative
+actor. Durable Object storage is isolated by environment and never shared
+between staging and production.
+
+The Worker exposes the typed Bot control RPC below `/admin/rpc/` over HTTPS.
+Every request requires the environment-specific bearer credential from an
+Alchemy-declared Cloudflare secret binding. The runtime derives authorization
+from the validated credential, not request-body identity. `/readyz` is the
+minimal public health route and reads the singleton's current health. No
+unauthenticated admin route or direct bot-token fallback exists.
+
+The Node host implementation remains buildable source fallback. It is not a
+deployed environment, a maintained second IaC topology, or evidence of current
+readiness. Reintroducing dev4 or another Node deployment requires a new host
+decision (R04, R14, R16; decision 0007).
 
 ## Runtime Lifecycle and Readiness
 
@@ -161,10 +195,11 @@ interface RuntimeHealth {
 
 `ready` is derived, never manually set: identity is verified, REST probe is
 `ok`, Gateway is `ready`, and handlers are registered. Losing any condition
-withdraws readiness synchronously. Process liveness is a separate deployment
-controller signal. The chosen platform exposes both signals externally and
-alerts when production remains non-ready beyond its declared startup/reconnect
-budget (R05-R06).
+withdraws readiness synchronously. Worker availability is a separate platform
+signal. `/readyz` reads the singleton Durable Object snapshot and returns only
+the readiness verdict, release identity, and non-content lifecycle fields. The
+operational gate independently probes Worker reachability, exact release
+identity, and current Gateway readiness (R05-R06).
 
 DFX owns socket/session mechanics. The integration must classify Discord fatal
 close codes 4004, 4010, 4011, 4012, 4013, and 4014 as terminal before applying
@@ -172,47 +207,42 @@ any reconnect schedule. Until upstream DFX provides and verifies that behavior,
 the production dependency pin carries a tested adapter or upstream patch rather
 than accepting an unbounded reconnect loop.
 
-## Telemetry and Privacy
+## Diagnostics and Durable Operational State
 
 ```text
-Discord input -> policy/action -> structured outcome
+Discord input -> policy/action -> allowlisted diagnostic outcome
       |                              |
-      +-- content boundary           +--> approved trace fields
-                                           |
-                                           v
-                              best-effort OTLP -> Tempo (30d)
+      +-- content boundary           +--> Cloudflare provider diagnostics
 
-service lifecycle/errors -> content-free systemd journal (host policy)
-receipts/recovery/state  -> /var/lib/discord-bot (owned lifecycle)
+gateway/session/journal/status -> singleton Durable Object storage
+deployment/version/state       -> Alchemy remote state + receipts
 ```
 
-The trace and log encoders use an explicit content allowlist. Permitted common fields are
-`service.name`, environment, release ID, event class, handler name, policy
-outcome, duration, retry count, Discord error class/code, lifecycle state, and
-a run-scoped one-way correlation value. Message text, prompts, generated text,
-docs excerpts, tokens, usernames, and raw Discord IDs have no encoder fields.
-Unknown error causes are rendered as a stable error class plus redacted summary,
-not serialized recursively (R10).
+The diagnostic encoder uses an explicit content allowlist. Permitted common
+fields are `service.name`, environment, release ID, event class, handler name,
+policy outcome, duration, retry count, Discord error class/code, lifecycle
+state, and a run-scoped one-way correlation value. Message text, prompts,
+generated text, docs excerpts, tokens, usernames, and raw Discord IDs have no
+encoder fields. Unknown error causes are rendered as a stable error class plus
+redacted summary, not serialized recursively (R10).
 
-The bot exports content-free traces only to dev4's existing local OTLP
-forwarder, which sends over Tailscale to Tempo on dev3. Forwarding is
-best-effort: the current path has no persistent queue, so an unavailable network
-or sink may lose traces. Tempo retains traces for 30 days. Operators inspect
-them through the fleet's existing tailnet-trusted Grafana boundary; initial
-scope does not introduce a bot-specific tenant or Grafana role (R11).
+Runtime diagnostics use only the Cloudflare sink and access boundary declared
+by the environment stack. Delivery is best-effort; provider or network loss may
+drop records. The stack declares the enabled sink, retention, and access-policy
+identifier so review does not infer those properties from defaults. There is
+no dev4 OTLP hop, systemd journal, bot-specific Loki/Mimir stream, or durable
+diagnostic-delivery claim (R11; decision 0007).
 
-Bot application logs and metrics are not exported to central Loki or Mimir in
-initial scope. Process lifecycle and error records remain in the local systemd
-journal under current dev4 host retention and access policy. They must be
-content-free, but the bot makes no bot-specific durability, retention, or access
-claim for the journal. A privacy test passes unique sentinels as a token,
-message, prompt, generated answer, and thrown-error detail through success and
-failure paths, captures emitted spans, local log records, and receipts, and
-fails if any sentinel occurs (R10-R11).
+Gateway session state, action journal entries, deployment and rollback
+receipts, recovery records, and readiness snapshots are durable operational
+data in the singleton Durable Object, not telemetry. Alchemy infrastructure
+metadata uses authoritative remote state. Each data class declares its own
+lifecycle.
 
-Deployment receipts, recovery records, and idempotency state are application
-state rather than telemetry. Their schemas and retention are independently
-declared under the environment state directory.
+A privacy test passes unique sentinels as a token, message, prompt, generated
+answer, and thrown-error detail through success and failure paths, captures
+provider diagnostics and durable operational records, and fails if any sentinel
+occurs (R10-R11).
 
 ## Live E2E Protocol
 
@@ -229,69 +259,95 @@ E2E Actor        Discord          Bot Deployment        E2E harness
                     +------------------------------ receipt -->
 ```
 
-The staging-live gate runs in a dedicated staging guild through a staging bot
-and a distinct E2E Actor. It executes this sequence (R07-R09):
+The functional gate runs the canonical eleven-lane matrix in the dedicated
+staging guild through the staging bot and a distinct E2E Actor. The runtime bot,
+historical bot, and E2E Actor all remain members until the matrix reaches
+Functional PASS; membership cleanup happens only afterward. The `bot-staging`
+area has exactly `#staging-e2e` and `#staging-docs-restricted`; both are
+staging-only, neither enables AI titles, and every matrix-created thread
+receives a deterministic local title. A later AI-title experiment requires a
+separately authorized channel outside this matrix (R07-R08, R15, R18; decisions
+0008-0009).
+
+Each mutating lane follows this protocol:
 
 1. Require an explicit live-write flag and confirmation value before resolving
    credentials.
 2. Resolve exact guild/channel IDs, fetch the channel, and verify its guild,
    allowlist membership, and purpose marker.
-3. Have the separate E2E Actor post a unique marker whose run correlation is
-   known to the harness; staging policy accepts that actor only in this target.
-4. Observe exactly one resulting thread. Discord's thread ID must equal the
-   source message ID, and its guild and parent channel must match the target.
-5. Delete the correlated thread, then the marker. Never delete a candidate that
-   fails any ownership check.
-6. Emit PASS only after cleanup. Timeout attempts marker cleanup; cleanup
-   failure emits FAIL plus a sanitized recovery receipt. Missing credentials or
-   target configuration emits UNRUN.
+3. Have the separate E2E Actor post or invoke the lane's unique correlated
+   stimulus; staging policy accepts that actor only in declared targets.
+4. Observe the exact expected automatic, manual, operator, or docs outcome and
+   bind it to the tested release.
+5. Delete only artifacts whose ownership and run correlation both match.
+6. Emit PASS only after the zero-artifact oracle succeeds. Timeout attempts
+   cleanup; cleanup failure emits FAIL plus a sanitized recovery receipt.
+   Missing credentials, target configuration, or attended authority emits
+   UNRUN.
 
-Production verification compares the running release/configuration digest to
-the deployment receipt, reads the external readiness signal, verifies the
-declared identity, and requires a healthy current Gateway session. It performs
-no Discord mutation in the initial rollout.
+The resulting Functional Verdict proves Discord behavior and cleanup only. It
+does not claim remote-state safety, production readiness, or rollback. Passive
+production verification separately compares running release/configuration
+digests to the deployment receipt, reads `/readyz`, verifies the declared
+identity, and requires a healthy current Gateway session without Discord
+mutation.
 
-## Deploy and Rollback
+## Deploy, Admission, and Rollback
 
 ```text
-build immutable release -> simulated gate -> staging-live gate
-                                              |
-                                              v
-                                      stop old authority
-                                              |
-                                      start candidate
-                                              |
-                                ready + production verify
-                                   | fail              | pass
-                                   v                   v
-                           stop candidate          receipt
-                                   |
-                         start rollback target
-                                   |
-                         readiness + rollback receipt
+             same immutable release
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+ functional gate       operational gate
+ 11 lanes + zero       remote state + release/readiness
+ artifacts             + CI + gradual rollback + duration
+          |                   |
+          +------ both PASS --+
+                    |
+                    v
+          enable production rollout
+                    |
+            gradual version traffic
+              | pass       | fail
+              v            v
+            receipt   restore prior version
+                            |
+                   readiness + rollback receipt
 ```
 
-Before a production deploy, the controller records the current release and
-configuration digest as the Rollback Target. It admits a candidate only when
-its policy tests and live staging E2E pass against the same immutable release.
-It then removes Action Authority from the old instance before starting the
-candidate. No blue/green overlap is permitted (R04, T01).
+Alchemy v2 deploys staging from authoritative remote state. The deploy receipt
+binds the Worker version to source/release ID, dependency-lock digest,
+configuration digest, sanitized application identity, and previous known-good
+Rollback Target (R12).
 
-A successful Deployment Receipt contains environment, source/release ID,
-dependency-lock digest, configuration digest, verified application identity in
-sanitized form, policy-test verdict, staging-live E2E verdict and receipt ID,
-production readiness verdict, deploy time, and Rollback Target. It contains no
-resolved secret or raw Discord object ID (R12).
+Functional and Operational Verdicts are independent records for that exact
+release. Functional PASS requires all eleven live matrix lanes and zero owned
+artifacts. Operational PASS requires remote Alchemy state, externally verified
+release identity, gateway-aware readiness, gradual rollout and rollback proof,
+a CI-owned deploy path, and long-duration reconnect observation. Production
+remains disabled if either verdict is absent, FAIL, BLOCKED, or UNRUN (R19;
+decision 0008).
 
-Rollback stops the candidate, launches the recorded artifact with the recorded
-configuration, and reruns identity/readiness verification. A rollback receipt
-is emitted regardless of outcome. Only restored readiness is `PASS`; process
-start without readiness is `FAIL` (R13).
+Production rollout moves version traffic gradually. Every version addresses the
+same environment singleton, so traffic overlap does not create overlapping
+Gateway Action Authority. Verification checks exact release/configuration,
+declared identity, Worker reachability, and gateway-aware `/readyz`. A
+successful Deployment Receipt records both gate verdicts and the Rollback
+Target without secrets or raw Discord IDs.
+
+Rollback restores the recorded Worker version and configuration without
+rebuilding, redirects traffic, and reruns exact-release and gateway-aware
+readiness verification. A rollback receipt is emitted regardless of outcome.
+Only restored readiness is `PASS`; a reachable Worker without a healthy Gateway
+is `FAIL` (R04, R09, R13).
 
 ## Operational Divergence
 
-No owned running realization currently satisfies this spec. The evidence and
-close conditions are recorded in
-[DELTA-001](./.delta/DELTA-001-no-owned-runtime.md). Historical telemetry also
-crossed the content-privacy boundary; see
+Cloudflare staging is the canonical live realization, but the full functional
+matrix and production operational gate remain independently open. Current
+evidence and close conditions are recorded in
+[DELTA-001](./.delta/DELTA-001-no-owned-runtime.md). Historical content-bearing
+telemetry remains a separate privacy boundary; see
 [DELTA-002](./.delta/DELTA-002-content-bearing-telemetry.md).

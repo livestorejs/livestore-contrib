@@ -2,7 +2,7 @@
 
 Specifies the target Discord process and protocol boundary. Builds on
 [requirements.md](./requirements.md) and uses the language in
-[ontology.md](./ontology.md). No production implementation is claimed.
+[ontology.md](./ontology.md). Source realization is not a production verdict.
 
 ## Status
 
@@ -25,21 +25,25 @@ feature handler -----> Discord action port -----> DFX REST -----> Discord API
                               `---- recording fake (tests)
 ```
 
-The production graph provides:
+The canonical Cloudflare graph provides:
 
 1. `DiscordConfig` with the bot token and exactly the intents in
    LSC.APP.DISCORD.RT-R03;
-2. the Node HTTP and WebSocket transports required by DFX;
+2. global Fetch HTTP and WebSocket transports required by DFX;
 3. DFX Gateway, REST, rate-limit, and interactions services;
 4. feature-handler layers consuming typed Gateway dispatches;
 5. narrow Discord action-port implementations delegating to DFX REST; and
 6. a health projection derived from Gateway session state and terminal failure.
 
-The graph runs as a dedicated systemd service and service user on dev4. Before
-DFX may identify a Gateway session, the process holds the environment-specific
-host-local Action Authority lock supplied by the deployment boundary. The
-controller stops the old service and observes lock release before starting a
-candidate; the runtime does not implement a distributed lease.
+Worker fetch and scheduled ingress address one fixed Durable Object name per
+environment. That singleton owns Gateway supervision, session persistence,
+health, and mutation authority. Gradual Worker version overlap cannot create a
+second Gateway actor because every version reaches the same environment object.
+The runtime does not implement active/active leases.
+
+The Node graph remains buildable fallback source with its Node HTTP/WebSocket
+transports. It is not a running dev4 service or a parallel production topology;
+reactivation requires a new operations host decision.
 
 Feature nodes own message eligibility, thread naming, command authorization,
 and response content. This node owns only their Discord transport, lifecycle,

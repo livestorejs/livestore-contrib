@@ -18,11 +18,12 @@ livestore-discord -> admin RPC -+-> BotControl RPC/use cases -> feature core
 recording test client ----------+
 ```
 
-Implement the contract with Effect schemas and typed tagged errors. Stateful CLI
-commands connect to the active runtime's environment-specific Unix-domain
-administrative socket on dev4. Socket ownership authenticates the local
-operator group; remote use runs the CLI through the fleet's authenticated SSH
-boundary. No public administrative HTTP listener is in initial scope.
+Implement the contract with Effect schemas and typed tagged errors. Stateful
+CLI commands connect to the active environment's authenticated Cloudflare
+`/admin/rpc/` HTTPS routes. An environment-specific bearer token supplied as a
+secret authenticates the operator boundary; the CLI never sends an actor
+identity or falls back to a Discord bot token. No unauthenticated administrative
+route exists.
 
 The RPC server supplies the actor identity. The CLI cannot send an arbitrary
 actor field. Each write requires an `OperatorReason` and passes through the same
@@ -130,7 +131,8 @@ tracer-bullet runtime implements 12; `ThreadReconcile`,
 return the typed `ControlGateUnrun` result. A standalone E2E runner does not
 substitute for the `StagingE2ERun` RPC contract. The standalone runner itself is
 implemented with a versioned manifest, explicit live-write confirmation,
-ownership-safe cleanup, and sanitized PASS/FAIL/UNRUN exit verdicts. Unix-RPC
-composition is locally proved for plan/create/repeat/status/docs/readiness,
-while authenticated live peer identity and Discord writes remain unproved. See
+ownership-safe cleanup, and sanitized PASS/FAIL/UNRUN exit verdicts. Historical
+Unix-RPC composition proves plan/create/repeat/status/docs/readiness against the
+Node source fallback; authenticated HTTPS control and live Discord writes must
+be proved independently against Cloudflare staging. See
 [DELTA-001](./.delta/DELTA-001-no-bot-control-cli.md).

@@ -79,13 +79,15 @@ DFX Ix      -> DiscordInteractions -----------^             |
 
 A private implementation now exists under `apps/discord-bot`. It composes the
 typed runtime, shared feature workflows, durable journal, Bot control RPC/CLI,
-DFX adapters, credential-free E2E harness, and immutable Nix package described
-by the child specs. The exact local tracer-bullet evidence is recorded in
+DFX adapters, credential-free E2E harness, retained Node fallback, and the
+Alchemy-declared Cloudflare Worker plus singleton Durable Object described by
+the child specs. The exact local tracer-bullet evidence is recorded in
 [experiment 0010](./.experiments/0010-implemented-tracer-bullet.md).
 
-This implementation is not a live realization: no isolated staging Discord
-application/guild receipt or declared dev4 production deployment has passed.
-That remaining drift stays open in
-[DELTA-001](./.delta/DELTA-001-application-not-implemented.md), and the
-cross-repository build and acceptance sequence remains recorded in the
-[implementation plan](./.reference/implementation-plan.md).
+Cloudflare staging is the canonical live host, but reachability does not prove
+the full functional matrix or production operations. Those independent gates
+remain open in
+[DELTA-001](./.delta/DELTA-001-application-not-implemented.md). The historical
+cross-repository sequence remains in the
+[implementation plan](./.reference/implementation-plan.md) as superseded
+planning evidence rather than current deployment authority.

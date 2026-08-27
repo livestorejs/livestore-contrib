@@ -1,6 +1,7 @@
 # 0003 - Reconcile thread creation through a durable per-source ledger
 
-Status: accepted
+Status: accepted; storage realization amended by the operations
+[host decision](../../04-operations/.decisions/0007-use-cloudflare-canonical-host.md)
 
 ## Context
 
@@ -36,3 +37,10 @@ days; expiry does not bypass the mandatory Discord existing-thread check.
 
 Accepted 2026-08-23. SQLite availability, crash boundaries, ambiguity
 reconciliation, and retention cleanup are production-admission tests.
+
+## Amendment
+
+The authoritative SQLite ledger now lives in the environment singleton Durable
+Object. The Effect service and per-source state machine remain unchanged; the
+never-activated dev4 filesystem path is superseded. The retained Node adapter
+remains source fallback and is not a second authority.

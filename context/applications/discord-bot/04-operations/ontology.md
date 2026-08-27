@@ -23,24 +23,26 @@ the operational terms needed to run the LiveStore bot safely.
   Discord event into a mutation. Only the single active actor for an
   environment holds it.
 
-- **Service Host:** The managed NixOS machine that runs and supervises the Bot
-  Deployment. The initial Service Host is dev4.
+- **Canonical Host:** The Cloudflare Worker and environment singleton Durable
+  Object that realize a Bot Deployment. The Worker owns HTTP/scheduled ingress;
+  the Durable Object owns Action Authority, Gateway supervision, health, and
+  durable operational state.
 
-- **Deployment Controller:** The dotfiles-owned `deploy-rs` and systemd
-  boundary that installs an immutable release, transfers Action Authority,
-  observes health, and performs rollback on the Service Host.
+- **Deployment Controller:** The Alchemy v2 stack that declares Cloudflare
+  resources, bindings, secrets, remote state, release traffic, and rollback for
+  a Bot Deployment.
 
 - **Environment Identity:** One environment's Discord application, bot user,
   and guild boundary. Production and staging have disjoint Environment
   Identities.
 
-- **Trace Pipeline:** The content-free, best-effort path from the runtime
-  through the Service Host's OTLP forwarder to central Tempo. It does not imply
-  a persistent delivery queue.
+- **Provider Diagnostics:** The content-free, best-effort records admitted to
+  the environment's declared Cloudflare diagnostic boundary. They do not imply
+  durable delivery and are distinct from Durable Object operational state.
 
-- **System Journal:** The Service Host's local systemd record of service
-  lifecycle and errors. It follows host policy and is distinct from exported
-  traces and durable application receipts.
+- **Operational State:** Gateway session state, action journal entries,
+  readiness, receipts, and recovery records retained by the singleton Durable
+  Object under independently declared lifecycles.
 
 - **Readiness Snapshot:** The current evidence that a Bot Deployment can serve
   its declared jobs: decoded configuration, verified identity, active Gateway
@@ -63,11 +65,19 @@ the operational terms needed to run the LiveStore bot safely.
 - **Rollback Target:** The previous immutable release and configuration digest
   recorded before a deployment and available without rebuilding.
 
+- **Functional Verdict:** The exact-release result of the canonical live
+  staging matrix and zero-artifact oracle. It proves Discord behavior, not
+  production operability.
+
+- **Operational Verdict:** The exact-release result of remote-state, release
+  identity, gateway-aware readiness, gradual rollback, CI deployment, and
+  long-duration reconnect proof. It does not prove feature behavior.
+
 ## Structure
 
 The leitwort is **Deployment**: identity, receipt, and rollback describe one Bot
-Deployment. Readiness and E2E evidence are independent facets of that deployment
-rather than alternate lifecycle states.
+Deployment. Functional and Operational Verdicts are independent facets of that
+deployment rather than alternate names for readiness.
 
 ```text
 Deployment Identity ---partOf---> Bot Deployment
@@ -75,15 +85,17 @@ Credential Projection -partOf---> Bot Deployment
 immutable release -----partOf---> Bot Deployment
 runtime instance ------partOf---> Bot Deployment
 Environment Identity --partOf---> Bot Deployment
-Service Host ----------hosts----> Bot Deployment
+Canonical Host --------hosts----> Bot Deployment
 Deployment Controller -controls-> Bot Deployment
-Trace Pipeline --------observes-> Bot Deployment
-System Journal --------records--> Bot Deployment
+Provider Diagnostics --observes-> Bot Deployment
+Operational State -----records--> Bot Deployment
 
 Bot Deployment --dependsOn--> Action Authority (only while active)
 Bot Deployment ----related---> Readiness Snapshot
 Bot Deployment ----related---> Deployment Receipt
 Bot Deployment ----related---> Rollback Target
+Bot Deployment ----related---> Functional Verdict
+Bot Deployment ----related---> Operational Verdict
 
 E2E Actor ------related-------> E2E Target
 E2E Target -----related-------> Run Correlation
