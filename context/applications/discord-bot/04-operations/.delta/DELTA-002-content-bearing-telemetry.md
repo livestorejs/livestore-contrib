@@ -2,17 +2,29 @@
 
 Status: open
 
-The privacy contract prohibits raw message, prompt, generated-answer, and docs
-  content in local logs, exported spans, and receipts
-(LSC.APP.DISCORD.OPS-R10 through R11). The historical implementation emitted
-message and prompt previews without an accepted access or retention contract.
-See [the investigation reference](../.reference/0001-current-state-investigation.md).
+## Divergence
 
-This delta describes the legacy implementation and any replacement that reuses
-its telemetry shape. It does not assert that an undeployed contrib
-implementation is currently leaking content.
+The historical implementation emitted message and prompt previews without an
+accepted access or retention contract.
 
-Close condition: remove content-bearing fields, implement explicit trace and log
-allowlists, declare the best-effort Tempo sink and local-journal boundary, and
-pass the sentinel leak test through success, typed failure, defect, reconnect,
-local-log, exported-span, and receipt paths.
+## VRS
+
+Requirements R10-R11 prohibit raw message, prompt, generated-answer, docs, and
+secret content in provider diagnostics and durable operational records.
+
+## Implementation
+
+This record covers the legacy implementation and any replacement that reuses
+its telemetry shape. It does not assert that the Cloudflare realization is
+currently leaking content. See
+[the investigation reference](../.reference/0001-current-state-investigation.md).
+
+## Direction
+
+update implementation
+
+## Resolution Signal
+
+The sentinel leak test passes through success, typed failure, defect,
+reconnect, provider-diagnostic, and durable-record paths with no content or
+secret sentinel present.

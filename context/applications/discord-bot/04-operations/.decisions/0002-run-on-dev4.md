@@ -1,6 +1,7 @@
 # 0002 - Run the singleton Gateway service on dev4
 
-Status: accepted
+Status: superseded by
+[decision 0007](./0007-use-cloudflare-canonical-host.md)
 
 ## Context
 
@@ -28,3 +29,11 @@ check. Activation remains blocked until a scoped dev4 preflight proves the new
 unit, secret references, health endpoints, state permissions, and rollback; the
 host's unrelated aggregate systemd state is not evidence for or against that
 scoped result.
+
+## Amendment
+
+Superseded 2026-08-27 after the Cloudflare Worker and singleton Durable Object
+realization became the canonical staging and eventual production host. The
+proposed dev4 service was never activated and its disabled dotfiles PR was
+closed rather than merged. The Node implementation remains source fallback,
+not a second deployment target.

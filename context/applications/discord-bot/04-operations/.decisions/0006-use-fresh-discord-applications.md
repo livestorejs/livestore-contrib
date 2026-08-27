@@ -1,7 +1,8 @@
 # 0006 - Use fresh isolated Discord applications
 
 Status: accepted; supersedes
-[decision 0003](./0003-isolate-staging-discord-identity.md)
+[decision 0003](./0003-isolate-staging-discord-identity.md); membership
+lifecycle amended by [decision 0009](./0009-retain-e2e-actor-membership.md)
 
 ## Context
 
@@ -28,3 +29,11 @@ Accepted 2026-08-23 in maintainer interview Q148, choice A (`fresh-both`), after
 reviewing the verified current control-plane evidence. Provisioning and live
 verification remain separate authorized actions; this record does not claim
 that either fresh application exists.
+
+## Amendment
+
+The historical application, commands, bot user, and credentials remain
+untouched throughout. Decision 0009 distinguishes those resources from the
+historical bot's staging-guild membership: all three bot memberships remain
+through Functional PASS, after which only the historical membership is
+uninstalled. The E2E Actor remains installed for recurring regression.

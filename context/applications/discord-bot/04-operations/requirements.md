@@ -9,9 +9,9 @@ host, deployment controller, environment isolation, and telemetry topology.
 
 Automatic threading consumes ambient Discord Gateway events, so it cannot be
 realized by a request-only interaction endpoint. The operation must own a
-persistent session and the authority used by that session. Current-state and
-prototype evidence is recorded in [`.reference/`](./.reference/); the absent
-owned runtime is tracked in [`.delta/`](./.delta/).
+persistent session and the authority used by that session. Cloudflare staging
+is the canonical live realization; current admission gaps remain tracked in
+[`.delta/`](./.delta/) rather than being conflated with feature proof.
 
 ## Assumptions
 
@@ -75,11 +75,12 @@ owned runtime is tracked in [`.delta/`](./.delta/).
   without changing the application identity or release artifact. `refines:
   LS.DEL.INFRA-R02, LS.DEL.INFRA-R03, LS.DEL.INFRA-R06`
 
-- **LSC.APP.DISCORD.OPS-R04 Single active actor:** At most one runtime instance
-  per environment may consume Gateway events with mutation authority. Startup,
-  deployment, and rollback controls prevent overlap rather than relying on
-  handler timing or Discord delivery behavior. On dev4, a host-local lock and
-  stop-old, start-new systemd activation enforce this invariant.
+- **LSC.APP.DISCORD.OPS-R04 Single active actor:** At most one runtime actor per
+  environment may consume Gateway events with mutation authority. Every Worker
+  route, schedule, and release version addresses one fixed singleton Durable
+  Object identity for that environment. Version rollout and rollback may not
+  create a second Gateway actor or depend on Discord delivery behavior to
+  suppress duplicate mutation.
 
 ### Must expose truthful service health
 
@@ -100,12 +101,14 @@ owned runtime is tracked in [`.delta/`](./.delta/).
 
 ### Must prove the real Discord boundary safely
 
-- **LSC.APP.DISCORD.OPS-R07 Layered E2E gate:** The release gate runs
-  credential-free policy tests and a live staging E2E through a separate actor
-  identity. The live run proves Gateway receipt, one correlated thread mutation,
-  and cleanup through Discord's real API before the release is production
-  eligible. Staging uses a separate Discord application and dedicated guild;
-  an absent staging credential or target yields UNRUN, never PASS.
+- **LSC.APP.DISCORD.OPS-R07 Layered functional E2E gate:** The functional gate
+  runs credential-free policy tests and the canonical live staging matrix
+  through a separate actor identity. The live matrix proves the accepted
+  automatic, manual, operator, and docs behaviors through Discord's real
+  Gateway and REST boundaries, records exact-release receipts, and leaves zero
+  owned artifacts. Staging uses a separate Discord application and dedicated
+  guild; absent credentials, targets, or attended authority yield UNRUN, never
+  PASS. A functional PASS does not claim operational or production readiness.
 
 - **LSC.APP.DISCORD.OPS-R08 Fail-closed live target:** Live E2E writes require
   an explicit write confirmation, exact guild and channel IDs, membership in an
@@ -128,38 +131,40 @@ owned runtime is tracked in [`.delta/`](./.delta/).
   event type, policy outcome, latency, error class, environment, release, and a
   run-scoped one-way correlation value.
 
-- **LSC.APP.DISCORD.OPS-R11 Bounded best-effort traces:** Each environment
-  exports content-free traces only through dev4's existing best-effort OTLP path
-  to Tempo on dev3. Tempo retains traces for 30 days and operators use the
-  fleet's existing tailnet-trusted Grafana boundary. Trace loss during a network
-  or sink outage is acceptable; no durable delivery is claimed. Bot application
-  logs and metrics are not exported to central Loki or Mimir in initial scope.
-  Local systemd journal records follow current host retention and access policy
-  without a bot-specific guarantee. A test injects secret and content sentinels
-  through success and failure paths and proves that emitted spans, local log
-  records, and durable receipts contain none of them.
+- **LSC.APP.DISCORD.OPS-R11 Declared provider diagnostics:** Runtime diagnostics
+  are content-free and best-effort through the declared Cloudflare account
+  boundary. Enabled sinks, access policy, and retention are reviewable
+  deployment configuration; unavailable diagnostics do not become a durable
+  delivery claim. Durable Object journal records, receipts, recovery records,
+  and readiness state are application data rather than telemetry and have
+  independently declared lifecycles. A sentinel test injects secret and content
+  values through success and failure paths and proves that provider diagnostics
+  and durable operational records contain none of them.
 
 ### Must be deployable and recoverable
 
 - **LSC.APP.DISCORD.OPS-R12 Immutable release and receipt:** A deployment runs
-  an immutable artifact identified by source revision and dependency lock. Its
-  receipt records environment, release, configuration digest, actor identity,
-  readiness result, staged-E2E result, deploy time, and rollback target without
-  recording secrets or raw Discord object IDs.
+  an immutable Worker version identified by source revision and dependency
+  lock. Its receipt records environment, release, configuration digest, actor
+  identity, readiness result, functional-gate result, operational-gate result,
+  deploy time, and rollback target without recording secrets or raw Discord
+  object IDs.
 
 - **LSC.APP.DISCORD.OPS-R13 Bounded rollback:** An operator can restore the
-  previous known-good release and configuration without rebuilding either.
-  Rollback stops the candidate before starting its predecessor, rechecks
-  readiness, and emits a new receipt; failure to restore readiness is surfaced
-  as a failed rollback rather than success.
+  previous known-good Worker version and configuration without rebuilding
+  either. Gradual rollout and rollback preserve the singleton Durable Object
+  authority, recheck gateway-aware readiness, and emit a new receipt; failure
+  to restore readiness is surfaced as a failed rollback rather than success.
 
-- **LSC.APP.DISCORD.OPS-R14 Declared NixOS realization:** The persistent
-  Gateway runtime is a dedicated Nix-managed systemd service and service user
-  on dev4, activated through the fleet's `deploy-rs` controller. Dotfiles owns
-  host integration, secret projection, supervision, telemetry forwarding, and
-  rollback; contrib owns the immutable artifact and decoded application
-  configuration. Environment state is isolated under `/var/lib/discord-bot/`.
-  `refines: LS.DEL.INFRA-R01, LS.DEL.INFRA-R04`
+- **LSC.APP.DISCORD.OPS-R14 Declared Cloudflare realization:** Each environment
+  is one Alchemy v2 stack declaring a Cloudflare Worker, one SQLite-backed
+  singleton Durable Object, its bindings, secret slots, triggers, routes,
+  release versions, and traffic policy. Alchemy remote state is authoritative;
+  no Wrangler manifest, host module, or imperative deploy script may become a
+  second IaC source. Cloudflare is the canonical staging host and the production
+  host after admission. The retained Node host implementation is source fallback
+  only and carries no deployed or ready claim. `refines: LS.DEL.INFRA-R01,
+  LS.DEL.INFRA-R04`
 
 - **LSC.APP.DISCORD.OPS-R15 Isolated Discord environments:** Production and
   staging use fresh, distinct Discord applications and bot users. Production is
@@ -167,10 +172,23 @@ owned runtime is tracked in [`.delta/`](./.delta/).
   with no production membership and a distinct E2E Actor. Their application
   IDs, command sets, privileged-intent settings, tokens, guild membership, and
   runtime projections are disjoint. Historical application
-  `1310646763505582171` remains untouched and excluded from deployment and
-  command synchronization. Both environments request exactly the Gateway
-  intents required by the runtime and receive only feature-required Discord
-  permissions.
+  `1310646763505582171`, its commands, and its credentials remain untouched and
+  excluded from deployment and command synchronization. The staging runtime,
+  E2E Actor, and historical bot memberships all remain installed through the
+  complete functional matrix. Only after Functional PASS may an operator
+  uninstall the historical bot membership from the staging guild; this does not
+  delete or modify the application, commands, or credentials. The purpose-scoped
+  E2E Actor remains installed for recurring regression runs. Both environments
+  request exactly the Gateway intents required by the runtime and receive only
+  feature-required Discord permissions.
+
+- **LSC.APP.DISCORD.OPS-R16 Authenticated administrative control:** Each
+  environment exposes its typed Bot control RPC only through authenticated
+  HTTPS routes whose environment-specific bearer credential is a Cloudflare
+  secret binding. The runtime derives authorization from that credential and
+  never accepts caller-supplied identity. There is no unauthenticated admin
+  route, direct bot-token CLI fallback, or second mutation authority. `refines:
+  LSC.APP.DISCORD-R08`
 
 - **LSC.APP.DISCORD.OPS-R17 Bounded provider configuration:** Each environment
   declares the one dedicated OpenAI project identity, its own credential
@@ -179,27 +197,45 @@ owned runtime is tracked in [`.delta/`](./.delta/).
   models, or claimed ZDR/residency without live verification fail startup or AI
   readiness without withdrawing basic threading readiness.
 
-- **LSC.APP.DISCORD.OPS-R16 Authenticated administrative control:** Each
-  environment exposes its typed Bot control RPC only through a protected Unix
-  socket on dev4. Filesystem peer identity maps to the bot operator policy;
-  remote access reuses authenticated SSH. There is no public admin listener,
-  caller-supplied identity, direct-token CLI fallback, or second mutation
-  authority. `refines: LSC.APP.DISCORD-R08`
+- **LSC.APP.DISCORD.OPS-R18 Two-channel staging area:** The dedicated
+  `bot-staging` area contains exactly `#staging-e2e` and
+  `#staging-docs-restricted` for the canonical matrix. Both are staging-only
+  targets, neither is in `aiTitleChannelIds`, and matrix-created threads use
+  deterministic local titles. Live AI-title proof requires a later,
+  independently authorized channel and experiment.
+
+- **LSC.APP.DISCORD.OPS-R19 Independent production gates:** Production remains
+  disabled until the same release has both a functional PASS and an operational
+  PASS. Operational PASS requires authoritative remote Alchemy state, externally
+  verified release identity, gateway-aware readiness, gradual rollout and
+  rollback proof, a CI-owned deployment path, and long-duration reconnect
+  observation. Neither verdict implies the other; missing evidence keeps
+  production BLOCKED rather than being reported as PASS.
 
 ## Resolved technical decisions
 
-- Initial production verification is passive: identity, exact release/config
-  digest, readiness, and current Gateway health; no ordinary production channel
-  receives a mutation canary ([decision 0001](./.decisions/0001-passive-production-verification.md)).
-- The singleton service runs on dev4 under NixOS systemd and `deploy-rs`
-  ([decision 0002](./.decisions/0002-run-on-dev4.md)).
+- Production verification is passive: identity, exact release/config digest,
+  readiness, and current Gateway health; no ordinary production channel
+  receives a mutation canary
+  ([decision 0001](./.decisions/0001-passive-production-verification.md)).
+- Cloudflare Worker plus one SQLite-backed singleton Durable Object per
+  environment is the canonical staging and eventual production host, declared
+  only through Alchemy v2. The Node host remains source fallback; the dev4 and
+  dev4-to-Tempo realizations are superseded
+  ([decision 0007](./.decisions/0007-use-cloudflare-canonical-host.md), which
+  supersedes [decision 0002](./.decisions/0002-run-on-dev4.md) and
+  [decision 0005](./.decisions/0005-use-best-effort-central-traces.md)).
+- Production admission keeps functional and operational verdicts independent,
+  and the canonical staging matrix uses the two-channel AI-off area
+  ([decision 0008](./.decisions/0008-separate-rollout-evidence.md)).
+- Staging retains all three bot memberships through the functional matrix,
+  removes only the historical bot's guild membership after PASS, and retains
+  the E2E Actor for recurring regression
+  ([decision 0009](./.decisions/0009-retain-e2e-actor-membership.md), which
+  amends the membership lifecycle in
+  [decision 0006](./.decisions/0006-use-fresh-discord-applications.md)).
 - Production and staging use fresh, disjoint Discord applications; staging also
   has a dedicated guild and E2E Actor, while the historical Molty identity stays
   untouched
   ([decision 0006](./.decisions/0006-use-fresh-discord-applications.md), which
   supersedes [decision 0003](./.decisions/0003-isolate-staging-discord-identity.md)).
-- Content-free traces use the existing best-effort dev4-to-Tempo path with
-  30-day retention and tailnet-trusted Grafana access; local journal records and
-  durable application receipts remain separate
-  ([decision 0005](./.decisions/0005-use-best-effort-central-traces.md), which
-  supersedes [decision 0004](./.decisions/0004-use-central-content-free-telemetry.md)).

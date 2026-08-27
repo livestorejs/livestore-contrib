@@ -1,29 +1,37 @@
-# Delta 001 — The contrib-owned Discord application is not live
+# Delta 001 — The contrib-owned Discord application is not production-live
 
 Status: open
 
-The private `apps/discord-bot` implementation now realizes the local application
-composition: shared threading/docs workflows, a durable action journal, typed
-Bot control RPC and CLI, DFX adapters, a credential-free E2E harness, and an
-immutable Nix package. Its exact local evidence is recorded in
+## Divergence
+
+The contrib application has a canonical Cloudflare staging host, but it is not
+production-live and lacks complete exact-release functional and operational
+evidence.
+
+## VRS
+
+The parent requirements demand truthful capability claims. The operations
+requirements define independent functional and operational verdicts and forbid
+production until both pass for the same release.
+
+## Implementation
+
+`apps/discord-bot` realizes the local application composition, retained Node
+fallback, and Alchemy-declared Cloudflare Worker plus singleton Durable Object.
+Its local evidence is recorded in
 [experiment 0010](../.experiments/0010-implemented-tracer-bullet.md).
+A reachable staging runtime does not prove the full live matrix or production
+operations.
 
-No declared staging or production runtime currently realizes that application.
-The historical Discord application now owns another command surface and is a
-reserved, forbidden deployment target; its existence does not prove a live
-Gateway consumer for this application. The old separate repository has no
-reconstructable active deployment.
+## Direction
 
-## Consequence
+update implementation
 
-The source-level and credential-free feature contracts have implementation
-evidence, but the live contract remains unsatisfied. Documentation must not
-claim that the redesigned bot is available, deployed, or live-verified.
+## Resolution Signal
 
-## Closure
-
-Close this delta only after an isolated staging identity and target pass the
-live automatic, manual, operator, and docs canaries with owned cleanup, and a
-declared dev4 production runtime passes exact-release identity, readiness,
-passive verification, receipt, and rollback gates. Missing live authority or
-configuration remains `UNRUN`, never local `PASS`.
+The staging matrix passes all automatic, manual, operator, and docs lanes with
+zero owned artifacts; the same release passes authoritative remote Alchemy
+state, release identity, gateway-aware readiness, gradual rollback, CI deploy,
+and long-duration reconnect proof; and production captures passive
+exact-release identity/readiness plus sanitized deployment and rollback
+receipts. Missing evidence remains UNRUN or BLOCKED, never local PASS.

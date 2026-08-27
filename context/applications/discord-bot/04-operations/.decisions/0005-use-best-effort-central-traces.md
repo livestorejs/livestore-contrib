@@ -1,7 +1,7 @@
 # 0005 - Use the existing best-effort central trace path
 
-Status: accepted; supersedes
-[decision 0004](./0004-use-central-content-free-telemetry.md)
+Status: superseded by
+[decision 0007](./0007-use-cloudflare-canonical-host.md)
 
 ## Context
 
@@ -37,3 +37,11 @@ role, persistent OTLP queue, Loki stream, or Mimir series.
 
 Accepted 2026-08-23 under the maintainer direction to keep the initial
 realization simple.
+
+## Amendment
+
+Superseded 2026-08-27 with the dev4 host decision. The canonical Cloudflare
+realization uses its declared provider diagnostic boundary; it does not route
+through dev4's OTLP forwarder or systemd journal. Content privacy remains
+mandatory, while durable receipts and operational state move to the singleton
+Durable Object rather than telemetry.
