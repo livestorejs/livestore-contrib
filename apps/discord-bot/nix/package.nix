@@ -38,6 +38,7 @@ let
   src = sourceWith (
     dependencyInputs
     ++ [
+      "cf"
       "e2e"
       "src"
       "tsconfig.json"
@@ -49,7 +50,7 @@ let
     src = depsSrc;
     pnpm = pnpm_11_8_0;
     fetcherVersion = 4;
-    hash = "sha256-v32iznElRCWx9jusj+J+KGk0vACUwlqXTdDiSwoAN0Q=";
+    hash = "sha256-qqUoF6R0PSvRj0zl/+W667lM3n9i/+5UEtxwUnYMIjg=";
   };
 in
 stdenvNoCC.mkDerivation {
