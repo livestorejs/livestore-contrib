@@ -16,10 +16,10 @@ contracts:
 
 | Child | Owns | Does not own |
 | --- | --- | --- |
-| [`01-runtime`](./01-runtime/spec.md) | DFX boundary, Gateway/REST/interaction lifecycle, decoded ports | feature policy |
+| [`01-runtime`](./01-runtime/spec.md) | DFX boundary, canonical host authority, Gateway/REST/interaction lifecycle, decoded ports | feature policy |
 | [`02-threading`](./02-threading/spec.md) | automatic and explicit thread decisions/actions | Discord transport |
 | [`03-docs-assistant`](./03-docs-assistant/spec.md) | explicit docs requests, canonical source, answer delivery | canonical LiveStore truth |
-| [`04-operations`](./04-operations/spec.md) | identities, configuration, secrets, deployment, health, canaries | community support policy |
+| [`04-operations`](./04-operations/spec.md) | identities, configuration, secrets, host realization, production admission, health, canaries | community support policy |
 | [`05-cli`](./05-cli/spec.md) | operator command surface over typed application use cases | alternate business logic or direct Discord writes |
 
 The dependency direction is:

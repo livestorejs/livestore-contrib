@@ -10,9 +10,10 @@ does not realize a LiveStore core runtime adapter contract: "runtime" here
 means the bot process and Discord protocol lifecycle, not a LiveStore store
 runtime.
 
-The requirements are target contracts. No product implementation exists in
-this repository yet. The supporting experiments establish API fit and known
-dependency gaps; they do not constitute a live Discord deployment verdict.
+The private application implements this contract with canonical Cloudflare and
+retained Node source realizations. Source and staging reachability are not a
+production verdict; production admission remains owned by the
+[Operations requirements](../04-operations/requirements.md).
 
 ## Requirements
 
@@ -61,11 +62,17 @@ dependency gaps; they do not constitute a live Discord deployment verdict.
   session capable of receiving dispatches; a terminal Gateway failure removes
   readiness and is surfaced to the process supervisor.
 
-- **LSC.APP.DISCORD.RT-R09 Host-owned singleton:** The application runtime is a
-  dedicated Nix-managed systemd service on dev4. An environment-specific
-  host-local lock and stop-old, start-new activation ensure only one process can
-  hold Gateway mutation authority. Distributed leases and active/active
-  coordination are outside initial scope.
+- **LSC.APP.DISCORD.RT-R09 Cloudflare singleton runtime authority:** Each
+  environment's canonical runtime is a Cloudflare Worker addressing one fixed,
+  SQLite-backed singleton Durable Object. That object is the only Gateway
+  mutation authority and durably owns the resumable session, action journal,
+  and validated runtime configuration. Isolate or release restart must restore
+  and validate that state, resume or establish the one session, and reconcile
+  durable actions before admitting new mutation; an incomplete or invalid
+  recovery fails closed. The Alchemy v2 host realization and independent
+  production admission gate remain owned by
+  [LSC.APP.DISCORD.OPS-R14 and OPS-R19](../04-operations/requirements.md#must-be-deployable-and-recoverable).
+  The Node host is buildable source fallback, not a second live topology.
 
 ## Resolved technical decisions
 
