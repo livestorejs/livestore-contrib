@@ -48,8 +48,8 @@ const stubHttpLayer = Layer.succeed(
   HttpClient.HttpClient,
   HttpClient.make((request) => {
     const url = request.url
-    const body = url.includes('llms-full') ? corpusFixture : openAiBody
-    const contentType = url.includes('llms-full') ? 'text/plain; charset=utf-8' : 'application/json'
+    const body = url.includes('llms-full') === true ? corpusFixture : openAiBody
+    const contentType = url.includes('llms-full') === true ? 'text/plain; charset=utf-8' : 'application/json'
     return Effect.succeed(
       HttpClientResponse.fromWeb(request, new Response(body, { status: 200, headers: { 'content-type': contentType } })),
     )

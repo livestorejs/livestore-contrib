@@ -6,13 +6,14 @@ import { WorkerEnvironment } from 'alchemy/Cloudflare'
 import * as Cause from 'effect/Cause'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as Redacted from 'effect/Redacted'
 import type * as Scope from 'effect/Scope'
 import * as Schema from 'effect/Schema'
-import type * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
-import * as Stream from 'effect/Stream'
+import * as Semaphore from 'effect/Semaphore'
+import type * as Stream from 'effect/Stream'
 import * as Reactivity from 'effect/unstable/reactivity/Reactivity'
 import { FetchHttpClient } from 'effect/unstable/http'
 import { layerWebSocketConstructorGlobal, WebSocketConstructor } from 'effect/unstable/socket/Socket'
@@ -44,8 +45,19 @@ import { makeSqliteDoThreadActionJournal, migrateJournal } from './journal.ts'
 import { make as makeSupervisorLoop, makeShardAcquire } from './supervisor.ts'
 import type { Supervisor, SupervisorState } from './supervisor.ts'
 import {
-  commandsSyncOutcome,
+  makeGatewayTelemetryRecorder,
+  type GatewayTelemetryRecorder,
+  type GatewayTelemetrySink,
+  type GatewayTelemetrySnapshot,
+} from './gateway-telemetry.ts'
+import { makeDurableObjectGatewayTelemetrySink } from './gateway-telemetry-do.ts'
+import type { GatewayHealthSummary } from './readiness.ts'
+import { makeSerializedRuntime } from './runtime-install.ts'
+import {
+  commandsSyncResultFromDiff,
+  makeCommandsSyncOperation,
   makeOperatorThreadCreate,
+  makeRuntimeConfigAdminOperations,
   OperatorThreadCreatePayload,
   portableReceiptDigestHex,
   reconcileOutcome,
@@ -56,11 +68,15 @@ import {
   encodeConfigSummary,
   makeDefaultRuntimeConfig,
   makeRuntimeConfigStore,
-  RuntimeConfigPayload,
+  type RuntimeConfigDocument,
+  type RuntimeConfigStore,
   type RuntimeConfigSummary,
 } from './runtime-config.ts'
 import { makeDocsServices } from './docs-services.ts'
-import { syncApplicationCommands, type SyncApplicationCommandsError } from './command-sync.ts'
+import { syncApplicationCommands } from './command-sync.ts'
+import { makeDfxApplicationCommandsPort } from '../../src/application-commands/dfx.ts'
+import { makeApplicationCommandsReconciler } from '../../src/application-commands/reconcile.ts'
+import { readReleaseId, readWorkerVersionId } from './release.ts'
 import { DiscordActions } from '../../src/discord/actions.ts'
 import { DiscordActionsDfxLive } from '../../src/discord/actions-dfx.ts'
 import { DiscordEventHandlers, gatewayIntents } from '../../src/discord/events.ts'
@@ -81,7 +97,7 @@ import {
   OperatorSourceTransportError,
 } from '../../src/runtime/threading-adapter.ts'
 import { DocsChannelResolutionError, makeDiscordEventHandlersLayer } from '../../src/runtime/handlers.ts'
-import { JournalUnavailableError, type ThreadActionJournalService } from '../../src/journal/service.ts'
+import type { JournalUnavailableError, ThreadActionJournalService } from '../../src/journal/service.ts'
 
 /** The alchemy DurableObjectState service instance yielded inside DO handlers. */
 type DoInstanceState = InstanceType<typeof Cloudflare.DurableObjectState>
@@ -103,35 +119,42 @@ const alarmDelayByState: Record<SupervisorState, number | undefined> = {
 }
 
 export interface BotStatus {
-  readonly supervisor: SupervisorState
-  readonly hasSession: boolean
+  readonly health: GatewayHealthSummary
   readonly journalSchemaVersion: number
   readonly docsMonthlySpentUsdMicros: number
   readonly configSummary: RuntimeConfigSummary
-  /** Last fatal supervision-loop error message, when one was recorded. */
-  readonly lastError: string | undefined
 }
+const makeGatewayHealthSummary = (input: {
+  readonly supervisor: SupervisorState
+  readonly sessionPresent: boolean
+  readonly telemetry: GatewayTelemetrySnapshot | null
+  readonly lastError: string | undefined
+  readonly releaseId: string
+  readonly workerVersionId: string | undefined
+}): GatewayHealthSummary => ({
+  supervisor: input.supervisor,
+  sessionPresent: input.sessionPresent,
+  gateway: input.telemetry,
+  lastError: input.lastError ?? null,
+  releaseId: input.releaseId,
+  workerVersionId: input.workerVersionId ?? null,
+})
 
 interface BotRuntime {
   readonly supervisor: Supervisor
+  readonly telemetry: GatewayTelemetryRecorder
   readonly journal: ThreadActionJournalService
   readonly docsStore: DocsStateStore
   /** The validated runtime config driving policy boundaries and routing. */
-  readonly config: RuntimeConfigPayload
+  readonly configDocument: RuntimeConfigDocument
+  readonly config: RuntimeConfigDocument['config']
   readonly configSummary: RuntimeConfigSummary
   /** Real operator trigger: journal claim → Discord API create → outcome. */
   readonly threadCreate: (payload: unknown) => Effect.Effect<AdminOperationOutcome>
   /** Real reconciliation over ambiguous journal entries (Node control-plane parity). */
   readonly threadReconcile: (payload: unknown) => Effect.Effect<AdminOperationOutcome>
-  /**
-   * Bounded recovery pass. 'close-interrupted' at startup closes pre-existing
-   * pending claims; 'stale-only' runs periodically off the cron/alarm tick —
-   * the exact pending policies of the Node runtime's runJournalMaintenance.
-   */
   readonly runJournalMaintenance: (pendingPolicy: 'close-interrupted' | 'stale-only') => Effect.Effect<void>
-  readonly configGet: Effect.Effect<AdminOperationOutcome>
-  readonly configPut: (payload: unknown) => Effect.Effect<AdminOperationOutcome>
-  readonly commandsSync: Effect.Effect<AdminOperationOutcome>
+  readonly commandsSync: (payload: unknown) => Effect.Effect<AdminOperationOutcome>
   /** Set when the journal could not be migrated; /readyz maps this to 503. */
   readonly migrationError: Option.Option<JournalUnavailableError>
 }
@@ -208,10 +231,18 @@ const connectShard = (
  * creation claims its journal entry before any Discord mutation, so replays
  * collapse into AlreadySatisfied instead of duplicate threads.
  */
-const buildRuntime = (doState: DoInstanceState, env: Record<string, unknown>): Effect.Effect<BotRuntime> =>
+const buildRuntime = (
+  doState: DoInstanceState,
+  env: Record<string, unknown>,
+  configDocument: RuntimeConfigDocument,
+  configStore: RuntimeConfigStore,
+  telemetrySink: GatewayTelemetrySink,
+): Effect.Effect<BotRuntime> =>
   Effect.gen(function* () {
     const rawStorage = doState.raw.storage
     const token = readSecret(env, 'DISCORD_BOT_TOKEN')
+    const crypto = makeCrypto()
+    const telemetry = makeGatewayTelemetryRecorder(yield* crypto.randomUUID, telemetrySink)
 
     // Built once per BotState instance (inert in-memory Map closure); shared
     // across every shard-connect attempt so identify throttling survives
@@ -230,7 +261,7 @@ const buildRuntime = (doState: DoInstanceState, env: Record<string, unknown>): E
     // Journal migration failure means the DO's durable journal is unusable
     // (e.g. a newer on-disk schema version). It must not kill the runtime:
     // supervision does not need the journal. The error is surfaced through
-    // BotStatus.lastError so /readyz degrades to 503 with a cause.
+    // BotStatus.health.lastError so /readyz degrades to 503 with a cause.
     const migrationError: Option.Option<JournalUnavailableError> = yield* migrateJournal(client).pipe(
       Effect.map((): Option.Option<JournalUnavailableError> => Option.none()),
       Effect.catchIf(
@@ -239,16 +270,14 @@ const buildRuntime = (doState: DoInstanceState, env: Record<string, unknown>): E
       ),
     )
 
-    const crypto = makeCrypto()
     const keyValue = keyValueStoreFromDurableStorage(rawStorage)
     const journal = makeSqliteDoThreadActionJournal(client, crypto)
     const docsStore = makeKeyValueDocsStateStore(keyValue, crypto)
 
-    // Load-or-default runtime config; a corrupt stored document fails LOUDLY
-    // here (by design, as an unhandled defect) instead of silently degrading
-    // policy boundaries.
-    const configStore = makeRuntimeConfigStore(rawStorage)
-    const config = yield* Effect.orDie(configStore.read)
+    // The caller supplies the exact revision being built. Reload candidates
+    // therefore never need to be persisted before identity and dependency
+    // validation succeeds.
+    const config = configDocument.config
     const configSummary = encodeConfigSummary(config)
 
     // Shared workers-fetch dfx REST client for every outbound Discord call.
@@ -491,87 +520,13 @@ const buildRuntime = (doState: DoInstanceState, env: Record<string, unknown>): E
         ),
       )
 
-    // Surfaces stored-vs-running divergence: writes persist immediately but
-    // the warm DO keeps serving its boot-time config until rebuilt.
-    let configMutatedAfterBoot = false
-    const staleWarning = () =>
-      configMutatedAfterBoot
-        ? ' WARNING: stored config differs from the running handlers until the runtime rebuilds.'
-        : ''
-    const configGet: Effect.Effect<AdminOperationOutcome> = Effect.suspend(() =>
-      Effect.succeed<AdminOperationOutcome>({
-        ok: true,
-        status: 200,
-        body: {
-          _tag: 'Success',
-          summary: `${config._tag} ${config.environment} config (release ${configSummary.releaseId})${staleWarning()}`,
-          configSummary,
-          payload: config,
-          ...(configMutatedAfterBoot ? { runningHandlersUseBootConfig: true } : {}),
-        },
-      }),
-    )
-
-    const configPut = (payload: unknown): Effect.Effect<AdminOperationOutcome> =>
-      Effect.as(configStore.write(payload), {
-        ok: true,
-        status: 200,
-        body: {
-          _tag: 'Success',
-          summary:
-            'Runtime config persisted. The running handlers keep the boot-time config until the runtime rebuilds.',
-        },
-      } as AdminOperationOutcome).pipe(
-        Effect.tap(() =>
-          Effect.sync(() => {
-            configMutatedAfterBoot = true
-          }),
-        ),
-        Effect.catchIf(
-          (error): error is KeyValueStore.KeyValueStoreError | Schema.SchemaError => true,
-          (error) =>
-            Effect.succeed<AdminOperationOutcome>(
-              error._tag === 'KeyValueStoreError'
-                ? {
-                  ok: false,
-                  status: 503,
-                  body: {
-                    _tag: 'ControlDependencyUnavailable',
-                    dependency: 'runtime-config-store',
-                    message: 'Config store write failed',
-                  },
-                }
-                : {
-                  ok: false,
-                  status: 422,
-                  body: { _tag: 'InvalidControlInput', message: 'Runtime config failed schema validation' },
-                },
-            ),
-        ),
-      )
-
-    // Node parity: sync against the RUNNING config's command scope (staging
-    // registers guild-scoped commands, production/global falls back to the
-    // global scope) — never a hardcoded GlobalCommandScope.
-    const commandsSync: Effect.Effect<AdminOperationOutcome> = syncApplicationCommands({
-      token,
-      scope: config.commandScope,
-    }).pipe(
-      Effect.map(commandsSyncOutcome),
-      Effect.catchIf(
-        (error): error is SyncApplicationCommandsError => true,
-        (error) =>
-          Effect.succeed<AdminOperationOutcome>({
-            ok: false,
-            status: 502,
-            body: {
-              _tag: 'ControlApplicationFailure',
-              message: 'Application-command sync failed',
-              reason: error._tag ?? 'unknown',
-            },
-          }),
-      ),
-    )
+    const commandReconciler = makeApplicationCommandsReconciler(makeDfxApplicationCommandsPort(rest))
+    const commandsSync = makeCommandsSyncOperation({
+      running: configDocument,
+      readStored: configStore.read,
+      plan: (scope) => commandReconciler.diff(scope).pipe(Effect.map(commandsSyncResultFromDiff)),
+      apply: (scope) => syncApplicationCommands({ token, scope }),
+    })
 
     return {
       supervisor: yield* makeSupervisorLoop(
@@ -600,17 +555,21 @@ const buildRuntime = (doState: DoInstanceState, env: Record<string, unknown>): E
             }),
           clearSession: clearShardState(rawStorage, shardLayout),
         },
-        { initialBackoff: '1 seconds', maxBackoff: '60 seconds' },
+        {
+          initialBackoff: '1 seconds',
+          maxBackoff: '60 seconds',
+          telemetry,
+        },
       ),
+      telemetry,
       journal,
       docsStore,
+      configDocument,
       config,
       configSummary,
       threadCreate,
       threadReconcile,
       runJournalMaintenance,
-      configGet,
-      configPut,
       commandsSync,
       migrationError,
     }
@@ -641,53 +600,86 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
     // Runtime phase: storage methods are RuntimeContext-colored and may only
     // run inside these handlers.
     return Effect.gen(function* () {
-      let runtime: BotRuntime | undefined
+      const releaseId = readReleaseId(env)
+      const configStore = makeRuntimeConfigStore(doState.raw.storage, releaseId)
+      const telemetrySink = makeDurableObjectGatewayTelemetrySink(doState.raw.storage)
       const gate = yield* makeSupervisorGate
+      // Serializes durable config mutation with command apply. The lifecycle
+      // mutex alone blocks runtime swap but not the config CAS that precedes
+      // activation; this outer gate keeps stored/running convergence stable
+      // through Discord mutation and verification.
+      const controlMutationLock = yield* Semaphore.make(1)
       let lastError: string | undefined
+      let supervisorFiber: Fiber.Fiber<void, unknown> | undefined
+      const runtimeInstall = yield* makeSerializedRuntime(
+        Effect.flatMap(Effect.orDie(configStore.read), (document) =>
+          buildRuntime(doState, env, document, configStore, telemetrySink)),
+        (candidate) => candidate.telemetry.activated,
+      )
 
-      const ensureRuntime = Effect.suspend((): Effect.Effect<BotRuntime> => {
-        if (runtime !== undefined) return Effect.succeed(runtime)
-        // Secret reads stay lazy: the deploy phase evaluates this class with
-        // placeholder bindings, so tokens resolve only at runtime.
-        return Effect.map(buildRuntime(doState, env), (built) => {
-          runtime = built
-          return built
-        })
-      })
+      const ensureRuntime = runtimeInstall.get
       const withRuntime = <A>(f: (rt: BotRuntime) => Effect.Effect<A>): Effect.Effect<A> =>
         Effect.flatMap(ensureRuntime, f)
+      const configAdmin = makeRuntimeConfigAdminOperations({
+        store: configStore,
+        getRunning: () => runtimeInstall.peek()?.configDocument,
+        buildCandidate: (document) => buildRuntime(doState, env, document, configStore, telemetrySink),
+        activateCandidate: (candidate) =>
+          runtimeInstall.replace(candidate, () =>
+            Effect.gen(function* () {
+              // Replacement holds the same mutex as cold install and tick
+              // startup while it stops the exact detached gateway owner.
+              if (supervisorFiber !== undefined) {
+                yield* Fiber.interrupt(supervisorFiber)
+                supervisorFiber = undefined
+              }
+            })).pipe(
+            Effect.tap(() => Effect.sync(() => {
+              lastError = undefined
+            })),
+          ),
+      })
 
       // Node parity (app.ts): the FIRST boot closes every pre-existing pending
       // claim as interrupted before any handler can observe it.
       let startupMaintenanceDone = false
 
       const tick: Effect.Effect<number | undefined> = Effect.gen(function* () {
-        const rt = yield* ensureRuntime
+        yield* ensureRuntime
+        const scheduledAlarm = yield* Effect.promise(() => doState.raw.storage.getAlarm())
 
-        // Atomic claim BEFORE any yield (finding: two overlapping alarm/cron
-        // ticks must never both fork the supervision loop). The stopped-state
-        // check happens after claiming; a claimed-but-stopped slot releases.
-        if ((yield* gate.tryBegin) === true) {
-          if ((yield* rt.supervisor.state) === 'stopped') {
-            yield* gate.end
-            return undefined
-          }
-          lastError = undefined
-          yield* Effect.forkDetach(rt.supervisor.run.pipe(
-            // forkDetach is this Effect line's daemon fork (no forkDaemon
-            // export); the loop's death would otherwise be invisible, so log
-            // every abnormal exit and release the slot for re-forking.
-            Effect.onExit((exit) =>
-              exit._tag === 'Failure'
-                ? Effect.sync(() => {
-                  lastError = Cause.pretty(exit.cause)
-                  console.error('[bot-state] supervision loop ended', lastError)
-                })
-                : Effect.void,
-            ),
-            Effect.ensuring(gate.end),
-          ))
-        }
+        // Re-read the installed runtime under the lifecycle mutex AFTER the
+        // alarm await. Reload cannot swap between this selection, the gate
+        // claim, and fiber publication; if it ran first, this tick starts B.
+        const installed = yield* runtimeInstall.withCurrent((rt) =>
+          Effect.gen(function* () {
+            if (scheduledAlarm !== null) {
+              yield* rt.telemetry.alarmObserved(Math.max(0, Date.now() - scheduledAlarm))
+            }
+            if ((yield* gate.tryBegin) === false) return rt
+            if ((yield* rt.supervisor.state) === 'stopped') {
+              yield* gate.end
+              return null
+            }
+            lastError = undefined
+            supervisorFiber = yield* Effect.forkDetach(rt.supervisor.run.pipe(
+              // The detached fiber is retained above so a config reload can
+              // interrupt and await the old gateway before swapping runtimes.
+              // Abnormal exits stay visible and always release the restart gate.
+              Effect.onExit((exit) =>
+                exit._tag === 'Failure'
+                  ? Effect.sync(() => {
+                    lastError = Cause.pretty(exit.cause)
+                    console.error('[bot-state] supervision loop ended', lastError)
+                  })
+                  : Effect.void,
+              ),
+              Effect.ensuring(gate.end),
+            ))
+            return rt
+          }))
+        if (installed === null) return undefined
+        const rt = installed
 
         if (startupMaintenanceDone === false) {
           startupMaintenanceDone = true
@@ -707,12 +699,17 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       // degrade /readyz to 503-with-cause instead of answering 500: report
       // schemaVersion 0 (readyz maps that to 503) plus the pretty cause.
       const degradedStatus = (causeText: string): BotStatus => ({
-        supervisor: 'disconnected',
-        hasSession: false,
+        health: makeGatewayHealthSummary({
+          supervisor: 'disconnected',
+          sessionPresent: false,
+          telemetry: null,
+          lastError: causeText,
+          releaseId,
+          workerVersionId: readWorkerVersionId(env),
+        }),
         journalSchemaVersion: 0,
         docsMonthlySpentUsdMicros: 0,
-        configSummary: encodeConfigSummary(makeDefaultRuntimeConfig()),
-        lastError: causeText,
+        configSummary: encodeConfigSummary(makeDefaultRuntimeConfig(releaseId)),
       })
       const status: Effect.Effect<BotStatus> = Effect.gen(function* () {
         const rt = yield* ensureRuntime
@@ -720,21 +717,32 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         // An unmigrated/unreadable journal reports schemaVersion 0, which the
         // /readyz probe maps to 503 — migration failure must degrade here,
         // not surface as an unhandled 500.
-        const settings = rt.migrationError._tag === 'Some'
-          ? { schemaVersion: 0 }
+        const journalStatus = rt.migrationError._tag === 'Some'
+          ? { schemaVersion: 0, error: rt.migrationError.value.message }
           : yield* rt.journal.inspectStorage.pipe(
+            Effect.map((settings): { readonly schemaVersion: number; readonly error: string | undefined } => ({
+              schemaVersion: settings.schemaVersion,
+              error: undefined,
+            })),
             Effect.catchIf(
               (_error): _error is JournalUnavailableError => true,
-              () => Effect.succeed({ schemaVersion: 0 }),
+              (error) => Effect.succeed({ schemaVersion: 0, error: error.message }),
             ),
           )
+        const supervisor = yield* rt.supervisor.state
+        const sessionPresent = session !== undefined && session.sessionId !== ''
         return {
-          supervisor: yield* rt.supervisor.state,
-          hasSession: session !== undefined && session.sessionId !== '',
-          journalSchemaVersion: settings.schemaVersion,
+          health: makeGatewayHealthSummary({
+            supervisor,
+            sessionPresent,
+            telemetry: yield* rt.telemetry.aggregate,
+            lastError: journalStatus.error ?? lastError,
+            releaseId,
+            workerVersionId: readWorkerVersionId(env),
+          }),
+          journalSchemaVersion: journalStatus.schemaVersion,
           docsMonthlySpentUsdMicros: yield* rt.docsStore.monthlySpent(Date.now()),
           configSummary: rt.configSummary,
-          lastError,
         }
       }).pipe(Effect.catchCause((cause) => Effect.succeed(degradedStatus(Cause.pretty(cause)))))
 
@@ -747,11 +755,17 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
 
         threadReconcile: (payload: unknown) => withRuntime((rt) => rt.threadReconcile(payload)),
 
-        configGet: () => withRuntime((rt) => rt.configGet),
+        configGet: () => configAdmin.configGet,
 
-        configPut: (payload: unknown) => withRuntime((rt) => rt.configPut(payload)),
+        configPut: (payload: unknown) =>
+          Semaphore.withPermits(controlMutationLock, 1)(configAdmin.configPut(payload)),
 
-        commandsSync: () => withRuntime((rt) => rt.commandsSync),
+        // Hold both control mutation and runtime lifecycle ownership through
+        // the final stored/running recheck and REST mutation/verification.
+        commandsSync: (payload: unknown) =>
+          Semaphore.withPermits(controlMutationLock, 1)(
+            runtimeInstall.withCurrent((rt) => rt.commandsSync(payload)),
+          ),
 
         /** Cloudflare DO alarm entry point — the same heartbeat as `tick`. */
         alarm: () => tick,

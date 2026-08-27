@@ -1,7 +1,7 @@
 import { expect, it } from '@effect/vitest'
 
 import * as Effect from 'effect/Effect'
-import * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
+import type * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
 
 import { makeFakeDoStorage } from './fake-do-storage.ts'
 import {

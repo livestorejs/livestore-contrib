@@ -7,7 +7,7 @@ import * as Alchemy from 'alchemy'
 import * as Cloudflare from 'alchemy/Cloudflare'
 import * as Effect from 'effect/Effect'
 
-import { DiscordBot } from './src/worker.ts'
+process.env['ALCHEMY_LOCAL'] = '1'
 
 export default Alchemy.Stack(
   'DiscordBotLocal',
@@ -16,6 +16,7 @@ export default Alchemy.Stack(
     state: Alchemy.localState(),
   },
   Effect.gen(function* () {
+    const { DiscordBot } = yield* Effect.promise(() => import('./src/worker.ts'))
     const worker = yield* DiscordBot
     return { url: worker.url }
   }),

@@ -7,6 +7,7 @@ import { Effect, Schema } from 'effect'
 // existing importer is unchanged.
 export * from './config-schema.ts'
 import {
+  canonicalizeRuntimeConfig,
   RuntimeConfigFile,
   RuntimeConfigError,
 } from './config-schema.ts'
@@ -20,6 +21,6 @@ export const loadRuntimeConfig = Effect.fn('runtime.config.load')(function* (pat
     text,
   ).pipe(
     Effect.mapError((cause) => new RuntimeConfigError({ path, message: 'Runtime config is invalid', cause })),
-    Effect.map(({ payload }) => payload),
+    Effect.map(({ payload }) => canonicalizeRuntimeConfig(payload)),
   )
 })

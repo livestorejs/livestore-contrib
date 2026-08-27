@@ -18,11 +18,12 @@ import { HttpRouter, HttpServerRequest, HttpServerError } from 'effect/unstable/
 import { HttpMiddleware, HttpServerResponse } from 'effect/unstable/http'
 
 import { EmptyPayload } from '../../src/control/schema.ts'
-import { OperatorThreadCreatePayload } from './admin-ops.ts'
+import { CommandsSyncPayload, OperatorThreadCreatePayload } from './admin-ops.ts'
 import type { ControlResult } from '../../src/control/schema.ts'
 import { schemaVersion as journalSchemaVersion } from './journal.ts'
 import type { AdminOperationOutcome } from './admin-ops.ts'
 import type { RuntimeConfigSummary } from './runtime-config.ts'
+import { evaluateReadiness, type GatewayHealthSummary } from './readiness.ts'
 
 // ---------------------------------------------------------------------------
 // Bridge: worker fetch Request <-> Effect HttpRouter
@@ -140,7 +141,10 @@ export const bearerAuth = HttpMiddleware.make((httpApp) =>
 
 export type ControlResultJson = ControlResult
 
-const json = (body: ControlResultJson, status: number): HttpServerResponse.HttpServerResponse =>
+const json = <TControlResult extends ControlResultJson>(
+  body: TControlResult,
+  status: number,
+): HttpServerResponse.HttpServerResponse =>
   HttpServerResponse.text(JSON.stringify(body), { status, contentType: 'application/json' })
 
 /**
@@ -192,8 +196,7 @@ const threadCreateUnavailable = errorJson(
 
 /** Live snapshot injected from the BotState Durable Object; absent ⇒ 503. */
 export interface RuntimeStatusSnapshot {
-  readonly supervisor: string
-  readonly hasSession: boolean
+  readonly health: GatewayHealthSummary
   readonly journalSchemaVersion: number
   readonly docsMonthlySpentUsdMicros: number
   /** Config projection (`encodeConfigSummary`); present once the runtime loaded its config. */
@@ -203,16 +206,15 @@ export interface RuntimeStatusSnapshot {
 const runtimeStatusResponse = (
   snapshot: RuntimeStatusSnapshot,
 ): HttpServerResponse.HttpServerResponse => {
-  const healthy = snapshot.journalSchemaVersion === journalSchemaVersion
+  const readiness = evaluateReadiness(snapshot)
   return json(
     {
       _tag: 'Success',
-      summary: healthy
-        ? `supervisor=${snapshot.supervisor} session=${snapshot.hasSession} docsSpendUsdMicros=${snapshot.docsMonthlySpentUsdMicros}`
-        : `journal unreadable (schemaVersion=${snapshot.journalSchemaVersion})`,
+      summary: readiness.ready === true ? `supervisor=${snapshot.health.supervisor} session=${snapshot.health.sessionPresent} docsSpendUsdMicros=${snapshot.docsMonthlySpentUsdMicros}` : `runtime unavailable (schemaVersion=${snapshot.journalSchemaVersion})`,
+      health: snapshot.health,
       ...(snapshot.configSummary === undefined ? {} : { configSummary: snapshot.configSummary }),
     },
-    healthy ? 200 : 503,
+    readiness.ready === true ? 200 : 503,
   )
 }
 
@@ -227,6 +229,7 @@ const runtimeStatusUnavailable = errorJson(
 
 const parseThreadCreate = decodePayload(OperatorThreadCreatePayload)
 const parseEmpty = decodePayload(EmptyPayload)
+const parseCommandsSync = decodePayload(CommandsSyncPayload)
 
 const configUnavailable = errorJson(
   {
@@ -280,12 +283,12 @@ export interface AdminRouterOptions {
    * fabricated Success.
    */
   readonly threadCreate?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
-  /** Config store read: validated summary plus the stored payload. Absent ⇒ 503. */
+  /** Storage-first config read. Absent ⇒ 503. */
   readonly configGet?: Effect.Effect<AdminOperationOutcome> | undefined
-  /** Validated config write through `RuntimeConfigStore.write`. Absent ⇒ 503. */
+  /** Revision-guarded validated persistence and optional atomic runtime reload. Absent ⇒ 503. */
   readonly configPut?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
-  /** Application-command sync against the RUNNING config's command scope. Absent ⇒ 503. */
-  readonly commandsSync?: Effect.Effect<AdminOperationOutcome> | undefined
+  /** Guarded plan/apply command reconciliation against the running config. Absent ⇒ 503. */
+  readonly commandsSync?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
   /** Journal reconciliation (Plan or Apply). Absent ⇒ 503. */
   readonly threadReconcile?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
 }
@@ -334,10 +337,10 @@ export const makeAdminRouter = (options: AdminRouterOptions = {}): AdminRouterEf
             : Effect.map(options.runtimeStatus(), runtimeStatusResponse))))
     yield* router.add('POST', '/admin/commands-sync', (request) =>
       Effect.flatMap(readJsonBody(request), (body) =>
-        Effect.flatMap(parseEmpty(body), () =>
+        Effect.flatMap(parseCommandsSync(body), (payload) =>
           options.commandsSync === undefined
             ? Effect.succeed(commandsSyncUnavailable)
-            : Effect.map(options.commandsSync, outcomeResponse))))
+            : Effect.map(options.commandsSync(payload), outcomeResponse))))
 
     // Policy/config plane over the SAME durable config document the handlers
     // consume: GET returns the validated summary plus the stored payload,

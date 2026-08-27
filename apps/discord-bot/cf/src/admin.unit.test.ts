@@ -1,8 +1,11 @@
 import { expect, it } from '@effect/vitest'
 
 import * as Effect from 'effect/Effect'
+import * as Schema from 'effect/Schema'
 
 import { makeAdminHandler, constantTimeEquals } from './admin.ts'
+import { RuntimeConfigPutPayload } from './runtime-config.ts'
+import { emptyGatewayTelemetrySnapshot } from './gateway-telemetry.ts'
 
 /**
  * Drives the assembled admin router through the worker bridge — the exact
@@ -11,9 +14,32 @@ import { makeAdminHandler, constantTimeEquals } from './admin.ts'
  * bodies on every non-2xx).
  */
 const token = 'secret-admin-token'
+const emptyGateway = emptyGatewayTelemetrySnapshot('activation-a')
+const readyGateway = {
+  lifetime: {
+    ...emptyGateway.lifetime,
+    attempts: 3,
+    identifies: 1,
+    reconnects: 2,
+    lastReadyAt: 1_000,
+  },
+  current: {
+    ...emptyGateway.current,
+    state: 'ready' as const,
+    attempt: 3,
+    connectedAt: 1_000,
+    lastReadyAt: 1_000,
+  },
+}
 const readySnapshot = {
-  supervisor: 'ready',
-  hasSession: true,
+  health: {
+    supervisor: 'ready' as const,
+    sessionPresent: true,
+    gateway: readyGateway,
+    lastError: null,
+    releaseId: 'sha256:release',
+    workerVersionId: 'cf-version-1',
+  },
   journalSchemaVersion: 1,
   docsMonthlySpentUsdMicros: 42,
 }
@@ -79,19 +105,60 @@ it('ThreadCreate validates then reports the operation unavailable (never fabrica
   })
 })
 
-it('RuntimeStatus reports 503 without a source and mirrors a wired snapshot', async () => {
+it('RuntimeStatus exposes content-free structured health and withdraws on terminal failure', async () => {
   const absent = await bareHandler(post('/admin/rpc/RuntimeStatus', {}, `Bearer ${token}`))
   expect(absent.status).toBe(503)
   expect(await jsonBody(absent)).toMatchObject({ _tag: 'ControlDependencyUnavailable' })
 
   const healthy = await handler(post('/admin/rpc/RuntimeStatus', {}, `Bearer ${token}`))
   expect(healthy.status).toBe(200)
-  expect(await jsonBody(healthy)).toMatchObject({ _tag: 'Success' })
-
-  const degraded = makeAdminHandler(token, {
-    runtimeStatus: () => Effect.succeed({ ...readySnapshot, journalSchemaVersion: 0 }),
+  const body = await jsonBody(healthy)
+  expect(body).toMatchObject({
+    _tag: 'Success',
+    health: {
+      supervisor: 'ready',
+      sessionPresent: true,
+      gateway: {
+        lifetime: {
+          identifies: 1,
+          reconnects: 2,
+          lastReadyAt: 1_000,
+        },
+        current: {
+          state: 'ready',
+          lastReadyAt: 1_000,
+          terminalCloseCode: null,
+        },
+      },
+      releaseId: 'sha256:release',
+      workerVersionId: 'cf-version-1',
+    },
   })
-  const unhealthy = await degraded(post('/admin/rpc/RuntimeStatus', {}, `Bearer ${token}`))
+  const serialized = JSON.stringify(body)
+  for (const forbiddenKey of ['messageId', 'content', 'token', 'sessionId', 'guildId', 'channelId']) {
+    expect(serialized).not.toContain(`"${forbiddenKey}"`)
+  }
+
+  const terminal = makeAdminHandler(token, {
+    runtimeStatus: () => Effect.succeed({
+      ...readySnapshot,
+      health: {
+        ...readySnapshot.health,
+        supervisor: 'stopped',
+        gateway: {
+          lifetime: { ...readyGateway.lifetime, terminalCloses: 1 },
+          current: {
+            ...readyGateway.current,
+            state: 'terminal',
+            connectedAt: null,
+            terminalCloseCode: 4_014,
+            lastError: 'terminal-close',
+          },
+        },
+      },
+    }),
+  })
+  const unhealthy = await terminal(post('/admin/rpc/RuntimeStatus', {}, `Bearer ${token}`))
   expect(unhealthy.status).toBe(503)
 })
 
@@ -120,7 +187,7 @@ const validConfigPayload = {
   guildId: '1154415661842452532',
   commandScope: { _tag: 'GuildCommandScope', applicationId: '1541431832195633232', guildId: '1154415661842452532' },
   actionChannelIds: ['1373597443798859776'],
-  aiTitleChannelIds: ['1373597443798859776'],
+  aiTitleChannelIds: [],
   stagingOnlyChannelIds: ['1373597443798859776'],
   legacyCommands: [],
   docsAudience: {
@@ -142,9 +209,9 @@ const validConfigPayload = {
     },
   },
   releaseId: 'dev',
-  telemetry: { sink: 'dev3-tempo', delivery: 'best-effort', accessBoundary: 'tailnet', retentionDays: 30 },
+  diagnostics: { sink: 'cloudflare-provider', delivery: 'best-effort', accessPolicyId: 'cloudflare-access-policy/discord-bot-admin', retentionDays: 30 },
   e2e: {
-    actorApplicationId: '1541431832195633232',
+    actorApplicationId: '1541440368212705380',
     actorTokenSecretRef: 'cf-secret/E2E_ACTOR_TOKEN',
     targetChannelId: '1373597443798859776',
     requiredPurposeMarker: 'livestore-discord-e2e-only',
@@ -177,14 +244,15 @@ const fullHandler = makeAdminHandler(token, {
     outcome(true, 200, { _tag: 'Success', summary: 'config', payload: validConfigPayload }),
   ),
   configPut: (payload) =>
-    (payload as { environment?: string }).environment === 'staging'
+    Schema.is(RuntimeConfigPutPayload)(payload) === true
       ? Effect.succeed(outcome(true, 200, { _tag: 'Success', summary: 'persisted' }))
       : Effect.succeed(
           outcome(false, 422, { _tag: 'InvalidControlInput', message: 'Runtime config failed schema validation' }),
         ),
-  commandsSync: Effect.succeed(
-    outcome(true, 200, { _tag: 'AlreadySatisfied', summary: 'changes=false create=0 update=0 delete=0 unchanged=2' }),
-  ),
+  commandsSync: (_payload) =>
+    Effect.succeed(
+      outcome(true, 200, { _tag: 'AlreadySatisfied', summary: 'changes=false create=0 update=0 delete=0 unchanged=2' }),
+    ),
 })
 
 const get = (path: string, authorization?: string) =>
@@ -219,7 +287,7 @@ it('PUT /admin/config validates before persisting; invalid bodies get a 422', as
     new Request('https://bot.example.test/admin/config', {
       method: 'PUT',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(validConfigPayload),
+      body: JSON.stringify({ expectedRevision: 0, config: validConfigPayload, reload: true }),
     }),
   )
   expect(good.status).toBe(200)
@@ -229,7 +297,7 @@ it('PUT /admin/config validates before persisting; invalid bodies get a 422', as
     new Request('https://bot.example.test/admin/config', {
       method: 'PUT',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ environment: 'production' }),
+      body: JSON.stringify({ expectedRevision: 0, config: { environment: 'production' }, reload: true }),
     }),
   )
   expect(bad.status).toBe(422)
@@ -237,7 +305,13 @@ it('PUT /admin/config validates before persisting; invalid bodies get a 422', as
 })
 
 it('POST /admin/commands-sync reports AlreadySatisfied when no drift exists', async () => {
-  const response = await fullHandler(post('/admin/commands-sync', {}, `Bearer ${token}`))
+  const response = await fullHandler(post('/admin/commands-sync', {
+    environment: 'staging',
+    reason: 'operator requested sync',
+    apply: true,
+    expectedApplicationId: '1541431832195633232',
+    expectedGuildId: '1154415661842452532',
+  }, `Bearer ${token}`))
   expect(response.status).toBe(200)
   expect(await jsonBody(response)).toMatchObject({ _tag: 'AlreadySatisfied' })
 })
@@ -261,7 +335,13 @@ it('unwired new routes degrade to ControlDependencyUnavailable instead of failin
   expect(response.status).toBe(503)
   expect(await jsonBody(response)).toMatchObject({ _tag: 'ControlDependencyUnavailable' })
   {
-    const syncResponse = await bare(post('/admin/commands-sync', {}, `Bearer ${token}`))
+    const syncResponse = await bare(post('/admin/commands-sync', {
+      environment: 'staging',
+      reason: 'operator requested sync',
+      apply: false,
+      expectedApplicationId: '1541431832195633232',
+      expectedGuildId: '1154415661842452532',
+    }, `Bearer ${token}`))
     expect(syncResponse.status).toBe(503)
     expect(await jsonBody(syncResponse)).toMatchObject({ _tag: 'ControlDependencyUnavailable' })
   }

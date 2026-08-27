@@ -100,7 +100,7 @@ export const migrateJournal = (
         yield* exec(client, "INSERT INTO journal_meta (key, value) VALUES ('user_version', '" + String(schemaVersion) + "')")
       }),
     ).pipe(Effect.mapError((cause: JournalUnavailableError | SqlErrorShape) =>
-      isSqlError(cause) ? unavailable('initialize', cause) : cause,
+      isSqlError(cause) === true ? unavailable('initialize', cause) : cause,
     ))
   }).pipe(Effect.withSpan('discord.journal.initialize'))
 
@@ -218,10 +218,10 @@ export const makeSqliteDoThreadActionJournal = (
           SET state = ?, updated_at = ?, observation_count = ?, outcome_code = ?
           WHERE source_message_id = ? AND claim_token = ? AND state IN ('creating', 'unknown_external')
         `, [
-          exhausted ? 'manual_review' : 'unknown_external',
+          exhausted === true ? 'manual_review' : 'unknown_external',
           input.now,
           observationCount,
-          exhausted ? 'ambiguous_mutation_unresolved' : 'awaiting_remote_observation',
+          exhausted === true ? 'ambiguous_mutation_unresolved' : 'awaiting_remote_observation',
           input.sourceMessageId,
           input.claimToken,
         ])

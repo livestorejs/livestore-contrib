@@ -40,7 +40,7 @@ const collectSpecifiers = (entryFile: string): string[] => {
     // stop here (package internals are not part of the worker's own code).
     for (const specifier of localRelative) {
       const resolved =
-        specifier.endsWith('.ts') ? join(dirname(file), specifier) : `${join(dirname(file), specifier)}.ts`
+        specifier.endsWith('.ts') === true ? join(dirname(file), specifier) : `${join(dirname(file), specifier)}.ts`
       walk(resolved)
     }
   }
@@ -78,8 +78,8 @@ it('the bundled dist output contains no node: builtins (when a build exists)', (
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry)
-      if (statSync(full).isDirectory()) walk(full)
-      else if (entry.endsWith('.js')) {
+      if (statSync(full).isDirectory() === true) walk(full)
+      else if (entry.endsWith('.js') === true) {
         const matches = readFileSync(full, 'utf8').match(/node:[a-z]+\//g)
         if (matches !== null) offenders.push(`${full}: ${[...new Set(matches)].join(', ')}`)
       }

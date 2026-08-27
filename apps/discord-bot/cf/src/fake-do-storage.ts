@@ -39,7 +39,7 @@ export const makeFakeDoStorage = (dbFile = ':memory:'): FakeDoStorage => {
   return {
     sql: {
       exec(query, ...bindings) {
-        if (/;\s*\S/.test(query.trimEnd())) {
+        if (/;\s*\S/.test(query.trimEnd()) === true) {
           throw new Error('fake DoStorage rejects multi-statement SQL')
         }
         const statement = db.prepare(query)
@@ -107,7 +107,7 @@ export const makeFakeDoStorage = (dbFile = ':memory:'): FakeDoStorage => {
     list: async <T>(options?: { prefix?: string }): Promise<Map<string, T>> => {
       const entries = new Map<string, T>()
       for (const [key, value] of keyValues) {
-        if (options?.prefix === undefined || key.startsWith(options.prefix)) {
+        if (options?.prefix === undefined || key.startsWith(options.prefix) === true) {
           entries.set(key, value as T)
         }
       }
