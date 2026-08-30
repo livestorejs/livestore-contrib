@@ -1,4 +1,4 @@
-import { Effect, FetchHttpClient, Layer, Queue, Stream } from '@livestore/utils/effect'
+import { Effect, FetchHttpClient, Layer, type Queue, Stream, SubscriptionRef } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 import { expect } from 'vitest'
@@ -43,6 +43,21 @@ Vitest.describe('sync-operations', { timeout: 10_000 }, () => {
 
       const lifecycle = yield* expectConnectLifecycle(connectionEvents)
       expect(lifecycle).toEqual(['connect', 'disconnect'])
+    }).pipe(withTestCtx(test)),
+  )
+
+  Vitest.live('preserves a successful export when backend disconnect fails', (test: Vitest.TestContext) =>
+    Effect.gen(function* () {
+      const { configPath, disconnectShouldFail } = yield* useMockConfig
+      yield* SubscriptionRef.set(disconnectShouldFail, true)
+
+      const result = yield* pullEventsFromSyncBackend({
+        configPath,
+        storeId,
+        clientId,
+      })
+
+      expect(result.eventCount).toBe(0)
     }).pipe(withTestCtx(test)),
   )
 
