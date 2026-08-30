@@ -1,0 +1,24 @@
+import { posix } from 'node:path'
+
+export type ControlSocketOption =
+  | { readonly _tag: 'Parsed'; readonly path: string | undefined }
+  | { readonly _tag: 'UsageError'; readonly message: string }
+
+/** Parses the process-level transport override before the RPC client exists. */
+export const parseControlSocketOption = (args: ReadonlyArray<string>): ControlSocketOption => {
+  const occurrences = args.flatMap((value, index) => (value === '--socket' ? [index] : []))
+  if (occurrences.length === 0) return { _tag: 'Parsed', path: undefined }
+  if (occurrences.length !== 1) return { _tag: 'UsageError', message: '--socket must be specified at most once' }
+
+  const path = args[occurrences[0]! + 1]
+  if (
+    path === undefined ||
+    path.startsWith('/') === false ||
+    posix.normalize(path) !== path ||
+    path.endsWith('.sock') === false
+  ) {
+    return { _tag: 'UsageError', message: '--socket requires a normalized absolute .sock path' }
+  }
+  return { _tag: 'Parsed', path }
+}
+

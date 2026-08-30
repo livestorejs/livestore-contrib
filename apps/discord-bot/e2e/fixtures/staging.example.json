@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "actorBotTokenRef": "op://VAULT/ITEM/FIELD",
+  "botControlSocket": "/run/discord-bot/staging/control.sock",
+  "target": {
+    "guildId": "111111111111111111",
+    "channelId": "222222222222222222",
+    "docsChannelIds": {
+      "public": "222222222222222222",
+      "restricted": "333333333333333333"
+    },
+    "allowedChannelIds": ["222222222222222222", "333333333333333333"],
+    "requiredTopicSentinel": "livestore-discord-e2e-only",
+    "pollIntervalMs": 1000,
+    "timeoutMs": 30000
+  }
+}
