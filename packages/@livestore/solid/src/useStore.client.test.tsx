@@ -579,9 +579,9 @@ describe('useStore.useClientDocument', () => {
       expect(result.state()).toBeDefined()
     })
 
-    // Store A is re-created fresh after retain/release cycle (RcMap disposes
-    // entries eagerly on release in Effect 3.19.19+), so state resets to defaults.
-    // Verify the hook correctly reflects the new store's default state.
+    // Store A is re-created fresh after the retain/release cycle because RcMap
+    // disposes entries eagerly on release, so state resets to defaults. Verify
+    // the hook correctly reflects the new store's default state.
     expect(result.state()?.username).toBe('')
 
     // Verify we can write to the re-created store A

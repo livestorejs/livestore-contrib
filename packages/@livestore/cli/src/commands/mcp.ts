@@ -1,4 +1,4 @@
-import { McpServer } from 'effect/unstable/ai'
+import { McpProtocol, McpServer } from 'effect/unstable/ai'
 
 import { Effect, Layer, Logger } from '@livestore/utils/effect'
 import { Cli, PlatformNode } from '@livestore/utils/node'

@@ -22,7 +22,7 @@ export const coachTool = Tool.make('livestore_coach', {
       description: 'AI-generated feedback and recommendations for the code',
     }),
     score: Schema.optional(
-      Schema.Number.annotate({
+      Schema.Finite.annotate({
         description: 'Code quality score from 1-10 (optional)',
       }),
     ),

@@ -25,9 +25,9 @@ export class S2LimitExceededError extends Schema.TaggedError<S2LimitExceededErro
   '~@livestore/sync-s2/S2LimitExceededError',
 )('S2LimitExceededError', {
   limitType: LimitType,
-  max: Schema.Number,
-  actual: Schema.Number,
-  recordIndex: Schema.optional(Schema.Number),
+  max: Schema.Finite,
+  actual: Schema.Finite,
+  recordIndex: Schema.optional(Schema.Finite),
 }) {}
 
 export interface AppendRecordBody {

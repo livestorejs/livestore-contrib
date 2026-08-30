@@ -45,12 +45,37 @@ packages:
 
 overrides:
   effect: 4.0.0-rc.111
+  '@effect/ai-openai': 4.0.0-rc.111
   '@effect/platform-browser': 4.0.0-rc.111
   '@effect/platform-bun': 4.0.0-rc.111
   '@effect/platform-node': 4.0.0-rc.111
   '@effect/platform-node-shared': 4.0.0-rc.111
   '@effect/opentelemetry': 4.0.0-rc.111
   '@effect/vitest': 4.0.0-rc.111
+  '@livestore/adapter-cloudflare': 'link:repos/livestore/packages/@livestore/adapter-cloudflare'
+  '@livestore/adapter-expo': 'link:packages/@livestore/adapter-expo'
+  '@livestore/adapter-node': 'link:packages/@livestore/adapter-node'
+  '@livestore/adapter-web': 'link:repos/livestore/packages/@livestore/adapter-web'
+  '@livestore/cli': 'link:packages/@livestore/cli'
+  '@livestore/common': 'link:repos/livestore/packages/@livestore/common'
+  '@livestore/common-cf': 'link:repos/livestore/packages/@livestore/common-cf'
+  '@livestore/devtools-expo': 'link:packages/@livestore/devtools-expo'
+  '@livestore/effect-playwright': 'link:repos/livestore/packages/@livestore/effect-playwright'
+  '@livestore/framework-toolkit': 'link:repos/livestore/packages/@livestore/framework-toolkit'
+  '@livestore/graphql': 'link:packages/@livestore/graphql'
+  '@livestore/livestore': 'link:repos/livestore/packages/@livestore/livestore'
+  '@livestore/peer-deps': 'link:repos/livestore/packages/@livestore/peer-deps'
+  '@livestore/react': 'link:repos/livestore/packages/@livestore/react'
+  '@livestore/solid': 'link:packages/@livestore/solid'
+  '@livestore/sqlite-wasm': 'link:repos/livestore/packages/@livestore/sqlite-wasm'
+  '@livestore/svelte': 'link:packages/@livestore/svelte'
+  '@livestore/sync-cf': 'link:repos/livestore/packages/@livestore/sync-cf'
+  '@livestore/sync-electric': 'link:packages/@livestore/sync-electric'
+  '@livestore/sync-s2': 'link:packages/@livestore/sync-s2'
+  '@livestore/utils': 'link:repos/livestore/packages/@livestore/utils'
+  '@livestore/utils-dev': 'link:repos/livestore/packages/@livestore/utils-dev'
+  '@livestore/wa-sqlite': 'link:repos/livestore/packages/@livestore/wa-sqlite'
+  '@livestore/webmesh': 'link:repos/livestore/packages/@livestore/webmesh'
   '@opentelemetry/api': 1.9.1
   '@opentelemetry/core': 2.8.0
   '@opentelemetry/resources': 2.8.0
@@ -66,7 +91,6 @@ peerDependencyRules:
     '@opentelemetry/sdk-trace-base': '>=2.2.0'
 
 allowBuilds:
-  '@parcel/watcher': true
   '@myobie/pty': false
   esbuild: false
   fsevents: false
@@ -74,6 +98,7 @@ allowBuilds:
   node-pty: false
   sharp: false
   unix-dgram: false
+  '@parcel/watcher': true
   '@mixedbread/cli': true
   cbor-extract: true
   dtrace-provider: true
@@ -82,9 +107,12 @@ allowBuilds:
   workerd: true
 
 minimumReleaseAgeExclude:
-  - '@effect/platform'
   - '@types/node'
   - effect
+  - '@effect/platform-node'
+  - '@effect/vitest'
+  - '@effect/opentelemetry'
+  - '@effect/atom-react'
   - '@livestore/adapter-web@0.5.0-dev.0'
   - '@livestore/common-cf@0.5.0-dev.0'
   - '@livestore/common@0.5.0-dev.0'

@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Events, makeSchema, State } from '@livestore/common/schema'
 import type { MockSyncBackend } from '@livestore/common/sync'
 import { EventFactory } from '@livestore/common/testing'
-import { Effect, FileSystem, type Queue, Schema } from '@livestore/utils/effect'
+import { Effect, FileSystem, type Queue, Schema, type SubscriptionRef } from '@livestore/utils/effect'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -49,10 +49,11 @@ const makeTempConfig = () => {
   const moduleSource = `
 import { schema } from ${JSON.stringify(schemaModuleUrl)}
 import { makeMockSyncBackend } from '@livestore/common/sync'
-import { Effect, Queue } from '@livestore/utils/effect'
+import { Effect, Queue, SubscriptionRef } from '@livestore/utils/effect'
 
 export const mockBackend = await Effect.runPromise(Effect.scoped(makeMockSyncBackend({ startConnected: true })))
 export const connectionEvents = await Effect.runPromise(Queue.make<'connect' | 'disconnect'>())
+export const disconnectShouldFail = await Effect.runPromise(SubscriptionRef.make(false))
 
 export { schema }
 
@@ -60,7 +61,11 @@ export const syncBackend = (_args) =>
   mockBackend.makeSyncBackend.pipe(
     Effect.tap(() => Queue.offer(connectionEvents, 'connect')),
     Effect.map((backend) => {
-      const disconnect = backend.disconnect ?? Effect.void
+      const disconnect = SubscriptionRef.get(disconnectShouldFail).pipe(
+        Effect.flatMap((shouldFail) =>
+          shouldFail ? Effect.fail(new Error('disconnect failed')) : (backend.disconnect ?? Effect.void),
+        ),
+      )
       return {
         ...backend,
         disconnect: disconnect.pipe(Effect.tap(() => Queue.offer(connectionEvents, 'disconnect'))),
@@ -93,9 +98,15 @@ export const useMockConfig = Effect.acquireRelease(
     })) as {
       mockBackend: MockSyncBackend
       connectionEvents: Queue.Queue<'connect' | 'disconnect'>
+      disconnectShouldFail: SubscriptionRef.SubscriptionRef<boolean>
     }
 
-    return { configPath: tempPath, mockBackend: mod.mockBackend, connectionEvents: mod.connectionEvents }
+    return {
+      configPath: tempPath,
+      mockBackend: mod.mockBackend,
+      connectionEvents: mod.connectionEvents,
+      disconnectShouldFail: mod.disconnectShouldFail,
+    }
   }),
   ({ configPath }) =>
     Effect.gen(function* () {

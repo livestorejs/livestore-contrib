@@ -328,7 +328,7 @@ export class Scalar extends S.Class<Scalar>('Scalar')({
   /**
    * Metric value.
    */
-  value: S.Number,
+  value: S.Finite,
 }) {}
 
 export class Accumulation extends S.Class<Accumulation>('Accumulation')({
@@ -1034,8 +1034,8 @@ export interface Client {
   readonly listAccessTokens: (
     options?: typeof ListAccessTokensParams.Encoded,
   ) => Effect.Effect<
-    typeof ListAccessTokensResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    ListAccessTokensResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Issue a new access token.
@@ -1043,8 +1043,8 @@ export interface Client {
   readonly issueAccessToken: (
     options: typeof AccessTokenInfo.Encoded,
   ) => Effect.Effect<
-    typeof IssueAccessTokenResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    IssueAccessTokenResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Revoke an access token.
@@ -1053,7 +1053,7 @@ export interface Client {
     id: string,
   ) => Effect.Effect<
     void,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * List basins.
@@ -1061,8 +1061,8 @@ export interface Client {
   readonly listBasins: (
     options?: typeof ListBasinsParams.Encoded,
   ) => Effect.Effect<
-    typeof ListBasinsResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    ListBasinsResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Create a basin.
@@ -1070,8 +1070,8 @@ export interface Client {
   readonly createBasin: (
     options: typeof CreateBasinRequest.Encoded,
   ) => Effect.Effect<
-    typeof BasinInfo.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    BasinInfo,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Get basin configuration.
@@ -1079,8 +1079,8 @@ export interface Client {
   readonly getBasinConfig: (
     basin: string,
   ) => Effect.Effect<
-    typeof BasinConfig.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    BasinConfig,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Create or reconfigure a basin.
@@ -1092,8 +1092,8 @@ export interface Client {
       readonly payload: typeof CreateOrReconfigureBasinRequest.Encoded
     },
   ) => Effect.Effect<
-    typeof BasinInfo.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    BasinInfo,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Delete a basin.
@@ -1102,7 +1102,7 @@ export interface Client {
     basin: string,
   ) => Effect.Effect<
     void,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Reconfigure a basin.
@@ -1111,8 +1111,8 @@ export interface Client {
     basin: string,
     options: typeof BasinReconfiguration.Encoded,
   ) => Effect.Effect<
-    typeof BasinConfig.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    BasinConfig,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Account-level metrics.
@@ -1120,8 +1120,8 @@ export interface Client {
   readonly accountMetrics: (
     options: typeof AccountMetricsParams.Encoded,
   ) => Effect.Effect<
-    typeof MetricSetResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    MetricSetResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Basin-level metrics.
@@ -1130,8 +1130,8 @@ export interface Client {
     basin: string,
     options: typeof BasinMetricsParams.Encoded,
   ) => Effect.Effect<
-    typeof MetricSetResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    MetricSetResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Stream-level metrics.
@@ -1141,8 +1141,8 @@ export interface Client {
     stream: string,
     options: typeof StreamMetricsParams.Encoded,
   ) => Effect.Effect<
-    typeof MetricSetResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    MetricSetResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * List streams.
@@ -1150,8 +1150,8 @@ export interface Client {
   readonly listStreams: (
     options?: typeof ListStreamsParams.Encoded,
   ) => Effect.Effect<
-    typeof ListStreamsResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    ListStreamsResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Create a stream.
@@ -1159,8 +1159,8 @@ export interface Client {
   readonly createStream: (
     options: typeof CreateStreamRequest.Encoded,
   ) => Effect.Effect<
-    typeof StreamInfo.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    StreamInfo,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Get stream configuration.
@@ -1168,8 +1168,8 @@ export interface Client {
   readonly getStreamConfig: (
     stream: string,
   ) => Effect.Effect<
-    typeof StreamConfig.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    StreamConfig,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Create or reconfigure a stream.
@@ -1181,8 +1181,8 @@ export interface Client {
       readonly payload: typeof CreateOrReconfigureStreamRequest.Encoded
     },
   ) => Effect.Effect<
-    typeof StreamInfo.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    StreamInfo,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Delete a stream.
@@ -1191,7 +1191,7 @@ export interface Client {
     stream: string,
   ) => Effect.Effect<
     void,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Reconfigure a stream.
@@ -1200,8 +1200,8 @@ export interface Client {
     stream: string,
     options: typeof StreamReconfiguration.Encoded,
   ) => Effect.Effect<
-    typeof StreamConfig.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    StreamConfig,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
   /**
    * Read records.
@@ -1210,11 +1210,11 @@ export interface Client {
     stream: string,
     options?: typeof ReadParams.Encoded,
   ) => Effect.Effect<
-    typeof ReadBatch.Type,
+    ReadBatch,
     | HttpClientError.HttpClientError
     | S.SchemaError
-    | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
-    | ClientError<'TailResponse', typeof TailResponse.Type>
+    | ClientError<'ErrorResponse', ErrorResponse>
+    | ClientError<'TailResponse', TailResponse>
   >
   /**
    * Append records.
@@ -1226,10 +1226,10 @@ export interface Client {
       readonly payload: typeof AppendInput.Encoded
     },
   ) => Effect.Effect<
-    typeof AppendAck.Type,
+    AppendAck,
     | HttpClientError.HttpClientError
     | S.SchemaError
-    | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    | ClientError<'ErrorResponse', ErrorResponse>
     | ClientError<'AppendConditionFailed', typeof AppendConditionFailed.Type>
   >
   /**
@@ -1238,8 +1238,8 @@ export interface Client {
   readonly checkTail: (
     stream: string,
   ) => Effect.Effect<
-    typeof TailResponse.Type,
-    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', typeof ErrorResponse.Type>
+    TailResponse,
+    HttpClientError.HttpClientError | S.SchemaError | ClientError<'ErrorResponse', ErrorResponse>
   >
 }
 

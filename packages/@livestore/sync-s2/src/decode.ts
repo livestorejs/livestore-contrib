@@ -14,7 +14,7 @@ const ReadBatchSchema = Schema.Struct({
 }).annotate({ title: '@livestore/sync-s2:ReadBatchSchema' })
 
 export const decodeReadBatch = (
-  readBatch: typeof HttpClientGenerated.ReadBatch.Type,
+  readBatch: HttpClientGenerated.ReadBatch,
 ): ReadonlyArray<{
   eventEncoded: LiveStoreEvent.Global.Encoded
   metadata: Option.Option<{ s2SeqNum: S2SeqNum }>

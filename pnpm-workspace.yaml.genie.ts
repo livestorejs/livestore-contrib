@@ -17,6 +17,7 @@ const { peerDependencyRules: _effectV3PeerDependencyRules, ...contribPnpmPolicyS
  */
 const effectDedupeOverrides = catalog.pick(
   'effect',
+  '@effect/ai-openai',
   '@effect/platform-browser',
   '@effect/platform-bun',
   '@effect/platform-node',
@@ -24,6 +25,34 @@ const effectDedupeOverrides = catalog.pick(
   '@effect/opentelemetry',
   '@effect/vitest',
 )
+
+/** Validate the examples against the composed source cohort without changing their copyable manifests. */
+const workspacePackageOverrides = {
+  '@livestore/adapter-cloudflare': 'link:repos/livestore/packages/@livestore/adapter-cloudflare',
+  '@livestore/adapter-expo': 'link:packages/@livestore/adapter-expo',
+  '@livestore/adapter-node': 'link:packages/@livestore/adapter-node',
+  '@livestore/adapter-web': 'link:repos/livestore/packages/@livestore/adapter-web',
+  '@livestore/cli': 'link:packages/@livestore/cli',
+  '@livestore/common': 'link:repos/livestore/packages/@livestore/common',
+  '@livestore/common-cf': 'link:repos/livestore/packages/@livestore/common-cf',
+  '@livestore/devtools-expo': 'link:packages/@livestore/devtools-expo',
+  '@livestore/effect-playwright': 'link:repos/livestore/packages/@livestore/effect-playwright',
+  '@livestore/framework-toolkit': 'link:repos/livestore/packages/@livestore/framework-toolkit',
+  '@livestore/graphql': 'link:packages/@livestore/graphql',
+  '@livestore/livestore': 'link:repos/livestore/packages/@livestore/livestore',
+  '@livestore/peer-deps': 'link:repos/livestore/packages/@livestore/peer-deps',
+  '@livestore/react': 'link:repos/livestore/packages/@livestore/react',
+  '@livestore/solid': 'link:packages/@livestore/solid',
+  '@livestore/sqlite-wasm': 'link:repos/livestore/packages/@livestore/sqlite-wasm',
+  '@livestore/svelte': 'link:packages/@livestore/svelte',
+  '@livestore/sync-cf': 'link:repos/livestore/packages/@livestore/sync-cf',
+  '@livestore/sync-electric': 'link:packages/@livestore/sync-electric',
+  '@livestore/sync-s2': 'link:packages/@livestore/sync-s2',
+  '@livestore/utils': 'link:repos/livestore/packages/@livestore/utils',
+  '@livestore/utils-dev': 'link:repos/livestore/packages/@livestore/utils-dev',
+  '@livestore/wa-sqlite': 'link:repos/livestore/packages/@livestore/wa-sqlite',
+  '@livestore/webmesh': 'link:repos/livestore/packages/@livestore/webmesh',
+} as const
 
 /** Published core cohort consumed transitively by the deliberately external DevTools artifact. */
 const coreDevReleaseCohort = [
@@ -261,6 +290,7 @@ export default pnpmWorkspaceYaml.root({
   linkWorkspacePackages: true,
   overrides: {
     ...effectDedupeOverrides,
+    ...workspacePackageOverrides,
     /**
      * Force one copy of the OpenTelemetry tracing packages, at the versions the catalog pins.
      * Two copies otherwise resolve side by side, and their `InMemorySpanExporter` types are

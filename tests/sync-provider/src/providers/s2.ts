@@ -123,11 +123,15 @@ const startS2LiteProxy = Effect.gen(function* () {
       ),
   })
 
+  const createBasinBody = yield* Schema.encodeEffect(
+    Schema.fromJsonString(Schema.Struct({ basin: Schema.String })),
+  )({ basin })
+
   yield* Effect.tryPromise(() =>
     fetch(`${s2LiteApiBase}/basins`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ basin }),
+      body: createBasinBody,
     }),
   ).pipe(
     Effect.retry(Schedule.exponentialBackoff10Sec),

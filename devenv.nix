@@ -240,6 +240,7 @@ in
     exec = ''
       set -euo pipefail
       cd "$DEVENV_ROOT"
+      export DEVENV_TASK_PASSTHROUGH=1
 
       git_sha="''${GIT_SHA:-$(git rev-parse HEAD)}"
       core_sha="''${LIVESTORE_CORE_GIT_SHA:-$(jq -r '.members.livestore.commit' megarepo.lock)}"
@@ -301,6 +302,7 @@ in
     ];
     exec = ''
       set -euo pipefail
+      export DEVENV_TASK_PASSTHROUGH=1
       cd "$DEVENV_ROOT"
 
       : "''${GIT_SHA:?GIT_SHA is required}"
@@ -526,7 +528,6 @@ in
         .slice(packagesStart + 1, packagesEnd)
         .map((line) => line.match(/^  - (.+)$/)?.[1])
         .filter(Boolean)
-
       const sort = (values) => [...values].sort()
       if (JSON.stringify(sort(packageWorkspaces)) !== JSON.stringify(sort(yamlPackages))) {
         throw new Error('package.json and pnpm-workspace.yaml workspace members differ')
