@@ -61,26 +61,26 @@ export const makeWorkerEffect = (options: WorkerOptions) => {
         )
       : Layer.empty
 
-  // Merge the runtime dependencies once so we can provide them together without chaining Effect.provide.
-  const runtimeLayer = Layer.mergeAll(FetchHttpClient.layer, PlatformNode.NodeFileSystem.layer, TracingLive)
+  const workerLayer = makeWorkerRunnerInner(options).pipe(
+    Layer.provideMerge(RpcServer.layerProtocolWorkerRunner),
+    Layer.provideMerge(PlatformNode.NodeWorkerRunner.layer),
+    Layer.provideMerge(FetchHttpClient.layer),
+    Layer.provideMerge(PlatformNode.NodeFileSystem.layer),
+    Layer.provideMerge(TracingLive),
+    Layer.provideMerge(options.logger ?? Layer.empty),
+    Layer.provideMerge(
+      Layer.succeed(References.MinimumLogLevel, options.logLevel ?? (isDevEnv() === true ? 'Debug' : 'Info')),
+    ),
+  )
 
   return RpcServer.make(WorkerSchema.LeaderWorkerInnerRpcs).pipe(
-    Effect.provide(makeWorkerRunnerInner(options)),
-    Effect.provide(RpcServer.layerProtocolWorkerRunner),
-    Effect.provide(PlatformNode.NodeWorkerRunner.layer),
     Effect.scoped,
     Effect.tapCauseLogPretty,
     Effect.annotateLogs({
       thread: options.otelOptions?.serviceName ?? 'livestore-node-leader-thread',
       processId: process.pid,
     }),
-    Effect.provide(
-      Layer.mergeAll(
-        options.logger ?? Layer.empty,
-        Layer.succeed(References.MinimumLogLevel, options.logLevel ?? (isDevEnv() === true ? 'Debug' : 'Info')),
-      ),
-    ),
-    Effect.provide(runtimeLayer),
+    Effect.provide(workerLayer),
   )
 }
 
@@ -131,12 +131,14 @@ const makeWorkerRunnerInner = (options: WorkerOptions) =>
         })
 
       return WorkerSchema.LeaderWorkerInnerRpcs.of({
-        GetRecreateSnapshot: () =>
-          Effect.gen(function* () {
+        GetRecreateSnapshot: Effect.fn('@livestore/adapter-node:worker:GetRecreateSnapshot')(
+          function* () {
             const workerCtx = yield* LeaderThreadCtx
             const snapshot = workerCtx.dbState.export()
             return { snapshot, migrationsReport: workerCtx.initialState.migrationsReport }
-          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetRecreateSnapshot')),
+          },
+          provideLeaderThread,
+        ),
         PullStream: ({ cursor }) =>
           Effect.gen(function* () {
             const { syncProcessor } = yield* LeaderThreadCtx
@@ -177,26 +179,32 @@ const makeWorkerRunnerInner = (options: WorkerOptions) =>
             provideLeaderThread,
             Stream.unwrap,
           ),
-        GetLeaderHead: () =>
-          Effect.gen(function* () {
+        GetLeaderHead: Effect.fn('@livestore/adapter-node:worker:GetLeaderHead')(
+          function* () {
             const workerCtx = yield* LeaderThreadCtx
             return Eventlog.getClientHeadFromDb(workerCtx.dbEventlog)
-          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetLeaderHead')),
-        GetLeaderSyncState: () =>
-          Effect.gen(function* () {
+          },
+          provideLeaderThread,
+        ),
+        GetLeaderSyncState: Effect.fn('@livestore/adapter-node:worker:GetLeaderSyncState')(
+          function* () {
             const workerCtx = yield* LeaderThreadCtx
             return yield* workerCtx.syncProcessor.syncState
-          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetLeaderSyncState')),
+          },
+          provideLeaderThread,
+        ),
         SyncStateStream: () =>
           Effect.gen(function* () {
             const workerCtx = yield* LeaderThreadCtx
             return workerCtx.syncProcessor.syncState.changes
           }).pipe(provideLeaderThread, Stream.unwrap),
-        GetNetworkStatus: () =>
-          Effect.gen(function* () {
+        GetNetworkStatus: Effect.fn('@livestore/adapter-node:worker:GetNetworkStatus')(
+          function* () {
             const workerCtx = yield* LeaderThreadCtx
             return yield* workerCtx.networkStatus
-          }).pipe(provideLeaderThread, Effect.withSpan('@livestore/adapter-node:worker:GetNetworkStatus')),
+          },
+          provideLeaderThread,
+        ),
         NetworkStatusStream: () =>
           Effect.gen(function* () {
             const workerCtx = yield* LeaderThreadCtx

@@ -150,7 +150,7 @@ Returns on success:
     }),
     success: Schema.Struct({
       rows: Schema.Array(Schema.Record(Schema.String, Schema.Json)),
-      rowCount: Schema.Number,
+      rowCount: Schema.Finite,
     }),
   }).annotate(Tool.Destructive, false),
 
@@ -188,7 +188,7 @@ Returns on success:
         }),
       ),
     }),
-    success: Schema.Struct({ committed: Schema.Number }),
+    success: Schema.Struct({ committed: Schema.Finite }),
   }).annotate(Tool.Destructive, true),
 
   Tool.make('livestore_instance_status', {
@@ -213,7 +213,7 @@ Returns when not connected:
         storeId: Schema.String,
         clientId: Schema.String,
         sessionId: Schema.String,
-        tableCounts: Schema.Record(Schema.String, Schema.Number).annotate({
+        tableCounts: Schema.Record(Schema.String, Schema.Finite).annotate({
           description: 'Tables in the LiveStore instance with their row count',
         }),
       }),
@@ -264,7 +264,7 @@ Returns on success:
     }),
     success: Schema.Struct({
       storeId: Schema.String,
-      eventCount: Schema.Number,
+      eventCount: Schema.Finite,
       exportedAt: Schema.String,
       data: Schema.Json.annotate({ description: 'The export file data (can be saved or passed to import)' }),
     }),
@@ -313,7 +313,7 @@ Returns on success:
     }),
     success: Schema.Struct({
       storeId: Schema.String,
-      eventCount: Schema.Number,
+      eventCount: Schema.Finite,
       dryRun: Schema.Boolean,
     }),
   }).annotate(Tool.Destructive, true),

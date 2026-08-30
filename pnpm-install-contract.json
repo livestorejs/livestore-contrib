@@ -36,9 +36,12 @@
     "dedupePeerDependents": true,
     "ignoreScripts": true,
     "minimumReleaseAgeExclude": [
-      "@effect/platform",
       "@types/node",
       "effect",
+      "@effect/platform-node",
+      "@effect/vitest",
+      "@effect/opentelemetry",
+      "@effect/atom-react",
       "@livestore/adapter-web@0.5.0-dev.0",
       "@livestore/common-cf@0.5.0-dev.0",
       "@livestore/common@0.5.0-dev.0",

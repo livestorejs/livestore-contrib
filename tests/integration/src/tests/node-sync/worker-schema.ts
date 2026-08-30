@@ -7,7 +7,7 @@ export const StorageType = Schema.Literals(['in-memory', 'fs'])
 export const AdapterType = Schema.Literals(['single-threaded', 'worker'])
 
 export const Params = Schema.Struct({
-  leaderPushBatchSize: Schema.optional(Schema.Number),
+  leaderPushBatchSize: Schema.optional(Schema.Finite),
 })
 
 export type Params = typeof Params.Type
@@ -27,8 +27,8 @@ export class InitialMessage extends Rpc.make('InitialMessage', {
 
 export class CreateTodos extends Rpc.make('CreateTodos', {
   payload: {
-    count: Schema.Number,
-    commitBatchSize: Schema.optional(Schema.Number),
+    count: Schema.Finite,
+    commitBatchSize: Schema.optional(Schema.Finite),
   },
   success: Schema.Void,
   error: Schema.Never,

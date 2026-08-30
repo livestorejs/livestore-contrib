@@ -8,7 +8,7 @@ export const makeS2StreamName = (storeId: string) => storeId.replace(/[^a-zA-Z0-
 /**
  * Decode `args` from URLSearchParams using Effect Schema, mirroring Electric's approach.
  */
-export const decodePullArgsFromSearchParams = (searchParams: URLSearchParams): typeof ApiSchema.PullArgs.Type => {
+export const decodePullArgsFromSearchParams = (searchParams: URLSearchParams): ApiSchema.PullArgs => {
   const UrlParamsSchema = Schema.Struct({ args: ApiSchema.ArgsSchema })
   const argsResult = Schema.decodeUnknownResult(UrlParamsSchema)(Object.fromEntries(searchParams.entries()))
 

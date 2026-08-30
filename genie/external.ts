@@ -4,8 +4,22 @@ import {
   packageJson,
   type WorkspaceIdentity,
 } from '../repos/effect-utils/genie/external.ts'
-import { effectV4Catalog, livestoreOnlyCatalog, obsoleteEffectV3Packages } from '../repos/livestore/genie/external.ts'
+import { effectV4Catalog, livestoreOnlyCatalog } from '../repos/livestore/genie/external.ts'
 import { coreOwnedPackageNames, contribPackageNames } from './internal.ts'
+
+const obsoleteEffectV3Packages = [
+  '@effect/ai',
+  '@effect/cli',
+  '@effect/cluster',
+  '@effect/experimental',
+  '@effect/platform',
+  '@effect/printer',
+  '@effect/printer-ansi',
+  '@effect/rpc',
+  '@effect/sql',
+  '@effect/typeclass',
+  '@effect/workflow',
+] as const
 
 const obsoleteEffectV3PackageNames = new Set<string>(obsoleteEffectV3Packages)
 

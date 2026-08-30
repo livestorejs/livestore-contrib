@@ -67,6 +67,7 @@ export const makeLeaderThread = ({
   Effect.gen(function* () {
     const services = yield* Effect.context()
 
+
     const makeDb = (kind: 'state' | 'eventlog') => {
       if (testing?.makeLeaderThread !== undefined) {
         return testing
@@ -126,6 +127,7 @@ export const makeLeaderThread = ({
       attributes: { storeId, clientId, storage, devtools, syncOptions },
     }),
   )
+
 
 const makeDevtoolsOptions = ({
   dbState,

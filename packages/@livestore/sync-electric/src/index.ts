@@ -69,8 +69,8 @@ Also see: https://github.com/electric-sql/electric/blob/main/packages/typescript
 */
 
 const LiveStoreEventGlobalFromStringRecord = Schema.Struct({
-  seqNum: Schema.NumberFromString,
-  parentSeqNum: Schema.NumberFromString,
+  seqNum: Schema.FiniteFromString,
+  parentSeqNum: Schema.FiniteFromString,
   name: Schema.String,
   args: Schema.fromJsonString(Schema.Any),
   clientId: Schema.String,
@@ -231,7 +231,7 @@ export const makeSyncBackend =
           const resp = yield* httpClient.get(url)
 
           if (resp.status === 401) {
-            const body = yield* resp.text.pipe(Effect.catch(() => Effect.succeed('-')))
+            const body = yield* resp.text.pipe(Effect.orElseSucceed(() => '-'))
             return yield* new UnknownError({
               cause: new Error(`Unauthorized (401): Couldn't connect to ElectricSQL: ${body}`),
             })

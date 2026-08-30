@@ -429,20 +429,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Prepare CI helper scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          scripts_src='genie/ci-scripts'
-          scripts_dst='${{ runner.temp }}/genie-ci-scripts'
-          if [ ! -d "$scripts_src" ]; then
-            echo "::error::CI helper script directory is missing: $scripts_src"
-            exit 1
-          fi
-          rm -rf "$scripts_dst"
-          mkdir -p "$scripts_dst"
-          cp -R "$scripts_src/." "$scripts_dst/"
-          chmod +x "$scripts_dst"/*.sh
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
         with:
@@ -472,6 +458,21 @@ jobs:
 
           nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
         shell: bash
+      - name: Prepare CI helper scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts_src='repos/livestore/genie/ci-scripts'
+          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          if [ ! -d "$scripts_src" ]; then
+            echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
+            exit 1
+          fi
+          rm -rf "$scripts_dst"
+          mkdir -p "$scripts_dst"
+          cp -R "$scripts_src/." "$scripts_dst/"
+          rm -f "$scripts_dst"/*.genie.ts
+          chmod +x "$scripts_dst"/*.sh
       - name: Use pinned devenv from lock
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev 'devenv.lock')
@@ -504,7 +505,7 @@ jobs:
             exit 1
           fi
 
-          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
+          . '${{ github.workspace }}/.genie-ci-runtime/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -558,7 +559,7 @@ jobs:
         run: node --test .github/scripts/pr-snapshot-artifact.test.mjs
       - name: Pack exact-SHA snapshot
         run: |
-          __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
+          __genie_ci_retry_script='${{ github.workspace }}/.genie-ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'devenv tasks run release:snapshot:pack:git-sha' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run release:snapshot:pack:git-sha'
         env:
           GIT_SHA: ${{ github.event.pull_request.head.sha }}
@@ -588,20 +589,6 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare CI helper scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          scripts_src='genie/ci-scripts'
-          scripts_dst='${{ runner.temp }}/genie-ci-scripts'
-          if [ ! -d "$scripts_src" ]; then
-            echo "::error::CI helper script directory is missing: $scripts_src"
-            exit 1
-          fi
-          rm -rf "$scripts_dst"
-          mkdir -p "$scripts_dst"
-          cp -R "$scripts_src/." "$scripts_dst/"
-          chmod +x "$scripts_dst"/*.sh
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
         with:
@@ -631,6 +618,21 @@ jobs:
 
           nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
         shell: bash
+      - name: Prepare CI helper scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts_src='repos/livestore/genie/ci-scripts'
+          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          if [ ! -d "$scripts_src" ]; then
+            echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
+            exit 1
+          fi
+          rm -rf "$scripts_dst"
+          mkdir -p "$scripts_dst"
+          cp -R "$scripts_src/." "$scripts_dst/"
+          rm -f "$scripts_dst"/*.genie.ts
+          chmod +x "$scripts_dst"/*.sh
       - name: Use pinned devenv from lock
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev 'devenv.lock')
@@ -663,7 +665,7 @@ jobs:
             exit 1
           fi
 
-          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
+          . '${{ github.workspace }}/.genie-ci-runtime/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -715,7 +717,7 @@ jobs:
         shell: bash
       - name: Run quality checks
         run: |
-          __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
+          __genie_ci_retry_script='${{ github.workspace }}/.genie-ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'devenv tasks run ci:quality' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:quality'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
@@ -741,20 +743,6 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare CI helper scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          scripts_src='genie/ci-scripts'
-          scripts_dst='${{ runner.temp }}/genie-ci-scripts'
-          if [ ! -d "$scripts_src" ]; then
-            echo "::error::CI helper script directory is missing: $scripts_src"
-            exit 1
-          fi
-          rm -rf "$scripts_dst"
-          mkdir -p "$scripts_dst"
-          cp -R "$scripts_src/." "$scripts_dst/"
-          chmod +x "$scripts_dst"/*.sh
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
         with:
@@ -784,6 +772,21 @@ jobs:
 
           nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
         shell: bash
+      - name: Prepare CI helper scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts_src='repos/livestore/genie/ci-scripts'
+          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          if [ ! -d "$scripts_src" ]; then
+            echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
+            exit 1
+          fi
+          rm -rf "$scripts_dst"
+          mkdir -p "$scripts_dst"
+          cp -R "$scripts_src/." "$scripts_dst/"
+          rm -f "$scripts_dst"/*.genie.ts
+          chmod +x "$scripts_dst"/*.sh
       - name: Use pinned devenv from lock
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev 'devenv.lock')
@@ -816,7 +819,7 @@ jobs:
             exit 1
           fi
 
-          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
+          . '${{ github.workspace }}/.genie-ci-runtime/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -868,7 +871,7 @@ jobs:
         shell: bash
       - name: Run type checks
         run: |
-          __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
+          __genie_ci_retry_script='${{ github.workspace }}/.genie-ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'devenv tasks run ci:types' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:types'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
@@ -894,20 +897,6 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare CI helper scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          scripts_src='genie/ci-scripts'
-          scripts_dst='${{ runner.temp }}/genie-ci-scripts'
-          if [ ! -d "$scripts_src" ]; then
-            echo "::error::CI helper script directory is missing: $scripts_src"
-            exit 1
-          fi
-          rm -rf "$scripts_dst"
-          mkdir -p "$scripts_dst"
-          cp -R "$scripts_src/." "$scripts_dst/"
-          chmod +x "$scripts_dst"/*.sh
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
         with:
@@ -937,6 +926,21 @@ jobs:
 
           nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
         shell: bash
+      - name: Prepare CI helper scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts_src='repos/livestore/genie/ci-scripts'
+          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          if [ ! -d "$scripts_src" ]; then
+            echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
+            exit 1
+          fi
+          rm -rf "$scripts_dst"
+          mkdir -p "$scripts_dst"
+          cp -R "$scripts_src/." "$scripts_dst/"
+          rm -f "$scripts_dst"/*.genie.ts
+          chmod +x "$scripts_dst"/*.sh
       - name: Use pinned devenv from lock
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev 'devenv.lock')
@@ -969,7 +973,7 @@ jobs:
             exit 1
           fi
 
-          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
+          . '${{ github.workspace }}/.genie-ci-runtime/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -1021,7 +1025,7 @@ jobs:
         shell: bash
       - name: Run package unit tests
         run: |
-          __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
+          __genie_ci_retry_script='${{ github.workspace }}/.genie-ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'devenv tasks run ci:packages' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:packages'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
@@ -1047,20 +1051,6 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare CI helper scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          scripts_src='genie/ci-scripts'
-          scripts_dst='${{ runner.temp }}/genie-ci-scripts'
-          if [ ! -d "$scripts_src" ]; then
-            echo "::error::CI helper script directory is missing: $scripts_src"
-            exit 1
-          fi
-          rm -rf "$scripts_dst"
-          mkdir -p "$scripts_dst"
-          cp -R "$scripts_src/." "$scripts_dst/"
-          chmod +x "$scripts_dst"/*.sh
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
         with:
@@ -1090,6 +1080,21 @@ jobs:
 
           nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
         shell: bash
+      - name: Prepare CI helper scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts_src='repos/livestore/genie/ci-scripts'
+          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          if [ ! -d "$scripts_src" ]; then
+            echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
+            exit 1
+          fi
+          rm -rf "$scripts_dst"
+          mkdir -p "$scripts_dst"
+          cp -R "$scripts_src/." "$scripts_dst/"
+          rm -f "$scripts_dst"/*.genie.ts
+          chmod +x "$scripts_dst"/*.sh
       - name: Use pinned devenv from lock
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev 'devenv.lock')
@@ -1122,7 +1127,7 @@ jobs:
             exit 1
           fi
 
-          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
+          . '${{ github.workspace }}/.genie-ci-runtime/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -1174,7 +1179,7 @@ jobs:
         shell: bash
       - name: Build contrib examples
         run: |
-          __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
+          __genie_ci_retry_script='${{ github.workspace }}/.genie-ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'devenv tasks run ci:examples-build' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:examples-build'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}
@@ -1200,20 +1205,6 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare CI helper scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          scripts_src='genie/ci-scripts'
-          scripts_dst='${{ runner.temp }}/genie-ci-scripts'
-          if [ ! -d "$scripts_src" ]; then
-            echo "::error::CI helper script directory is missing: $scripts_src"
-            exit 1
-          fi
-          rm -rf "$scripts_dst"
-          mkdir -p "$scripts_dst"
-          cp -R "$scripts_src/." "$scripts_dst/"
-          chmod +x "$scripts_dst"/*.sh
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
         with:
@@ -1243,6 +1234,21 @@ jobs:
 
           nix run "github:overengineeringstudio/effect-utils/$EU_REV#megarepo" -- apply --all
         shell: bash
+      - name: Prepare CI helper scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts_src='repos/livestore/genie/ci-scripts'
+          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          if [ ! -d "$scripts_src" ]; then
+            echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
+            exit 1
+          fi
+          rm -rf "$scripts_dst"
+          mkdir -p "$scripts_dst"
+          cp -R "$scripts_src/." "$scripts_dst/"
+          rm -f "$scripts_dst"/*.genie.ts
+          chmod +x "$scripts_dst"/*.sh
       - name: Use pinned devenv from lock
         run: |
           DEVENV_REV=$(jq -r .nodes.devenv.locked.rev 'devenv.lock')
@@ -1275,7 +1281,7 @@ jobs:
             exit 1
           fi
 
-          . '${{ runner.temp }}/genie-ci-scripts/resolve-devenv.sh'
+          . '${{ github.workspace }}/.genie-ci-runtime/resolve-devenv.sh'
 
           # Temporary: capture diagnostics dir for #272 root-cause analysis.
           DIAG_ROOT="${RUNNER_TEMP:-/tmp}/nix-store-diagnostics-${GITHUB_JOB:-job}-${RUNNER_OS:-unknown}-${GITHUB_RUN_ATTEMPT:-0}"
@@ -1327,7 +1333,7 @@ jobs:
         shell: bash
       - name: Run node integration coverage
         run: |
-          __genie_ci_retry_script='${{ runner.temp }}/genie-ci-scripts/run-with-nix-gc-race-retry.sh'
+          __genie_ci_retry_script='${{ github.workspace }}/.genie-ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'devenv tasks run ci:node' 'if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" PNPM_HOME="${PNPM_HOME:-${{ github.workspace }}/.pnpm-home}" PNPM_STORE_DIR="${PNPM_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-${{ github.workspace }}/.pnpm-store}" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run ci:node'
       - name: Save pnpm state
         if: ${{ success() && steps.restore-pnpm-state.outputs.cache-hit != 'true' }}

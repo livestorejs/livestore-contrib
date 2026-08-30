@@ -5,4 +5,4 @@ inputs:
   nixpkgs:
     follows: effect-utils/nixpkgs
   effect-utils:
-    url: github:overengineeringstudio/effect-utils/main
+    url: github:overengineeringstudio/effect-utils/5f90869ee54539cf71fbd2a093993891ba8a0c97

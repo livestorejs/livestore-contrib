@@ -8,13 +8,10 @@
  * `../../../genie/repo.ts`.
  */
 
-// Imported straight from effect-utils rather than through core's re-export: contrib pins a core
-// revision that predates this step, so routing it through core would break generation here.
-import { prepareCiScriptsStep } from '../repos/effect-utils/genie/ci-workflow.ts'
+import { preparedCiRuntimeScriptsDir } from '../repos/effect-utils/genie/ci-workflow.ts'
 import { jsonArtifact } from '../repos/effect-utils/packages/@overeng/genie/src/runtime/json-artifact/mod.ts'
 import {
   applyMegarepoLockStep,
-  baseTsconfigCompilerOptions as coreBaseTsconfigCompilerOptions,
   checkoutStep,
   installNixStep,
   livestorePackageDefaults as coreLivestorePackageDefaults,
@@ -23,6 +20,7 @@ import {
   restorePnpmStateStep,
   type PnpmPackageClosureConfig,
   validateNixStoreStep,
+  utilsEffectPeerDeps,
   type WorkspaceIdentity,
 } from '../repos/livestore/genie/repo.ts'
 import { catalog as contribCatalog, packageJson as contribPackageJson } from './external.ts'
@@ -56,32 +54,11 @@ export const catalog = contribCatalog
 
 export const packageJson = contribPackageJson
 
-/**
- * Relax core's Effect-LSP gate to errors-only while contrib converges.
- *
- * effect-utils' `effectDiagnosticsGate` (#811) makes Effect warnings AND suggestions fail
- * `tsgo --build`, and core inherits it unchanged. Contrib is not clean under it yet: 70 advisory
- * diagnostics remain (5 warnings, 65 suggestions), 41 of them inside the generated
- * `@livestore/sync-s2/src/http-client-generated.ts`. The shared policy anticipates exactly this and
- * prescribes a local tsconfig override "until it converges, rather than carrying diagnostics in
- * source" — so no `@effect-diagnostics` waivers are sprinkled into contrib sources.
- *
- * Effect ERRORS still gate, unchanged. Suggestions stay visible in build output
- * (`includeSuggestionsInTsc`), so the burndown remains discoverable. Delete this override — not the
- * diagnostics — once contrib reaches zero.
- *
- * This explicit named export shadows the `export *` re-export from core.
- */
-export const baseTsconfigCompilerOptions = {
-  ...coreBaseTsconfigCompilerOptions,
-  plugins: [
-    {
-      ...coreBaseTsconfigCompilerOptions.plugins[0],
-      ignoreEffectWarningsInTscExitCode: true,
-      ignoreEffectSuggestionsInTscExitCode: true,
-    },
-  ],
-} as const
+/** Resolve contrib-owned Effect development and peer dependencies from contrib's rc.111 catalog. */
+export const effectDevDeps = (...additionalDeps: Parameters<typeof contribCatalog.pick>) =>
+  contribCatalog.pick(...utilsEffectPeerDeps, ...additionalDeps)
+
+export const getUtilsPeerDeps = () => contribCatalog.peers(...utilsEffectPeerDeps)
 
 export const githubRepositorySettings = <const TSettings extends Record<string, unknown>>(settings: TSettings) =>
   jsonArtifact({ data: settings })
@@ -118,16 +95,32 @@ export const refs = {
   webmesh: { path: '../../../repos/livestore/packages/@livestore/webmesh' },
 } as const
 
+const prepareLivestoreContribCiScriptsStep = {
+  name: 'Prepare CI helper scripts',
+  shell: 'bash',
+  run: [
+    'set -euo pipefail',
+    "scripts_src='repos/livestore/genie/ci-scripts'",
+    `scripts_dst='${preparedCiRuntimeScriptsDir}'`,
+    'if [ ! -d "$scripts_src" ]; then',
+    '  echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"',
+    '  exit 1',
+    'fi',
+    'rm -rf "$scripts_dst"',
+    'mkdir -p "$scripts_dst"',
+    'cp -R "$scripts_src/." "$scripts_dst/"',
+    'rm -f "$scripts_dst"/*.genie.ts',
+    'chmod +x "$scripts_dst"/*.sh',
+  ].join('\n'),
+} as const
+
 export const livestoreContribSetupStepsAfterCheckout = [
-  // Copy CI helper scripts (e.g. the nix-gc-race retry wrapper) into the prepared scripts dir before
-  // any retry-wrapped command runs, and before an alternate checkout can replace the workspace.
-  // Required by the genie CI workflow validator.
-  prepareCiScriptsStep,
   installNixStep({
     extraConf:
       'extra-substituters = https://cache.nixos.org\nextra-trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=',
   }),
   applyMegarepoLockStep(),
+  prepareLivestoreContribCiScriptsStep,
   preparePinnedDevenvStep,
   pnpmStateSetupStep,
   restorePnpmStateStep({ keyPrefix: 'livestore-contrib-pnpm-state-v1' }),

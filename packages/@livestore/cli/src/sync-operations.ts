@@ -35,7 +35,7 @@ export const ExportFileSchema = Schema.Struct({
   /** ISO timestamp of when the export was created */
   exportedAt: Schema.String,
   /** Total number of events in the export */
-  eventCount: Schema.Number,
+  eventCount: Schema.Finite,
   /** Array of events in global encoded format */
   events: Schema.Array(LiveStoreEvent.Global.Encoded),
 })
@@ -128,7 +128,7 @@ export const makeSyncBackend = ({
 const releaseSyncBackend = (syncBackend: SyncBackend.SyncBackend): Effect.Effect<void> => {
   const maybeDisconnect = (syncBackend as { disconnect?: Effect.Effect<void> }).disconnect
   const releaseEffect = maybeDisconnect ?? SubscriptionRef.set(syncBackend.isConnected, false)
-  return releaseEffect.pipe(Effect.catch(() => Effect.void))
+  return releaseEffect
 }
 
 export interface ExportResult {
