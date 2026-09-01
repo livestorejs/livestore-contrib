@@ -1,0 +1,200 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.kanban {
+  position: relative;
+  min-height: 100vh;
+}
+
+.kanban-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.kanban-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.online-count {
+  background: #10b981;
+  color: #fff;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.new-column-input,
+.name-input {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: #fff;
+  cursor: pointer;
+}
+
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.kanban-column {
+  background: #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 300px;
+}
+
+.kanban-column-title {
+  margin: 0;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #374151;
+}
+
+.kanban-column-delete {
+  background: transparent;
+  color: #6b7280;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+
+.kanban-column-delete:hover {
+  background: #d1d5db;
+  color: #111827;
+}
+
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanban-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  cursor: grab;
+  font-size: 14px;
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+}
+
+.kanban-card-dragging {
+  transform: rotate(3deg) scale(1.02);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.25);
+}
+
+.kanban-add-card {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.kanban-add-card input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* Presence cursors overlay — above the drag layer so cursors are always
+   visible even when a peer is dragging a card underneath them */
+.cursor-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1002;
+}
+
+.cursor {
+  position: fixed;
+  /* Anchor: the arrow tip is at (0, 0) of this div = the reported pointer
+     position. No transition: updates arrive every ~40ms; interpolating reads
+     as lag/jitter. */
+  will-change: left, top;
+}
+
+.cursor-pointer {
+  display: block;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.3));
+}
+
+.cursor-name {
+  /* Absolutely positioned above the arrow tip */
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  width: fit-content;
+  white-space: nowrap;
+}
+
+/* Live drag overlay — renders the dragged card at the peer's cursor */
+.drag-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.remote-drag-card {
+  position: fixed;
+  /* Identical to the local dnd-kit DragOverlay card — no extra styling. */
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.25);
+}
+
+.remote-drag-name {
+  position: absolute;
+  top: -20px;
+  left: 8px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
