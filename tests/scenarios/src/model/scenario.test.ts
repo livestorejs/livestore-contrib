@@ -1,0 +1,262 @@
+import {
+  Vitest,
+  browserMultiSessionRecovery,
+  defineScenario,
+  deriveScenarioRequirements,
+  deriveScenarioTopology,
+  expect,
+  offlineWriterRecovery,
+  makeSeededTodoActions,
+  scenarioVersion,
+  seededTodoActions,
+  terminalStabilizationParticipants,
+  todoApplication,
+} from '../test-support/scenario-test-kit.ts'
+
+Vitest.describe('scenario model', () => {
+  Vitest.it('validates and round-trips the versioned serializable AST', () => {
+    const encoded = JSON.parse(JSON.stringify(offlineWriterRecovery))
+    expect(defineScenario(encoded)).toEqual(offlineWriterRecovery)
+  })
+
+  Vitest.it('accepts only the current Scenario format', () => {
+    expect(() => defineScenario({ ...offlineWriterRecovery, version: 1 })).toThrow('Invalid scenario AST')
+  })
+
+  Vitest.it('retains helper expansion as one self-contained serializable action sequence', () => {
+    const encoded = JSON.parse(JSON.stringify(seededTodoActions))
+    const decoded = defineScenario(encoded)
+    const sequence = decoded.instructions.find((instruction) => instruction._tag === 'action-sequence')
+
+    expect(decoded).toEqual(seededTodoActions)
+    expect(sequence).toEqual(expect.objectContaining({ id: 'generate-0001' }))
+    expect(sequence?._tag === 'action-sequence' ? sequence.actions : []).toHaveLength(40)
+    expect(decoded.instructions.some((instruction) => instruction._tag === 'action')).toBe(false)
+    expect(deriveScenarioRequirements(decoded)).toContain('named-actions')
+  })
+
+  Vitest.it('derives keyed actions deterministically while keeping IDs stable across seeds', () => {
+    const first = makeSeededTodoActions(1445).instructions.find(
+      (instruction) => instruction._tag === 'action-sequence',
+    )!
+    const same = makeSeededTodoActions(1445).instructions.find((instruction) => instruction._tag === 'action-sequence')!
+    const different = makeSeededTodoActions(1446).instructions.find(
+      (instruction) => instruction._tag === 'action-sequence',
+    )!
+    if (first._tag !== 'action-sequence' || same._tag !== 'action-sequence' || different._tag !== 'action-sequence') {
+      throw new Error('Expected generated action sequences')
+    }
+    expect(first.actions).toEqual(same.actions)
+    expect(first.actions.map(({ id }) => id)).toEqual(different.actions.map(({ id }) => id))
+    expect(first.actions).not.toEqual(different.actions)
+  })
+
+  Vitest.it('rejects empty or unbounded generated action sequences', () => {
+    const sequence = seededTodoActions.instructions.find((instruction) => instruction._tag === 'action-sequence')!
+    if (sequence._tag !== 'action-sequence') throw new Error('Expected generated action sequence')
+    for (const count of [0, 10_001]) {
+      expect(() =>
+        defineScenario({
+          ...seededTodoActions,
+          id: `invalid-action-count-${count}`,
+          instructions: [
+            {
+              ...sequence,
+              actions: Array.from({ length: count }, (_, index) => ({
+                ...sequence.actions[0]!,
+                id: `generated:${index}`,
+              })),
+            },
+          ],
+          oracles: [],
+        }),
+      ).toThrow('Action sequence must contain between 1 and 10000 actions')
+    }
+  })
+
+  Vitest.it('rejects non-positive elapsed delays in normalized plans', () => {
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'invalid-wait-duration',
+        instructions: [{ _tag: 'wait', id: 'wait-invalid', durationMs: 0 }],
+        oracles: [],
+      }),
+    ).toThrow('Wait duration must be positive')
+    expect(() =>
+      defineScenario({
+        ...seededTodoActions,
+        id: 'invalid-sequence-delay',
+        instructions: seededTodoActions.instructions.map((instruction) =>
+          instruction._tag === 'action-sequence' ? { ...instruction, delayBetweenActionsMs: 0 } : instruction,
+        ),
+        oracles: [],
+      }),
+    ).toThrow('Action-sequence delay must be positive')
+  })
+
+  Vitest.it('validates dynamic participant additions in plan order', () => {
+    const scenario = defineScenario({
+      version: scenarioVersion,
+      id: 'dynamic-topology-model',
+      description: 'Adds a Client and a session after startup.',
+      tags: ['topology'],
+      seed: 1,
+      applicationId: todoApplication.id,
+      requires: [],
+      topology: {
+        storeId: 'dynamic-topology-model',
+        clients: [{ id: 'client-a', sessions: ['session-a'], initiallyConnected: true }],
+      },
+      instructions: [
+        {
+          _tag: 'create-client',
+          id: 'create-b',
+          client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
+        },
+        {
+          _tag: 'add-session',
+          id: 'add-a2',
+          target: { clientId: 'client-a', sessionId: 'session-a2' },
+        },
+        {
+          _tag: 'action',
+          id: 'write-b',
+          target: { clientId: 'client-b', sessionId: 'session-b' },
+          action: 'createTodo',
+          input: { id: 'late', text: 'Late participant write' },
+        },
+      ],
+      oracles: [],
+    })
+
+    expect(deriveScenarioTopology(scenario)).toEqual([
+      { id: 'client-a', sessions: ['session-a', 'session-a2'], initiallyConnected: true },
+      { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
+    ])
+    expect(deriveScenarioRequirements(scenario)).toEqual(
+      expect.arrayContaining([
+        'multiple-clients',
+        'multiple-sessions',
+        'dynamic-client-creation',
+        'dynamic-session-addition',
+      ]),
+    )
+  })
+
+  Vitest.it('rejects participant use before its creation step', () => {
+    expect(() =>
+      defineScenario({
+        version: scenarioVersion,
+        id: 'dynamic-topology-use-before-create',
+        description: 'Invalid ordering.',
+        tags: ['topology'],
+        seed: 1,
+        applicationId: todoApplication.id,
+        requires: [],
+        topology: { storeId: 'dynamic-topology-invalid', clients: [] },
+        instructions: [
+          {
+            _tag: 'action',
+            id: 'write-b-too-early',
+            target: { clientId: 'client-b', sessionId: 'session-b' },
+            action: 'createTodo',
+            input: { id: 'late', text: 'Too early' },
+          },
+          {
+            _tag: 'create-client',
+            id: 'create-b',
+            client: { id: 'client-b', sessions: ['session-b'], initiallyConnected: true },
+          },
+        ],
+        oracles: [],
+      }),
+    ).toThrow('Unknown participant reference: client-b/session-b')
+  })
+
+  Vitest.it('derives host requirements from topology, operations, observations, and oracles', () => {
+    expect(
+      deriveScenarioRequirements(
+        defineScenario({
+          ...browserMultiSessionRecovery,
+          requires: [],
+        }),
+      ),
+    ).toEqual([
+      'system-observation',
+      'sync-observation',
+      'multiple-sessions',
+      'named-actions',
+      'dynamic-session-addition',
+      'session-restart',
+      'client-restart',
+      'state-inspection',
+    ])
+  })
+
+  Vitest.it('accepts snapshot-based oracles without an authored terminal Settlement', () => {
+    const scenario = defineScenario({
+      ...offlineWriterRecovery,
+      id: 'implicit-terminal-stabilization',
+      instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
+    })
+
+    expect(scenario.instructions.every((instruction) => instruction._tag !== 'settle')).toBe(true)
+  })
+
+  Vitest.it('derives terminal stabilization from the union of snapshot-oracle participants', () => {
+    expect(terminalStabilizationParticipants(offlineWriterRecovery)).toEqual([
+      { clientId: 'client-a', sessionId: 'session-a' },
+      { clientId: 'client-b', sessionId: 'session-b' },
+    ])
+  })
+
+  Vitest.it('allows operation-history-only scenarios without Settlement', () => {
+    const scenario = defineScenario({
+      ...offlineWriterRecovery,
+      id: 'history-without-settlement',
+      instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
+      oracles: offlineWriterRecovery.oracles.filter((oracle) => oracle._tag === 'operation-history'),
+    })
+
+    expect(scenario.instructions.every((instruction) => instruction._tag !== 'settle')).toBe(true)
+  })
+
+  Vitest.it('excludes history-only oracles from terminal stabilization', () => {
+    const prefixOracle = {
+      _tag: 'confirmed-eventlog-prefix' as const,
+      id: 'confirmed-eventlogs-append-only',
+      participants: [{ clientId: 'client-a', sessionId: 'session-a' }],
+    }
+    const scenario = defineScenario({
+      ...offlineWriterRecovery,
+      id: 'prefix-history-without-settlement',
+      instructions: offlineWriterRecovery.instructions.filter((instruction) => instruction._tag !== 'settle'),
+      oracles: [prefixOracle],
+    })
+
+    expect(terminalStabilizationParticipants(scenario)).toEqual([])
+  })
+
+  Vitest.it('requires a non-empty, unique participant selection for confirmed Eventlog prefix evidence', () => {
+    const prefixOracle = {
+      _tag: 'confirmed-eventlog-prefix' as const,
+      id: 'confirmed-eventlogs-append-only',
+      participants: [{ clientId: 'client-a', sessionId: 'session-a' }],
+    }
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'empty-prefix-selection',
+        oracles: [{ ...prefixOracle, participants: [] }],
+      }),
+    ).toThrow('must select at least one participant')
+    expect(() =>
+      defineScenario({
+        ...offlineWriterRecovery,
+        id: 'duplicate-prefix-selection',
+        oracles: [{ ...prefixOracle, participants: [prefixOracle.participants[0]!, prefixOracle.participants[0]!] }],
+      }),
+    ).toThrow('selects participant more than once')
+  })
+})

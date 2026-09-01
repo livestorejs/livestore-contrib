@@ -1,0 +1,69 @@
+{
+  "name": "@local/tests-scenarios",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scenario:run": "tsx src/launcher.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "viewer": "pnpm exec vite --config scenario-viewer.vite.config.ts",
+    "viewer:build": "pnpm exec vite build --config scenario-viewer.vite.config.ts",
+    "storybook": "pnpm exec storybook dev -p 6006",
+    "storybook:build": "pnpm exec storybook build",
+    "viewer:parity": "pnpm exec playwright test --config viewer-playwright.config.ts"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "4.20251118.0",
+    "@livestore/adapter-web": "link:../../repos/livestore/packages/@livestore/adapter-web",
+    "@livestore/common": "link:../../repos/livestore/packages/@livestore/common",
+    "@livestore/livestore": "link:../../repos/livestore/packages/@livestore/livestore",
+    "@livestore/sync-cf": "link:../../repos/livestore/packages/@livestore/sync-cf",
+    "@livestore/utils": "link:../../repos/livestore/packages/@livestore/utils",
+    "@playwright/test": "1.61.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@effect/opentelemetry": "4.0.0-rc.111",
+    "@effect/platform-browser": "4.0.0-rc.111",
+    "@effect/platform-bun": "4.0.0-rc.111",
+    "@effect/platform-node": "4.0.0-rc.111",
+    "@effect/platform-node-shared": "4.0.0-rc.111",
+    "@effect/vitest": "4.0.0-rc.111",
+    "@livestore/utils-dev": "link:../../repos/livestore/packages/@livestore/utils-dev",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/resources": "2.2.0",
+    "@standard-schema/spec": "1.1.0",
+    "@storybook/addon-a11y": "10.5.4",
+    "@storybook/react-vite": "10.5.4",
+    "@types/node": "25.3.3",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.2",
+    "effect": "4.0.0-rc.111",
+    "storybook": "10.5.4",
+    "tsx": "^4.20.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.1",
+    "vitest": "4.1.9",
+    "wrangler": "4.42.2"
+  },
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "workspaceClosureDirs": [
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/sync-cf",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh",
+      "tests/scenarios"
+    ]
+  }
+}

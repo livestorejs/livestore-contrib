@@ -107,5 +107,13 @@ export default githubWorkflow({
         { name: 'Run node integration coverage', run: runDevenvTasksBefore('ci:node') },
       ],
     }),
+
+    'pr-scenarios': standardCIJob({
+      name: 'pr/scenarios',
+      steps: [
+        ...livestoreContribSetupSteps,
+        { name: 'Run scenario verification', run: runDevenvTasksBefore('ci:scenarios') },
+      ],
+    }),
   },
 })

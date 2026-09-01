@@ -16,6 +16,14 @@ Core LiveStore packages are consumed from the pinned `livestore` megarepo member
 under `repos/livestore`; they remain owned by
 [`livestorejs/livestore`](https://github.com/livestorejs/livestore).
 
+## Scenario Verification
+
+The private [`tests/scenarios`](./tests/scenarios) workspace runs portable sync
+stories against real LiveStore components and produces replayable evidence for
+the artifact viewer. Start with the
+[scenario runner guide](./tests/scenarios/README.md) to set up the workspace,
+run or author a scenario, and inspect the result.
+
 ## Development
 
 Choose the smallest setup that covers the work. The core
