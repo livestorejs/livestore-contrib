@@ -27,6 +27,7 @@ export const contribExampleMembers = [
   'examples/expo-todomvc-sync-cf',
   'examples/node-effect-cli',
   'examples/node-todomvc-sync-cf',
+  'examples/web-kanban-presence',
   'examples/web-multi-store',
   'examples/web-todomvc-custom-elements',
   'examples/web-todomvc-experimental',
