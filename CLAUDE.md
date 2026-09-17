@@ -9,6 +9,7 @@ This repository is the contrib companion to `livestorejs/livestore`.
 - Progress tracker: `livestorejs/livestore#1265`
 - Core packages are consumed through the materialized megarepo member at `repos/livestore`
 - Shared generator and devenv helpers come from `repos/effect-utils`
+- Scenario runner contributor guide: [`tests/scenarios/README.md`](./tests/scenarios/README.md)
 
 ## Intent Layer (`context/`)
 

@@ -32,6 +32,7 @@ let
 in
 {
   imports = [
+    inputs.playwright.devenvModules.default
     taskModules.genie
     # gh:apply-labels / gh:check-labels — reconcile .github/labels.json with live labels.
     (taskModules.gh-labels { repo = "livestorejs/livestore-contrib"; })
@@ -51,6 +52,7 @@ in
     (taskModules.lint-oxc {
       lintPaths = [
         "packages"
+        "tests/scenarios"
         ".github"
         "genie"
         "release"
@@ -134,6 +136,11 @@ in
     pkgs.jq
   ];
 
+  env = {
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+    PUPPETEER_SKIP_DOWNLOAD = "1";
+  };
+
   tasks."lint:check".after = lib.mkForce [
     "lint:check:format"
     "lint:check:oxlint"
@@ -203,6 +210,20 @@ in
   tasks."ci:node" = {
     description = "Run PR node adapter integration coverage for contrib";
     after = [ "test:integration:node-misc" ];
+  };
+  tasks."ci:scenarios" = {
+    description = "Run the complete PR scenario verification aggregate";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = ''
+      set -euo pipefail
+      DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios exec vitest run --config vitest.config.ts
+      DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios viewer:build
+      DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios storybook:build
+      DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios viewer:parity
+    '';
   };
   tasks."release:surface:check" = {
     description = "Validate the contrib release workflow surface";
@@ -447,6 +468,62 @@ in
       "pnpm:install"
     ];
     exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir packages/@livestore/sync-s2 exec vitest run --config vitest.config.ts";
+  };
+  tasks."test:scenarios" = {
+    description = "Run the scenario runner, host conformance, and profile suites";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios exec vitest run --config vitest.config.ts";
+  };
+  tasks."test:scenarios:viewer-build" = {
+    description = "Build the React scenario viewer";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios viewer:build";
+  };
+  tasks."test:scenarios:storybook-build" = {
+    description = "Build the scenario viewer Storybook";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios storybook:build";
+  };
+  tasks."test:scenarios:viewer-parity" = {
+    description = "Run the React scenario viewer Playwright parity suite";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios viewer:parity";
+  };
+  tasks."scenario:run" = {
+    description = "Run a declarative scenario (pass CLI arguments after --)";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios scenario:run";
+  };
+  tasks."scenario:viewer" = {
+    description = "Start the React scenario artifact viewer";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios viewer";
+  };
+  tasks."scenario:storybook" = {
+    description = "Start the scenario viewer Storybook";
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios storybook";
   };
   tasks."test:examples:build" = {
     description = "Build contrib examples with build scripts";

@@ -1,0 +1,475 @@
+.timeline {
+  max-width: 100%;
+  min-height: 250px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0;
+  width: 100%;
+}
+
+.timeline svg {
+  display: block;
+  min-width: 1000px;
+  outline: none;
+  touch-action: none;
+  width: 100%;
+}
+
+.timeline .timeline-main {
+  cursor: col-resize;
+}
+
+.timeline svg:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: -1px;
+}
+
+.timeline text {
+  fill: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.timeline .lane-label {
+  font-weight: 600;
+}
+
+.timeline .lane-label.session {
+  font-weight: 500;
+}
+
+.timeline .lane-hierarchy {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .lane-track {
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .lane-track.declared {
+  opacity: 0.34;
+  stroke-dasharray: 3 5;
+  stroke-width: 1;
+}
+
+.timeline .lane-track.active {
+  stroke-width: 2;
+}
+
+.timeline .participant-milestone {
+  cursor: pointer;
+}
+
+.timeline .participant-milestone line,
+.timeline .participant-milestone path,
+.timeline .participant-milestone circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .participant-milestone.topology {
+  color: var(--good);
+}
+
+.timeline .participant-milestone.topology .group-boundary {
+  opacity: 0.55;
+  stroke: currentcolor;
+  stroke-dasharray: 2 3;
+  stroke-width: 1;
+}
+
+.timeline .participant-milestone.topology path {
+  fill: var(--background);
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.timeline .runtime-failure-interval {
+  color: var(--bad);
+}
+
+.timeline .runtime-failure-terminal {
+  stroke: currentcolor;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .runtime-failure-callout {
+  cursor: pointer;
+}
+
+.timeline .runtime-failure-callout line {
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .runtime-failure-callout path {
+  fill: currentcolor;
+}
+
+.timeline .runtime-failure-callout text {
+  fill: currentcolor;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.timeline .participant-milestone.connectivity line {
+  opacity: 0.72;
+  stroke: currentcolor;
+  stroke-dasharray: 2 3;
+  stroke-width: 1;
+}
+
+.timeline .participant-milestone.connectivity circle,
+.timeline .participant-milestone.lifecycle circle {
+  fill: var(--background);
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.timeline .participant-milestone.connectivity.disconnected,
+.timeline .participant-milestone.lifecycle.stopped {
+  color: var(--bad);
+}
+
+.timeline .participant-milestone.connectivity.reconnected,
+.timeline .participant-milestone.lifecycle.restarted {
+  color: var(--good);
+}
+
+.timeline .participant-milestone.lifecycle line {
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.timeline .participant-milestone.lifecycle.restarted circle {
+  fill: currentcolor;
+}
+
+.timeline .offline-period rect {
+  fill: var(--bad);
+  fill-opacity: 0.07;
+  stroke: var(--bad);
+  stroke-dasharray: 5 4;
+  stroke-opacity: 0.62;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.timeline .offline-period.uncertain rect {
+  stroke-dasharray: 1 5;
+}
+
+.timeline .offline-period-label {
+  fill: var(--bad);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.timeline .failure-boundary {
+  color: #d63b32;
+  cursor: pointer;
+}
+
+.timeline .failure-boundary line {
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.timeline .failure-boundary path {
+  fill: currentcolor;
+}
+
+.timeline .failure-boundary text {
+  fill: currentcolor;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.timeline .marker {
+  cursor: pointer;
+}
+
+.timeline .marker.future {
+  opacity: 0.22;
+}
+
+.timeline .marker-label rect {
+  fill: var(--background);
+  stroke: var(--line-strong);
+}
+
+.timeline .marker-label.pending rect {
+  fill: var(--background);
+  stroke: var(--warn);
+}
+
+.timeline .marker-label.origin-colored rect {
+  stroke: currentcolor;
+}
+
+.timeline .marker-label.origin-colored text {
+  fill: currentcolor;
+}
+
+.timeline .marker-label.origin-colored.pending rect {
+  stroke: currentcolor;
+  stroke-dasharray: 3 2;
+}
+
+.timeline .marker-label.selected rect {
+  fill: var(--text);
+  stroke: var(--text);
+}
+
+.timeline .marker-label.origin-colored.selected rect {
+  fill: currentcolor;
+  stroke: currentcolor;
+}
+
+.timeline .marker-label.selected text {
+  fill: var(--background);
+}
+
+.timeline .event-point circle {
+  fill: var(--background);
+  stroke: var(--line-strong);
+  stroke-width: 1.35;
+}
+
+.timeline .event-point.pending circle {
+  stroke: var(--warn);
+}
+
+.timeline .event-point.origin-colored circle {
+  stroke: currentcolor;
+}
+
+.timeline .event-point.origin-colored.pending circle {
+  stroke: currentcolor;
+  stroke-dasharray: 2 1.5;
+}
+
+.timeline .event-point.aggregate circle {
+  fill: var(--code-background);
+}
+
+.timeline .event-point.selected circle {
+  fill: var(--text);
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.timeline .event-point.origin-colored.selected circle {
+  fill: currentcolor;
+  stroke: currentcolor;
+}
+
+.timeline .event-point text {
+  fill: var(--muted);
+  font-size: 6px;
+  pointer-events: none;
+}
+
+.timeline .event-point.selected text {
+  fill: var(--background);
+}
+
+.timeline .cursor-line {
+  stroke: #a04ad4;
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+}
+
+.timeline .cursor-scrubber {
+  pointer-events: none;
+}
+
+.timeline .cursor-handle {
+  fill: var(--background);
+  stroke: #a04ad4;
+  stroke-width: 2;
+}
+
+.timeline .capture-guide {
+  stroke: var(--line);
+  stroke-dasharray: 1 5;
+  stroke-width: 1;
+}
+
+.timeline .time-uncertainty {
+  opacity: 0.75;
+  stroke: var(--muted);
+  stroke-width: 5;
+}
+
+.timeline .compressed-gap-band {
+  fill: var(--code-background);
+  opacity: 0.7;
+}
+
+.timeline .compressed-gap-edge {
+  stroke: var(--line-strong);
+  stroke-dasharray: 2 5;
+  stroke-width: 1;
+}
+
+.timeline .compressed-gap-label {
+  fill: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.timeline .carpet-cursor {
+  stroke: #a04ad4;
+  stroke-width: 1.5;
+}
+
+.timeline .trace-carpet-label {
+  fill: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.timeline .trace-dot {
+  cursor: pointer;
+  fill: var(--line-strong);
+}
+
+.timeline .trace-dot.instruction-sent {
+  fill: var(--muted);
+}
+
+.timeline .trace-dot.acknowledgement-received {
+  fill: var(--line-strong);
+}
+
+.timeline .trace-dot.verdict {
+  fill: var(--muted);
+}
+
+.timeline .trace-dot.moment-capture {
+  fill: var(--background);
+  opacity: 0.68;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.timeline .trace-dot.moment-wait {
+  fill: #7c63c9;
+}
+
+.timeline .trace-action-sequence {
+  cursor: pointer;
+}
+
+.timeline .trace-action-sequence rect {
+  fill: var(--background);
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.timeline .trace-action-sequence text {
+  fill: var(--text);
+  font-size: 7px;
+  pointer-events: none;
+}
+
+.timeline .trace-action-sequence.selected rect {
+  fill: var(--text);
+}
+
+.timeline .trace-action-sequence.selected text {
+  fill: var(--background);
+}
+
+.timeline .trace-dot.moment-failure {
+  fill: var(--bad);
+}
+
+.timeline .trace-dot.selected {
+  opacity: 1;
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.timeline .range-navigator {
+  cursor: default;
+  margin-top: 6px;
+}
+
+.timeline .range-track {
+  fill: var(--code-background);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.timeline .range-density-bar {
+  fill: var(--line-strong);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.timeline .range-offline-period {
+  fill: var(--bad);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.timeline .range-failure {
+  stroke: #d63b32;
+  stroke-width: 2;
+}
+
+.timeline .range-runtime-failure {
+  stroke: var(--bad);
+  stroke-dasharray: 2 2;
+  stroke-width: 2;
+}
+
+.timeline .range-window {
+  cursor: grab;
+  fill: #a04ad4;
+  fill-opacity: 0.08;
+  stroke: #a04ad4;
+  stroke-width: 1.25;
+}
+
+.timeline .range-window:active {
+  cursor: grabbing;
+}
+
+.timeline .range-handle {
+  cursor: ew-resize;
+}
+
+.timeline .range-handle-hit {
+  fill: transparent;
+}
+
+.timeline .range-handle line {
+  stroke: #a04ad4;
+  stroke-width: 2.5;
+}
+
+.timeline .range-cursor {
+  pointer-events: none;
+  stroke: var(--text);
+  stroke-dasharray: 2 3;
+  stroke-width: 1.25;
+}
+
+.timeline .range-label,
+.timeline .range-summary {
+  fill: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}

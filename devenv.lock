@@ -388,6 +388,24 @@
         "type": "github"
       }
     },
+    "flake-utils_2": {
+      "inputs": {
+        "systems": "systems_3"
+      },
+      "locked": {
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
     "ghostty": {
       "inputs": {
         "flake-compat": "flake-compat_4",
@@ -892,6 +910,52 @@
         "type": "github"
       }
     },
+    "playwright": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "playwright-web-flake": "playwright-web-flake"
+      },
+      "locked": {
+        "dir": "nix/playwright-flake",
+        "lastModified": 1787155462,
+        "narHash": "sha256-YA5F1l2C+Foa7f37KfNdo1PGiZr6efjdHlIgu5sux7w=",
+        "owner": "overengineeringstudio",
+        "repo": "effect-utils",
+        "rev": "8c686de0d3837e53afb121faae24d8ebc4249f88",
+        "type": "github"
+      },
+      "original": {
+        "dir": "nix/playwright-flake",
+        "owner": "overengineeringstudio",
+        "ref": "main",
+        "repo": "effect-utils",
+        "type": "github"
+      }
+    },
+    "playwright-web-flake": {
+      "inputs": {
+        "flake-utils": "flake-utils_2",
+        "nixpkgs": [
+          "playwright",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1781832096,
+        "narHash": "sha256-yLvEWfnLLXMhZwAQmcEjPVmAOvdBzSVqFmAX5P0K17w=",
+        "owner": "pietdevries94",
+        "repo": "playwright-web-flake",
+        "rev": "f4d253d83c1d4bdd54920730e569964949294308",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pietdevries94",
+        "repo": "playwright-web-flake",
+        "type": "github"
+      }
+    },
     "pre-commit-hooks": {
       "inputs": {
         "flake-compat": [
@@ -957,7 +1021,8 @@
         "nixpkgs": [
           "effect-utils",
           "nixpkgs"
-        ]
+        ],
+        "playwright": "playwright"
       }
     },
     "rust-overlay": {
@@ -998,6 +1063,21 @@
       }
     },
     "systems_2": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
+    "systems_3": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",

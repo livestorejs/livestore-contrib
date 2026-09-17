@@ -7,6 +7,7 @@ node_modules
 test-results
 playwright-report
 .playwright-mcp
+tests/scenarios/storybook-static
 
 # Vite cache
 .vite

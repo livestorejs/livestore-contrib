@@ -1,0 +1,113 @@
+:root {
+  --background: #f7f7f4;
+  --text: #111210;
+  --muted: #6d716c;
+  --line: #d8dad5;
+  --line-strong: #a8aca6;
+  --code-background: #efefeb;
+  --good: #087c5a;
+  --warn: #bd531e;
+  --bad: #b92340;
+  color: var(--text);
+  background: var(--background);
+  color-scheme: light dark;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-synthesis: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #000;
+    --text: #f4f4ef;
+    --muted: #858a84;
+    --line: #242624;
+    --line-strong: #474a46;
+    --code-background: #070807;
+    --good: #55d7a5;
+    --warn: #ff9459;
+    --bad: #ff667e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  min-width: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+.file-button,
+select {
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+button:hover,
+.file-button:hover {
+  border-color: var(--text);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+select:disabled {
+  opacity: 0.35;
+}
+
+/* Chromium renders the expanded native menu on a light surface on macOS,
+ * even when the select itself participates in the page's dark color scheme. */
+select option {
+  background: #fff;
+  color: #111210;
+}
+
+.file-button input {
+  display: none;
+}
+
+.shell {
+  display: grid;
+  margin: 0 auto;
+  max-width: 1440px;
+  min-width: 0;
+  padding: 22px 28px 56px;
+  width: 100%;
+}
+
+.toolbar,
+.details,
+section[aria-labelledby] {
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+  padding: 22px 0;
+}
+
+.toolbar,
+.section-heading {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}

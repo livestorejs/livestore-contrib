@@ -26,6 +26,8 @@ context/
     graphql/
   devtools/        realize core 02-system/07-devtools/ (surface contract)
     expo/
+  verification/    realize core 02-system/09-verification/
+    scenarios/     private scenario runner/viewer realization
   cli/             standalone tool; realizes no core dimension
   release/         realizes core 03-delivery/02-release/ (snapshot publishing)
 ```
@@ -54,6 +56,7 @@ IDs with links (see below).
 | `LSC.INT.SVELTE-*`    | `integrations/svelte/`    |
 | `LSC.QS.GQL-*`        | `query-surfaces/graphql/` |
 | `LSC.DT.EXPO-*`       | `devtools/expo/`          |
+| `LSC.VER.SCEN-*`      | `verification/scenarios/` |
 | `LSC.CLI-*`           | `cli/`                    |
 | `LSC.REL-*`           | `release/`                |
 

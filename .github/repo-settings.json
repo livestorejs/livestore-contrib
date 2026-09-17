@@ -47,6 +47,9 @@
             "context": "pr/node"
           },
           {
+            "context": "pr/scenarios"
+          },
+          {
             "context": "release-surface"
           }
         ]

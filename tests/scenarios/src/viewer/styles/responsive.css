@@ -1,0 +1,67 @@
+@media (max-width: 720px) {
+  .shell {
+    padding: 18px 16px 40px;
+  }
+
+  .toolbar,
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .section-heading {
+    margin-bottom: 14px;
+  }
+
+  .timeline-heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trace-inspector-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .moment-record-browser {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+    max-height: 300px;
+  }
+
+  #record-label {
+    justify-self: start;
+  }
+
+  .timeline-actions,
+  .timeline-action-settings {
+    flex-wrap: wrap;
+  }
+
+  .timeline-action-settings {
+    flex: 1 1 calc(100% - 80px);
+  }
+
+  #cursor-label {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .controls {
+    flex: none;
+    grid-template-columns: auto minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .role-row {
+    gap: 5px;
+    grid-template-columns: 1fr;
+  }
+
+  .leader-state-status-summary span:nth-of-type(n + 3) {
+    display: none;
+  }
+
+  .reconstructed-table-toolbar {
+    padding-inline: 10px;
+  }
+}
