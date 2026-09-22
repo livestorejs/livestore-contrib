@@ -1,8 +1,27 @@
 {
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "workspaceClosureDirs": [
+      "packages/@livestore/adapter-node",
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/effect-playwright",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/sync-cf",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh",
+      "tests/integration"
+    ]
+  },
   "name": "@local/tests-integration",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "test": "vitest run --config src/tests/node-misc/vitest.config.ts && vitest run --config src/tests/node-sync/vitest.config.ts"
   },
@@ -32,24 +51,5 @@
     "vite": "7.3.1",
     "vitest": "4.1.9",
     "wrangler": "4.42.2"
-  },
-  "$genie": {
-    "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten",
-    "workspaceClosureDirs": [
-      "packages/@livestore/adapter-node",
-      "repos/livestore/packages/@livestore/adapter-web",
-      "repos/livestore/packages/@livestore/common",
-      "repos/livestore/packages/@livestore/common-cf",
-      "repos/livestore/packages/@livestore/effect-playwright",
-      "repos/livestore/packages/@livestore/livestore",
-      "repos/livestore/packages/@livestore/sqlite-wasm",
-      "repos/livestore/packages/@livestore/sync-cf",
-      "repos/livestore/packages/@livestore/utils",
-      "repos/livestore/packages/@livestore/utils-dev",
-      "repos/livestore/packages/@livestore/wa-sqlite",
-      "repos/livestore/packages/@livestore/webmesh",
-      "tests/integration"
-    ]
   }
 }

@@ -1,8 +1,25 @@
 {
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "workspaceClosureDirs": [
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/sync-cf",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh",
+      "tests/scenarios"
+    ]
+  },
   "name": "@local/tests-scenarios",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "scenario:run": "tsx src/launcher.ts",
     "test": "vitest run",
@@ -39,7 +56,7 @@
     "@storybook/react-vite": "10.5.4",
     "@types/node": "25.3.3",
     "@types/react": "19.2.7",
-    "@types/react-dom": "19.2.3",
+    "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "5.1.2",
     "effect": "4.0.0-rc.111",
     "storybook": "10.5.4",
@@ -48,22 +65,5 @@
     "vite": "7.3.1",
     "vitest": "4.1.9",
     "wrangler": "4.42.2"
-  },
-  "$genie": {
-    "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten",
-    "workspaceClosureDirs": [
-      "repos/livestore/packages/@livestore/adapter-web",
-      "repos/livestore/packages/@livestore/common",
-      "repos/livestore/packages/@livestore/common-cf",
-      "repos/livestore/packages/@livestore/livestore",
-      "repos/livestore/packages/@livestore/sqlite-wasm",
-      "repos/livestore/packages/@livestore/sync-cf",
-      "repos/livestore/packages/@livestore/utils",
-      "repos/livestore/packages/@livestore/utils-dev",
-      "repos/livestore/packages/@livestore/wa-sqlite",
-      "repos/livestore/packages/@livestore/webmesh",
-      "tests/scenarios"
-    ]
   }
 }

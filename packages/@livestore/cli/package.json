@@ -1,10 +1,33 @@
 {
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "workspaceClosureDirs": [
+      "packages/@livestore/adapter-node",
+      "packages/@livestore/cli",
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/peer-deps",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh"
+    ]
+  },
   "name": "@livestore/cli",
   "version": "0.5.0-dev.0",
+  "type": "module",
+  "sideEffects": false,
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/livestorejs/livestore-contrib.git"
+  },
+  "exports": {
+    ".": "./src/mod.ts"
   },
   "bin": {
     "livestore": "./src/bin.ts"
@@ -14,20 +37,6 @@
     "package.json",
     "src"
   ],
-  "type": "module",
-  "sideEffects": false,
-  "exports": {
-    ".": "./src/mod.ts"
-  },
-  "publishConfig": {
-    "access": "public",
-    "bin": {
-      "livestore": "./dist/bin.js"
-    },
-    "exports": {
-      ".": "./dist/mod.js"
-    }
-  },
   "scripts": {
     "build": "tsc",
     "dev": "bun src/bin.ts"
@@ -60,6 +69,15 @@
     "@standard-schema/spec": "^1.1.0",
     "effect": "^4.0.0-rc.111"
   },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": "./dist/mod.js"
+    },
+    "bin": {
+      "livestore": "./dist/bin.js"
+    }
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "@mixedbread/cli",
@@ -69,24 +87,6 @@
       "protobufjs",
       "puppeteer",
       "workerd"
-    ]
-  },
-  "$genie": {
-    "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten",
-    "workspaceClosureDirs": [
-      "packages/@livestore/adapter-node",
-      "packages/@livestore/cli",
-      "repos/livestore/packages/@livestore/adapter-web",
-      "repos/livestore/packages/@livestore/common",
-      "repos/livestore/packages/@livestore/common-cf",
-      "repos/livestore/packages/@livestore/livestore",
-      "repos/livestore/packages/@livestore/peer-deps",
-      "repos/livestore/packages/@livestore/sqlite-wasm",
-      "repos/livestore/packages/@livestore/utils",
-      "repos/livestore/packages/@livestore/utils-dev",
-      "repos/livestore/packages/@livestore/wa-sqlite",
-      "repos/livestore/packages/@livestore/webmesh"
     ]
   }
 }

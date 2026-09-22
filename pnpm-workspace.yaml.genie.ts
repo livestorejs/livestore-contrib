@@ -219,7 +219,13 @@ const contribCatalogDuplicateExceptions = [
     package: '@types/react-dom',
     versions: ['19.2.3', '19.1.11'],
     reason:
-      "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
+      'The catalog follows the current React type cohort while existing example applications retain older compatible versions.',
+  },
+  {
+    package: 'playwright',
+    versions: ['1.61.0', '1.59.1'],
+    reason:
+      'The catalog follows the current Playwright toolchain while existing example applications retain older test-runner versions.',
   },
   {
     package: '@vitejs/plugin-react',

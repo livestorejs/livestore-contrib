@@ -3,7 +3,10 @@
 {
   "compilerOptions": {
     "target": "ES2024",
-    "lib": ["ES2024", "DOM"],
+    "lib": [
+      "ES2024",
+      "DOM"
+    ],
     "module": "NodeNext",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
@@ -34,14 +37,26 @@
           "anyUnknownInErrorContext": "warning",
           "preferSchemaOverJson": "warning"
         },
-        "allowedDuplicatedPackages": ["@livestore/utils"]
+        "allowedDuplicatedPackages": [
+          "@livestore/utils"
+        ]
       }
     ],
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["./tests/**/*.ts", "./tests/**/*.svelte", "./tests/**/*.d.ts"],
-  "exclude": ["./tests/vitest.config.ts", "node_modules", "**/dist", "**/node_modules/.pnpm", "**/*.genie.ts"],
+  "include": [
+    "./tests/**/*.ts",
+    "./tests/**/*.svelte",
+    "./tests/**/*.d.ts"
+  ],
+  "exclude": [
+    "./tests/vitest.config.ts",
+    "node_modules",
+    "**/dist",
+    "**/node_modules/.pnpm",
+    "**/*.genie.ts"
+  ],
   "references": [
     {
       "path": "../../../repos/livestore/packages/@livestore/common"

@@ -1,27 +1,37 @@
 {
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "workspaceClosureDirs": [
+      "packages/@livestore/graphql",
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh"
+    ]
+  },
   "name": "@livestore/graphql",
   "version": "0.5.0-dev.0",
+  "type": "module",
+  "sideEffects": false,
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/livestorejs/livestore-contrib.git"
+  },
+  "exports": {
+    ".": "./src/index.ts"
   },
   "files": [
     "dist",
     "package.json",
     "src"
   ],
-  "type": "module",
-  "sideEffects": false,
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "publishConfig": {
-    "access": "public",
-    "exports": {
-      ".": "./dist/index.js"
-    }
-  },
   "scripts": {
     "test": "echo 'No tests'"
   },
@@ -48,20 +58,10 @@
     "effect": "^4.0.0-rc.111",
     "graphql": "^16.11.0"
   },
-  "$genie": {
-    "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten",
-    "workspaceClosureDirs": [
-      "packages/@livestore/graphql",
-      "repos/livestore/packages/@livestore/adapter-web",
-      "repos/livestore/packages/@livestore/common",
-      "repos/livestore/packages/@livestore/common-cf",
-      "repos/livestore/packages/@livestore/livestore",
-      "repos/livestore/packages/@livestore/sqlite-wasm",
-      "repos/livestore/packages/@livestore/utils",
-      "repos/livestore/packages/@livestore/utils-dev",
-      "repos/livestore/packages/@livestore/wa-sqlite",
-      "repos/livestore/packages/@livestore/webmesh"
-    ]
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": "./dist/index.js"
+    }
   }
 }

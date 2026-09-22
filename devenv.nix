@@ -26,7 +26,6 @@ let
   oxlintNpm = effectUtils.lib.mkOxlintNpm {
     inherit pkgs;
     bun = pkgs.bun;
-    src = inputs.effect-utils;
   };
   oxlintWithPlugins = effectUtils.lib.mkOxlintWithPlugins {
     inherit pkgs oxlintNpm;

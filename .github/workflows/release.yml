@@ -609,6 +609,8 @@ jobs:
           persist-credentials: false
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           extra-conf: |
             experimental-features = nix-command flakes
@@ -621,6 +623,7 @@ jobs:
           summarize: true
       - name: Sync megarepo dependencies
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           MEGAREPO_STORE: '${{ runner.temp }}/megarepo-store/${{ github.run_id }}/${{ github.run_attempt }}/${{ github.job }}'
         run: |
           EU_REV=$(jq -r '.members["effect-utils"].commit' megarepo.lock)
@@ -641,7 +644,7 @@ jobs:
         run: |
           set -euo pipefail
           scripts_src='repos/livestore/genie/ci-scripts'
-          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          scripts_dst='${{ runner.temp }}/composition-state/ci-runtime'
           if [ ! -d "$scripts_src" ]; then
             echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
             exit 1
@@ -690,6 +693,8 @@ jobs:
             ${{ runner.temp }}/composition-state/pnpm-store-pure-v1
           key: "livestore-contrib-pnpm-state-v1-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/composition-state/ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'resolve devenv (devenv.lock)' 'cd "${EFFECT_UTILS_MEMBER_ROOT:-${GITHUB_WORKSPACE:-$PWD}}" && '"'"'${{ runner.temp }}/composition-state/ci-runtime/resolve-devenv.sh'"'"' '"'"'devenv.lock'"'"''
@@ -730,6 +735,8 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           extra-conf: |
             experimental-features = nix-command flakes
@@ -742,6 +749,7 @@ jobs:
           summarize: true
       - name: Sync megarepo dependencies
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           MEGAREPO_STORE: '${{ runner.temp }}/megarepo-store/${{ github.run_id }}/${{ github.run_attempt }}/${{ github.job }}'
         run: |
           EU_REV=$(jq -r '.members["effect-utils"].commit' megarepo.lock)
@@ -762,7 +770,7 @@ jobs:
         run: |
           set -euo pipefail
           scripts_src='repos/livestore/genie/ci-scripts'
-          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          scripts_dst='${{ runner.temp }}/composition-state/ci-runtime'
           if [ ! -d "$scripts_src" ]; then
             echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
             exit 1
@@ -811,6 +819,8 @@ jobs:
             ${{ runner.temp }}/composition-state/pnpm-store-pure-v1
           key: "livestore-contrib-pnpm-state-v1-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/composition-state/ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'resolve devenv (devenv.lock)' 'cd "${EFFECT_UTILS_MEMBER_ROOT:-${GITHUB_WORKSPACE:-$PWD}}" && '"'"'${{ runner.temp }}/composition-state/ci-runtime/resolve-devenv.sh'"'"' '"'"'devenv.lock'"'"''
@@ -877,6 +887,8 @@ jobs:
           test "$CONTRIB_VERSION" = "$CORE_VERSION"
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           extra-conf: |
             experimental-features = nix-command flakes
@@ -889,6 +901,7 @@ jobs:
           summarize: true
       - name: Sync megarepo dependencies
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           MEGAREPO_STORE: '${{ runner.temp }}/megarepo-store/${{ github.run_id }}/${{ github.run_attempt }}/${{ github.job }}'
         run: |
           EU_REV=$(jq -r '.members["effect-utils"].commit' megarepo.lock)
@@ -909,7 +922,7 @@ jobs:
         run: |
           set -euo pipefail
           scripts_src='repos/livestore/genie/ci-scripts'
-          scripts_dst='${{ github.workspace }}/.genie-ci-runtime'
+          scripts_dst='${{ runner.temp }}/composition-state/ci-runtime'
           if [ ! -d "$scripts_src" ]; then
             echo "::error::CI helper script directory is missing after megarepo sync: $scripts_src"
             exit 1
@@ -958,6 +971,8 @@ jobs:
             ${{ runner.temp }}/composition-state/pnpm-store-pure-v1
           key: "livestore-contrib-pnpm-state-v1-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pnpm-lock.yaml') }}"
       - name: Resolve devenv
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/composition-state/ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'resolve devenv (devenv.lock)' 'cd "${EFFECT_UTILS_MEMBER_ROOT:-${GITHUB_WORKSPACE:-$PWD}}" && '"'"'${{ runner.temp }}/composition-state/ci-runtime/resolve-devenv.sh'"'"' '"'"'devenv.lock'"'"''
