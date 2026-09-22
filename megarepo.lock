@@ -3,10 +3,10 @@
   "members": {
     "livestore": {
       "url": "https://github.com/livestorejs/livestore",
-      "ref": "schickling-assistant/2026-09-22-fix-nix-retry-generator",
-      "commit": "34006c1cefc26abd307a65878c377da52d0f11b4",
-      "pinned": true,
-      "lockedAt": "2026-09-22T19:27:30.062Z"
+      "ref": "main",
+      "commit": "cb0d62a26a2954f7baeaffb4b0661fe3d3bfa5d4",
+      "pinned": false,
+      "lockedAt": "2026-09-22T19:54:19.245Z"
     },
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",
