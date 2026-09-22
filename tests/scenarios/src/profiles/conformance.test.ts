@@ -374,7 +374,7 @@ const makeUnsupportedScenario = (capabilities: HostCapabilities): ScenarioAst =>
 
 const expectPassingHostContract = (artifact: ScenarioRunArtifact): void => {
   expect(artifact.status).toBe('passed')
-  expect(() => Schema.decodeUnknownSync(ScenarioRunArtifact)(artifact)).not.toThrow()
+  expect(() => Schema.decodeSync(ScenarioRunArtifact)(artifact)).not.toThrow()
 
   const instructions = artifact.trace.filter(
     (record): record is typeof record & { readonly correlationId: string } =>

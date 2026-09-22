@@ -1,8 +1,25 @@
 {
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "workspaceClosureDirs": [
+      "repos/livestore/packages/@livestore/adapter-web",
+      "repos/livestore/packages/@livestore/common",
+      "repos/livestore/packages/@livestore/common-cf",
+      "repos/livestore/packages/@livestore/livestore",
+      "repos/livestore/packages/@livestore/sqlite-wasm",
+      "repos/livestore/packages/@livestore/sync-cf",
+      "repos/livestore/packages/@livestore/utils",
+      "repos/livestore/packages/@livestore/utils-dev",
+      "repos/livestore/packages/@livestore/wa-sqlite",
+      "repos/livestore/packages/@livestore/webmesh",
+      "tests/scenarios"
+    ]
+  },
   "name": "@local/tests-scenarios",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "scenario:run": "tsx src/launcher.ts",
     "test": "vitest run",
@@ -20,17 +37,17 @@
     "@livestore/livestore": "link:../../repos/livestore/packages/@livestore/livestore",
     "@livestore/sync-cf": "link:../../repos/livestore/packages/@livestore/sync-cf",
     "@livestore/utils": "link:../../repos/livestore/packages/@livestore/utils",
-    "@playwright/test": "1.61.0",
+    "@playwright/test": "1.63.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
-    "@effect/opentelemetry": "4.0.0-rc.111",
-    "@effect/platform-browser": "4.0.0-rc.111",
-    "@effect/platform-bun": "4.0.0-rc.111",
-    "@effect/platform-node": "4.0.0-rc.111",
-    "@effect/platform-node-shared": "4.0.0-rc.111",
-    "@effect/vitest": "4.0.0-rc.111",
+    "@effect/opentelemetry": "4.0.0-rc.113",
+    "@effect/platform-browser": "4.0.0-rc.113",
+    "@effect/platform-bun": "4.0.0-rc.113",
+    "@effect/platform-node": "4.0.0-rc.113",
+    "@effect/platform-node-shared": "4.0.0-rc.113",
+    "@effect/vitest": "4.0.0-rc.113",
     "@livestore/utils-dev": "link:../../repos/livestore/packages/@livestore/utils-dev",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/resources": "2.2.0",
@@ -39,31 +56,14 @@
     "@storybook/react-vite": "10.5.4",
     "@types/node": "25.3.3",
     "@types/react": "19.2.7",
-    "@types/react-dom": "19.2.3",
+    "@types/react-dom": "19.2.7",
     "@vitejs/plugin-react": "5.1.2",
-    "effect": "4.0.0-rc.111",
+    "effect": "4.0.0-rc.113",
     "storybook": "10.5.4",
     "tsx": "^4.20.0",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vite": "7.3.1",
-    "vitest": "4.1.9",
+    "vitest": "5.0.1",
     "wrangler": "4.42.2"
-  },
-  "$genie": {
-    "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten",
-    "workspaceClosureDirs": [
-      "repos/livestore/packages/@livestore/adapter-web",
-      "repos/livestore/packages/@livestore/common",
-      "repos/livestore/packages/@livestore/common-cf",
-      "repos/livestore/packages/@livestore/livestore",
-      "repos/livestore/packages/@livestore/sqlite-wasm",
-      "repos/livestore/packages/@livestore/sync-cf",
-      "repos/livestore/packages/@livestore/utils",
-      "repos/livestore/packages/@livestore/utils-dev",
-      "repos/livestore/packages/@livestore/wa-sqlite",
-      "repos/livestore/packages/@livestore/webmesh",
-      "tests/scenarios"
-    ]
   }
 }

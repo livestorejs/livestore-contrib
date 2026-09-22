@@ -45,14 +45,14 @@ packages:
   - tests/sync-provider
 
 overrides:
-  effect: 4.0.0-rc.111
-  '@effect/ai-openai': 4.0.0-rc.111
-  '@effect/platform-browser': 4.0.0-rc.111
-  '@effect/platform-bun': 4.0.0-rc.111
-  '@effect/platform-node': 4.0.0-rc.111
-  '@effect/platform-node-shared': 4.0.0-rc.111
-  '@effect/opentelemetry': 4.0.0-rc.111
-  '@effect/vitest': 4.0.0-rc.111
+  effect: 4.0.0-rc.113
+  '@effect/ai-openai': 4.0.0-rc.113
+  '@effect/platform-browser': 4.0.0-rc.113
+  '@effect/platform-bun': 4.0.0-rc.113
+  '@effect/platform-node': 4.0.0-rc.113
+  '@effect/platform-node-shared': 4.0.0-rc.113
+  '@effect/opentelemetry': 4.0.0-rc.113
+  '@effect/vitest': 4.0.0-rc.113
   '@livestore/adapter-cloudflare': 'link:repos/livestore/packages/@livestore/adapter-cloudflare'
   '@livestore/adapter-expo': 'link:packages/@livestore/adapter-expo'
   '@livestore/adapter-node': 'link:packages/@livestore/adapter-node'

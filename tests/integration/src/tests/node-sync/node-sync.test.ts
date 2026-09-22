@@ -79,7 +79,7 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
 
         expect(result.length).toEqual(todoCount)
       }).pipe(withTestCtx()(test)),
-    { fastCheck: { numRuns: 4 } },
+    { arbitrary: { runs: 4 } },
   )
 
   // Warning: A high CreateCount can lead to very long test runs.
@@ -90,8 +90,7 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
 
   // TODO investigate why stoping this test in VSC Vitest UI often doesn't stop the test runs
   // https://share.cleanshot.com/8gDKh62c
-  Vitest.asProp(
-    Vitest.live,
+  Vitest.live.prop(
     'node-sync prop tests',
     Vitest.DEBUGGER_ACTIVE === true
       ? {
@@ -110,20 +109,8 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
           commitBatchSize: CommitBatchSize,
           leaderPushBatchSize: LEADER_PUSH_BATCH_SIZE,
         },
-    (
-      { storageType, adapterType, todoCountA, todoCountB, commitBatchSize, leaderPushBatchSize },
-      test,
-      { numRuns, runIndex },
-    ) =>
+    ({ storageType, adapterType, todoCountA, todoCountB, commitBatchSize, leaderPushBatchSize }, test) =>
       Effect.gen(function* () {
-        console.log(`Run ${runIndex + 1}/${numRuns}`, {
-          storageType,
-          adapterType,
-          todoCountA,
-          todoCountB,
-          commitBatchSize,
-          leaderPushBatchSize,
-        })
 
         const storeId = nanoid(10)
         const totalCount = todoCountA + todoCountB
@@ -180,11 +167,11 @@ Vitest.describe.concurrent('node-sync', { timeout: testTimeout }, () => {
             }),
         })(test),
         // Logging without context (to make sure log is always displayed)
-        Effect.logDuration(`${test.task.suite?.name}:${test.task.name} (Run ${runIndex + 1}/${numRuns})`),
+        Effect.logDuration(`${test.task.suite?.name}:${test.task.name}`),
       ),
     Vitest.DEBUGGER_ACTIVE === true
-      ? { fastCheck: { numRuns: 1 }, timeout: testTimeout * 100 }
-      : { fastCheck: { numRuns: IS_CI === true ? 6 : 20 } },
+      ? { arbitrary: { runs: 1 }, timeout: testTimeout * 100 }
+      : { arbitrary: { runs: IS_CI === true ? 6 : 20 } },
   )
 })
 

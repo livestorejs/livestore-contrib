@@ -45,10 +45,10 @@ export const contribWorkspaceMemberPaths = [
 const corePackageNames = new Set<string>(livestoreCorePackageNames)
 
 const corePackageNameFromPackageJsonName = (name: string): LivestorePackageName | undefined => {
-  if (!name.startsWith('@livestore/')) return undefined
+  if (name.startsWith('@livestore/') === false) return undefined
 
   const packageName = name.slice('@livestore/'.length)
-  return corePackageNames.has(packageName) ? (packageName as LivestorePackageName) : undefined
+  return corePackageNames.has(packageName) === true ? (packageName as LivestorePackageName) : undefined
 }
 
 const dependenciesForExample = (memberPath: string) => {

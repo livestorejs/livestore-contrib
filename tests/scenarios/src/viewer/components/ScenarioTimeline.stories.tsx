@@ -25,6 +25,7 @@ interface FixtureProps {
   readonly viewport?: TimelineViewport
   readonly cursor?: 'start' | 'middle' | 'end' | 'outside'
 }
+const defaultTimelineViewport = { start: 0, end: 1 } satisfies TimelineViewport
 
 const TimelineFixture = ({
   name = 'reference-offline-writer-recovery-browser.json.gz',
@@ -32,7 +33,7 @@ const TimelineFixture = ({
   timelineMode = 'flow',
   timeScaleMode = 'fit',
   traceVisibility = 'evidence',
-  viewport: initialViewport = { start: 0, end: 1 },
+  viewport: initialViewport = defaultTimelineViewport,
   cursor = 'middle',
 }: FixtureProps) => (
   <ReferenceFixture name={name}>

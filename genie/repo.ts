@@ -54,7 +54,7 @@ export const catalog = contribCatalog
 
 export const packageJson = contribPackageJson
 
-/** Resolve contrib-owned Effect development and peer dependencies from contrib's rc.111 catalog. */
+/** Resolve contrib-owned Effect development and peer dependencies from the composed catalog. */
 export const effectDevDeps = (...additionalDeps: Parameters<typeof contribCatalog.pick>) =>
   contribCatalog.pick(...utilsEffectPeerDeps, ...additionalDeps)
 

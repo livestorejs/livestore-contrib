@@ -37,9 +37,12 @@ const effectUtilsCatalogWithoutEffectV3 = Object.fromEntries(
   ),
 )
 
-/** TODO: Remove once effect-utils upgrades its TypeScript catalog pin. */
+/** Versions where contrib must lead effect-utils to stay aligned with the composed LiveStore cohort. */
 const contribCatalogOverrides = {
-  typescript: '6.0.3',
+  '@playwright/test': '1.63.0',
+  '@vitest/ui': '5.0.1',
+  typescript: '7.0.2',
+  vitest: '5.0.1',
 } as const
 
 export const coreWorkspaceCatalog = Object.fromEntries(
@@ -74,7 +77,7 @@ export const isMirroredDevRelease =
   requestedCoreReleaseVersion !== undefined &&
   mirroredDevVersionPattern.test(requestedCoreReleaseVersion)
 
-export const contribCoreReleaseVersion = isMirroredDevRelease ? requestedCoreReleaseVersion : '0.5.0-dev.0'
+export const contribCoreReleaseVersion = isMirroredDevRelease === true ? requestedCoreReleaseVersion : '0.5.0-dev.0'
 
 export const contribConsumedCoreArtifacts = {
   '@livestore/devtools-vite': contribCoreReleaseVersion,
@@ -86,12 +89,12 @@ export const livestoreContribOnlyCatalog = {
 
 export const catalog = defineCatalog({
   ...effectUtilsCatalogWithoutEffectV3,
-  ...contribCatalogOverrides,
   ...effectV4Catalog,
   ...coreWorkspaceCatalog,
   ...livestoreContribWorkspaceCatalog,
   ...livestoreOnlyCatalog,
   ...livestoreContribOnlyCatalog,
+  ...contribCatalogOverrides,
 })
 
 export { packageJson }

@@ -68,10 +68,10 @@ export const makeFileLogger = (
         Effect.gen(function* () {
           const server = yield* HttpServer.HttpServer
           const address = server.address
-          if (address._tag === 'TcpAddress') {
+          if (address._tag === 'InetAddressV4' || address._tag === 'InetAddressV6') {
             process.env.LOGGER_SERVER_PORT = String(address.port)
           } else {
-            shouldNeverHappen('Expected a TcpAddress', { address })
+            shouldNeverHappen('Expected an IP address', { address })
           }
           process.env.TEST_RUN_ID = testRunId
           return Layer.provide(makeRpcClient(threadName), RpcLogger({ testRunId }))
@@ -143,7 +143,7 @@ export const makeRpcClient = (threadName: string): Layer.Layer<never> => {
           options: prettyLoggerOptions,
         })
         return client.LogMessage({ message: formattedMessage }).pipe(
-          Effect.catch(() => Effect.void),
+          Effect.ignore,
           Effect.runForkWith(context),
         )
       })

@@ -1,53 +1,4 @@
 {
-  "name": "@livestore/graphql",
-  "version": "0.5.0-dev.0",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/livestorejs/livestore-contrib.git"
-  },
-  "files": [
-    "dist",
-    "package.json",
-    "src"
-  ],
-  "type": "module",
-  "sideEffects": false,
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "publishConfig": {
-    "access": "public",
-    "exports": {
-      ".": "./dist/index.js"
-    }
-  },
-  "scripts": {
-    "test": "echo 'No tests'"
-  },
-  "dependencies": {
-    "@graphql-typed-document-node/core": "3.2.0",
-    "@livestore/common": "link:../../../repos/livestore/packages/@livestore/common",
-    "@livestore/livestore": "link:../../../repos/livestore/packages/@livestore/livestore",
-    "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils",
-    "@opentelemetry/api": "1.9.0"
-  },
-  "devDependencies": {
-    "graphql": "16.11.0"
-  },
-  "peerDependencies": {
-    "@effect/opentelemetry": "^4.0.0-rc.111",
-    "@effect/platform-browser": "^4.0.0-rc.111",
-    "@effect/platform-bun": "^4.0.0-rc.111",
-    "@effect/platform-node": "^4.0.0-rc.111",
-    "@effect/platform-node-shared": "^4.0.0-rc.111",
-    "@effect/vitest": "^4.0.0-rc.111",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/resources": "^2.2.0",
-    "@standard-schema/spec": "^1.1.0",
-    "effect": "^4.0.0-rc.111",
-    "graphql": "^16.11.0"
-  },
   "$genie": {
     "source": "package.json.genie.ts",
     "warning": "DO NOT EDIT - changes will be overwritten",
@@ -63,5 +14,54 @@
       "repos/livestore/packages/@livestore/wa-sqlite",
       "repos/livestore/packages/@livestore/webmesh"
     ]
+  },
+  "name": "@livestore/graphql",
+  "version": "0.5.0-dev.0",
+  "type": "module",
+  "sideEffects": false,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/livestorejs/livestore-contrib.git"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "src"
+  ],
+  "scripts": {
+    "test": "echo 'No tests'"
+  },
+  "dependencies": {
+    "@graphql-typed-document-node/core": "3.2.0",
+    "@livestore/common": "link:../../../repos/livestore/packages/@livestore/common",
+    "@livestore/livestore": "link:../../../repos/livestore/packages/@livestore/livestore",
+    "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils",
+    "@opentelemetry/api": "1.9.0"
+  },
+  "devDependencies": {
+    "graphql": "16.11.0"
+  },
+  "peerDependencies": {
+    "@effect/opentelemetry": "^4.0.0-rc.113",
+    "@effect/platform-browser": "^4.0.0-rc.113",
+    "@effect/platform-bun": "^4.0.0-rc.113",
+    "@effect/platform-node": "^4.0.0-rc.113",
+    "@effect/platform-node-shared": "^4.0.0-rc.113",
+    "@effect/vitest": "^4.0.0-rc.113",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@standard-schema/spec": "^1.1.0",
+    "effect": "^4.0.0-rc.113",
+    "graphql": "^16.11.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": "./dist/index.js"
+    }
   }
 }

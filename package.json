@@ -1,4 +1,24 @@
 {
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten",
+    "coreOwnedPackageNames": [
+      "adapter-cloudflare",
+      "adapter-web",
+      "common",
+      "common-cf",
+      "framework-toolkit",
+      "livestore",
+      "peer-deps",
+      "react",
+      "sqlite-wasm",
+      "sync-cf",
+      "utils",
+      "utils-dev",
+      "wa-sqlite",
+      "webmesh"
+    ]
+  },
   "name": "livestore-contrib-workspace",
   "private": true,
   "workspaces": [
@@ -44,29 +64,9 @@
     "tests/scenarios",
     "tests/sync-provider"
   ],
+  "packageManager": "pnpm@12.4.1",
   "scripts": {
     "format": "oxfmt .",
     "lint": "oxlint --import-plugin"
-  },
-  "packageManager": "pnpm@11.8.0",
-  "$genie": {
-    "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten",
-    "coreOwnedPackageNames": [
-      "adapter-cloudflare",
-      "adapter-web",
-      "common",
-      "common-cf",
-      "framework-toolkit",
-      "livestore",
-      "peer-deps",
-      "react",
-      "sqlite-wasm",
-      "sync-cf",
-      "utils",
-      "utils-dev",
-      "wa-sqlite",
-      "webmesh"
-    ]
   }
 }

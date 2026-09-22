@@ -22,7 +22,7 @@ RUN npm install --global "$(bun -e 'console.log(require("./package.json").packag
 # The same host-native bootstrap owns tool checks, exact core materialization, and install.
 RUN ./scripts/minimal-setup.sh
 
-RUN pnpm --dir packages/@livestore/solid exec tsc -b ../../../tsconfig.dev.json --pretty false
+RUN pnpm --dir packages/@livestore/solid exec tsc -b ../../../tsconfig.emit.json --pretty false
 
 RUN pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts \
     && WORKSPACE_ROOT=/workspace pnpm --dir packages/@livestore/svelte exec vitest run --config tests/vitest.config.ts \

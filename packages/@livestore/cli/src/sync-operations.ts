@@ -132,10 +132,10 @@ type SyncBackendWithOptionalDisconnect = SyncBackend.SyncBackend & {
 const releaseSyncBackend = (syncBackend: SyncBackend.SyncBackend): Effect.Effect<void> => {
   const maybeDisconnect = (syncBackend as SyncBackendWithOptionalDisconnect).disconnect
   const releaseEffect =
-    maybeDisconnect !== undefined && Effect.isEffect(maybeDisconnect)
+    maybeDisconnect !== undefined && Effect.isEffect(maybeDisconnect) === true
       ? maybeDisconnect
       : SubscriptionRef.set(syncBackend.isConnected, false)
-  return releaseEffect.pipe(Effect.catch(() => Effect.void))
+  return releaseEffect.pipe(Effect.ignore)
 }
 
 export interface ExportResult {

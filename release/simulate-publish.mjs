@@ -52,7 +52,7 @@ if (packOnly === true && (outDir === undefined || outDir.length === 0)) {
   console.error('--pack-only requires --out-dir')
   process.exit(1)
 }
-if (hasArg('--manifest-out') && (manifestOut === undefined || manifestOut.length === 0)) {
+if (hasArg('--manifest-out') === true && (manifestOut === undefined || manifestOut.length === 0)) {
   console.error('--manifest-out requires a path')
   process.exit(1)
 }
@@ -107,12 +107,12 @@ const coreReleaseVersion =
 
 const rootManifest = readJson('package.json')
 const coreOwnedPackageNames = rootManifest.$genie?.coreOwnedPackageNames
-if (!Array.isArray(coreOwnedPackageNames) || coreOwnedPackageNames.length === 0) {
+if (Array.isArray(coreOwnedPackageNames) === false || coreOwnedPackageNames.length === 0) {
   addError('package.json must expose $genie.coreOwnedPackageNames')
 }
 
 const corePackageNames = new Set(
-  Array.isArray(coreOwnedPackageNames) ? coreOwnedPackageNames.map((name) => `@livestore/${name}`) : [],
+  Array.isArray(coreOwnedPackageNames) === true ? coreOwnedPackageNames.map((name) => `@livestore/${name}`) : [],
 )
 
 const packageRoot = join(rootDir, 'packages/@livestore')
@@ -145,12 +145,12 @@ const isLocalProtocol = (spec) =>
 const rewriteDependency = ({ packageName, section, dependencyName, spec }) => {
   if (typeof spec !== 'string') return spec
 
-  if (spec.startsWith('link:')) {
-    if (!corePackageNames.has(dependencyName)) {
+  if (spec.startsWith('link:') === true) {
+    if (corePackageNames.has(dependencyName) === false) {
       addError(`${packageName} ${section}.${dependencyName} uses ${spec}, but ${dependencyName} is not a core package`)
       return spec
     }
-    if (!spec.startsWith('link:../../../repos/livestore/packages/@livestore/')) {
+    if (spec.startsWith('link:../../../repos/livestore/packages/@livestore/') === false) {
       addError(`${packageName} ${section}.${dependencyName} uses unsupported core link path ${spec}`)
       return spec
     }
@@ -158,8 +158,8 @@ const rewriteDependency = ({ packageName, section, dependencyName, spec }) => {
     return coreReleaseVersion
   }
 
-  if (spec.startsWith('workspace:')) {
-    if (!contribPackageNames.has(dependencyName)) {
+  if (spec.startsWith('workspace:') === true) {
+    if (contribPackageNames.has(dependencyName) === false) {
       addError(
         `${packageName} ${section}.${dependencyName} uses ${spec}, but ${dependencyName} is not a publishable contrib package`,
       )
@@ -168,7 +168,7 @@ const rewriteDependency = ({ packageName, section, dependencyName, spec }) => {
     return releaseVersion ?? coreVersion
   }
 
-  if (spec.startsWith('file:')) {
+  if (spec.startsWith('file:') === true) {
     addError(`${packageName} ${section}.${dependencyName} uses unsupported publish-time file protocol ${spec}`)
   }
 
@@ -197,7 +197,7 @@ for (const { path, manifest } of publishablePackages) {
   for (const section of dependencySections) {
     const dependencies = simulatedManifest[section]
     if (dependencies === undefined) continue
-    if (dependencies === null || typeof dependencies !== 'object' || Array.isArray(dependencies)) {
+    if (dependencies === null || typeof dependencies !== 'object' || Array.isArray(dependencies) === true) {
       addError(`${manifest.name} ${section} must be an object when present`)
       continue
     }
@@ -218,7 +218,7 @@ for (const { path, manifest } of publishablePackages) {
 
   for (const section of dependencySections) {
     for (const [dependencyName, spec] of Object.entries(simulatedManifest[section] ?? {})) {
-      if (isLocalProtocol(spec)) {
+      if (isLocalProtocol(spec) === true) {
         addError(`${manifest.name} ${section}.${dependencyName} still uses local protocol ${spec}`)
       }
       if (npmTag === 'dev' && dependencyName === '@livestore/devtools-vite' && spec !== coreReleaseVersion) {
@@ -268,7 +268,7 @@ if (errors.length > 0) {
  * `execFileSync` with `stdio: 'inherit'` always reports `stdout: null, stderr: null` on the
  * error object regardless of what the child printed. Together those read as "no output at all".
  *
- * Keep it opt-in: `tsc --build`, `pnpm pack` and `npm publish` want live streaming, both for
+ * Keep it opt-in: `tsgo --build`, `pnpm pack` and `npm publish` want live streaming, both for
  * long-build progress and for the CI retry wrapper's heartbeat.
  */
 const run = (command, args, options = {}) => {
@@ -403,7 +403,7 @@ const packPackage = (pkg) => {
 const buildPackages = () => {
   for (const pkg of plan.packages) {
     const packageDir = dirname(join(rootDir, pkg.path))
-    run('pnpm', ['--dir', packageDir, 'exec', 'tsc', '--build', 'tsconfig.json', '--noCheck'])
+    run('tsgo', ['--build', join(packageDir, 'tsconfig.json'), '--noCheck'])
   }
 }
 
@@ -475,7 +475,7 @@ const smokeInstallPackedTarballs = (packed) => {
 }
 
 if (outPath !== undefined) {
-  const absoluteOutPath = isAbsolute(outPath) ? outPath : join(rootDir, outPath)
+  const absoluteOutPath = isAbsolute(outPath) === true ? outPath : join(rootDir, outPath)
   mkdirSync(dirname(absoluteOutPath), { recursive: true })
   writeFileSync(absoluteOutPath, `${JSON.stringify(plan, null, 2)}\n`)
 }
@@ -507,7 +507,7 @@ if (dryRun === true || publish === true || packOnly === true) {
     // `--pack-only` is the untrusted producer half of PR snapshot publishing: it emits the exact
     // tarballs a later trusted job will validate and publish, and must never touch the registry.
     if (packOnly === true) {
-      const absoluteOutDir = isAbsolute(outDir) ? outDir : join(rootDir, outDir)
+      const absoluteOutDir = isAbsolute(outDir) === true ? outDir : join(rootDir, outDir)
       mkdirSync(absoluteOutDir, { recursive: true })
       for (const { pkg, tarballPath } of packed) {
         const destination = join(absoluteOutDir, basename(tarballPath))
@@ -545,7 +545,7 @@ if (dryRun === true || publish === true || packOnly === true) {
       }
 
       if (manifestOut !== undefined) {
-        const absoluteManifestOut = isAbsolute(manifestOut) ? manifestOut : join(rootDir, manifestOut)
+        const absoluteManifestOut = isAbsolute(manifestOut) === true ? manifestOut : join(rootDir, manifestOut)
         mkdirSync(dirname(absoluteManifestOut), { recursive: true })
         writeFileSync(
           absoluteManifestOut,

@@ -27,11 +27,11 @@ describe('sync-electric ArgsSchema round-trip', () => {
       const encoded = Schema.encodeSync(ApiSchema.ArgsSchema)(input)
       expect(typeof encoded).toBe('string')
 
-      const decoded = Schema.decodeUnknownSync(ApiSchema.ArgsSchema)(encoded)
+      const decoded = Schema.decodeSync(ApiSchema.ArgsSchema)(encoded)
 
       expect(Option.isOption(decoded.handle)).toBe(true)
       expect(decoded.handle._tag).toBe(c.handle._tag)
-      if (Option.isSome(c.handle)) {
+      if (Option.isSome(c.handle) === true) {
         expect((decoded.handle as Option.Some<typeof HandleStruct>).value).toEqual(HandleStruct)
       }
       expect(decoded.payload).toEqual(c.payload)

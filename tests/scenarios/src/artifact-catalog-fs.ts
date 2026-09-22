@@ -25,7 +25,7 @@ export const writeArtifactCatalog = async (artifactDirectory: string): Promise<v
       const fileData = await fs.readFile(path.join(artifactDirectory, entry.name))
       const artifactJson =
         entry.name.endsWith('.gz') === true ? gunzipSync(fileData).toString('utf8') : fileData.toString('utf8')
-      const artifact = Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(artifactJson)
+      const artifact = Schema.decodeSync(Schema.fromJsonString(ScenarioRunArtifact))(artifactJson)
       catalogEntries.push(
         makeArtifactCatalogEntry({
           file: entry.name,

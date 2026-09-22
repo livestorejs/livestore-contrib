@@ -610,7 +610,7 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
       if (operation._tag === 'restart-client') {
         if (
           restartedClients.has(operation.clientId) === true ||
-          [...sessionTransitions.values()].some(({ target }) => target.clientId === operation.clientId)
+          [...sessionTransitions.values()].some(({ target }) => target.clientId === operation.clientId) === true
         ) {
           throw new ScenarioSourceError(`Parallel lifecycle operations conflict for Client '${operation.clientId}'`)
         }

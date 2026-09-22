@@ -13,6 +13,8 @@ let
   effectUtils = inputs.effect-utils;
   effectUtilsPackages = effectUtils.packages.${pkgs.system};
   taskModules = effectUtils.devenvModules.tasks;
+  effectTsgo = effectUtilsPackages.effect-tsgo;
+  pnpmPkg = effectUtils.lib.mkPnpm { inherit pkgs; };
 
   rootPackageJson = builtins.fromJSON (builtins.readFile ./package.json);
   pnpmPackages = rootPackageJson.workspaces or [ ];
@@ -24,7 +26,6 @@ let
   oxlintNpm = effectUtils.lib.mkOxlintNpm {
     inherit pkgs;
     bun = pkgs.bun;
-    src = inputs.effect-utils;
   };
   oxlintWithPlugins = effectUtils.lib.mkOxlintWithPlugins {
     inherit pkgs oxlintNpm;
@@ -46,8 +47,11 @@ in
     (taskModules.pnpm {
       packages = pnpmPackages;
       installAfter = [ "mr:bootstrap" ];
+      inherit pnpmPkg;
     })
-    (taskModules.ts { tsconfigFile = "tsconfig.dev.json"; })
+    (taskModules.ts {
+      tsBinPkg = effectTsgo;
+    })
     (taskModules.clean { packages = pnpmPackages; })
     (taskModules.lint-oxc {
       lintPaths = [
@@ -60,7 +64,8 @@ in
         ".oxlintrc.json"
         "package.json.genie.ts"
         "pnpm-workspace.yaml.genie.ts"
-        "tsconfig.dev.json.genie.ts"
+        "tsconfig.check.json.genie.ts"
+        "tsconfig.emit.json.genie.ts"
       ];
       geniePatterns = [ "**/*.genie.ts" ];
       genieCoverageDirs = [ "." ];
@@ -94,49 +99,19 @@ in
     })
   ];
 
-  # Keep Nix-provided `tsc` aligned with the workspace TypeScript catalog override so
-  # devenv tasks validate against the same compiler as package-local tooling. Remove
-  # this once the inherited nixpkgs `pkgs.typescript` provides TypeScript 6.0.3 or newer.
-  overlays = [
-    (_final: prev: {
-      typescript = prev.typescript.overrideAttrs (
-        _finalAttrs: _oldAttrs:
-        let
-          typescriptSrc = prev.fetchFromGitHub {
-            owner = "microsoft";
-            repo = "TypeScript";
-            rev = "v6.0.3";
-            hash = "sha256-RvM+fGO94ItdQxgXUcCdkpX039pytnMri100wGjNhhc=";
-          };
-        in
-        {
-          version = "6.0.3";
-          src = typescriptSrc;
-          npmDeps = prev.fetchNpmDeps {
-            name = "typescript-6.0.3-npm-deps";
-            src = typescriptSrc;
-            hash = "sha256-nnBXImViLpuPPNYwBxe3T+hpoiuA/7qpIMVcXJmjklg=";
-          };
-          npmDepsHash = "sha256-nnBXImViLpuPPNYwBxe3T+hpoiuA/7qpIMVcXJmjklg=";
-        }
-      );
-    })
-  ];
-
   packages = [
-    (effectUtils.lib.mkPnpm { inherit pkgs; })
     pkgs.bun
+    effectTsgo
     pkgs.nodejs_24
-    pkgs.typescript
     oxlintWithPlugins
     pkgs.oxfmt
     effectUtilsPackages.genie
     effectUtilsPackages.megarepo
-    effectUtilsPackages.effect-tsgo
     pkgs.jq
   ];
 
   env = {
+    MEGAREPO_SKIP_MEMBERS = "effect-utils,livestore";
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     PUPPETEER_SKIP_DOWNLOAD = "1";
   };
@@ -296,9 +271,11 @@ in
         exit 1
       fi
 
-      core_sha="$(jq -r '.members.livestore.commit' megarepo.lock)"
-      if [ -z "$core_sha" ] || [ "$core_sha" = "null" ]; then
-        echo "megarepo.lock is missing members.livestore.commit" >&2
+      # Main-branch core commits do not publish an exact-SHA snapshot. Use the release version
+      # declared by the pinned core checkout, then let --verify-core prove that cohort is installable.
+      core_release_version="$(jq -r '.version' repos/livestore/release/version.json)"
+      if [ -z "$core_release_version" ] || [ "$core_release_version" = "null" ]; then
+        echo "repos/livestore/release/version.json is missing version" >&2
         exit 1
       fi
 
@@ -309,7 +286,7 @@ in
         genie --writeable
       node release/simulate-publish.mjs \
         --version "$release_version" \
-        --core-sha "$core_sha" \
+        --core-version "$core_release_version" \
         --verify-core \
         --pack-only \
         --out-dir "$SNAPSHOT_OUT_DIR"
@@ -428,7 +405,8 @@ in
       "pnpm:install"
     ];
     exec = ''
-      if timeout --kill-after=30s 180s devenv tasks run test:integration:node-sync --mode before --no-tui; then
+      if WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 timeout --kill-after=30s 180s \
+        pnpm --dir tests/integration exec vitest run --config src/tests/node-sync/vitest.config.ts; then
         exit 0
       fi
       echo "::warning::Node-sync integration tests failed or timed out (flaky; carried over from livestorejs/livestore#624)"
@@ -570,7 +548,8 @@ in
       const generatedFiles = [
         'package.json',
         'pnpm-workspace.yaml',
-        'tsconfig.dev.json',
+        'tsconfig.check.json',
+        'tsconfig.emit.json',
         '.oxlintrc.json',
         '.oxfmtrc.json',
       ]

@@ -1,4 +1,4 @@
-import { catalog, contribCoreReleaseVersion, isMirroredDevRelease } from './genie/external.ts'
+import { catalog, contribCoreReleaseVersion } from './genie/external.ts'
 import { commonPnpmPolicySettings, pnpmWorkspaceYaml, repoPnpmAllowBuilds } from './genie/repo.ts'
 import { rootWorkspaceExtraMembers, rootWorkspacePackages } from './package.json.genie.ts'
 
@@ -119,65 +119,22 @@ const contribCatalogDuplicateExceptions = [
       "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
   },
   {
-    package: '@livestore/adapter-web',
-    versions: [contribCoreReleaseVersion, ...(isMirroredDevRelease ? ['0.4.0'] : []), '0.4.0-dev.25'],
-    reason: isMirroredDevRelease
-      ? 'The mirrored dev projection brings its matching core cohort, stable examples resolve the published 0.4.0 adapter because local contrib packages now carry the dev version, and older devtools examples retain 0.4.0-dev.25.'
-      : 'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing examples still consume the previous devtools cohort.',
-  },
-  {
-    package: '@livestore/common',
-    versions: [contribCoreReleaseVersion, '0.4.0'],
-    reason:
-      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
-  },
-  {
-    package: '@livestore/common-cf',
-    versions: [contribCoreReleaseVersion, '0.4.0'],
-    reason:
-      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
-  },
-  {
     package: '@livestore/devtools-vite',
     versions: [contribCoreReleaseVersion, '0.4.0-dev.25'],
     reason:
       'Generated publishable packages deliberately consume the new core dev cohort while static examples remain on the previous devtools cohort.',
   },
   {
-    package: '@livestore/sqlite-wasm',
-    versions: [contribCoreReleaseVersion, '0.4.0'],
+    package: '@playwright/test',
+    versions: ['1.63.0', '1.61.0'],
     reason:
-      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
+      'Contrib uses Playwright 1.63 to match the pinned Nix browser bundle while the pinned core effect-playwright workspace still carries Playwright 1.61.',
   },
   {
     package: '@testing-library/jest-dom',
     versions: ['6.10.0', '6.6.3'],
     reason:
       'The scenario Storybook and existing example tooling resolve different compatible versions of this test-only package.',
-  },
-  {
-    package: '@livestore/utils',
-    versions: ['0.4.0', '0.4.0-dev.25', contribCoreReleaseVersion],
-    reason:
-      "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
-  },
-  {
-    package: '@livestore/wa-sqlite',
-    versions: [contribCoreReleaseVersion, '0.4.0'],
-    reason:
-      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
-  },
-  {
-    package: '@livestore/webmesh',
-    versions: [contribCoreReleaseVersion, '0.4.0'],
-    reason:
-      'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing example dependency trees still consume the stable 0.4 line.',
-  },
-  {
-    package: '@playwright/test',
-    versions: ['1.61.0', '1.59.1'],
-    reason:
-      "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
   },
   {
     package: '@rollup/plugin-node-resolve',
@@ -217,9 +174,21 @@ const contribCatalogDuplicateExceptions = [
   },
   {
     package: '@types/react-dom',
-    versions: ['19.2.3', '19.1.11'],
+    versions: ['19.2.7', '19.2.3', '19.1.11'],
     reason:
-      "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
+      'The catalog follows the current React type cohort while existing example applications retain older compatible versions.',
+  },
+  {
+    package: 'vitest',
+    versions: ['5.0.1', '4.1.9'],
+    reason:
+      'Contrib uses Vitest 5 to satisfy the current Effect peer contract while the pinned core workspace still carries Vitest 4.',
+  },
+  {
+    package: 'playwright',
+    versions: ['1.63.0', '1.61.0'],
+    reason:
+      'Contrib uses Playwright 1.63 to match the pinned Nix browser bundle while the pinned core effect-playwright workspace still carries Playwright 1.61.',
   },
   {
     package: '@vitejs/plugin-react',

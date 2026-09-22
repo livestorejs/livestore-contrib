@@ -32,7 +32,7 @@ export const projectTraceAt = (args: {
     state = applyTraceRecord(state, record, args.scenario)
   }
 
-  return Schema.decodeUnknownSync(ObservedSystemState)(state)
+  return Schema.decodeSync(ObservedSystemState)(state)
 }
 
 /** Derives material navigation points while retaining a raw observation-index boundary for every moment. */

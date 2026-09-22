@@ -1,76 +1,4 @@
 {
-  "name": "@livestore/cli",
-  "version": "0.5.0-dev.0",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/livestorejs/livestore-contrib.git"
-  },
-  "bin": {
-    "livestore": "./src/bin.ts"
-  },
-  "files": [
-    "dist",
-    "package.json",
-    "src"
-  ],
-  "type": "module",
-  "sideEffects": false,
-  "exports": {
-    ".": "./src/mod.ts"
-  },
-  "publishConfig": {
-    "access": "public",
-    "bin": {
-      "livestore": "./dist/bin.js"
-    },
-    "exports": {
-      ".": "./dist/mod.js"
-    }
-  },
-  "scripts": {
-    "build": "tsc",
-    "dev": "bun src/bin.ts"
-  },
-  "dependencies": {
-    "@effect/ai-openai": "4.0.0-rc.111",
-    "@effect/opentelemetry": "4.0.0-rc.111",
-    "@livestore/adapter-node": "workspace:^",
-    "@livestore/common": "link:../../../repos/livestore/packages/@livestore/common",
-    "@livestore/livestore": "link:../../../repos/livestore/packages/@livestore/livestore",
-    "@livestore/peer-deps": "link:../../../repos/livestore/packages/@livestore/peer-deps",
-    "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils",
-    "effect": "4.0.0-rc.111"
-  },
-  "devDependencies": {
-    "@livestore/utils-dev": "link:../../../repos/livestore/packages/@livestore/utils-dev",
-    "@types/node": "25.3.3",
-    "typescript": "6.0.3",
-    "vitest": "4.1.9"
-  },
-  "peerDependencies": {
-    "@effect/opentelemetry": "^4.0.0-rc.111",
-    "@effect/platform-browser": "^4.0.0-rc.111",
-    "@effect/platform-bun": "^4.0.0-rc.111",
-    "@effect/platform-node": "^4.0.0-rc.111",
-    "@effect/platform-node-shared": "^4.0.0-rc.111",
-    "@effect/vitest": "^4.0.0-rc.111",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/resources": "^2.2.0",
-    "@standard-schema/spec": "^1.1.0",
-    "effect": "^4.0.0-rc.111"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@mixedbread/cli",
-      "@parcel/watcher",
-      "cbor-extract",
-      "dtrace-provider",
-      "protobufjs",
-      "puppeteer",
-      "workerd"
-    ]
-  },
   "$genie": {
     "source": "package.json.genie.ts",
     "warning": "DO NOT EDIT - changes will be overwritten",
@@ -87,6 +15,78 @@
       "repos/livestore/packages/@livestore/utils-dev",
       "repos/livestore/packages/@livestore/wa-sqlite",
       "repos/livestore/packages/@livestore/webmesh"
+    ]
+  },
+  "name": "@livestore/cli",
+  "version": "0.5.0-dev.0",
+  "type": "module",
+  "sideEffects": false,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/livestorejs/livestore-contrib.git"
+  },
+  "exports": {
+    ".": "./src/mod.ts"
+  },
+  "bin": {
+    "livestore": "./src/bin.ts"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "bun src/bin.ts"
+  },
+  "dependencies": {
+    "@effect/ai-openai": "4.0.0-rc.113",
+    "@effect/opentelemetry": "4.0.0-rc.113",
+    "@livestore/adapter-node": "workspace:^",
+    "@livestore/common": "link:../../../repos/livestore/packages/@livestore/common",
+    "@livestore/livestore": "link:../../../repos/livestore/packages/@livestore/livestore",
+    "@livestore/peer-deps": "link:../../../repos/livestore/packages/@livestore/peer-deps",
+    "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils",
+    "effect": "4.0.0-rc.113"
+  },
+  "devDependencies": {
+    "@livestore/utils-dev": "link:../../../repos/livestore/packages/@livestore/utils-dev",
+    "@types/node": "25.3.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  },
+  "peerDependencies": {
+    "@effect/opentelemetry": "^4.0.0-rc.113",
+    "@effect/platform-browser": "^4.0.0-rc.113",
+    "@effect/platform-bun": "^4.0.0-rc.113",
+    "@effect/platform-node": "^4.0.0-rc.113",
+    "@effect/platform-node-shared": "^4.0.0-rc.113",
+    "@effect/vitest": "^4.0.0-rc.113",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@standard-schema/spec": "^1.1.0",
+    "effect": "^4.0.0-rc.113"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": "./dist/mod.js"
+    },
+    "bin": {
+      "livestore": "./dist/bin.js"
+    }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@mixedbread/cli",
+      "@parcel/watcher",
+      "cbor-extract",
+      "dtrace-provider",
+      "protobufjs",
+      "puppeteer",
+      "workerd"
     ]
   }
 }

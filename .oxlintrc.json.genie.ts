@@ -8,7 +8,8 @@ import {
 } from './repos/livestore/.oxlintrc.json.genie.ts'
 
 export default oxlintConfig({
-  plugins: livestoreOxlintPlugins,
+  plugins: [...new Set(livestoreOxlintPlugins)],
+  jsPlugins: ['./repos/effect-utils/packages/@overeng/oxc-config/src/mod.ts'],
   categories: livestoreOxlintCategories,
   rules: livestoreOxlintRules,
   ignorePatterns: [

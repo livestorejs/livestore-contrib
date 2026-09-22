@@ -87,7 +87,7 @@ const fetchExamples = (ref: string) =>
 
     const responseText = yield* response.text
 
-    const examples = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(GitHubContentsResponseSchema))(
+    const examples = yield* Schema.decodeEffect(Schema.fromJsonString(GitHubContentsResponseSchema))(
       responseText,
     ).pipe(
       Effect.catch(
@@ -116,7 +116,7 @@ const selectExample = (examples: string[]) =>
       return yield* new NoExamplesError({ message: 'No examples available' })
     }
 
-    const prompt = Cli.Prompt.select({
+    const prompt = Cli.Prompt.Select({
       message: '📦 Select a LiveStore example to create:',
       choices: examples.map((example) => ({
         title: example,
@@ -213,10 +213,10 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
     )
 
     // Clean up extract directory
-    yield* fs.remove(extractDir, { recursive: true }).pipe(Effect.catch(() => Effect.void))
+    yield* fs.remove(extractDir, { recursive: true }).pipe(Effect.ignore)
 
     // Clean up tarball
-    yield* fs.remove(tarballPath).pipe(Effect.catch(() => Effect.void))
+    yield* fs.remove(tarballPath).pipe(Effect.ignore)
 
     yield* Console.log(`✅ Example "${exampleName}" created successfully at: ${destinationPath}`)
   })
@@ -224,11 +224,11 @@ const downloadExample = (exampleName: string, ref: string, destinationPath: stri
 export const createCommand = Cli.Command.make(
   'create',
   {
-    example: Cli.Flag.string('example').pipe(
+    example: Cli.Flag.String('example').pipe(
       Cli.Flag.optional,
       Cli.Flag.withDescription('Example name to create (bypasses interactive selection)'),
     ),
-    ref: Cli.Flag.string('ref').pipe(
+    ref: Cli.Flag.String('ref').pipe(
       Cli.Flag.withAlias('commit'),
       Cli.Flag.withAlias('branch'),
       Cli.Flag.withAlias('tag'),
@@ -237,7 +237,7 @@ export const createCommand = Cli.Command.make(
         'The name of the commit/branch/tag to fetch examples from. Pull requests refs must be fully-formed (e.g., `refs/pull/123/merge`).',
       ),
     ),
-    path: Cli.Argument.string('path').pipe(
+    path: Cli.Argument.String('path').pipe(
       Cli.Argument.optional,
       Cli.Argument.withDescription('Destination path for the new project'),
     ),
@@ -292,7 +292,7 @@ export const createCommand = Cli.Command.make(
     const fs = yield* FileSystem.FileSystem
     const packageJsonPath = nodePath.join(destinationPath, 'package.json')
     const packageJsonContent = yield* fs.readFileString(packageJsonPath)
-    const runScript = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PackageJsonScriptsSchema))(
+    const runScript = yield* Schema.decodeEffect(Schema.fromJsonString(PackageJsonScriptsSchema))(
       packageJsonContent,
     ).pipe(
       Effect.map((pkg) => ('dev' in pkg.scripts ? ('dev' as const) : ('start' as const))),

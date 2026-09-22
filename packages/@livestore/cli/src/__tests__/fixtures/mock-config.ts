@@ -111,7 +111,7 @@ export const useMockConfig = Effect.acquireRelease(
   ({ configPath }) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
-      yield* fs.remove(configPath, { recursive: false }).pipe(Effect.catch(() => Effect.void))
+      yield* fs.remove(configPath, { recursive: false }).pipe(Effect.ignore)
     }),
 )
 

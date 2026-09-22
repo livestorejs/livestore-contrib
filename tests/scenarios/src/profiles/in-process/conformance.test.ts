@@ -208,7 +208,7 @@ Vitest.describe('in-process host conformance', () => {
         projectTraceAt({ scenario, trace: artifact.trace, cursorIndex: artifact.trace.length - 1 }).runStatus,
       ).toBe('failed')
       expect(derivePlaybackMoments({ scenario, trace: artifact.trace }).at(-1)?.kind).toBe('failure')
-      expect(() => Schema.decodeUnknownSync(ScenarioRunArtifact)(artifact)).not.toThrow()
+      expect(() => Schema.decodeSync(ScenarioRunArtifact)(artifact)).not.toThrow()
     }).pipe(Vitest.withTestCtx(test)),
   )
 

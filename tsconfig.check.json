@@ -1,8 +1,7 @@
 // Generated file - DO NOT EDIT
-// Source: tsconfig.dev.json.genie.ts
+// Source: tsconfig.check.json.genie.ts
 {
-  "compilerOptions": {},
-  "include": [],
+  "files": [],
   "references": [
     {
       "path": "./packages/@livestore/adapter-expo"
