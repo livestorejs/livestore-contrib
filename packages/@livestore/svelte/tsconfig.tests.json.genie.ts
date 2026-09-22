@@ -11,7 +11,6 @@ export default tsconfigJson({
     ...baseTsconfigCompilerOptions,
     lib: domLib, // Need DOM for jsdom-based tests
     noEmit: true,
-    composite: false,
     rootDir: '.',
   },
   include: ['./tests/**/*.ts', './tests/**/*.svelte', './tests/**/*.d.ts'],

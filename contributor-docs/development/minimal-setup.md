@@ -33,7 +33,7 @@ checkout rather than overwriting state owned by another setup flow.
 
 | Task | Command |
 | --- | --- |
-| Build the TypeScript project graph | `pnpm --dir packages/@livestore/solid exec tsc -b ../../../tsconfig.dev.json` |
+| Emit the TypeScript project graph | `pnpm --dir packages/@livestore/solid exec tsc -b ../../../tsconfig.emit.json` |
 | Run a focused package suite | `pnpm --dir packages/@livestore/cli exec vitest run --config vitest.config.ts` |
 | Build the representative web example | `pnpm --dir examples/web-todomvc-solid run build` |
 

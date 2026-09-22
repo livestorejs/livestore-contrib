@@ -38,7 +38,6 @@
       }
     ],
     "noEmit": true,
-    "composite": false,
     "rootDir": "."
   },
   "include": ["./tests/**/*.ts", "./tests/**/*.svelte", "./tests/**/*.d.ts"],

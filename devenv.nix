@@ -13,6 +13,8 @@ let
   effectUtils = inputs.effect-utils;
   effectUtilsPackages = effectUtils.packages.${pkgs.system};
   taskModules = effectUtils.devenvModules.tasks;
+  effectTsgo = effectUtilsPackages.effect-tsgo;
+  pnpmPkg = effectUtils.lib.mkPnpm { inherit pkgs; };
 
   rootPackageJson = builtins.fromJSON (builtins.readFile ./package.json);
   pnpmPackages = rootPackageJson.workspaces or [ ];
@@ -46,8 +48,11 @@ in
     (taskModules.pnpm {
       packages = pnpmPackages;
       installAfter = [ "mr:bootstrap" ];
+      inherit pnpmPkg;
     })
-    (taskModules.ts { tsconfigFile = "tsconfig.dev.json"; })
+    (taskModules.ts {
+      tsBinPkg = effectTsgo;
+    })
     (taskModules.clean { packages = pnpmPackages; })
     (taskModules.lint-oxc {
       lintPaths = [
@@ -60,7 +65,8 @@ in
         ".oxlintrc.json"
         "package.json.genie.ts"
         "pnpm-workspace.yaml.genie.ts"
-        "tsconfig.dev.json.genie.ts"
+        "tsconfig.check.json.genie.ts"
+        "tsconfig.emit.json.genie.ts"
       ];
       geniePatterns = [ "**/*.genie.ts" ];
       genieCoverageDirs = [ "." ];
@@ -94,45 +100,13 @@ in
     })
   ];
 
-  # Keep Nix-provided `tsc` aligned with the workspace TypeScript catalog override so
-  # devenv tasks validate against the same compiler as package-local tooling. Remove
-  # this once the inherited nixpkgs `pkgs.typescript` provides TypeScript 6.0.3 or newer.
-  overlays = [
-    (_final: prev: {
-      typescript = prev.typescript.overrideAttrs (
-        _finalAttrs: _oldAttrs:
-        let
-          typescriptSrc = prev.fetchFromGitHub {
-            owner = "microsoft";
-            repo = "TypeScript";
-            rev = "v6.0.3";
-            hash = "sha256-RvM+fGO94ItdQxgXUcCdkpX039pytnMri100wGjNhhc=";
-          };
-        in
-        {
-          version = "6.0.3";
-          src = typescriptSrc;
-          npmDeps = prev.fetchNpmDeps {
-            name = "typescript-6.0.3-npm-deps";
-            src = typescriptSrc;
-            hash = "sha256-nnBXImViLpuPPNYwBxe3T+hpoiuA/7qpIMVcXJmjklg=";
-          };
-          npmDepsHash = "sha256-nnBXImViLpuPPNYwBxe3T+hpoiuA/7qpIMVcXJmjklg=";
-        }
-      );
-    })
-  ];
-
   packages = [
-    (effectUtils.lib.mkPnpm { inherit pkgs; })
     pkgs.bun
     pkgs.nodejs_24
-    pkgs.typescript
     oxlintWithPlugins
     pkgs.oxfmt
     effectUtilsPackages.genie
     effectUtilsPackages.megarepo
-    effectUtilsPackages.effect-tsgo
     pkgs.jq
   ];
 
@@ -570,7 +544,8 @@ in
       const generatedFiles = [
         'package.json',
         'pnpm-workspace.yaml',
-        'tsconfig.dev.json',
+        'tsconfig.check.json',
+        'tsconfig.emit.json',
         '.oxlintrc.json',
         '.oxfmtrc.json',
       ]
