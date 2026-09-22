@@ -268,9 +268,7 @@ export const makeSyncBackend =
             return Option.some([[], Option.some(nextHandle)] as const)
           }
 
-          const allItems = yield* HttpClientResponse.schemaBodyJson(Schema.Array(ResponseItem), {
-            onExcessProperty: 'preserve',
-          })(resp)
+          const allItems = yield* HttpClientResponse.schemaBodyJson(Schema.Array(ResponseItem))(resp)
 
           // Check for delete/update operations and throw descriptive error
           const invalidOperations = ReadonlyArray.filterMap(allItems, (item) =>
@@ -311,8 +309,10 @@ export const makeSyncBackend =
         yield* SubscriptionRef.set(isConnected, true)
       }).pipe(
         UnknownError.mapToUnknownError,
-        Effect.timeout(pingTimeout),
-        Effect.catchTag('TimeoutError', () => SubscriptionRef.set(isConnected, false)),
+        Effect.timeoutOrElse({
+          duration: pingTimeout,
+          orElse: () => SubscriptionRef.set(isConnected, false),
+        }),
         Effect.withSpan('electric-provider:ping'),
       )
 

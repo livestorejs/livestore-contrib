@@ -91,7 +91,9 @@ const mcpServerCommand = Cli.Command.make(
     }).pipe(
       Layer.provide(LivestoreResources),
       Layer.provide(LivestoreTools),
-      Layer.provide(Logger.layer([Logger.consolePretty({ stderr: true })])),
+      Layer.provide(
+        Layer.merge(Logger.layer([Logger.consolePretty()]), Layer.succeed(Logger.LogToStderr, true)),
+      ),
       Layer.provide(PlatformNode.NodeStdio.layer),
       Layer.launch,
     )

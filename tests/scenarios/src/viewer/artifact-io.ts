@@ -16,7 +16,7 @@ export interface ArtifactCatalog {
 }
 
 export const decodeArtifactJson = (input: string): ScenarioRunArtifact =>
-  Schema.decodeUnknownSync(Schema.fromJsonString(ScenarioRunArtifact))(input)
+  Schema.decodeSync(Schema.fromJsonString(ScenarioRunArtifact))(input)
 
 export const readArtifactFile = async (file: File): Promise<string> =>
   file.name.endsWith('.gz') === true ? decompressGzip(await file.arrayBuffer()) : file.text()

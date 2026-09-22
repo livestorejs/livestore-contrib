@@ -171,19 +171,19 @@ const importEvents = ({
 export const exportCommand = Cli.Command.make(
   'export',
   {
-    config: Cli.Flag.string('config').pipe(
+    config: Cli.Flag.String('config').pipe(
       Cli.Flag.withAlias('c'),
       Cli.Flag.withDescription('Path to the config module that exports schema and syncBackend'),
     ),
-    storeId: Cli.Flag.string('store-id').pipe(
+    storeId: Cli.Flag.String('store-id').pipe(
       Cli.Flag.withAlias('i'),
       Cli.Flag.withDescription('Store identifier'),
     ),
-    clientId: Cli.Flag.string('client-id').pipe(
+    clientId: Cli.Flag.String('client-id').pipe(
       Cli.Flag.withDefault('cli-export'),
       Cli.Flag.withDescription('Client identifier for the sync connection'),
     ),
-    output: Cli.Argument.string('file').pipe(Cli.Argument.withDescription('Output JSON file path')),
+    output: Cli.Argument.String('file').pipe(Cli.Argument.withDescription('Output JSON file path')),
   },
   Effect.fn(function* ({
     config,
@@ -218,28 +218,28 @@ export const exportCommand = Cli.Command.make(
 export const importCommand = Cli.Command.make(
   'import',
   {
-    config: Cli.Flag.string('config').pipe(
+    config: Cli.Flag.String('config').pipe(
       Cli.Flag.withAlias('c'),
       Cli.Flag.withDescription('Path to the config module that exports schema and syncBackend'),
     ),
-    storeId: Cli.Flag.string('store-id').pipe(
+    storeId: Cli.Flag.String('store-id').pipe(
       Cli.Flag.withAlias('i'),
       Cli.Flag.withDescription('Store identifier'),
     ),
-    clientId: Cli.Flag.string('client-id').pipe(
+    clientId: Cli.Flag.String('client-id').pipe(
       Cli.Flag.withDefault('cli-import'),
       Cli.Flag.withDescription('Client identifier for the sync connection'),
     ),
-    force: Cli.Flag.boolean('force').pipe(
+    force: Cli.Flag.Boolean('force').pipe(
       Cli.Flag.withAlias('f'),
       Cli.Flag.withDefault(false),
       Cli.Flag.withDescription('Force import even if store ID does not match'),
     ),
-    dryRun: Cli.Flag.boolean('dry-run').pipe(
+    dryRun: Cli.Flag.Boolean('dry-run').pipe(
       Cli.Flag.withDefault(false),
       Cli.Flag.withDescription('Validate the import file without actually importing'),
     ),
-    input: Cli.Argument.string('file').pipe(Cli.Argument.withDescription('Input JSON file to import')),
+    input: Cli.Argument.String('file').pipe(Cli.Argument.withDescription('Input JSON file to import')),
   },
   Effect.fn(function* ({
     config,

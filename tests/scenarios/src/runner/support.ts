@@ -106,7 +106,7 @@ export const makeScenarioArtifact = (input: {
   snapshots: ReadonlyArray<ParticipantSnapshot>
   status: 'passed' | 'failed'
 }): Effect.Effect<ScenarioRunArtifact> =>
-  Schema.decodeUnknownEffect(ScenarioRunArtifact)({
+  Schema.decodeEffect(ScenarioRunArtifact)({
     artifactVersion: scenarioArtifactVersion,
     descriptor: {
       runId: input.runId,

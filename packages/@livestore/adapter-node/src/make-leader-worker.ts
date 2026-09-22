@@ -6,8 +6,7 @@ if (process.execArgv.includes('--inspect') === true) {
   inspector.waitForDebugger()
 }
 
-import type { SyncOptions } from '@livestore/common'
-import { LogConfig, UnknownError } from '@livestore/common'
+import { type LogConfig, type SyncOptions, UnknownError } from '@livestore/common'
 import type { StreamEventsOptions } from '@livestore/common/leader-thread'
 import { Eventlog, LeaderThreadCtx, streamEventsWithSyncState } from '@livestore/common/leader-thread'
 import type { LiveStoreSchema } from '@livestore/common/schema'

@@ -234,7 +234,7 @@ Vitest.describe('offline writer recovery', () => {
             'oracle.verdict',
           ]),
         )
-        expect(() => Schema.decodeUnknownSync(ScenarioRunArtifact)(artifact)).not.toThrow()
+        expect(() => Schema.decodeSync(ScenarioRunArtifact)(artifact)).not.toThrow()
 
         for (const emitterRecords of Map.groupBy(artifact.trace, (record) => record.emitterId).values()) {
           expect(

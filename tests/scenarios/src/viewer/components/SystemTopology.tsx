@@ -60,14 +60,17 @@ export const EventLog = ({
   readonly onSelectEvent: (eventRef: string) => void
 }) => {
   const ref = useRef<HTMLDivElement>(null)
+  const eventCount = events.length
   useLayoutEffect(() => {
+    // Event rows change the element width, so tail-following must run when their count changes.
+    void eventCount
     const element = ref.current
     if (element === null || scrollStates === undefined) return
     const state = scrollStates.get(eventlogKey) ?? { followTail: true, scrollLeft: 0 }
     const maximumScrollLeft = Math.max(element.scrollWidth - element.clientWidth, 0)
     element.scrollLeft = state.followTail === true ? maximumScrollLeft : Math.min(state.scrollLeft, maximumScrollLeft)
     scrollStates.set(eventlogKey, { followTail: state.followTail, scrollLeft: element.scrollLeft })
-  }, [eventlogKey, events, scrollStates])
+  }, [eventCount, eventlogKey, scrollStates])
   return (
     <div className="eventlog-block">
       <p className="eyebrow">{label}</p>

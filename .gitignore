@@ -29,6 +29,9 @@ dist
 .pnpm-store/
 repos/
 
+# Deterministic plugin-injected oxlint config cache
+.oxlint-with-plugins.*
+
 # Codex project-local config
 .codex
 

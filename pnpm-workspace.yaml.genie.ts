@@ -120,10 +120,11 @@ const contribCatalogDuplicateExceptions = [
   },
   {
     package: '@livestore/adapter-web',
-    versions: [contribCoreReleaseVersion, ...(isMirroredDevRelease ? ['0.4.0'] : []), '0.4.0-dev.25'],
-    reason: isMirroredDevRelease
-      ? 'The mirrored dev projection brings its matching core cohort, stable examples resolve the published 0.4.0 adapter because local contrib packages now carry the dev version, and older devtools examples retain 0.4.0-dev.25.'
-      : 'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing examples still consume the previous devtools cohort.',
+    versions: [contribCoreReleaseVersion, ...(isMirroredDevRelease === true ? ['0.4.0'] : []), '0.4.0-dev.25'],
+    reason:
+      isMirroredDevRelease === true
+        ? 'The mirrored dev projection brings its matching core cohort, stable examples resolve the published 0.4.0 adapter because local contrib packages now carry the dev version, and older devtools examples retain 0.4.0-dev.25.'
+        : 'The pinned 0.5.0 devtools-vite artifact brings its matching core cohort while existing examples still consume the previous devtools cohort.',
   },
   {
     package: '@livestore/common',
@@ -217,9 +218,15 @@ const contribCatalogDuplicateExceptions = [
   },
   {
     package: '@types/react-dom',
-    versions: ['19.2.3', '19.1.11'],
+    versions: ['19.2.7', '19.2.3', '19.1.11'],
     reason:
       'The catalog follows the current React type cohort while existing example applications retain older compatible versions.',
+  },
+  {
+    package: 'vitest',
+    versions: ['5.0.1', '4.1.9'],
+    reason:
+      'Contrib uses Vitest 5 to satisfy the current Effect peer contract while the pinned core workspace still carries Vitest 4.',
   },
   {
     package: 'playwright',

@@ -171,7 +171,7 @@ export const makeProcessHost = (args: {
         const result = yield* client
           .request({ _tag: 'observe-sync', participant })
           .pipe(Effect.flatMap(expectResult('sync-observation')))
-        return yield* Schema.decodeUnknownEffect(SyncObservationSchema)(result.observation).pipe(
+        return yield* Schema.decodeEffect(SyncObservationSchema)(result.observation).pipe(
           Effect.mapError((cause) => processResponseInvalid(`Invalid sync observation: ${String(cause)}`)),
         )
       })

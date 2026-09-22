@@ -217,7 +217,7 @@ export const makeBrowserHost = (args: {
           ),
         { concurrency: 'unbounded' },
       )
-      return yield* Schema.decodeUnknownEffect(HostSystemObservationSchema)({
+      return yield* Schema.decodeEffect(HostSystemObservationSchema)({
         backend: {
           id: 'sync-backend',
           connected: backend.connected,
@@ -250,7 +250,7 @@ export const makeBrowserHost = (args: {
         const backendHead = backend.events.at(-1)?.seqNum ?? 0
         const leaderHead = EventSequenceNumber.Client.fromString(observation.sync.upstreamHead)
         const pendingCount = Math.max(observation.sync.pendingCount, leaderHead.client)
-        return yield* Schema.decodeUnknownEffect(SyncObservationSchema)({
+        return yield* Schema.decodeEffect(SyncObservationSchema)({
           participant,
           localHead: observation.sync.upstreamHead,
           upstreamHead: `e${backendHead}`,
@@ -468,7 +468,7 @@ const makeBrowserClient = (args: {
           return yield* Effect.fail(
             browserResponseInvalid(`Client ${args.clientId} observation has no timing evidence`),
           )
-        const observation = yield* Schema.decodeUnknownEffect(ClientSystemObservationSchema)({
+        const observation = yield* Schema.decodeEffect(ClientSystemObservationSchema)({
           clientId: args.clientId,
           connected: state.connected,
           leader,

@@ -185,7 +185,7 @@ Vitest.describe('useQuery', () => {
       const [numItems, setNumItems] = Solid.createSignal(1)
 
       const VirtualizedList = () => {
-        const itemData = Solid.createMemo(() => Array.from({ length: numItems() }, (_, i) => i).reverse())
+        const itemData = Solid.createMemo(() => Array.from({ length: numItems() }, (_, i) => i).toReversed())
 
         const containerHeight = 100
         const itemHeight = 10

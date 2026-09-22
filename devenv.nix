@@ -101,6 +101,7 @@ in
 
   packages = [
     pkgs.bun
+    effectTsgo
     pkgs.nodejs_24
     oxlintWithPlugins
     pkgs.oxfmt
@@ -110,6 +111,7 @@ in
   ];
 
   env = {
+    MEGAREPO_SKIP_MEMBERS = "effect-utils,livestore";
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     PUPPETEER_SKIP_DOWNLOAD = "1";
   };
@@ -401,7 +403,8 @@ in
       "pnpm:install"
     ];
     exec = ''
-      if timeout --kill-after=30s 180s devenv tasks run test:integration:node-sync --mode before --no-tui; then
+      if WORKSPACE_ROOT="$PWD" DEVENV_TASK_PASSTHROUGH=1 timeout --kill-after=30s 180s \
+        pnpm --dir tests/integration exec vitest run --config src/tests/node-sync/vitest.config.ts; then
         exit 0
       fi
       echo "::warning::Node-sync integration tests failed or timed out (flaky; carried over from livestorejs/livestore#624)"

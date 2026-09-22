@@ -92,10 +92,10 @@ export const defineAction = <
   run: (args: { store: Store<TSchema>; input: TInputSchema['Type'] }) => Effect.Effect<void, never>
 }): ApplicationAction<TSchema, TInputSchema['Type']> => ({
   validateInput: (input) => {
-    Schema.decodeUnknownSync(args.input)(input)
+    Schema.decodeSync(args.input)(input)
   },
   dispatch: (store, encodedInput) =>
-    Schema.decodeUnknownEffect(args.input)(encodedInput).pipe(
+    Schema.decodeEffect(args.input)(encodedInput).pipe(
       Effect.mapError(
         (cause) =>
           new ScenarioOperationError('invalid-action-input', `Action input failed schema validation: ${String(cause)}`),

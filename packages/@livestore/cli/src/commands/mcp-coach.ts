@@ -39,7 +39,7 @@ export const coachTool = Tool.make('livestore_coach', {
 
 /** Composed layer: HttpClient → OpenAiClient → LanguageModel */
 const LanguageModelLayer = OpenAiLanguageModel.layer({ model: 'gpt-4o-mini' }).pipe(
-  Layer.provide(OpenAiClient.layerConfig({ apiKey: Config.redacted('OPENAI_API_KEY') })),
+  Layer.provide(OpenAiClient.layerConfig({ apiKey: Config.Redacted('OPENAI_API_KEY') })),
   Layer.provide(FetchHttpClient.layer),
 )
 
