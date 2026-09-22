@@ -12,7 +12,7 @@ const runtimeDeps = catalog.compose({
     workspace: [adapterWebPkg, commonPkg, livestorePkg, syncCfPkg, utilsPkg],
     external: {
       ...catalog.pick('@cloudflare/workers-types'),
-      '@playwright/test': '1.61.0',
+      ...catalog.pick('@playwright/test'),
       ...catalog.pick('react', 'react-dom'),
     },
   },

@@ -39,6 +39,7 @@ const effectUtilsCatalogWithoutEffectV3 = Object.fromEntries(
 
 /** Versions where contrib must lead effect-utils to stay aligned with the composed LiveStore cohort. */
 const contribCatalogOverrides = {
+  '@playwright/test': '1.63.0',
   '@vitest/ui': '5.0.1',
   typescript: '7.0.2',
   vitest: '5.0.1',

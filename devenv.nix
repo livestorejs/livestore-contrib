@@ -271,9 +271,11 @@ in
         exit 1
       fi
 
-      core_sha="$(jq -r '.members.livestore.commit' megarepo.lock)"
-      if [ -z "$core_sha" ] || [ "$core_sha" = "null" ]; then
-        echo "megarepo.lock is missing members.livestore.commit" >&2
+      # Main-branch core commits do not publish an exact-SHA snapshot. Use the release version
+      # declared by the pinned core checkout, then let --verify-core prove that cohort is installable.
+      core_release_version="$(jq -r '.version' repos/livestore/release/version.json)"
+      if [ -z "$core_release_version" ] || [ "$core_release_version" = "null" ]; then
+        echo "repos/livestore/release/version.json is missing version" >&2
         exit 1
       fi
 
@@ -284,7 +286,7 @@ in
         genie --writeable
       node release/simulate-publish.mjs \
         --version "$release_version" \
-        --core-sha "$core_sha" \
+        --core-version "$core_release_version" \
         --verify-core \
         --pack-only \
         --out-dir "$SNAPSHOT_OUT_DIR"
