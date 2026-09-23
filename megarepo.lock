@@ -4,9 +4,9 @@
     "livestore": {
       "url": "https://github.com/livestorejs/livestore",
       "ref": "schickling-assistant/2026-09-23-playwright-cohort",
-      "commit": "40732fc197a546e587d1d57a9b52f129726f59f6",
+      "commit": "8e141979ac1641259b953adbfa5d4d06effbd242",
       "pinned": true,
-      "lockedAt": "2026-09-23T11:41:49.236Z"
+      "lockedAt": "2026-09-23T13:02:07.947Z"
     },
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",
