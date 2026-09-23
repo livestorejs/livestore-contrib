@@ -54,6 +54,6 @@
     "@standard-schema/spec": "1.1.0",
     "@types/node": "25.3.3",
     "effect": "4.0.0-rc.113",
-    "vitest": "5.0.1"
+    "vitest": "4.1.9"
   }
 }

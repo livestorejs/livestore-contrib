@@ -55,7 +55,7 @@
     "@livestore/utils-dev": "link:../../../repos/livestore/packages/@livestore/utils-dev",
     "@types/node": "25.3.3",
     "typescript": "7.0.2",
-    "vitest": "5.0.1"
+    "vitest": "4.1.9"
   },
   "peerDependencies": {
     "@effect/opentelemetry": "^4.0.0-rc.113",
