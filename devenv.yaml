@@ -5,9 +5,9 @@ inputs:
   nixpkgs:
     follows: effect-utils/nixpkgs
   effect-utils:
-    url: github:overengineeringstudio/effect-utils/main
+    url: github:overengineeringstudio/effect-utils/1b63d2bc2d9e95851dc616cfb89c709767eccf76
   playwright:
-    url: github:overengineeringstudio/effect-utils/main?dir=nix/playwright-flake
+    url: github:overengineeringstudio/effect-utils/1b63d2bc2d9e95851dc616cfb89c709767eccf76?dir=nix/playwright-flake
     inputs:
       nixpkgs:
         follows: nixpkgs

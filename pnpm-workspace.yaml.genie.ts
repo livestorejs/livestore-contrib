@@ -24,6 +24,7 @@ const effectDedupeOverrides = catalog.pick(
   '@effect/platform-node-shared',
   '@effect/opentelemetry',
   '@effect/vitest',
+  'vitest',
 )
 
 /** Validate the examples against the composed source cohort without changing their copyable manifests. */
@@ -125,12 +126,6 @@ const contribCatalogDuplicateExceptions = [
       'Generated publishable packages deliberately consume the new core dev cohort while static examples remain on the previous devtools cohort.',
   },
   {
-    package: '@playwright/test',
-    versions: ['1.63.0', '1.61.0'],
-    reason:
-      'Contrib uses Playwright 1.63 to match the pinned Nix browser bundle while the pinned core effect-playwright workspace still carries Playwright 1.61.',
-  },
-  {
     package: '@testing-library/jest-dom',
     versions: ['6.10.0', '6.6.3'],
     reason:
@@ -177,18 +172,6 @@ const contribCatalogDuplicateExceptions = [
     versions: ['19.2.7', '19.2.3', '19.1.11'],
     reason:
       'The catalog follows the current React type cohort while existing example applications retain older compatible versions.',
-  },
-  {
-    package: 'vitest',
-    versions: ['5.0.1', '4.1.9'],
-    reason:
-      'Contrib uses Vitest 5 to satisfy the current Effect peer contract while the pinned core workspace still carries Vitest 4.',
-  },
-  {
-    package: 'playwright',
-    versions: ['1.63.0', '1.61.0'],
-    reason:
-      'Contrib uses Playwright 1.63 to match the pinned Nix browser bundle while the pinned core effect-playwright workspace still carries Playwright 1.61.',
   },
   {
     package: '@vitejs/plugin-react',
