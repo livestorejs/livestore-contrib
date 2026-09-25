@@ -35,11 +35,16 @@ export const makeSerializedRuntime = <TRuntime>(
       if (current !== undefined) return Effect.succeed(current)
       return Effect.flatMap(build, (candidate) =>
         Effect.as(
-          activate(candidate).pipe(Effect.tap(() => Effect.sync(() => {
-            current = candidate
-          }))),
+          activate(candidate).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                current = candidate
+              }),
+            ),
+          ),
           candidate,
-        ))
+        ),
+      )
     })
 
     const get = Semaphore.withPermits(lock, 1)(getUnlocked)
@@ -48,7 +53,10 @@ export const makeSerializedRuntime = <TRuntime>(
       Semaphore.withPermits(lock, 1)(Effect.flatMap(getUnlocked, use))
 
     const replace: SerializedRuntime<TRuntime>['replace'] = (candidate, beforeReplace) =>
-      Semaphore.withPermits(lock, 1)(
+      Semaphore.withPermits(
+        lock,
+        1,
+      )(
         Effect.gen(function* () {
           // Claiming telemetry ownership is the only fallible handoff step.
           // Do it before stopping the old owner: foreign-event rejection makes

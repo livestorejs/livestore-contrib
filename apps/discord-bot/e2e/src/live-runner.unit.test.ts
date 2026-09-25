@@ -30,10 +30,7 @@ const manifest = parseLiveManifest({
 
 const scenariosByRung: ReadonlyArray<readonly [ScenarioRung, ReadonlyArray<ScenarioId>]> = [
   ['tracer', ['automated-author-rejected', 'operator-retroactive']],
-  [
-    'unattended',
-    ['automated-author-rejected', 'operator-retroactive', 'operator-idempotent', 'operator-concurrent'],
-  ],
+  ['unattended', ['automated-author-rejected', 'operator-retroactive', 'operator-idempotent', 'operator-concurrent']],
   [
     'attended',
     [
@@ -89,9 +86,9 @@ describe('live staging write gate', () => {
     expect(inspected).toEqual([manifest.target.channelId, manifest.target.docsChannelIds.restricted])
     expect(receipt.verdict).toBe('PASS')
     expect(receipt.scenarios).toHaveLength(11)
-    expect(receipt.scenarios.filter((scenario) => scenario.verdict === 'PASS').map((scenario) => scenario.scenario)).toEqual([
-      'operator-retroactive',
-    ])
+    expect(
+      receipt.scenarios.filter((scenario) => scenario.verdict === 'PASS').map((scenario) => scenario.scenario),
+    ).toEqual(['operator-retroactive'])
     expect(
       receipt.scenarios
         .filter((scenario) => scenario.scenario !== 'operator-retroactive')
@@ -110,8 +107,9 @@ describe('live staging write gate', () => {
 
     expect(
       receipt.scenarios
-        .filter((scenario) =>
-          scenario.scenario === 'automated-author-rejected' || scenario.scenario === 'operator-retroactive',
+        .filter(
+          (scenario) =>
+            scenario.scenario === 'automated-author-rejected' || scenario.scenario === 'operator-retroactive',
         )
         .every((scenario) => scenario.reason === 'prerequisite-missing'),
     ).toBe(true)

@@ -100,8 +100,7 @@ export const fullScenarioSelection: ScenarioSelection = { _tag: 'Rung', rung: 'f
 export const isScenarioId = (value: string): value is ScenarioId =>
   scenarioMatrix.some((scenario) => scenario.id === value)
 
-export const isScenarioRung = (value: string): value is ScenarioRung =>
-  scenarioRungs.some((rung) => rung === value)
+export const isScenarioRung = (value: string): value is ScenarioRung => scenarioRungs.some((rung) => rung === value)
 
 export const scenarioIdsForSelection = (selection: ScenarioSelection): ReadonlyArray<ScenarioId> => {
   if (selection._tag === 'Scenarios') return selection.scenarios

@@ -27,7 +27,7 @@ export const docsAdmissionLimitsFromDeployment = (limits: {
   readonly inputTokensPerRequest: number
   readonly outputTokensPerRequest: number
 }) =>
-  Schema.decodeUnknownSync(DocsAdmissionLimits)({
+  Schema.decodeSync(DocsAdmissionLimits)({
     ...defaultDocsAdmissionLimits,
     maximumRequestsPerPrincipalWindow: limits.requestsPerMemberPerHour,
     maximumRequestsGlobalWindow: Math.max(1, limits.requestsPerMinute),
@@ -35,7 +35,7 @@ export const docsAdmissionLimitsFromDeployment = (limits: {
     maximumOutputTokensPerRequest: limits.outputTokensPerRequest,
   })
 
-export const defaultDocsAdmissionLimits = Schema.decodeUnknownSync(DocsAdmissionLimits)({
+export const defaultDocsAdmissionLimits = Schema.decodeSync(DocsAdmissionLimits)({
   maximumConcurrentPerPrincipal: 1,
   maximumConcurrentGlobal: 4,
   maximumRequestsPerPrincipalWindow: 10,

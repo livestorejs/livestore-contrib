@@ -1,11 +1,11 @@
 // Generated file - DO NOT EDIT
-// Source: mirrors the app root tsconfig options; the cf subtree adds the
-// Cloudflare Workers type surface required by @effect/sql-sqlite-do and the
-// DO runtime, plus node types for the test fakes that run under Bun/Vitest.
+// Source: tsconfig.json.genie.ts
 {
   "compilerOptions": {
     "target": "ES2024",
-    "lib": ["ES2024"],
+    "lib": [
+      "ES2024"
+    ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "allowImportingTsExtensions": true,
@@ -28,8 +28,18 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "types": ["@cloudflare/workers-types", "node"]
+    "types": [
+      "@cloudflare/workers-types",
+      "node"
+    ]
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "**/dist", "**/node_modules/.pnpm"]
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/dist",
+    "**/node_modules/.pnpm",
+    "**/*.genie.ts"
+  ]
 }

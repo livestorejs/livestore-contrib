@@ -1,5 +1,4 @@
 import { expect, it } from '@effect/vitest'
-
 import * as Effect from 'effect/Effect'
 
 import { makeSupervisorGate } from './loop-gate.ts'
@@ -16,4 +15,5 @@ it.effect('the supervision gate admits exactly one claimant among concurrent tic
     // After the loop's ensuring releases the slot, the next tick can claim.
     yield* gate.end
     expect(yield* gate.tryBegin).toBe(true)
-  }))
+  }),
+)

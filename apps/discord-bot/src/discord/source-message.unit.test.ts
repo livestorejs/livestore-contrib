@@ -4,7 +4,7 @@ import { Schema } from 'effect'
 import { DiscordMessageRef } from '../threading/model.ts'
 import { decodeDiscordSourceMessage } from './source-message.ts'
 
-const source = Schema.decodeUnknownSync(DiscordMessageRef)({
+const source = Schema.decodeSync(DiscordMessageRef)({
   guildId: '100000000000000001',
   channelId: '100000000000000002',
   messageId: '100000000000000003',

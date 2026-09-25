@@ -8,8 +8,8 @@ import * as Config from 'effect/Config'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
-import { DiscordBot } from './src/worker.ts'
 import { canonicalStagingIdentity, deploymentIdentityMismatch } from './src/release.ts'
+import { DiscordBot } from './src/worker.ts'
 
 export default Alchemy.Stack(
   'DiscordBot',
@@ -24,10 +24,7 @@ export default Alchemy.Stack(
       return yield* Effect.die('remote stack refuses ALCHEMY_LOCAL=1; use alchemy.local.ts')
     }
     const deploymentIdentity = yield* Config.all({
-      releaseId: Config.schema(
-        Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(256)),
-        'RELEASE_ID',
-      ),
+      releaseId: Config.schema(Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(256)), 'RELEASE_ID'),
       workerName: Config.schema(Schema.Trimmed.check(Schema.isNonEmpty()), 'CF_WORKER_NAME'),
       botStateNamespaceId: Config.schema(
         Schema.Trimmed.check(Schema.isPattern(/^[0-9a-f]{32}$/)),
@@ -40,10 +37,7 @@ export default Alchemy.Stack(
         `remote stage ${stage} is not admitted; production remains gated and local work uses alchemy.local.ts`,
       )
     }
-    const requestedIdentityMismatch = deploymentIdentityMismatch(
-      canonicalStagingIdentity,
-      deploymentIdentity,
-    )
+    const requestedIdentityMismatch = deploymentIdentityMismatch(canonicalStagingIdentity, deploymentIdentity)
     if (requestedIdentityMismatch !== undefined) {
       return yield* Effect.die(requestedIdentityMismatch)
     }
@@ -53,12 +47,12 @@ export default Alchemy.Stack(
       )
     }
     const worker = yield* DiscordBot
-    const workerName = yield* (yield* worker.workerName)
+    const workerName = yield* yield* worker.workerName
     const botStateNamespace = worker.durableObjectNamespaces['BotState']
     if (botStateNamespace === undefined) {
       return yield* Effect.die('remote Worker has no BotState Durable Object namespace')
     }
-    const botStateNamespaceId = yield* (yield* botStateNamespace)
+    const botStateNamespaceId = yield* yield* botStateNamespace
     const identityMismatch = deploymentIdentityMismatch(deploymentIdentity, {
       workerName,
       botStateNamespaceId,

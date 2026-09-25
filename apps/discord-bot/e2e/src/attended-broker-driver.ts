@@ -25,11 +25,7 @@ interface BrowserStepOutput {
  * `http-capture browser` reads one JSON operation from stdin, so this cannot go
  * through execFile-style runners that have no stdin channel.
  */
-const runBrowserStep = async (
-  sessionId: string,
-  epoch: string,
-  step: BrowserControlStep,
-): Promise<BrowserStepOutput> =>
+const runBrowserStep = async (sessionId: string, epoch: string, step: BrowserControlStep): Promise<BrowserStepOutput> =>
   new Promise((resolve) => {
     const child = spawn('http-capture', ['browser', sessionId, '--epoch', epoch], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -88,8 +84,21 @@ export const buildMessageActionSteps = (input: {
   readonly sourceMarkerText: string
 }): ReadonlyArray<BrowserControlStep> => [
   { operation: 'navigate', url: guildChannelUrl(input.guildId, input.channelId) },
-  { operation: 'wait', locator: { kind: 'exact_text', value: input.sourceMarkerText }, state: 'visible', timeoutMs: 15000 },
-  { operation: 'click', locator: { kind: 'row_scoped', anchor: { kind: 'exact_text', value: input.sourceMarkerText }, target: { kind: 'role', name: 'button' } }, timeoutMs: 5000 },
+  {
+    operation: 'wait',
+    locator: { kind: 'exact_text', value: input.sourceMarkerText },
+    state: 'visible',
+    timeoutMs: 15000,
+  },
+  {
+    operation: 'click',
+    locator: {
+      kind: 'row_scoped',
+      anchor: { kind: 'exact_text', value: input.sourceMarkerText },
+      target: { kind: 'role', name: 'button' },
+    },
+    timeoutMs: 5000,
+  },
   // The context menu item label matches the registered application command.
   { operation: 'click', locator: { kind: 'role', name: 'Create Thread' }, timeoutMs: 5000 },
 ]
@@ -101,15 +110,22 @@ export const buildDeleteMessageSteps = (input: {
 }): ReadonlyArray<BrowserControlStep> => [
   { operation: 'navigate', url: guildChannelUrl(input.guildId, input.channelId) },
   { operation: 'wait', locator: { kind: 'exact_text', value: input.markerText }, state: 'visible', timeoutMs: 15000 },
-  { operation: 'click', locator: { kind: 'row_scoped', anchor: { kind: 'exact_text', value: input.markerText }, target: { kind: 'role', name: 'button' } }, timeoutMs: 5000 },
+  {
+    operation: 'click',
+    locator: {
+      kind: 'row_scoped',
+      anchor: { kind: 'exact_text', value: input.markerText },
+      target: { kind: 'role', name: 'button' },
+    },
+    timeoutMs: 5000,
+  },
   { operation: 'click', locator: { kind: 'role', name: 'Delete Message' }, timeoutMs: 5000 },
 ]
 
 const evidenceFromText = (text: string | undefined): GestureEvidence => {
   const lowered = (text ?? '').toLowerCase()
-  if (
-    lowered.includes('denied') === true || lowered.includes('not allowed') === true
-  ) return { docsOutcome: 'denied', messageActionOutcome: 'denied' }
+  if (lowered.includes('denied') === true || lowered.includes('not allowed') === true)
+    return { docsOutcome: 'denied', messageActionOutcome: 'denied' }
   if (lowered.length !== 0) return { docsOutcome: 'answered', messageActionOutcome: 'created' }
   return {}
 }

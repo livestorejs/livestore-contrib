@@ -87,7 +87,10 @@ export interface GestureEvidence {
 }
 
 export interface AttendedBrokerDriver {
-  readonly perform: (input: { readonly operation: BrokerOperation; readonly request: unknown }) => Promise<GestureEvidence>
+  readonly perform: (input: {
+    readonly operation: BrokerOperation
+    readonly request: unknown
+  }) => Promise<GestureEvidence>
 }
 
 /**
@@ -115,7 +118,6 @@ export interface BrokerCorrelator {
   readonly dispose: () => Promise<void>
 }
 
-
 const asSnowflake = (value: string, label: string): Snowflake => {
   if (/^\d{17,20}$/u.test(value) === false) throw new Error(`broker ${label} returned an invalid snowflake`)
   return value as Snowflake
@@ -128,7 +130,8 @@ export const parseBrokerInvocation = (args: ReadonlyArray<string>): ParseBrokerR
     'Usage: livestore-discord-e2e-broker <create-message|invoke-message-action|invoke-docs|delete-message|delete-response|resolve-thread> --request-json JSON [--ledger FILE]'
   const flagValueIndices: number[] = []
   args.forEach((value, index) => {
-    if (value === '--request-json' || value === '--ledger' || value === '--run-id') flagValueIndices.push(index, index + 1)
+    if (value === '--request-json' || value === '--ledger' || value === '--run-id')
+      flagValueIndices.push(index, index + 1)
   })
   const positional = args.flatMap((value, index) => (flagValueIndices.includes(index) === false ? [value] : []))
   const [operation, ...extra] = positional
@@ -163,9 +166,12 @@ export const parseBrokerInvocation = (args: ReadonlyArray<string>): ParseBrokerR
 }
 
 /** Correlation windows ride on the injected target context; sane defaults otherwise. */
-const readTiming = (request: Record<string, unknown>): { readonly timeoutMs: number; readonly pollIntervalMs: number } => ({
+const readTiming = (
+  request: Record<string, unknown>,
+): { readonly timeoutMs: number; readonly pollIntervalMs: number } => ({
   timeoutMs: typeof request.timeoutMs === 'number' && request.timeoutMs > 0 ? request.timeoutMs : 30_000,
-  pollIntervalMs: typeof request.pollIntervalMs === 'number' && request.pollIntervalMs > 0 ? request.pollIntervalMs : 1_000,
+  pollIntervalMs:
+    typeof request.pollIntervalMs === 'number' && request.pollIntervalMs > 0 ? request.pollIntervalMs : 1_000,
 })
 
 const readRequestString = (request: Record<string, unknown>, key: string, label: string): string => {
@@ -175,9 +181,7 @@ const readRequestString = (request: Record<string, unknown>, key: string, label:
 }
 
 /** DFX-backed correlator: polls the actor-bot REST seam until the gesture's effect appears. */
-export const makeDfxBrokerCorrelator = (input: {
-  readonly actorBotToken: string
-}): BrokerCorrelator => {
+export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string }): BrokerCorrelator => {
   const DiscordLive = DiscordRESTMemoryLive.pipe(
     Layer.provide(NodeHttpClient.layerUndici),
     Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
@@ -227,7 +231,6 @@ export const makeDfxBrokerCorrelator = (input: {
   }
 }
 
-
 export interface BrokerDispatchResult {
   readonly payload: Record<string, unknown>
   readonly declineExitCode: undefined | 7
@@ -238,7 +241,11 @@ export const dispatchBrokerOperation = async (
   invocation: ParsedBrokerInvocation,
   deps: AttendedBrokerDeps,
 ): Promise<BrokerDispatchResult> => {
-  if (typeof invocation.request !== 'object' || invocation.request === null || Array.isArray(invocation.request) === true) {
+  if (
+    typeof invocation.request !== 'object' ||
+    invocation.request === null ||
+    Array.isArray(invocation.request) === true
+  ) {
     throw new Error('broker request must be a JSON object')
   }
   const request = invocation.request as Record<string, unknown>
@@ -246,7 +253,9 @@ export const dispatchBrokerOperation = async (
   // resolve-thread acknowledges a deletion already completed through the bot
   // REST seam; it is ledger bookkeeping, not another official-client gesture.
   const evidence =
-    invocation.operation === 'resolve-thread' ? {} : await deps.driver.perform({ operation: invocation.operation, request })
+    invocation.operation === 'resolve-thread'
+      ? {}
+      : await deps.driver.perform({ operation: invocation.operation, request })
   if (evidence.declined === true) {
     return { payload: { declinedByOperator: true }, declineExitCode: 7 }
   }

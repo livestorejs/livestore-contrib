@@ -92,7 +92,6 @@ export class GatewayReadinessError extends Schema.TaggedError<GatewayReadinessEr
 const FakeDocsWorkflowLive = makeDocsWorkflowLayer().pipe(Layer.provide(FakeDocsPortsLive))
 const FakeServiceLayer = Layer.merge(FakeDiscordActionsLive, FakeDocsWorkflowLive)
 
-
 /** Acquires the complete fake-composable tracer bullet in one Effect scope. */
 export const acquireRuntime = Effect.fn('runtime.acquire')(function* (
   config: RuntimeConfigPayload,

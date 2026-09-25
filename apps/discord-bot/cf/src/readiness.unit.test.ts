@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  emptyGatewayTelemetrySnapshot,
-  type GatewayTelemetrySnapshot,
-} from './gateway-telemetry.ts'
+import { emptyGatewayTelemetrySnapshot, type GatewayTelemetrySnapshot } from './gateway-telemetry.ts'
 import { schemaVersion } from './journal.ts'
 import { evaluateReadiness, type ReadinessStatus } from './readiness.ts'
 
@@ -63,15 +60,21 @@ describe('gateway-aware readiness', () => {
     // Lifetime history deliberately remains ready: only this activation's
     // establishment is allowed to satisfy readiness.
     expect(evaluateReadiness(withCurrent({ lastReadyAt: null })).ready).toBe(false)
-    expect(evaluateReadiness(withCurrent({
-      state: 'terminal',
-      terminalCloseCode: 4_014,
-      lastError: 'terminal-close',
-    })).ready).toBe(false)
-    expect(evaluateReadiness({
-      ...readyStatus,
-      health: { ...readyStatus.health, lastError: 'gateway loop failed' },
-    }).ready).toBe(false)
+    expect(
+      evaluateReadiness(
+        withCurrent({
+          state: 'terminal',
+          terminalCloseCode: 4_014,
+          lastError: 'terminal-close',
+        }),
+      ).ready,
+    ).toBe(false)
+    expect(
+      evaluateReadiness({
+        ...readyStatus,
+        health: { ...readyStatus.health, lastError: 'gateway loop failed' },
+      }).ready,
+    ).toBe(false)
   })
 
   it('withdraws on disconnect and restores only after the current activation resumes', () => {
@@ -94,39 +97,43 @@ describe('gateway-aware readiness', () => {
     }
     expect(evaluateReadiness(readyStatus).ready).toBe(true)
     expect(evaluateReadiness(disconnected).ready).toBe(false)
-    expect(evaluateReadiness({
-      ...disconnected,
-      health: {
-        ...disconnected.health,
-        gateway: {
-          ...disconnectedGateway,
-          current: {
-            ...disconnectedGateway.current,
-            state: 'ready',
-            connectedAt: 1_100,
-            lastResumedAt: 1_100,
-            lastError: null,
+    expect(
+      evaluateReadiness({
+        ...disconnected,
+        health: {
+          ...disconnected.health,
+          gateway: {
+            ...disconnectedGateway,
+            current: {
+              ...disconnectedGateway.current,
+              state: 'ready',
+              connectedAt: 1_100,
+              lastResumedAt: 1_100,
+              lastError: null,
+            },
           },
         },
-      },
-    }).ready).toBe(true)
+      }).ready,
+    ).toBe(true)
   })
 
   it('accepts RESUMED as the first current-activation establishment observation', () => {
-    expect(evaluateReadiness({
-      ...readyStatus,
-      health: {
-        ...readyStatus.health,
-        gateway: {
-          ...readyGateway,
-          current: {
-            ...readyGateway.current,
-            lastReadyAt: null,
-            lastResumedAt: 1_100,
+    expect(
+      evaluateReadiness({
+        ...readyStatus,
+        health: {
+          ...readyStatus.health,
+          gateway: {
+            ...readyGateway,
+            current: {
+              ...readyGateway.current,
+              lastReadyAt: null,
+              lastResumedAt: 1_100,
+            },
           },
         },
-      },
-    }).ready).toBe(true)
+      }).ready,
+    ).toBe(true)
   })
 
   it.each([

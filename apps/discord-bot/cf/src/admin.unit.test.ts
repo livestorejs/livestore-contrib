@@ -1,11 +1,10 @@
 import { expect, it } from '@effect/vitest'
-
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
 import { makeAdminHandler, constantTimeEquals } from './admin.ts'
-import { RuntimeConfigPutPayload } from './runtime-config.ts'
 import { emptyGatewayTelemetrySnapshot } from './gateway-telemetry.ts'
+import { RuntimeConfigPutPayload } from './runtime-config.ts'
 
 /**
  * Drives the assembled admin router through the worker bridge — the exact
@@ -140,23 +139,24 @@ it('RuntimeStatus exposes content-free structured health and withdraws on termin
   }
 
   const terminal = makeAdminHandler(token, {
-    runtimeStatus: () => Effect.succeed({
-      ...readySnapshot,
-      health: {
-        ...readySnapshot.health,
-        supervisor: 'stopped',
-        gateway: {
-          lifetime: { ...readyGateway.lifetime, terminalCloses: 1 },
-          current: {
-            ...readyGateway.current,
-            state: 'terminal',
-            connectedAt: null,
-            terminalCloseCode: 4_014,
-            lastError: 'terminal-close',
+    runtimeStatus: () =>
+      Effect.succeed({
+        ...readySnapshot,
+        health: {
+          ...readySnapshot.health,
+          supervisor: 'stopped',
+          gateway: {
+            lifetime: { ...readyGateway.lifetime, terminalCloses: 1 },
+            current: {
+              ...readyGateway.current,
+              state: 'terminal',
+              connectedAt: null,
+              terminalCloseCode: 4_014,
+              lastError: 'terminal-close',
+            },
           },
         },
-      },
-    }),
+      }),
   })
   const unhealthy = await terminal(post('/admin/rpc/RuntimeStatus', {}, `Bearer ${token}`))
   expect(unhealthy.status).toBe(503)
@@ -209,7 +209,12 @@ const validConfigPayload = {
     },
   },
   releaseId: 'dev',
-  diagnostics: { sink: 'cloudflare-provider', delivery: 'best-effort', accessPolicyId: 'cloudflare-access-policy/discord-bot-admin', retentionDays: 30 },
+  diagnostics: {
+    sink: 'cloudflare-provider',
+    delivery: 'best-effort',
+    accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
+    retentionDays: 30,
+  },
   e2e: {
     actorApplicationId: '1541440368212705380',
     actorTokenSecretRef: 'cf-secret/E2E_ACTOR_TOKEN',
@@ -240,9 +245,7 @@ const fullHandler = makeAdminHandler(token, {
       }),
     )
   },
-  configGet: Effect.succeed(
-    outcome(true, 200, { _tag: 'Success', summary: 'config', payload: validConfigPayload }),
-  ),
+  configGet: Effect.succeed(outcome(true, 200, { _tag: 'Success', summary: 'config', payload: validConfigPayload })),
   configPut: (payload) =>
     Schema.is(RuntimeConfigPutPayload)(payload) === true
       ? Effect.succeed(outcome(true, 200, { _tag: 'Success', summary: 'persisted' }))
@@ -305,13 +308,19 @@ it('PUT /admin/config validates before persisting; invalid bodies get a 422', as
 })
 
 it('POST /admin/commands-sync reports AlreadySatisfied when no drift exists', async () => {
-  const response = await fullHandler(post('/admin/commands-sync', {
-    environment: 'staging',
-    reason: 'operator requested sync',
-    apply: true,
-    expectedApplicationId: '1541431832195633232',
-    expectedGuildId: '1154415661842452532',
-  }, `Bearer ${token}`))
+  const response = await fullHandler(
+    post(
+      '/admin/commands-sync',
+      {
+        environment: 'staging',
+        reason: 'operator requested sync',
+        apply: true,
+        expectedApplicationId: '1541431832195633232',
+        expectedGuildId: '1154415661842452532',
+      },
+      `Bearer ${token}`,
+    ),
+  )
   expect(response.status).toBe(200)
   expect(await jsonBody(response)).toMatchObject({ _tag: 'AlreadySatisfied' })
 })
@@ -335,13 +344,19 @@ it('unwired new routes degrade to ControlDependencyUnavailable instead of failin
   expect(response.status).toBe(503)
   expect(await jsonBody(response)).toMatchObject({ _tag: 'ControlDependencyUnavailable' })
   {
-    const syncResponse = await bare(post('/admin/commands-sync', {
-      environment: 'staging',
-      reason: 'operator requested sync',
-      apply: false,
-      expectedApplicationId: '1541431832195633232',
-      expectedGuildId: '1154415661842452532',
-    }, `Bearer ${token}`))
+    const syncResponse = await bare(
+      post(
+        '/admin/commands-sync',
+        {
+          environment: 'staging',
+          reason: 'operator requested sync',
+          apply: false,
+          expectedApplicationId: '1541431832195633232',
+          expectedGuildId: '1154415661842452532',
+        },
+        `Bearer ${token}`,
+      ),
+    )
     expect(syncResponse.status).toBe(503)
     expect(await jsonBody(syncResponse)).toMatchObject({ _tag: 'ControlDependencyUnavailable' })
   }

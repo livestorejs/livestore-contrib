@@ -30,7 +30,8 @@ const unrunReceipt = (selection: ScenarioSelection): RunReceipt => {
     scenario: scenario.id,
     executor: scenario.executor,
     verdict: 'UNRUN' as const,
-    reason: selectedScenarioIds.has(scenario.id) === true ? ('prerequisite-missing' as const) : ('not-selected' as const),
+    reason:
+      selectedScenarioIds.has(scenario.id) === true ? ('prerequisite-missing' as const) : ('not-selected' as const),
     targetHash: opaqueHash('unconfigured-staging-target'),
     markerHash: opaqueHash(makeMarker(runId, scenario.id)),
     artifactHashes: [],

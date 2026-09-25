@@ -11,7 +11,7 @@ import { runCli } from './run.ts'
 
 const messageUrl = 'https://discord.com/channels/10000000000000001/10000000000000002/10000000000000003'
 const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown))
-const result = Schema.decodeUnknownSync(ControlResult)({
+const result = Schema.decodeSync(ControlResult)({
   _tag: 'Success',
   summary: 'operation completed',
   correlationId: 'correlation-1',

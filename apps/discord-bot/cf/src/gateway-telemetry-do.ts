@@ -18,9 +18,7 @@ export const gatewayTelemetryAggregateKey = 'gateway-telemetry:aggregate:v1'
  * counter increments. Durable Object input gates serialize separate executions;
  * this lock serializes fibers within the current execution.
  */
-export const makeDurableObjectGatewayTelemetrySink = (
-  storage: DurableStorage,
-): GatewayTelemetrySink => {
+export const makeDurableObjectGatewayTelemetrySink = (storage: DurableStorage): GatewayTelemetrySink => {
   const lock = Effect.runSync(Semaphore.make(1))
 
   const readAggregate = Effect.map(
@@ -29,13 +27,14 @@ export const makeDurableObjectGatewayTelemetrySink = (
   )
 
   const append = (observation: GatewayObservation): Effect.Effect<void> =>
-    Semaphore.withPermits(lock, 1)(
+    Semaphore.withPermits(
+      lock,
+      1,
+    )(
       Effect.gen(function* () {
         const current = yield* readAggregate
         const next = reduceGatewayObservation(current, observation)
-        yield* Effect.asVoid(
-          Effect.promise(() => storage.put(gatewayTelemetryAggregateKey, next)),
-        )
+        yield* Effect.asVoid(Effect.promise(() => storage.put(gatewayTelemetryAggregateKey, next)))
       }),
     )
 

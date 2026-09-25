@@ -1,3 +1,7 @@
+import type { PersistedState, StateService } from 'alchemy/State'
+import * as Effect from 'effect/Effect'
+import { describe, expect, it } from 'vitest'
+
 import {
   copyStage,
   remoteAuthorityExitCode,
@@ -8,9 +12,6 @@ import {
   verifyRemoteAuthoritative,
   type MigrationSummary,
 } from './state-migrate.ts'
-import type { PersistedState, StateService } from 'alchemy/State'
-import * as Effect from 'effect/Effect'
-import { describe, expect, it } from 'vitest'
 
 const makeResource = (fqn: string, secret: string): PersistedState => ({
   kind: 'resource',
@@ -74,22 +75,10 @@ const makeFakeState = (input?: {
   const service: StateService = {
     id: 'fake',
     getVersion: () => Effect.succeed(4),
-    listStacks: () =>
-      Effect.succeed(records.size > 0 || output !== undefined ? [STACK] : []),
-    listStages: (stack) =>
-      Effect.succeed(
-        stack === STACK && (records.size > 0 || output !== undefined)
-          ? [STAGE]
-          : [],
-      ),
-    get: ({ stack, stage, fqn }) =>
-      Effect.succeed(
-        stack === STACK && stage === STAGE ? records.get(fqn) : undefined,
-      ),
-    getReplacedResources: () =>
-      Effect.succeed(
-        [...records.values()].filter((record) => record.status === 'replaced'),
-      ),
+    listStacks: () => Effect.succeed(records.size > 0 || output !== undefined ? [STACK] : []),
+    listStages: (stack) => Effect.succeed(stack === STACK && (records.size > 0 || output !== undefined) ? [STAGE] : []),
+    get: ({ stack, stage, fqn }) => Effect.succeed(stack === STACK && stage === STAGE ? records.get(fqn) : undefined),
+    getReplacedResources: () => Effect.succeed([...records.values()].filter((record) => record.status === 'replaced')),
     set: ({ stack, stage, fqn, value }) =>
       Effect.sync(() => {
         if (stack === STACK && stage === STAGE) records.set(fqn, value)
@@ -107,12 +96,8 @@ const makeFakeState = (input?: {
         records.clear()
         output = undefined
       }),
-    list: ({ stack, stage }) =>
-      Effect.succeed(
-        stack === STACK && stage === STAGE ? [...records.keys()] : [],
-      ),
-    getOutput: ({ stack, stage }) =>
-      Effect.succeed(stack === STACK && stage === STAGE ? output : undefined),
+    list: ({ stack, stage }) => Effect.succeed(stack === STACK && stage === STAGE ? [...records.keys()] : []),
+    getOutput: ({ stack, stage }) => Effect.succeed(stack === STACK && stage === STAGE ? output : undefined),
     setOutput: ({ stack, stage, value }) =>
       Effect.sync(() => {
         if (stack === STACK && stage === STAGE) output = value
@@ -132,11 +117,7 @@ const makeFakeState = (input?: {
   }
 }
 
-const runCopy = (
-  source: FakeState,
-  destination: FakeState,
-  dryRun = false,
-) =>
+const runCopy = (source: FakeState, destination: FakeState, dryRun = false) =>
   Effect.runPromise(
     copyStage({
       source: source.service,
@@ -152,16 +133,9 @@ const expectNoDeletes = (...states: readonly FakeState[]) => {
   }
 }
 
-const expectSafeSummary = (
-  summary: MigrationSummary,
-  forbidden: readonly string[],
-) => {
+const expectSafeSummary = (summary: MigrationSummary, forbidden: readonly string[]) => {
   const record = safeLogRecord(summary)
-  expect(
-    Object.values(record).every(
-      (value) => typeof value === 'boolean' || typeof value === 'number',
-    ),
-  ).toBe(true)
+  expect(Object.values(record).every((value) => typeof value === 'boolean' || typeof value === 'number')).toBe(true)
   const rendered = JSON.stringify(record)
   for (const value of forbidden) expect(rendered).not.toContain(value)
 }
@@ -225,14 +199,9 @@ describe('copyStage', () => {
       verified: true,
     })
     expect(destination.records.get('Worker/main')).toBe(worker)
-    expect(destination.records.get('DurableObject/gateway')).toBe(
-      durableObject,
-    )
+    expect(destination.records.get('DurableObject/gateway')).toBe(durableObject)
     expect(destination.output()).toBe(sourceOutput)
-    expect(destination.setValues.map(({ value }) => value)).toEqual([
-      durableObject,
-      worker,
-    ])
+    expect(destination.setValues.map(({ value }) => value)).toEqual([durableObject, worker])
     expect(destination.setOutputValues).toEqual([sourceOutput])
     expectNoDeletes(source, destination)
     expectSafeSummary(summary, [secret, 'Worker/main', 'private-output'])
@@ -267,10 +236,7 @@ describe('copyStage', () => {
 
   it('aborts before writes when any destination record differs and preserves extras', async () => {
     const sourceRecord = makeResource('Worker/main', 'source-secret')
-    const destinationRecord = makeResource(
-      'Worker/main',
-      'destination-secret',
-    )
+    const destinationRecord = makeResource('Worker/main', 'destination-secret')
     const extra = makeResource('Worker/unrelated', 'leave-me-alone')
     const source = makeFakeState({
       records: { 'Worker/main': sourceRecord },
@@ -310,10 +276,7 @@ describe('copyStage', () => {
       output: { endpoint: 'source' },
     })
     const destination = makeFakeState()
-    const concurrentRecord = makeResource(
-      'Worker/main',
-      'concurrent-writer-secret',
-    )
+    const concurrentRecord = makeResource('Worker/main', 'concurrent-writer-secret')
     const originalGet = destination.service.get
     destination.service.get = (request) => {
       destination.records.set(request.fqn, concurrentRecord)
@@ -415,20 +378,18 @@ describe('verifyRemoteAuthoritative', () => {
   const expectedBotStateNamespaceId = '11111111111111111111111111111111'
 
   const runAuthority = (destination: FakeState) =>
-    Effect.runPromise(verifyRemoteAuthoritative({
-      destination: destination.service,
-      expectedWorkerName,
-      expectedBotStateNamespaceId,
-    }))
+    Effect.runPromise(
+      verifyRemoteAuthoritative({
+        destination: destination.service,
+        expectedWorkerName,
+        expectedBotStateNamespaceId,
+      }),
+    )
 
   it('accepts post-deploy version and output drift when canonical identities remain stable', async () => {
     const destination = makeFakeState({
       records: {
-        DiscordBot: makeAuthorityResource(
-          expectedWorkerName,
-          expectedBotStateNamespaceId,
-          'post-deploy-version',
-        ),
+        DiscordBot: makeAuthorityResource(expectedWorkerName, expectedBotStateNamespaceId, 'post-deploy-version'),
       },
       output: { releaseId: 'new-release', workerVersionId: 'new-version' },
     })
@@ -454,30 +415,18 @@ describe('verifyRemoteAuthoritative', () => {
     const absent = makeFakeState()
     const partial = makeFakeState({
       records: {
-        DiscordBot: makeAuthorityResource(
-          expectedWorkerName,
-          expectedBotStateNamespaceId,
-          'partial',
-        ),
+        DiscordBot: makeAuthorityResource(expectedWorkerName, expectedBotStateNamespaceId, 'partial'),
       },
     })
     const wrongWorker = makeFakeState({
       records: {
-        DiscordBot: makeAuthorityResource(
-          'wrong-worker',
-          expectedBotStateNamespaceId,
-          'wrong-worker',
-        ),
+        DiscordBot: makeAuthorityResource('wrong-worker', expectedBotStateNamespaceId, 'wrong-worker'),
       },
       output: { releaseId: 'release' },
     })
     const wrongNamespace = makeFakeState({
       records: {
-        DiscordBot: makeAuthorityResource(
-          expectedWorkerName,
-          '22222222222222222222222222222222',
-          'wrong-namespace',
-        ),
+        DiscordBot: makeAuthorityResource(expectedWorkerName, '22222222222222222222222222222222', 'wrong-namespace'),
       },
       output: { releaseId: 'release' },
     })

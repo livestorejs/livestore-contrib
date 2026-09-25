@@ -83,7 +83,8 @@ const appendLine = (fd: number, entry: CleanupLedgerEntry): void => {
 const isSnowflakeString = (value: unknown): value is string =>
   typeof value === 'string' && /^\d{17,20}$/u.test(value) === true
 
-const decodeSnowflake = (value: unknown): Snowflake | undefined => (isSnowflakeString(value) === true ? (value as Snowflake) : undefined)
+const decodeSnowflake = (value: unknown): Snowflake | undefined =>
+  isSnowflakeString(value) === true ? (value as Snowflake) : undefined
 
 const decodeEntry = (value: unknown): CleanupLedgerEntry | undefined => {
   if (typeof value !== 'object' || value === null || Array.isArray(value) === true) return undefined

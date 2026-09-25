@@ -1,10 +1,6 @@
 import * as Schema from 'effect/Schema'
 
-import {
-  canonicalStagingIdentity,
-  deploymentIdentityMismatch,
-  type CloudflareDeploymentIdentity,
-} from './release.ts'
+import { canonicalStagingIdentity, deploymentIdentityMismatch, type CloudflareDeploymentIdentity } from './release.ts'
 
 const WorkerSettingsBinding = Schema.Struct({
   type: Schema.String,
@@ -19,17 +15,13 @@ const WorkerSettingsEnvelope = Schema.Struct({
 })
 
 /** Decode Cloudflare's live script settings into the identity deploy must preserve. */
-export const parseLiveDeploymentIdentity = (
-  payload: unknown,
-  workerName: string,
-): CloudflareDeploymentIdentity => {
+export const parseLiveDeploymentIdentity = (payload: unknown, workerName: string): CloudflareDeploymentIdentity => {
   const envelope = Schema.decodeUnknownSync(WorkerSettingsEnvelope)(payload)
   if (envelope.success === false) throw new Error('Cloudflare Worker settings request was unsuccessful')
 
   const botState = envelope.result.bindings.find(
     (binding) =>
-      binding.type === 'durable_object_namespace' &&
-      (binding.class_name === 'BotState' || binding.name === 'BotState'),
+      binding.type === 'durable_object_namespace' && (binding.class_name === 'BotState' || binding.name === 'BotState'),
   )
   if (botState?.namespace_id === undefined || botState.namespace_id === '') {
     throw new Error(`live Worker ${workerName} has no BotState Durable Object namespace binding`)

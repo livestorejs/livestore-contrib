@@ -62,18 +62,18 @@ Provision secrets through op-proxy/Alchemy config; export the non-secret
 deployment identity in the invoking environment (not only `--env-file`, because
 the Worker resource name is fixed while the module is loaded):
 
-| Binding / variable | Purpose |
-| --- | --- |
-| `DISCORD_BOT_TOKEN` | gateway + REST identity |
-| `OPENAI_API_KEY` | docs answer engine |
-| `DOCS_CORRELATION_KEY` | provenance correlation HMAC |
-| `E2E_ACTOR_TOKEN` | e2e actor identity |
-| `ADMIN_TOKEN` | bearer token for `/admin/rpc/*` |
-| `CLOUDFLARE_ACCOUNT_ID` | account queried by the read-only live-identity preflight |
-| `CLOUDFLARE_API_TOKEN` | token used by preflight and Alchemy; needs Worker read plus deploy permissions |
-| `RELEASE_ID` | required, non-empty immutable source/build identity (max 256 characters) |
-| `CF_WORKER_NAME` | expected existing Worker script name; also pins the resource name |
-| `CF_BOT_STATE_NAMESPACE_ID` | expected 32-hex `BotState` Durable Object namespace |
+| Binding / variable          | Purpose                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| `DISCORD_BOT_TOKEN`         | gateway + REST identity                                                        |
+| `OPENAI_API_KEY`            | docs answer engine                                                             |
+| `DOCS_CORRELATION_KEY`      | provenance correlation HMAC                                                    |
+| `E2E_ACTOR_TOKEN`           | e2e actor identity                                                             |
+| `ADMIN_TOKEN`               | bearer token for `/admin/rpc/*`                                                |
+| `CLOUDFLARE_ACCOUNT_ID`     | account queried by the read-only live-identity preflight                       |
+| `CLOUDFLARE_API_TOKEN`      | token used by preflight and Alchemy; needs Worker read plus deploy permissions |
+| `RELEASE_ID`                | required, non-empty immutable source/build identity (max 256 characters)       |
+| `CF_WORKER_NAME`            | expected existing Worker script name; also pins the resource name              |
+| `CF_BOT_STATE_NAMESPACE_ID` | expected 32-hex `BotState` Durable Object namespace                            |
 
 `cf:preflight` performs a read-only Cloudflare Worker-settings request and
 compares the live script name and `BotState` namespace before Alchemy runs.

@@ -1,5 +1,4 @@
 import type { SqliteClient } from '@effect/sql-sqlite-do/SqliteClient'
-
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
@@ -21,9 +20,8 @@ import {
   type ThreadActionRecord as ThreadActionRecordType,
 } from '../../src/journal/model.ts'
 import { JournalTransitionError, JournalUnavailableError } from '../../src/journal/service.ts'
-
-import type { CryptoService } from './crypto.ts'
 import type { ThreadActionJournalService } from '../../src/journal/service.ts'
+import type { CryptoService } from './crypto.ts'
 
 type JournalWriteError = JournalUnavailableError | JournalTransitionError
 
@@ -37,21 +35,17 @@ export const terminalRetentionMs = 30 * 24 * 60 * 60 * 1_000
  * DO `SqlStorage.exec` surface (and the hardened test fake) rejects
  * multi-statement strings, unlike node:sqlite's `exec`.
  */
-const readMetaVersion = (
-  client: SqliteClient,
-): Effect.Effect<ReadonlyArray<Record<string, unknown>>, SqlErrorShape> =>
+const readMetaVersion = (client: SqliteClient): Effect.Effect<ReadonlyArray<Record<string, unknown>>, SqlErrorShape> =>
   exec(client, "SELECT value FROM journal_meta WHERE key = 'user_version'")
 
-export const migrateJournal = (
-  client: SqliteClient,
-): Effect.Effect<void, JournalUnavailableError> =>
+export const migrateJournal = (client: SqliteClient): Effect.Effect<void, JournalUnavailableError> =>
   Effect.gen(function* () {
-    yield* exec(client,
-      'CREATE TABLE IF NOT EXISTS journal_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
-    ).pipe(Effect.catchIf(isSqlError, (cause) => unavailable('initialize', cause)))
-    const observedVersion = readUserVersion(yield* readMetaVersion(client).pipe(
+    yield* exec(client, 'CREATE TABLE IF NOT EXISTS journal_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)').pipe(
       Effect.catchIf(isSqlError, (cause) => unavailable('initialize', cause)),
-    ))
+    )
+    const observedVersion = readUserVersion(
+      yield* readMetaVersion(client).pipe(Effect.catchIf(isSqlError, (cause) => unavailable('initialize', cause))),
+    )
     if (observedVersion > schemaVersion) {
       return yield* unavailable(
         'initialize',
@@ -74,7 +68,9 @@ export const migrateJournal = (
         }
         if (lockedVersion === schemaVersion) return
 
-        yield* exec(client, `CREATE TABLE IF NOT EXISTS thread_actions (
+        yield* exec(
+          client,
+          `CREATE TABLE IF NOT EXISTS thread_actions (
           source_message_id TEXT PRIMARY KEY,
           channel_id TEXT NOT NULL,
           state TEXT NOT NULL CHECK (state IN (
@@ -92,16 +88,22 @@ export const migrateJournal = (
             'multiple_matching_threads', 'awaiting_remote_observation', 'ambiguous_mutation_unresolved',
             'interrupted_before_mutation'
           ))
-        ) STRICT`)
+        ) STRICT`,
+        )
         yield* exec(client, 'CREATE INDEX IF NOT EXISTS thread_actions_recovery ON thread_actions(state, claimed_at)')
         yield* exec(client, 'CREATE INDEX IF NOT EXISTS thread_actions_retention ON thread_actions(state, updated_at)')
         // DO SQL storage rejects PRAGMA statements, so the schema version
         // lives in a meta table instead of SQLite's user_version header.
-        yield* exec(client, "INSERT INTO journal_meta (key, value) VALUES ('user_version', '" + String(schemaVersion) + "')")
+        yield* exec(
+          client,
+          "INSERT INTO journal_meta (key, value) VALUES ('user_version', '" + String(schemaVersion) + "')",
+        )
       }),
-    ).pipe(Effect.mapError((cause: JournalUnavailableError | SqlErrorShape) =>
-      isSqlError(cause) === true ? unavailable('initialize', cause) : cause,
-    ))
+    ).pipe(
+      Effect.mapError((cause: JournalUnavailableError | SqlErrorShape) =>
+        isSqlError(cause) === true ? unavailable('initialize', cause) : cause,
+      ),
+    )
   }).pipe(Effect.withSpan('discord.journal.initialize'))
 
 /**
@@ -123,13 +125,17 @@ export const makeSqliteDoThreadActionJournal = (
       client,
       Effect.gen(function* () {
         const claimToken = yield* crypto.randomUUID
-        yield* exec(client, `
+        yield* exec(
+          client,
+          `
           INSERT INTO thread_actions (
             source_message_id, channel_id, state, trigger, claim_token,
             claimed_at, updated_at, reconcile_by
           ) VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)
           ON CONFLICT(source_message_id) DO NOTHING
-        `, [input.sourceMessageId, input.channelId, input.trigger, claimToken, input.now, input.now, input.reconcileBy])
+        `,
+          [input.sourceMessageId, input.channelId, input.trigger, claimToken, input.now, input.now, input.reconcileBy],
+        )
         const record = yield* getRecord(client, input.sourceMessageId)
         if (record === undefined) {
           return yield* unavailable('claim', new Error('Claim row disappeared before commit'))
@@ -144,8 +150,11 @@ export const makeSqliteDoThreadActionJournal = (
   get: (sourceMessageId: DiscordSnowflake) => getRecord(client, sourceMessageId),
 
   listRecoverable: Effect.flatMap(
-    exec(client, `SELECT * FROM thread_actions WHERE state IN ('pending', 'creating', 'unknown_external')
-                  ORDER BY claimed_at, source_message_id`),
+    exec(
+      client,
+      `SELECT * FROM thread_actions WHERE state IN ('pending', 'creating', 'unknown_external')
+                  ORDER BY claimed_at, source_message_id`,
+    ),
     (rows) =>
       // Row decoding validates against the record schema; a malformed row
       // folds into the same domain-unavailable channel as driver failures.
@@ -161,40 +170,23 @@ export const makeSqliteDoThreadActionJournal = (
   markCreating: (input: ClaimedActionInput) => transition(client, 'markCreating', input, ['pending'], 'creating', {}),
 
   markCreated: (input: MarkCreatedInput) =>
-    transition(
-      client,
-      'markCreated',
-      input,
-      ['pending', 'creating', 'unknown_external'],
-      'created',
-      {
-        threadId: input.threadId,
-        ...(input.resolution === 'existing' ? { outcomeCode: 'existing_thread' as const } : {}),
-      },
-    ),
+    transition(client, 'markCreated', input, ['pending', 'creating', 'unknown_external'], 'created', {
+      threadId: input.threadId,
+      ...(input.resolution === 'existing' ? { outcomeCode: 'existing_thread' as const } : {}),
+    }),
 
   markUnknownExternal: (input: MarkUnknownExternalInput) =>
-    transition(
-      client,
-      'markUnknownExternal',
-      input,
-      ['creating', 'unknown_external'],
-      'unknown_external',
-      { outcomeCode: input.outcomeCode },
-    ),
+    transition(client, 'markUnknownExternal', input, ['creating', 'unknown_external'], 'unknown_external', {
+      outcomeCode: input.outcomeCode,
+    }),
 
   markFailed: (input: MarkFailedInput) =>
     transition(client, 'markFailed', input, ['pending', 'creating'], 'failed', { outcomeCode: input.outcomeCode }),
 
   markManualReview: (input: MarkManualReviewInput) =>
-    transition(
-      client,
-      'markManualReview',
-      input,
-      ['pending', 'creating', 'unknown_external'],
-      'manual_review',
-      { outcomeCode: input.outcomeCode },
-    ),
+    transition(client, 'markManualReview', input, ['pending', 'creating', 'unknown_external'], 'manual_review', {
+      outcomeCode: input.outcomeCode,
+    }),
 
   observeAmbiguity: (input: ObserveAmbiguityInput) =>
     runInTransaction(
@@ -213,18 +205,22 @@ export const makeSqliteDoThreadActionJournal = (
         }
         const observationCount = current.observationCount + 1
         const exhausted = observationCount >= input.minimumObservations || input.now >= current.reconcileBy
-        yield* exec(client, `
+        yield* exec(
+          client,
+          `
           UPDATE thread_actions
           SET state = ?, updated_at = ?, observation_count = ?, outcome_code = ?
           WHERE source_message_id = ? AND claim_token = ? AND state IN ('creating', 'unknown_external')
-        `, [
-          exhausted === true ? 'manual_review' : 'unknown_external',
-          input.now,
-          observationCount,
-          exhausted === true ? 'ambiguous_mutation_unresolved' : 'awaiting_remote_observation',
-          input.sourceMessageId,
-          input.claimToken,
-        ])
+        `,
+          [
+            exhausted === true ? 'manual_review' : 'unknown_external',
+            input.now,
+            observationCount,
+            exhausted === true ? 'ambiguous_mutation_unresolved' : 'awaiting_remote_observation',
+            input.sourceMessageId,
+            input.claimToken,
+          ],
+        )
         return yield* getRecordRequired(client, 'observeAmbiguity', input.sourceMessageId)
       }),
     ).pipe(
@@ -243,11 +239,13 @@ export const makeSqliteDoThreadActionJournal = (
             new TypeError('retentionMs must be a non-negative safe integer'),
           )
         }
-        const doomed = countFrom(yield* exec(
-          client,
-          `SELECT COUNT(*) AS n FROM thread_actions WHERE state IN ('created', 'failed', 'manual_review') AND updated_at <= ?`,
-          [input.now - retentionMs],
-        ))
+        const doomed = countFrom(
+          yield* exec(
+            client,
+            `SELECT COUNT(*) AS n FROM thread_actions WHERE state IN ('created', 'failed', 'manual_review') AND updated_at <= ?`,
+            [input.now - retentionMs],
+          ),
+        )
         yield* exec(
           client,
           `DELETE FROM thread_actions WHERE state IN ('created', 'failed', 'manual_review') AND updated_at <= ?`,
@@ -370,12 +368,14 @@ const conflict = (
   expectedStates: ReadonlyArray<JournalState>,
   targetState: JournalState,
 ): Effect.Effect<never, JournalTransitionError> =>
-  Effect.fail(new JournalTransitionError({
-    sourceMessageId,
-    expectedStates: [...expectedStates],
-    targetState,
-    message: `Journal action cannot transition from its current state to ${targetState}`,
-  }))
+  Effect.fail(
+    new JournalTransitionError({
+      sourceMessageId,
+      expectedStates: [...expectedStates],
+      targetState,
+      message: `Journal action cannot transition from its current state to ${targetState}`,
+    }),
+  )
 
 const getRecord = (
   client: SqliteClient,
@@ -399,7 +399,8 @@ const getRecordRequired = (
   Effect.flatMap(getRecord(client, sourceMessageId), (record) =>
     record === undefined
       ? unavailable(operation, new Error(`No journal row for source message ${sourceMessageId}`))
-      : Effect.succeed(record))
+      : Effect.succeed(record),
+  )
 
 const countFrom = (rows: ReadonlyArray<Record<string, unknown>>): number => {
   const first = rows[0]
@@ -425,22 +426,26 @@ const transition = (
       if (current.claimToken !== input.claimToken || from.includes(current.state) === false) {
         return yield* conflict(input.sourceMessageId, from, to)
       }
-      yield* exec(client, `
+      yield* exec(
+        client,
+        `
         UPDATE thread_actions
         SET state = ?, updated_at = ?,
             thread_id = COALESCE(?, thread_id),
             outcome_code = COALESCE(?, outcome_code),
             observation_count = observation_count + ?
         WHERE source_message_id = ? AND claim_token = ?
-      `, [
-        to,
-        input.now,
-        patch.threadId ?? null,
-        patch.outcomeCode ?? null,
-        patch.incrementObservation === true ? 1 : 0,
-        input.sourceMessageId,
-        input.claimToken,
-      ])
+      `,
+        [
+          to,
+          input.now,
+          patch.threadId ?? null,
+          patch.outcomeCode ?? null,
+          patch.incrementObservation === true ? 1 : 0,
+          input.sourceMessageId,
+          input.claimToken,
+        ],
+      )
       return yield* getRecordRequired(client, operation, input.sourceMessageId)
     }),
   ).pipe(

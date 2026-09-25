@@ -13,7 +13,7 @@ const config: AutomaticThreadPolicyConfig = {
   legacyCommands: new Set(['!help', '!ping']),
 }
 
-const candidate = Schema.decodeUnknownSync(ThreadCandidate)({
+const candidate = Schema.decodeSync(ThreadCandidate)({
   environment: 'staging',
   source: {
     guildId: '10000000000000001',
@@ -30,9 +30,9 @@ const candidate = Schema.decodeUnknownSync(ThreadCandidate)({
   stickerCount: 0,
   trigger: { _tag: 'Automatic', deliveryCorrelation: 'session:1' },
 })
-const existingThreadId = Schema.decodeUnknownSync(DiscordSnowflake)('10000000000000004')
-const otherSnowflake = Schema.decodeUnknownSync(DiscordSnowflake)('10000000000000009')
-const production = Schema.decodeUnknownSync(EnvironmentName)('production')
+const existingThreadId = Schema.decodeSync(DiscordSnowflake)('10000000000000004')
+const otherSnowflake = Schema.decodeSync(DiscordSnowflake)('10000000000000009')
+const production = Schema.decodeSync(EnvironmentName)('production')
 
 describe('automatic thread eligibility', () => {
   const cases: ReadonlyArray<readonly [string, Partial<typeof candidate>, 'Eligible' | AutomaticRejectionReason]> = [

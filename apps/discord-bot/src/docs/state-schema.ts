@@ -1,5 +1,5 @@
-import type * as Effect from 'effect/Effect'
 import { Schema } from 'effect'
+import type * as Effect from 'effect/Effect'
 
 /**
  * Portable docs-state schema: the exact schemas and store contract from

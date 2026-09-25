@@ -4,11 +4,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import {
-  buildCreateMessageSteps,
-  buildDocsCommandSteps,
-  buildMessageActionSteps,
-} from './attended-broker-driver.ts'
+import { buildCreateMessageSteps, buildDocsCommandSteps, buildMessageActionSteps } from './attended-broker-driver.ts'
 import {
   dispatchBrokerOperation,
   parseBrokerInvocation,
@@ -78,9 +74,9 @@ describe('broker invocation parsing', () => {
   })
 
   it('requires the run id when a ledger is configured', () => {
-    expect(
-      parseBrokerInvocation(['create-message', '--request-json', '{}', '--ledger', '/tmp/l.jsonl'])._tag,
-    ).toBe('UsageError')
+    expect(parseBrokerInvocation(['create-message', '--request-json', '{}', '--ledger', '/tmp/l.jsonl'])._tag).toBe(
+      'UsageError',
+    )
     const parsed = parseBrokerInvocation([
       'create-message',
       '--request-json',
@@ -111,7 +107,10 @@ describe('broker dispatch', () => {
       waitForMessage: async () => ({ id: '333333333333333333' as Snowflake, channelId, marker: 'm', author: 'human' }),
       recordOrder,
     })
-    const result = await dispatchBrokerOperation(makeInvocation('create-message', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'), deps)
+    const result = await dispatchBrokerOperation(
+      makeInvocation('create-message', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'),
+      deps,
+    )
     expect(result.declineExitCode).toBeUndefined()
     expect(result.payload).toMatchObject({ id: '333333333333333333', performedBy: 'official-client-session' })
     expect(recordOrder).toEqual(['record:message:333333333333333333', 'close'])
@@ -120,7 +119,10 @@ describe('broker dispatch', () => {
   it('maps an operator decline to exit code 7 without touching the ledger', async () => {
     const recordOrder: string[] = []
     const deps = makeDeps({ evidence: { declined: true }, recordOrder })
-    const result = await dispatchBrokerOperation(makeInvocation('create-message', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'), deps)
+    const result = await dispatchBrokerOperation(
+      makeInvocation('create-message', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'),
+      deps,
+    )
     expect(result.declineExitCode).toBe(7)
     expect(recordOrder).toEqual([])
   })
@@ -134,10 +136,10 @@ describe('broker dispatch', () => {
     })
     const result = await dispatchBrokerOperation(
       makeInvocation(
-      'invoke-message-action',
-      { ...baseRequest, marker: 'm', sourceMessageId: '666666666666666666' },
-      '/tmp/broker-test-ledger.jsonl',
-    ),
+        'invoke-message-action',
+        { ...baseRequest, marker: 'm', sourceMessageId: '666666666666666666' },
+        '/tmp/broker-test-ledger.jsonl',
+      ),
       deps,
     )
     expect(result.payload).toMatchObject({ _tag: 'Created', thread: { id: '555555555555555555' } })
@@ -163,10 +165,10 @@ describe('broker dispatch', () => {
     const deps = makeDeps({ evidence: {}, recordOrder })
     const result = await dispatchBrokerOperation(
       makeInvocation(
-      'delete-response',
-      { ...baseRequest, id: '444444444444444444', marker: 'm' },
-      '/tmp/broker-test-ledger.jsonl',
-    ),
+        'delete-response',
+        { ...baseRequest, id: '444444444444444444', marker: 'm' },
+        '/tmp/broker-test-ledger.jsonl',
+      ),
       deps,
     )
     expect(result.payload).toMatchObject({ deleted: true, id: '444444444444444444' })
@@ -177,11 +179,7 @@ describe('broker dispatch', () => {
     const recordOrder: string[] = []
     const deps = makeDeps({ evidence: { declined: true }, recordOrder })
     const result = await dispatchBrokerOperation(
-      makeInvocation(
-        'resolve-thread',
-        { ...baseRequest, id: '555555555555555555' },
-        '/tmp/broker-test-ledger.jsonl',
-      ),
+      makeInvocation('resolve-thread', { ...baseRequest, id: '555555555555555555' }, '/tmp/broker-test-ledger.jsonl'),
       deps,
     )
 
@@ -227,10 +225,7 @@ describe('broker dispatch', () => {
       },
     }
 
-    await dispatchBrokerOperation(
-      makeInvocation('create-message', { ...baseRequest, marker: 'm' }, ledgerPath),
-      deps,
-    )
+    await dispatchBrokerOperation(makeInvocation('create-message', { ...baseRequest, marker: 'm' }, ledgerPath), deps)
     await dispatchBrokerOperation(
       makeInvocation('invoke-message-action', { ...baseRequest, marker: 'm', sourceMessageId: sourceId }, ledgerPath),
       deps,

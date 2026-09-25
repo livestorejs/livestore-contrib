@@ -1,12 +1,11 @@
+import { isDeepStrictEqual } from 'node:util'
+
+import * as NodeRuntime from '@effect/platform-node/NodeRuntime'
+import * as NodeServices from '@effect/platform-node/NodeServices'
 import { AlchemyContext, AuthProviders, Cli } from 'alchemy'
 import { ArtifactStore, createArtifactStore } from 'alchemy/Artifacts'
 import * as Cloudflare from 'alchemy/Cloudflare'
-import {
-  encodeState,
-  localState,
-  isResourceState,
-  State,
-} from 'alchemy/State'
+import { encodeState, localState, isResourceState, State } from 'alchemy/State'
 import type { PersistedState, StateService, StateStoreError } from 'alchemy/State'
 import * as ConfigProvider from 'effect/ConfigProvider'
 import * as Context from 'effect/Context'
@@ -14,10 +13,7 @@ import * as Data from 'effect/Data'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Layer from 'effect/Layer'
-import * as NodeRuntime from '@effect/platform-node/NodeRuntime'
-import * as NodeServices from '@effect/platform-node/NodeServices'
 import * as FetchHttpClient from 'effect/unstable/http/FetchHttpClient'
-import { isDeepStrictEqual } from 'node:util'
 
 export const STACK = 'DiscordBot'
 export const STAGE = 'staging'
@@ -63,18 +59,10 @@ interface Snapshot {
 }
 
 export class SnapshotChanged extends Data.TaggedError('SnapshotChanged')<{}> {}
-export class DestinationChanged extends Data.TaggedError(
-  'DestinationChanged',
-)<{}> {}
-export class VerificationFailed extends Data.TaggedError(
-  'VerificationFailed',
-)<{}> {}
+export class DestinationChanged extends Data.TaggedError('DestinationChanged')<{}> {}
+export class VerificationFailed extends Data.TaggedError('VerificationFailed')<{}> {}
 
-export type MigrationError =
-  | StateStoreError
-  | SnapshotChanged
-  | DestinationChanged
-  | VerificationFailed
+export type MigrationError = StateStoreError | SnapshotChanged | DestinationChanged | VerificationFailed
 
 const readSnapshot = (
   state: StateService,
@@ -84,13 +72,13 @@ const readSnapshot = (
   Effect.gen(function* () {
     const fqns = [...new Set(yield* state.list({ stack, stage }))].toSorted()
     const entries = yield* Effect.forEach(fqns, (fqn) =>
-      state.get({ stack, stage, fqn }).pipe(
-        Effect.flatMap((value) =>
-          value === undefined
-            ? Effect.fail(new SnapshotChanged())
-            : Effect.succeed([fqn, value] as const),
+      state
+        .get({ stack, stage, fqn })
+        .pipe(
+          Effect.flatMap((value) =>
+            value === undefined ? Effect.fail(new SnapshotChanged()) : Effect.succeed([fqn, value] as const),
+          ),
         ),
-      ),
     )
     const output = yield* state.getOutput({ stack, stage })
     return { fqns, records: new Map(entries), output }
@@ -103,10 +91,7 @@ const snapshotsEqual = (left: Snapshot, right: Snapshot): boolean =>
   left.fqns.length === right.fqns.length &&
   left.fqns.every((fqn, index) => {
     const rightFqn = right.fqns[index]
-    return (
-      fqn === rightFqn &&
-      stateValueEqual(left.records.get(fqn), right.records.get(fqn))
-    )
+    return fqn === rightFqn && stateValueEqual(left.records.get(fqn), right.records.get(fqn))
   }) &&
   stateValueEqual(left.output, right.output)
 
@@ -161,10 +146,8 @@ export const copyStage = (input: {
     const dryRun = input.dryRun ?? false
     const source = yield* readSnapshot(input.source, stack, stage)
     const destination = yield* readSnapshot(input.destination, stack, stage)
-    const sourceComplete =
-      source.fqns.length > 0 && source.output !== undefined
-    const destinationAbsent =
-      destination.fqns.length === 0 && destination.output === undefined
+    const sourceComplete = source.fqns.length > 0 && source.output !== undefined
+    const destinationAbsent = destination.fqns.length === 0 && destination.output === undefined
     const destinationEqual = snapshotsEqual(source, destination)
 
     if (sourceComplete === false) {
@@ -261,12 +244,16 @@ export const copyStage = (input: {
     })
   })
 
-export const safeLogRecord = (
-  summary: MigrationSummary,
-): Readonly<Record<keyof MigrationSummary, number | boolean>> => summary
+export const safeLogRecord = (summary: MigrationSummary): Readonly<Record<keyof MigrationSummary, number | boolean>> =>
+  summary
 
 export const verifyEqualExitCode = (summary: MigrationSummary): 0 | 1 =>
-  summary.sourceComplete === true && summary.destinationEqual === true && summary.noOp === true && summary.verified === true ? 0 : 1
+  summary.sourceComplete === true &&
+  summary.destinationEqual === true &&
+  summary.noOp === true &&
+  summary.verified === true
+    ? 0
+    : 1
 
 const readProperty = (value: unknown, key: string): unknown => {
   if (typeof value !== 'object' || value === null || key in value === false) return undefined
@@ -287,9 +274,7 @@ export const verifyRemoteAuthoritative = (input: {
     const destination = yield* readSnapshot(input.destination, stack, stage)
     const worker = [...destination.records.values()].find(
       (record) =>
-        isResourceState(record) &&
-        record.resourceType === 'Cloudflare.Worker' &&
-        record.logicalId === 'DiscordBot',
+        isResourceState(record) && record.resourceType === 'Cloudflare.Worker' && record.logicalId === 'DiscordBot',
     )
     const workerAttributes = readProperty(worker, 'attr')
     const workerName = readProperty(workerAttributes, 'workerName')
@@ -298,12 +283,8 @@ export const verifyRemoteAuthoritative = (input: {
     const destinationOutputPresent = destination.output !== undefined
     const workerResourcePresent = worker !== undefined
     const workerIdentityMatches = workerName === input.expectedWorkerName
-    const botStateNamespaceMatches =
-      botStateNamespaceId === input.expectedBotStateNamespaceId
-    const remoteComplete =
-      destination.fqns.length > 0 &&
-      destinationOutputPresent &&
-      workerResourcePresent
+    const botStateNamespaceMatches = botStateNamespaceId === input.expectedBotStateNamespaceId
+    const remoteComplete = destination.fqns.length > 0 && destinationOutputPresent && workerResourcePresent
     return {
       destinationResourceCount: destination.fqns.length,
       destinationOutputPresent,
@@ -311,15 +292,11 @@ export const verifyRemoteAuthoritative = (input: {
       workerIdentityMatches,
       botStateNamespaceMatches,
       remoteComplete,
-      verified:
-        remoteComplete &&
-        workerIdentityMatches &&
-        botStateNamespaceMatches,
+      verified: remoteComplete && workerIdentityMatches && botStateNamespaceMatches,
     }
   })
 
-export const remoteAuthorityExitCode = (summary: RemoteAuthoritySummary): 0 | 1 =>
-  summary.verified === true ? 0 : 1
+export const remoteAuthorityExitCode = (summary: RemoteAuthoritySummary): 0 | 1 => (summary.verified === true ? 0 : 1)
 
 const liveSupport = Layer.mergeAll(
   Layer.succeed(AlchemyContext, {
@@ -351,27 +328,18 @@ const liveDependencies = Layer.mergeAll(
 const liveMigration = (dryRun: boolean) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const localContext = yield* Layer.build(
-        localState().pipe(Layer.provide(liveDependencies)),
-      )
-      const remoteContext = yield* Layer.build(
-        Cloudflare.state().pipe(Layer.provide(liveDependencies)),
-      )
+      const localContext = yield* Layer.build(localState().pipe(Layer.provide(liveDependencies)))
+      const remoteContext = yield* Layer.build(Cloudflare.state().pipe(Layer.provide(liveDependencies)))
       const source = yield* Context.get(localContext, State)
       const destination = yield* Context.get(remoteContext, State)
       return yield* copyStage({ source, destination, dryRun })
     }),
   )
 
-const liveRemoteAuthority = (
-  expectedWorkerName: string,
-  expectedBotStateNamespaceId: string,
-) =>
+const liveRemoteAuthority = (expectedWorkerName: string, expectedBotStateNamespaceId: string) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const remoteContext = yield* Layer.build(
-        Cloudflare.state().pipe(Layer.provide(liveDependencies)),
-      )
+      const remoteContext = yield* Layer.build(Cloudflare.state().pipe(Layer.provide(liveDependencies)))
       const destination = yield* Context.get(remoteContext, State)
       return yield* verifyRemoteAuthoritative({
         destination,
@@ -383,9 +351,7 @@ const liveRemoteAuthority = (
 
 const liveSourceProbe = Effect.scoped(
   Effect.gen(function* () {
-    const localContext = yield* Layer.build(
-      localState().pipe(Layer.provide(liveDependencies)),
-    )
+    const localContext = yield* Layer.build(localState().pipe(Layer.provide(liveDependencies)))
     const source = yield* Context.get(localContext, State)
     const snapshot = yield* readSnapshot(source, STACK, STAGE)
     const summary: SourceProbeSummary = {
@@ -402,10 +368,15 @@ const main = Effect.gen(function* () {
   const dryRun = argument.length === 1 && argument[0] === '--dry-run'
   const execute = argument.length === 1 && argument[0] === '--execute'
   const verifyEqual = argument.length === 1 && argument[0] === '--verify-equal'
-  const verifyRemoteAuthority =
-    argument.length === 1 && argument[0] === '--verify-remote-authoritative'
+  const verifyRemoteAuthority = argument.length === 1 && argument[0] === '--verify-remote-authoritative'
   const sourceProbe = argument.length === 1 && argument[0] === '--source-probe'
-  if (dryRun === false && execute === false && verifyEqual === false && verifyRemoteAuthority === false && sourceProbe === false) {
+  if (
+    dryRun === false &&
+    execute === false &&
+    verifyEqual === false &&
+    verifyRemoteAuthority === false &&
+    sourceProbe === false
+  ) {
     console.log(JSON.stringify({ argumentAccepted: false }))
     process.exitCode = 2
     return
@@ -430,8 +401,7 @@ const main = Effect.gen(function* () {
 
   if (verifyRemoteAuthority === true) {
     const expectedWorkerName = process.env['CF_WORKER_NAME']?.trim()
-    const expectedBotStateNamespaceId =
-      process.env['CF_BOT_STATE_NAMESPACE_ID']?.trim()
+    const expectedBotStateNamespaceId = process.env['CF_BOT_STATE_NAMESPACE_ID']?.trim()
     if (
       expectedWorkerName === undefined ||
       expectedWorkerName === '' ||
@@ -442,9 +412,7 @@ const main = Effect.gen(function* () {
       process.exitCode = 2
       return
     }
-    const authorityExit = yield* Effect.exit(
-      liveRemoteAuthority(expectedWorkerName, expectedBotStateNamespaceId),
-    )
+    const authorityExit = yield* Effect.exit(liveRemoteAuthority(expectedWorkerName, expectedBotStateNamespaceId))
     if (Exit.isFailure(authorityExit) === true) {
       console.log(JSON.stringify({ completed: false, verified: false }))
       process.exitCode = 1
@@ -469,9 +437,6 @@ const main = Effect.gen(function* () {
 })
 
 const invokedPath = process.argv[1]
-if (
-  invokedPath !== undefined &&
-  import.meta.url === new URL(invokedPath, 'file:').href
-) {
+if (invokedPath !== undefined && import.meta.url === new URL(invokedPath, 'file:').href) {
   NodeRuntime.runMain(main)
 }

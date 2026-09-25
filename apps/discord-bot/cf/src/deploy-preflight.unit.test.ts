@@ -26,8 +26,9 @@ it('extracts the live BotState namespace from Worker settings', () => {
 })
 
 it('fails closed when Worker settings omit the BotState namespace', () => {
-  expect(() => parseLiveDeploymentIdentity({ success: true, result: { bindings: [] } }, workerName))
-    .toThrow(/no BotState Durable Object namespace/)
+  expect(() => parseLiveDeploymentIdentity({ success: true, result: { bindings: [] } }, workerName)).toThrow(
+    /no BotState Durable Object namespace/,
+  )
 })
 
 it('reads identity through the Cloudflare settings endpoint', async () => {

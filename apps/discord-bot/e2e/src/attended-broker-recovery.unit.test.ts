@@ -17,7 +17,14 @@ const runId = 'recovery-test-run'
 const ledgerWith = (kind: 'thread' | 'response'): string => {
   const filePath = join(mkdtempSync(join(tmpdir(), 'broker-recovery-')), 'cleanup.jsonl')
   const writer = openCleanupLedger({ filePath, runId })
-  writer.record({ runId, scenario: undefined, kind, guildId, channelId, messageId: kind === 'thread' ? threadId : responseId })
+  writer.record({
+    runId,
+    scenario: undefined,
+    kind,
+    guildId,
+    channelId,
+    messageId: kind === 'thread' ? threadId : responseId,
+  })
   writer.close()
   return filePath
 }

@@ -1,5 +1,4 @@
 import { expect, it } from '@effect/vitest'
-
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
@@ -42,7 +41,8 @@ it.effect('empty storage exposes the AI-off dedicated-actor default at revision 
       retentionDays: 30,
     })
     expect(document.config.telemetry).toBeUndefined()
-  }))
+  }),
+)
 
 it.effect('write persists one revisioned document and keeps release identity deploy-owned', () =>
   Effect.gen(function* () {
@@ -55,9 +55,10 @@ it.effect('write persists one revisioned document and keeps release identity dep
 
     expect(written.revision).toBe(1)
     expect(written.config.releaseId).toBe('current-release')
-    expect([...((yield* Effect.promise(() => storage.list())).keys())]).toEqual([runtimeConfigKey])
+    expect([...(yield* Effect.promise(() => storage.list())).keys()]).toEqual([runtimeConfigKey])
     expect(yield* store.read).toEqual(written)
-  }))
+  }),
+)
 
 it.effect('stale expectedRevision is rejected without changing the durable document', () =>
   Effect.gen(function* () {
@@ -72,7 +73,8 @@ it.effect('stale expectedRevision is rejected without changing the durable docum
       actualRevision: 1,
     })
     expect(yield* store.read).toEqual(revisionOne)
-  }))
+  }),
+)
 
 it.effect('validation precedes CAS and invalid candidates leave storage untouched', () =>
   Effect.gen(function* () {
@@ -88,7 +90,8 @@ it.effect('validation precedes CAS and invalid candidates leave storage untouche
 
     expect((yield* Effect.exit(store.write({ expectedRevision: 0, config: invalid })))._tag).toBe('Failure')
     expect(yield* Effect.promise(() => storage.list())).toHaveLength(0)
-  }))
+  }),
+)
 it('serializes concurrent CAS writers so only one can advance a revision', async () => {
   const backing = makeFakeDoStorage()
   let releaseReads: () => void = () => {}
@@ -124,7 +127,6 @@ it('serializes concurrent CAS writers so only one can advance a revision', async
   expect((await Effect.runPromise(store.read)).revision).toBe(1)
 })
 
-
 it.effect('stored release identity is rebound to the current Worker release on read', () =>
   Effect.gen(function* () {
     const storage = makeFakeDoStorage()
@@ -134,7 +136,8 @@ it.effect('stored release identity is rebound to the current Worker release on r
     const current = yield* makeRuntimeConfigStore(storage, 'current-release').read
     expect(current.revision).toBe(1)
     expect(current.config.releaseId).toBe('current-release')
-  }))
+  }),
+)
 
 it.effect('reads a legacy telemetry payload as revision zero and reports canonical diagnostics', () =>
   Effect.gen(function* () {
@@ -142,15 +145,19 @@ it.effect('reads a legacy telemetry payload as revision zero and reports canonic
     const canonical = (yield* makeRuntimeConfigStore(storage, 'legacy-release').read).config
     const { diagnostics: _diagnostics, ...withoutDiagnostics } = canonical
     yield* Effect.promise(() =>
-      storage.put(runtimeConfigKey, JSON.stringify({
-        ...withoutDiagnostics,
-        telemetry: {
-          sink: 'dev3-tempo',
-          delivery: 'best-effort',
-          accessBoundary: 'tailnet-trusted-grafana',
-          retentionDays: 30,
-        },
-      })))
+      storage.put(
+        runtimeConfigKey,
+        JSON.stringify({
+          ...withoutDiagnostics,
+          telemetry: {
+            sink: 'dev3-tempo',
+            delivery: 'best-effort',
+            accessBoundary: 'tailnet-trusted-grafana',
+            retentionDays: 30,
+          },
+        }),
+      ),
+    )
 
     const currentStore = makeRuntimeConfigStore(storage, 'current-release')
     const document = yield* currentStore.read
@@ -167,7 +174,8 @@ it.effect('reads a legacy telemetry payload as revision zero and reports canonic
 
     const upgraded = yield* currentStore.write({ expectedRevision: 0, config: document.config })
     expect(upgraded.revision).toBe(1)
-  }))
+  }),
+)
 
 it.effect('a corrupt revisioned document fails loudly instead of defaulting', () =>
   Effect.gen(function* () {
@@ -177,7 +185,8 @@ it.effect('a corrupt revisioned document fails loudly instead of defaulting', ()
 
     yield* Effect.promise(() => storage.put(runtimeConfigKey, JSON.stringify({ revision: 2, config: { _tag: 'bad' } })))
     expect((yield* Effect.exit(store.read))._tag).toBe('Failure')
-  }))
+  }),
+)
 
 it.effect('encodeConfigSummary projects a JSON-safe running/stored view', () =>
   Effect.gen(function* () {
@@ -192,4 +201,5 @@ it.effect('encodeConfigSummary projects a JSON-safe running/stored view', () =>
       accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
       retentionDays: 30,
     })
-  }))
+  }),
+)

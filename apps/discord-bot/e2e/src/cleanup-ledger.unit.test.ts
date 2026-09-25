@@ -118,9 +118,7 @@ describe('cleanup ledger', () => {
     writer.record(identity({ channelId: otherChannelId }))
     writer.resolve(identity())
 
-    expect(readUnresolvedEntries(filePath).unresolved).toEqual([
-      expect.objectContaining({ channelId: otherChannelId }),
-    ])
+    expect(readUnresolvedEntries(filePath).unresolved).toEqual([expect.objectContaining({ channelId: otherChannelId })])
     writer.close()
   })
 
@@ -163,7 +161,11 @@ describe('cleanup ledger', () => {
     const outcomes = await recoverCleanupLedger({
       filePath,
       transport: makeTransportStub({
-        inspectChannel: async () => ({ id: '222222222222222222' as Snowflake, guildId: '111111111111111111' as Snowflake, topic: undefined }),
+        inspectChannel: async () => ({
+          id: '222222222222222222' as Snowflake,
+          guildId: '111111111111111111' as Snowflake,
+          topic: undefined,
+        }),
         findThreadForMessage: async (_guildId, sourceMessageId) =>
           sourceMessageId === threadMessageId ? threadSnapshot(sourceMessageId) : undefined,
         deleteMessage: async (_channelId, id) => {

@@ -4,7 +4,7 @@ import { Effect, Redacted, Schema } from 'effect'
 import { followUpInteractionResponse } from './actions-dfx.ts'
 import { InteractionRoute } from './actions.ts'
 
-const route = Schema.decodeUnknownSync(InteractionRoute)({
+const route = Schema.decodeSync(InteractionRoute)({
   interactionId: '100000000000000001',
   applicationId: '100000000000000002',
   token: Redacted.make('interaction-token'),

@@ -120,7 +120,7 @@ export const makeDiscordEventHandlersLayer = (config: RuntimeConfigPayload, work
   )
 
 const toAutomaticCandidate = (config: RuntimeConfigPayload, input: AutomaticMessage): ThreadCandidate => ({
-  environment: Schema.decodeUnknownSync(EnvironmentName)(config.environment),
+  environment: Schema.decodeSync(EnvironmentName)(config.environment),
   source: { guildId: input.guildId, channelId: input.channelId, messageId: input.messageId },
   sourceChannelKind: input.sourceChannelKind ?? 'GuildText',
   messageKind: input.isReply === true ? 'Reply' : input.authorIsSystem === true ? 'System' : 'Default',

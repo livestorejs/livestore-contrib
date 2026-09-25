@@ -1,3 +1,4 @@
+import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
 /**
  * Application-command synchronization for the Cloudflare deployment.
  *
@@ -11,12 +12,11 @@
  * though usually much faster.
  */
 import { Context, Effect, Layer, Redacted } from 'effect'
-import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
 import { FetchHttpClient } from 'effect/unstable/http'
 
+import { makeDfxApplicationCommandsPort } from '../../src/application-commands/dfx.ts'
 import { diffApplicationCommands } from '../../src/application-commands/diff.ts'
 import type { ApplicationCommandsDiff } from '../../src/application-commands/model.ts'
-import { makeDfxApplicationCommandsPort } from '../../src/application-commands/dfx.ts'
 import {
   type ApplicationCommand,
   type ApplicationCommandInventoryInvalid,

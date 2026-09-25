@@ -17,7 +17,7 @@ export const makeDfxThreadMutation = (rest: DiscordRestService): ThreadMutationP
         name: input.name,
       })
       .pipe(
-        Effect.flatMap((thread) => Schema.decodeUnknownEffect(DiscordSnowflake)(thread.id)),
+        Effect.flatMap((thread) => Schema.decodeEffect(DiscordSnowflake)(thread.id)),
         Effect.mapError(
           (cause) =>
             new ThreadMutationError({

@@ -1,3 +1,4 @@
+import { isTerminalGatewayCloseCode } from 'dfx/DiscordGateway/DiscordWS'
 /**
  * Gateway reconnect supervisor — outer supervision over dfx's Shard reconnect.
  *
@@ -16,7 +17,6 @@
  * - survive isolate crashes/deploys: durable state lives in the store, not the process
  */
 import * as Cause from 'effect/Cause'
-import { defaultCloseCodeIsError } from 'effect/unstable/socket/Socket'
 import * as Clock from 'effect/Clock'
 import * as Data from 'effect/Data'
 import * as Duration from 'effect/Duration'
@@ -25,12 +25,10 @@ import * as Fiber from 'effect/Fiber'
 import * as Queue from 'effect/Queue'
 import * as Ref from 'effect/Ref'
 import * as Result from 'effect/Result'
+import type { Scope } from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import * as Stream from 'effect/Stream'
-
-import { isTerminalGatewayCloseCode } from 'dfx/DiscordGateway/DiscordWS'
-
-import type { Scope } from 'effect/Scope'
+import { defaultCloseCodeIsError } from 'effect/unstable/socket/Socket'
 
 import type { GatewayTelemetryRecorder } from './gateway-telemetry.ts'
 
@@ -58,16 +56,9 @@ export interface GatewaySession {
   readonly resumeUrl?: string | undefined
 }
 
-export type ConnectMode =
-  | { readonly _tag: 'Identify' }
-  | { readonly _tag: 'Resume'; readonly session: GatewaySession }
+export type ConnectMode = { readonly _tag: 'Identify' } | { readonly _tag: 'Resume'; readonly session: GatewaySession }
 
-export type SupervisorState =
-  | 'disconnected'
-  | 'connecting'
-  | 'resuming'
-  | 'ready'
-  | 'stopped'
+export type SupervisorState = 'disconnected' | 'connecting' | 'resuming' | 'ready' | 'stopped'
 
 /** Events the live gateway session reports back to the supervisor. */
 export type SessionEvent =
@@ -198,11 +189,7 @@ export const uncappedBackoffMillis = (
   attempt: number,
   initialBackoff: Duration.Input,
   maxBackoff: Duration.Input,
-): number =>
-  Math.min(
-    Duration.toMillis(maxBackoff),
-    Duration.toMillis(initialBackoff) * 2 ** attempt,
-  )
+): number => Math.min(Duration.toMillis(maxBackoff), Duration.toMillis(initialBackoff) * 2 ** attempt)
 
 // ---------------------------------------------------------------------------
 // Supervisor
@@ -240,12 +227,10 @@ interface AttemptOutcome {
   readonly disconnectObserved: boolean
 }
 
-export const make = Effect.fnUntraced(function* (
-  deps: SupervisorDeps,
-  options: SupervisorOptions,
-) {
+export const make = Effect.fnUntraced(function* (deps: SupervisorDeps, options: SupervisorOptions) {
   const capMillis = Duration.toMillis(options.maxBackoff)
-  const graceMillis = options.gracePeriod !== undefined ? Duration.toMillis(options.gracePeriod) : Duration.toMillis(defaultGracePeriod)
+  const graceMillis =
+    options.gracePeriod !== undefined ? Duration.toMillis(options.gracePeriod) : Duration.toMillis(defaultGracePeriod)
   const random = options.random ?? Effect.sync(() => Math.random())
   const stateRef = yield* Ref.make<SupervisorState>('disconnected')
   const transitions = yield* Queue.unbounded<Transition>()
@@ -267,9 +252,7 @@ export const make = Effect.fnUntraced(function* (
   const recordEstablished = (
     latest: Ref.Ref<GatewaySession | null>,
     setEstablishedAt: (millis: number) => void,
-    markReady: (
-      event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>,
-    ) => Effect.Effect<void>,
+    markReady: (event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>) => Effect.Effect<void>,
     event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>,
   ) =>
     Effect.gen(function* () {
@@ -292,10 +275,7 @@ export const make = Effect.fnUntraced(function* (
       const mode: ConnectMode = session !== null ? { _tag: 'Resume', session } : { _tag: 'Identify' }
       yield* setState(session !== null ? 'resuming' : 'connecting')
       if (options.telemetry !== undefined) {
-        yield* options.telemetry.attemptStarted(
-          attemptNumber,
-          mode._tag === 'Identify' ? 'identify' : 'resume',
-        )
+        yield* options.telemetry.attemptStarted(attemptNumber, mode._tag === 'Identify' ? 'identify' : 'resume')
       }
 
       const latest = yield* Ref.make<GatewaySession | null>(session)
@@ -303,10 +283,11 @@ export const make = Effect.fnUntraced(function* (
       let disconnectObserved = false
       const live = yield* Ref.make(true)
       const readinessLock = yield* Semaphore.make(1)
-      const markReady = (
-        event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>,
-      ) =>
-        Semaphore.withPermits(readinessLock, 1)(
+      const markReady = (event: Extract<SessionEvent, { _tag: 'Ready' | 'Resumed' }>) =>
+        Semaphore.withPermits(
+          readinessLock,
+          1,
+        )(
           Effect.gen(function* () {
             if ((yield* Ref.get(live)) === false) return
             // Append before publishing readiness: if the durable sink is slow,
@@ -319,7 +300,10 @@ export const make = Effect.fnUntraced(function* (
             yield* setState('ready')
           }),
         )
-      const markDisconnected = Semaphore.withPermits(readinessLock, 1)(
+      const markDisconnected = Semaphore.withPermits(
+        readinessLock,
+        1,
+      )(
         Effect.gen(function* () {
           if ((yield* Ref.get(live)) === false) return
           disconnectObserved = true
@@ -334,20 +318,18 @@ export const make = Effect.fnUntraced(function* (
 
       const inbox = yield* Queue.unbounded<SessionEvent>()
       const emit = (event: SessionEvent) =>
-        event._tag === 'Disconnected'
-          ? markDisconnected
-          : Queue.offer(inbox, event).pipe(Effect.asVoid)
+        event._tag === 'Disconnected' ? markDisconnected : Queue.offer(inbox, event).pipe(Effect.asVoid)
 
       const onEvent = (event: SessionEvent) =>
         event._tag === 'Ready' || event._tag === 'Resumed'
           ? recordEstablished(
-            latest,
-            (millis) => {
-              establishedAt = millis
-            },
-            markReady,
-            event,
-          )
+              latest,
+              (millis) => {
+                establishedAt = millis
+              },
+              markReady,
+              event,
+            )
           : Effect.void
 
       const pump = yield* Effect.forkScoped(
@@ -358,19 +340,16 @@ export const make = Effect.fnUntraced(function* (
         }),
       )
 
-      const end = yield* Effect.exit(
-        deps.acquire(mode, emit).pipe(Effect.flatMap((handle) => handle.join)),
-      )
+      const end = yield* Effect.exit(deps.acquire(mode, emit).pipe(Effect.flatMap((handle) => handle.join)))
 
       // Serialize with READY publication, permanently close the live gate,
       // and withdraw readiness before waiting for an in-flight durable
       // checkpoint. A late buffered event may still persist resume state, but
       // can never publish `ready` for this dead attempt.
-      yield* Semaphore.withPermits(readinessLock, 1)(
-        Ref.set(live, false).pipe(
-          Effect.andThen(setState('disconnected')),
-        ),
-      )
+      yield* Semaphore.withPermits(
+        readinessLock,
+        1,
+      )(Ref.set(live, false).pipe(Effect.andThen(setState('disconnected'))))
       yield* Fiber.interrupt(pump)
       // A session may emit READY/RESUMED right before it ends; process anything
       // still buffered so persistence and `establishedAt` cannot lose the race.
@@ -398,13 +377,14 @@ export const make = Effect.fnUntraced(function* (
         }
       } else {
         const foundFail = Cause.findFail(end.cause)
-        outcome = Result.isSuccess(foundFail) === true
-          ? { failure: foundFail.success.error, establishedAt, disconnectObserved }
-          : {
-              failure: new DisconnectedError({ reason: 'crash' }),
-              establishedAt,
-              disconnectObserved,
-            }
+        outcome =
+          Result.isSuccess(foundFail) === true
+            ? { failure: foundFail.success.error, establishedAt, disconnectObserved }
+            : {
+                failure: new DisconnectedError({ reason: 'crash' }),
+                establishedAt,
+                disconnectObserved,
+              }
       }
       return outcome
     })
@@ -418,8 +398,7 @@ export const make = Effect.fnUntraced(function* (
       // Own scope per attempt: acquire-side `forkScoped` resources finalize
       // the moment the session ends instead of leaking through backoff waits.
       attemptNumber++
-      const { disconnectObserved, establishedAt, failure } =
-        yield* Effect.scoped(attemptOnce(attemptNumber))
+      const { disconnectObserved, establishedAt, failure } = yield* Effect.scoped(attemptOnce(attemptNumber))
 
       if (failure._tag === 'TerminalCloseError') {
         if (options.telemetry !== undefined) {
@@ -465,7 +444,10 @@ export const make = Effect.fnUntraced(function* (
   // an empty slot and fork duplicate supervision loops.
   const startLock = yield* Semaphore.make(1)
 
-  const start = Semaphore.withPermits(startLock, 1)(
+  const start = Semaphore.withPermits(
+    startLock,
+    1,
+  )(
     Effect.gen(function* () {
       if ((yield* Ref.get(running)) === null) {
         yield* Ref.set(running, yield* Effect.forkScoped(run))
@@ -474,9 +456,7 @@ export const make = Effect.fnUntraced(function* (
   )
 
   const stop = Ref.get(running).pipe(
-    Effect.flatMap((fiber) =>
-      fiber === null ? Effect.void : Effect.asVoid(Fiber.interrupt(fiber)),
-    ),
+    Effect.flatMap((fiber) => (fiber === null ? Effect.void : Effect.asVoid(Fiber.interrupt(fiber)))),
     Effect.andThen(Ref.set(running, null)),
     Effect.andThen(setState('stopped')),
   )
@@ -502,10 +482,7 @@ export interface RunningShardLike {
    * DFX's terminal-failure channel is independent of `lifecycle`; the latter
    * stays open after Discord rejects the connection.
    */
-  readonly failure: Effect.Effect<
-    never,
-    { readonly code: number; readonly reason?: string | undefined }
-  >
+  readonly failure: Effect.Effect<never, { readonly code: number; readonly reason?: string | undefined }>
   /**
    * Raw gateway payloads (dfx Messaging hub) when the host wires event
    * handlers; forwarded verbatim to `onDispatch` while the session lives.
@@ -536,9 +513,11 @@ export interface MakeShardAcquireOptions {
   readonly loadShardState: Effect.Effect<
     { readonly resumeUrl: string; readonly sequence: number | null; readonly sessionId: string } | undefined
   >
-  readonly saveShardState: (
-    state: { readonly resumeUrl: string; readonly sequence: number | null; readonly sessionId: string },
-  ) => Effect.Effect<void>
+  readonly saveShardState: (state: {
+    readonly resumeUrl: string
+    readonly sequence: number | null
+    readonly sessionId: string
+  }) => Effect.Effect<void>
   readonly clearShardState: Effect.Effect<void>
   /**
    * Receives every raw gateway payload of the live session while it lasts.
@@ -556,7 +535,8 @@ export interface MakeShardAcquireOptions {
  * classifies every session end through `sessionEndFromClose` — patched dfx
  * treats every close as a socket error, so all of them arrive here.
  */
-export const makeShardAcquire = (options: MakeShardAcquireOptions): Acquire =>
+export const makeShardAcquire =
+  (options: MakeShardAcquireOptions): Acquire =>
   (mode, emit) =>
     Effect.gen(function* () {
       if (mode._tag === 'Identify') {
@@ -599,24 +579,12 @@ export const makeShardAcquire = (options: MakeShardAcquireOptions): Acquire =>
               return emit({ _tag: 'Disconnected' })
             }
             return Effect.void
-          }).pipe(
-            Effect.andThen(
-              Effect.suspend(() =>
-                Effect.fail(end ?? new DisconnectedError({})),
-              ),
-            ),
-          )
+          }).pipe(Effect.andThen(Effect.suspend(() => Effect.fail(end ?? new DisconnectedError({})))))
           const terminalFailure = running.failure.pipe(
-            Effect.mapError((failure) =>
-              sessionEndFromClose(failure.code, failure.reason),
-            ),
+            Effect.mapError((failure) => sessionEndFromClose(failure.code, failure.reason)),
           )
           yield* Effect.raceFirst(consumeLifecycle, terminalFailure).pipe(
-            Effect.ensuring(
-              dispatchFiber === undefined
-                ? Effect.void
-                : Effect.asVoid(Fiber.interrupt(dispatchFiber)),
-            ),
+            Effect.ensuring(dispatchFiber === undefined ? Effect.void : Effect.asVoid(Fiber.interrupt(dispatchFiber))),
           )
         }),
       )

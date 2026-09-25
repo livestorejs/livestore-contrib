@@ -1,14 +1,15 @@
 {
+  "$genie": {
+    "source": "package.json.genie.ts",
+    "warning": "DO NOT EDIT - changes will be overwritten"
+  },
   "name": "livestore-discord",
   "version": "0.0.0",
+  "type": "module",
   "private": true,
   "bin": {
     "livestore-discord": "./src/main.ts"
   },
-  "workspaces": [
-    "."
-  ],
-  "type": "module",
   "scripts": {
     "check": "tsc --noEmit && tsc -p e2e/tsconfig.json --noEmit && tsc -p cf/tsconfig.json --noEmit",
     "check:cf": "tsc -p cf/tsconfig.json --noEmit && vitest run cf",
@@ -25,7 +26,7 @@
     "e2e:live": "node --experimental-strip-types e2e/src/live-main.ts",
     "start": "node --experimental-strip-types src/main.ts",
     "test": "vitest run",
-    "test:e2e": "vitest run e2e/src",
+    "test:e2e": "vitest run e2e/src --no-file-parallelism",
     "test:cf": "vitest run cf"
   },
   "dependencies": {
@@ -44,20 +45,19 @@
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   },
-  "overrides": {
-    "@effect/platform-node": "4.0.0-beta.105",
-    "@effect/platform-node-shared": "4.0.0-beta.105",
-    "@effect/sql-sqlite-do": "4.0.0-beta.105",
-    "@effect/vitest": "4.0.0-beta.105",
-    "discord-api-types": "0.38.40",
-    "effect": "4.0.0-beta.105"
-  },
   "engines": {
     "node": ">=24.0.0"
   },
-  "packageManager": "pnpm@11.8.0",
-  "$genie": {
-    "source": "package.json.genie.ts",
-    "warning": "DO NOT EDIT - changes will be overwritten"
-  }
+  "workspaces": [
+    "."
+  ],
+  "overrides": {
+    "@effect/platform-node-shared": "4.0.0-beta.105",
+    "@effect/sql-sqlite-do": "4.0.0-beta.105",
+    "discord-api-types": "0.38.40",
+    "effect": "4.0.0-beta.105",
+    "@effect/platform-node": "4.0.0-beta.105",
+    "@effect/vitest": "4.0.0-beta.105"
+  },
+  "packageManager": "pnpm@11.8.0"
 }

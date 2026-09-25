@@ -11,7 +11,7 @@ import {
 } from '../docs/index.ts'
 import type { ThreadMutationPort } from '../threading/index.ts'
 
-const fakeSource = Schema.decodeUnknownSync(DocumentationSourceSchema)({
+const fakeSource = Schema.decodeSync(DocumentationSourceSchema)({
   id: 'docs.livestore.dev/overview',
   title: 'LiveStore overview',
   canonicalUrl: 'https://docs.livestore.dev/overview',
@@ -29,7 +29,7 @@ export const FakeDiscordActionsLive = Layer.succeed(
 )
 
 export const fakeThreadMutation: ThreadMutationPort = {
-  create: (input) => Effect.succeed(Schema.decodeUnknownSync(DiscordSnowflake)(fakeThreadId(input.messageId))),
+  create: (input) => Effect.succeed(Schema.decodeSync(DiscordSnowflake)(fakeThreadId(input.messageId))),
 }
 
 export const FakeDocsPortsLive = Layer.mergeAll(

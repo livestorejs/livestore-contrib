@@ -14,8 +14,7 @@ export interface SupervisorGate {
   readonly end: Effect.Effect<void>
 }
 
-export const makeSupervisorGate: Effect.Effect<SupervisorGate> =
-  Effect.map(Ref.make(false), (ref) => ({
-    tryBegin: Ref.modify(ref, (running) => (running === false ? [true, true] : [false, running])),
-    end: Ref.set(ref, false),
-  }))
+export const makeSupervisorGate: Effect.Effect<SupervisorGate> = Effect.map(Ref.make(false), (ref) => ({
+  tryBegin: Ref.modify(ref, (running) => (running === false ? [true, true] : [false, running])),
+  end: Ref.set(ref, false),
+}))

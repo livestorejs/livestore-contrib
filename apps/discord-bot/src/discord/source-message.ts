@@ -51,7 +51,7 @@ export const decodeDiscordSourceMessage = (
   if (isRecord(value.author) === false || typeof value.author.id !== 'string') {
     throw new TypeError('Discord source message author was invalid')
   }
-  const authorId = Schema.decodeUnknownSync(DiscordSnowflake)(value.author.id)
+  const authorId = Schema.decodeSync(DiscordSnowflake)(value.author.id)
   if (
     typeof value.content !== 'string' ||
     typeof value.type !== 'number' ||

@@ -1,8 +1,8 @@
-import * as Clock from "effect/Clock"
-import * as Effect from "effect/Effect"
-import * as Ref from "effect/Ref"
+import * as Clock from 'effect/Clock'
+import * as Effect from 'effect/Effect'
+import * as Ref from 'effect/Ref'
 
-export type GatewayAttemptMode = "identify" | "resume"
+export type GatewayAttemptMode = 'identify' | 'resume'
 
 /**
  * Content-free gateway observations. These deliberately contain no Discord
@@ -10,63 +10,58 @@ export type GatewayAttemptMode = "identify" | "resume"
  */
 export type GatewayObservation =
   | {
-      readonly _tag: "Activated"
+      readonly _tag: 'Activated'
       readonly activationId: string
       readonly at: number
     }
   | {
-      readonly _tag: "AttemptStarted"
+      readonly _tag: 'AttemptStarted'
       readonly activationId: string
       readonly at: number
       readonly attempt: number
       readonly mode: GatewayAttemptMode
     }
   | {
-      readonly _tag: "Ready"
+      readonly _tag: 'Ready'
       readonly activationId: string
       readonly at: number
       readonly attempt: number
     }
   | {
-      readonly _tag: "Resumed"
+      readonly _tag: 'Resumed'
       readonly activationId: string
       readonly at: number
       readonly attempt: number
     }
   | {
-      readonly _tag: "Disconnected"
+      readonly _tag: 'Disconnected'
       readonly activationId: string
       readonly at: number
       readonly attempt: number
     }
   | {
-      readonly _tag: "HeartbeatAck"
+      readonly _tag: 'HeartbeatAck'
       readonly activationId: string
       readonly at: number
       readonly attempt: number
     }
   | {
-      readonly _tag: "TerminalClose"
+      readonly _tag: 'TerminalClose'
       readonly activationId: string
       readonly at: number
       readonly attempt: number
       readonly code: number
     }
   | {
-      readonly _tag: "AlarmObserved"
+      readonly _tag: 'AlarmObserved'
       readonly activationId: string
       readonly at: number
       readonly lagMs: number
     }
 
-export type GatewayConnectionState =
-  | "activated"
-  | "connecting"
-  | "ready"
-  | "disconnected"
-  | "terminal"
+export type GatewayConnectionState = 'activated' | 'connecting' | 'ready' | 'disconnected' | 'terminal'
 
-export type GatewayLastError = "disconnected" | "terminal-close" | null
+export type GatewayLastError = 'disconnected' | 'terminal-close' | null
 
 export interface GatewayTelemetryLifetime {
   readonly attempts: number
@@ -114,10 +109,7 @@ export interface GatewayTelemetrySink {
 export interface GatewayTelemetryRecorder {
   readonly activationId: string
   readonly activated: Effect.Effect<void>
-  readonly attemptStarted: (
-    attempt: number,
-    mode: GatewayAttemptMode,
-  ) => Effect.Effect<void>
+  readonly attemptStarted: (attempt: number, mode: GatewayAttemptMode) => Effect.Effect<void>
   readonly ready: (attempt: number) => Effect.Effect<void>
   readonly resumed: (attempt: number) => Effect.Effect<void>
   readonly disconnected: (attempt: number) => Effect.Effect<void>
@@ -142,15 +134,12 @@ export interface GatewayHealthPredicateData {
   readonly lastError: GatewayLastError
 }
 
-const later = (current: number | null, next: number): number =>
-  current === null ? next : Math.max(current, next)
+const later = (current: number | null, next: number): number => (current === null ? next : Math.max(current, next))
 
 const age = (now: number, timestamp: number | null): number | null =>
   timestamp === null ? null : Math.max(0, now - timestamp)
 
-export const emptyGatewayTelemetrySnapshot = (
-  activationId: string,
-): GatewayTelemetrySnapshot => ({
+export const emptyGatewayTelemetrySnapshot = (activationId: string): GatewayTelemetrySnapshot => ({
   lifetime: {
     attempts: 0,
     identifies: 0,
@@ -164,7 +153,7 @@ export const emptyGatewayTelemetrySnapshot = (
   },
   current: {
     activationId,
-    state: "activated",
+    state: 'activated',
     attempt: 0,
     connectedAt: null,
     lastReadyAt: null,
@@ -188,39 +177,35 @@ export const reduceGatewayObservation = (
   // reclaim it or restore predecessor terminal/connection state.
   if (
     current !== null &&
-    observation._tag !== "Activated" &&
+    observation._tag !== 'Activated' &&
     observation.activationId !== current.current.activationId
   ) {
     return current
   }
 
   switch (observation._tag) {
-    case "Activated":
+    case 'Activated':
       return snapshot.current.activationId === observation.activationId
         ? snapshot
         : {
             lifetime: snapshot.lifetime,
             current: emptyGatewayTelemetrySnapshot(observation.activationId).current,
           }
-    case "AttemptStarted":
+    case 'AttemptStarted':
       return {
         lifetime: {
           ...snapshot.lifetime,
           attempts: snapshot.lifetime.attempts + 1,
-          identifies:
-            snapshot.lifetime.identifies +
-            (observation.mode === "identify" ? 1 : 0),
-          resumes:
-            snapshot.lifetime.resumes +
-            (observation.mode === "resume" ? 1 : 0),
+          identifies: snapshot.lifetime.identifies + (observation.mode === 'identify' ? 1 : 0),
+          resumes: snapshot.lifetime.resumes + (observation.mode === 'resume' ? 1 : 0),
         },
         current: {
           ...snapshot.current,
-          state: "connecting",
+          state: 'connecting',
           attempt: Math.max(snapshot.current.attempt, observation.attempt),
         },
       }
-    case "Ready":
+    case 'Ready':
       return {
         lifetime: {
           ...snapshot.lifetime,
@@ -228,7 +213,7 @@ export const reduceGatewayObservation = (
         },
         current: {
           ...snapshot.current,
-          state: "ready",
+          state: 'ready',
           attempt: Math.max(snapshot.current.attempt, observation.attempt),
           connectedAt: observation.at,
           lastReadyAt: later(snapshot.current.lastReadyAt, observation.at),
@@ -236,18 +221,15 @@ export const reduceGatewayObservation = (
           lastError: null,
         },
       }
-    case "Resumed":
+    case 'Resumed':
       return {
         lifetime: {
           ...snapshot.lifetime,
-          lastResumedAt: later(
-            snapshot.lifetime.lastResumedAt,
-            observation.at,
-          ),
+          lastResumedAt: later(snapshot.lifetime.lastResumedAt, observation.at),
         },
         current: {
           ...snapshot.current,
-          state: "ready",
+          state: 'ready',
           attempt: Math.max(snapshot.current.attempt, observation.attempt),
           connectedAt: observation.at,
           lastResumedAt: later(snapshot.current.lastResumedAt, observation.at),
@@ -255,70 +237,52 @@ export const reduceGatewayObservation = (
           lastError: null,
         },
       }
-    case "Disconnected":
+    case 'Disconnected':
       return {
         lifetime: {
           ...snapshot.lifetime,
-          lastDisconnectedAt: later(
-            snapshot.lifetime.lastDisconnectedAt,
-            observation.at,
-          ),
+          lastDisconnectedAt: later(snapshot.lifetime.lastDisconnectedAt, observation.at),
           reconnects: snapshot.lifetime.reconnects + 1,
         },
         current: {
           ...snapshot.current,
-          state: "disconnected",
+          state: 'disconnected',
           attempt: Math.max(snapshot.current.attempt, observation.attempt),
           connectedAt: null,
-          lastDisconnectedAt: later(
-            snapshot.current.lastDisconnectedAt,
-            observation.at,
-          ),
-          lastError: "disconnected",
+          lastDisconnectedAt: later(snapshot.current.lastDisconnectedAt, observation.at),
+          lastError: 'disconnected',
         },
       }
-    case "HeartbeatAck":
+    case 'HeartbeatAck':
       return {
         lifetime: {
           ...snapshot.lifetime,
-          lastHeartbeatAckAt: later(
-            snapshot.lifetime.lastHeartbeatAckAt,
-            observation.at,
-          ),
+          lastHeartbeatAckAt: later(snapshot.lifetime.lastHeartbeatAckAt, observation.at),
         },
         current: {
           ...snapshot.current,
           attempt: Math.max(snapshot.current.attempt, observation.attempt),
-          lastHeartbeatAckAt: later(
-            snapshot.current.lastHeartbeatAckAt,
-            observation.at,
-          ),
+          lastHeartbeatAckAt: later(snapshot.current.lastHeartbeatAckAt, observation.at),
         },
       }
-    case "TerminalClose":
+    case 'TerminalClose':
       return {
         lifetime: {
           ...snapshot.lifetime,
           terminalCloses: snapshot.lifetime.terminalCloses + 1,
-          lastDisconnectedAt: later(
-            snapshot.lifetime.lastDisconnectedAt,
-            observation.at,
-          ),
+          lastDisconnectedAt: later(snapshot.lifetime.lastDisconnectedAt, observation.at),
         },
         current: {
           ...snapshot.current,
-          state: "terminal",
+          state: 'terminal',
           attempt: Math.max(snapshot.current.attempt, observation.attempt),
           connectedAt: null,
           terminalCloseCode: observation.code,
-          lastDisconnectedAt: later(
-            snapshot.current.lastDisconnectedAt,
-            observation.at,
-          ),
-          lastError: "terminal-close",
+          lastDisconnectedAt: later(snapshot.current.lastDisconnectedAt, observation.at),
+          lastError: 'terminal-close',
         },
       }
-    case "AlarmObserved":
+    case 'AlarmObserved':
       return {
         ...snapshot,
         current: {
@@ -341,14 +305,14 @@ export const gatewayHealthPredicateData = (
       : current.lastResumedAt === null
         ? current.lastReadyAt
         : Math.max(current.lastReadyAt, current.lastResumedAt)
-  const connected = current.state === "ready" && current.connectedAt !== null
+  const connected = current.state === 'ready' && current.connectedAt !== null
 
   return {
     activationId: current.activationId,
     state: current.state,
     connected,
     established: lastEstablishedAt !== null,
-    terminal: current.state === "terminal",
+    terminal: current.state === 'terminal',
     lastEstablishedAt,
     connectionAgeMs: age(now, current.connectedAt),
     heartbeatAckAgeMs: age(now, current.lastHeartbeatAckAt),
@@ -362,42 +326,39 @@ export const makeGatewayTelemetryRecorder = (
   sink: GatewayTelemetrySink,
   now: Effect.Effect<number> = Clock.currentTimeMillis,
 ): GatewayTelemetryRecorder => {
-  const appendAt = <TObservation extends GatewayObservation>(
-    make: (at: number) => TObservation,
-  ) => Effect.flatMap(now, (at) => sink.append(make(at)))
+  const appendAt = <TObservation extends GatewayObservation>(make: (at: number) => TObservation) =>
+    Effect.flatMap(now, (at) => sink.append(make(at)))
 
   return {
     activationId,
-    activated: appendAt((at) => ({ _tag: "Activated", activationId, at })),
+    activated: appendAt((at) => ({ _tag: 'Activated', activationId, at })),
     attemptStarted: (attempt, mode) =>
       appendAt((at) => ({
-        _tag: "AttemptStarted",
+        _tag: 'AttemptStarted',
         activationId,
         at,
         attempt,
         mode,
       })),
-    ready: (attempt) =>
-      appendAt((at) => ({ _tag: "Ready", activationId, at, attempt })),
-    resumed: (attempt) =>
-      appendAt((at) => ({ _tag: "Resumed", activationId, at, attempt })),
+    ready: (attempt) => appendAt((at) => ({ _tag: 'Ready', activationId, at, attempt })),
+    resumed: (attempt) => appendAt((at) => ({ _tag: 'Resumed', activationId, at, attempt })),
     disconnected: (attempt) =>
       appendAt((at) => ({
-        _tag: "Disconnected",
+        _tag: 'Disconnected',
         activationId,
         at,
         attempt,
       })),
     heartbeatAck: (attempt) =>
       appendAt((at) => ({
-        _tag: "HeartbeatAck",
+        _tag: 'HeartbeatAck',
         activationId,
         at,
         attempt,
       })),
     terminalClose: (attempt, code) =>
       appendAt((at) => ({
-        _tag: "TerminalClose",
+        _tag: 'TerminalClose',
         activationId,
         at,
         attempt,
@@ -405,7 +366,7 @@ export const makeGatewayTelemetryRecorder = (
       })),
     alarmObserved: (lagMs) =>
       appendAt((at) => ({
-        _tag: "AlarmObserved",
+        _tag: 'AlarmObserved',
         activationId,
         at,
         lagMs,
@@ -414,9 +375,7 @@ export const makeGatewayTelemetryRecorder = (
     health: Effect.flatMap(sink.aggregate, (snapshot) =>
       snapshot === null
         ? Effect.succeed(null)
-        : Effect.map(now, (current) =>
-            gatewayHealthPredicateData(snapshot, current),
-          ),
+        : Effect.map(now, (current) => gatewayHealthPredicateData(snapshot, current)),
     ),
   }
 }
@@ -428,10 +387,7 @@ export const makeInMemoryGatewayTelemetrySink = Effect.gen(function* () {
   const aggregate = yield* Ref.make<GatewayTelemetrySnapshot | null>(null)
 
   return {
-    append: (observation) =>
-      Ref.update(aggregate, (current) =>
-        reduceGatewayObservation(current, observation),
-      ),
+    append: (observation) => Ref.update(aggregate, (current) => reduceGatewayObservation(current, observation)),
     aggregate: Ref.get(aggregate),
   } satisfies InMemoryGatewayTelemetrySink
 })

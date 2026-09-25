@@ -63,13 +63,7 @@ const httpsEndpoint = (value: unknown, label: string): string => {
   } catch {
     throw new LiveManifestError(`${label} must be an HTTPS URL`)
   }
-  if (
-    url.protocol !== 'https:' ||
-    url.username !== '' ||
-    url.password !== '' ||
-    url.search !== '' ||
-    url.hash !== ''
-  ) {
+  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
     throw new LiveManifestError(`${label} must be a bare HTTPS origin/path without credentials, query, or fragment`)
   }
   return parsed
@@ -80,14 +74,7 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
   const root = object(input, 'manifest')
   exactKeys(
     root,
-    new Set([
-      'schemaVersion',
-      'environment',
-      'target',
-      'actorBotTokenRef',
-      'botControlSocket',
-      'botAdminEndpoint',
-    ]),
+    new Set(['schemaVersion', 'environment', 'target', 'actorBotTokenRef', 'botControlSocket', 'botAdminEndpoint']),
     'manifest',
   )
   if (root.schemaVersion !== 1) throw new LiveManifestError('schemaVersion must be 1')

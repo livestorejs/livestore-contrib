@@ -1,9 +1,8 @@
 import * as Effect from 'effect/Effect'
-import type * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
 import * as Schema from 'effect/Schema'
+import type * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
 
 import { StateFile, type DocsStateStore, type MonthlyReservation } from '../../src/docs/state-schema.ts'
-
 import type { CryptoService } from './crypto.ts'
 
 const stateKey = 'livestore-discord/docs-state'
@@ -23,9 +22,8 @@ export const makeKeyValueDocsStateStore = (
   const decode = Schema.decodeUnknownEffect(StateFile)
   const encode = Schema.encodeSync(StateFile)
 
-  const load: Effect.Effect<StateFile> = Effect.flatMap(
-    store.get(stateKey),
-    (raw) => (raw === undefined ? Effect.succeed(emptyState) : decode(JSON.parse(raw))),
+  const load: Effect.Effect<StateFile> = Effect.flatMap(store.get(stateKey), (raw) =>
+    raw === undefined ? Effect.succeed(emptyState) : decode(JSON.parse(raw)),
   ).pipe(
     // A missing/corrupt state degrades to the empty state; both error sources
     // (driver + schema decode) are caught by this total predicate.
@@ -71,11 +69,7 @@ export const makeKeyValueDocsStateStore = (
     recent: (nowMillis: number) => Effect.map(load, (value) => prune(value, nowMillis)),
 
     monthlySpent: (nowMillis: number) =>
-      Effect.map(
-        load,
-        (value) =>
-          spentInMonth(prune(value, nowMillis), new Date(nowMillis).toISOString().slice(0, 7)),
-      ),
+      Effect.map(load, (value) => spentInMonth(prune(value, nowMillis), new Date(nowMillis).toISOString().slice(0, 7))),
 
     reserveMonthly: (input) =>
       Effect.flatMap(load, (current) => {
@@ -94,7 +88,8 @@ export const makeKeyValueDocsStateStore = (
               ],
             }),
             { _tag: 'Reserved', id } satisfies MonthlyReservation,
-          ))
+          ),
+        )
       }),
 
     /** Settles a reservation; unknown provider usage deliberately keeps its reservation. */

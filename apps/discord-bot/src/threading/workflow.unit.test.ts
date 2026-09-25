@@ -10,7 +10,7 @@ import {
   type ThreadWorkflowPorts,
 } from './workflow.ts'
 
-const candidate = Schema.decodeUnknownSync(ThreadCandidate)({
+const candidate = Schema.decodeSync(ThreadCandidate)({
   environment: 'staging',
   source: {
     guildId: '10000000000000001',
@@ -27,8 +27,8 @@ const candidate = Schema.decodeUnknownSync(ThreadCandidate)({
   stickerCount: 0,
   trigger: { _tag: 'Automatic', deliveryCorrelation: 'session:1' },
 })
-const threadId = Schema.decodeUnknownSync(DiscordSnowflake)('10000000000000004')
-const actorId = Schema.decodeUnknownSync(DiscordSnowflake)('10000000000000005')
+const threadId = Schema.decodeSync(DiscordSnowflake)('10000000000000004')
+const actorId = Schema.decodeSync(DiscordSnowflake)('10000000000000005')
 const claimHandle: ThreadClaimHandle = {
   sourceMessageId: candidate.source.messageId,
   claimToken: '00000000-0000-4000-8000-000000000001',
@@ -191,7 +191,7 @@ describe('thread workflow', () => {
   it.effect('fails safely when reconciliation returns a handle for another source', () =>
     Effect.gen(function* () {
       const events: Array<string> = []
-      const wrongSource = yield* Schema.decodeUnknownEffect(DiscordSnowflake)('10000000000000009')
+      const wrongSource = yield* Schema.decodeEffect(DiscordSnowflake)('10000000000000009')
       const outcome = yield* makeThreadWorkflow(
         makePorts(events, {
           _tag: 'Proceed',

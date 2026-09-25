@@ -85,21 +85,13 @@ describe('standalone staging E2E CLI', () => {
       dependencies: { readTextFile: async () => manifest, run },
     })
 
-    expect(run).toHaveBeenCalledWith(
-      expect.objectContaining({ selection: { _tag: 'Rung', rung: 'tracer' } }),
-    )
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ selection: { _tag: 'Rung', rung: 'tracer' } }))
   })
 
   it('forwards repeatable explicit scenario selections in invocation order', async () => {
     const run = vi.fn(async () => receipt('UNRUN'))
     await runStagingCli({
-      args: [
-        ...args,
-        '--scenario',
-        'operator-retroactive',
-        '--scenario',
-        'automated-author-rejected',
-      ],
+      args: [...args, '--scenario', 'operator-retroactive', '--scenario', 'automated-author-rejected'],
       environment: {},
       dependencies: { readTextFile: async () => manifest, run },
     })

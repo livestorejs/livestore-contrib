@@ -11,7 +11,7 @@ import {
   validateThreadName,
 } from './title.ts'
 
-const candidate = Schema.decodeUnknownSync(ThreadCandidate)({
+const candidate = Schema.decodeSync(ThreadCandidate)({
   environment: 'staging',
   source: {
     guildId: '10000000000000001',

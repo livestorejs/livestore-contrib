@@ -51,7 +51,6 @@ const usageError = (message: string): StagingCliResult => ({
   stderr: [`CRITICAL usage: ${message}`, usage],
 })
 
-
 const parseArguments = (
   args: ReadonlyArray<string>,
 ): { readonly _tag: 'Parsed'; readonly value: ParsedArguments } | StagingCliResult => {
@@ -62,7 +61,7 @@ const parseArguments = (
   const scenarios: string[] = []
   let liveCount = 0
 
-  for (let index = 0; index < args.length; ) {
+  for (let index = 0; index < args.length;) {
     const argument = args[index]!
     if (argument === '--live') {
       liveCount += 1
@@ -83,7 +82,9 @@ const parseArguments = (
                 ? scenarios
                 : undefined
     if (values === undefined) {
-      return usageError(argument.startsWith('--') === true ? `unknown option ${argument}` : `unexpected argument ${argument}`)
+      return usageError(
+        argument.startsWith('--') === true ? `unknown option ${argument}` : `unexpected argument ${argument}`,
+      )
     }
 
     const value = args[index + 1]

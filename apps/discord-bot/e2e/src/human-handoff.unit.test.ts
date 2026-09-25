@@ -28,7 +28,12 @@ describe('attended human handoff broker', () => {
     expect(executable).toBe('/opt/e2e/human-broker')
     expect(argv.slice(0, 3)).toEqual(['create-message', '--request-json', expect.any(String)])
     // Every invocation carries the run-scoped ledger identity.
-    expect(argv.slice(3)).toEqual(['--run-id', expect.any(String), '--ledger', expect.stringMatching(/ledger-.*\.jsonl$/)])
+    expect(argv.slice(3)).toEqual([
+      '--run-id',
+      expect.any(String),
+      '--ledger',
+      expect.stringMatching(/ledger-.*\.jsonl$/),
+    ])
   })
 
   it('maps an unavailable human to a prerequisite instead of PASS', async () => {

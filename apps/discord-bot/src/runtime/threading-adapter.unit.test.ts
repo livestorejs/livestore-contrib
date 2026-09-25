@@ -4,7 +4,7 @@ import { Effect, Schema } from 'effect'
 import { DiscordMessageRef, EnvironmentName } from '../threading/model.ts'
 import { candidateForOperator, makeDfxOperatorSourceReader } from './threading-adapter.ts'
 
-const source = Schema.decodeUnknownSync(DiscordMessageRef)({
+const source = Schema.decodeSync(DiscordMessageRef)({
   guildId: '100000000000000001',
   channelId: '100000000000000002',
   messageId: '100000000000000003',
@@ -30,7 +30,7 @@ describe('operator source validation', () => {
       const facts = yield* reader.read(source)
       const candidate = candidateForOperator(
         source,
-        yield* Schema.decodeUnknownEffect(EnvironmentName)('staging'),
+        yield* Schema.decodeEffect(EnvironmentName)('staging'),
         undefined,
         'incident repair',
         'unix-peer:uid=42',

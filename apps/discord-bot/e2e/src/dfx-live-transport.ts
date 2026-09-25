@@ -202,9 +202,7 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
                   target: input.target,
                   sourceMessageId,
                   reason,
-                  ...(input.botControlSocket === undefined
-                    ? {}
-                    : { botControlSocket: input.botControlSocket }),
+                  ...(input.botControlSocket === undefined ? {} : { botControlSocket: input.botControlSocket }),
                 }),
               ),
             )

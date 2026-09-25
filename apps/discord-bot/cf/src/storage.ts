@@ -1,7 +1,6 @@
+import type { ShardState } from 'dfx/DiscordGateway/Shard/StateStore'
 import * as Effect from 'effect/Effect'
 import * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
-
-import type { ShardState } from 'dfx/DiscordGateway/Shard/StateStore'
 
 /**
  * Structural slice of the Cloudflare Durable Object storage API that the bot
@@ -35,7 +34,10 @@ export const keyValueStoreFromDurableStorage = (storage: DurableStorage): KeyVal
         yield* Effect.promise(() => storage.delete(key))
       }
     }),
-    size: Effect.map(Effect.promise(() => storage.list()), (entries) => entries.size),
+    size: Effect.map(
+      Effect.promise(() => storage.list()),
+      (entries) => entries.size,
+    ),
   })
 
 /** Same key layout dfx's own `ShardStateStore.KVSLive` derives — both writers share one durable home. */

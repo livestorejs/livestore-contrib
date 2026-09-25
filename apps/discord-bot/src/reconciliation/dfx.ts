@@ -42,7 +42,7 @@ export const classifyThreadChannel = (
   ) {
     return {
       _tag: 'ExactSourceThread',
-      threadId: Schema.decodeUnknownSync(DiscordSnowflake)(channel.id),
+      threadId: Schema.decodeSync(DiscordSnowflake)(channel.id),
     }
   }
   return { _tag: 'Unrun', reason: 'source_anchor_not_proven' }

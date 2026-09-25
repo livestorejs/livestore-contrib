@@ -1,6 +1,6 @@
+import type { GatewayTelemetrySnapshot } from './gateway-telemetry.ts'
 import { schemaVersion } from './journal.ts'
 import type { SupervisorState } from './supervisor.ts'
-import type { GatewayTelemetrySnapshot } from './gateway-telemetry.ts'
 
 export interface GatewayHealthSummary {
   readonly supervisor: SupervisorState
@@ -43,8 +43,7 @@ export const evaluateReadiness = (status: ReadinessStatus): ReadinessReport => {
       health.gateway !== null &&
       health.gateway.current.state === 'ready' &&
       health.gateway.current.connectedAt !== null &&
-      (health.gateway.current.lastReadyAt !== null ||
-        health.gateway.current.lastResumedAt !== null) &&
+      (health.gateway.current.lastReadyAt !== null || health.gateway.current.lastResumedAt !== null) &&
       health.gateway.current.terminalCloseCode === null &&
       health.gateway.current.lastError === null &&
       health.lastError === null,

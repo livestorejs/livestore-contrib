@@ -58,12 +58,21 @@ const postOperation = (
   payload: unknown,
 ): Effect.Effect<ControlResultType, ControlErrorType> =>
   Effect.gen(function* () {
+    const encodedPayload = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(payload ?? {}).pipe(
+      Effect.mapError(
+        () =>
+          new ControlDependencyUnavailable({
+            dependency: 'admin-endpoint',
+            message: 'Could not reach the admin endpoint',
+          }),
+      ),
+    )
     const response = yield* Effect.tryPromise({
       try: () =>
         globalThis.fetch(`${baseUrl}/admin/rpc/${operation}`, {
           method: 'POST',
           headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-          body: JSON.stringify(payload ?? {}),
+          body: encodedPayload,
         }),
       catch: () =>
         new ControlDependencyUnavailable({
@@ -77,29 +86,27 @@ const postOperation = (
     if (response.ok === true) {
       const result = decodeOptional(ControlResult, body)
       if (result !== undefined) return result as ControlResultType
-      return yield* Effect.fail(new InvalidControlInput({ message: 'Malformed admin response' }))
+      return yield* new InvalidControlInput({ message: 'Malformed admin response' })
     }
 
     const decoded = decodeOptional(ControlError, body)
-    if (decoded !== undefined) return yield* Effect.fail(decoded as ControlErrorType)
+    if (decoded !== undefined) return yield* decoded as ControlErrorType
     // The admin plane always answers failures with decodable ControlError
     // bodies; these fallbacks cover proxies and outages that do not.
     if (response.status === 401) {
-      return yield* Effect.fail(new ControlAuthorizationRejected({ message: 'Admin endpoint rejected the bearer token' }))
+      return yield* new ControlAuthorizationRejected({ message: 'Admin endpoint rejected the bearer token' })
     }
     if (response.status === 404) {
-      return yield* Effect.fail(new InvalidControlInput({ message: 'No such admin operation route' }))
+      return yield* new InvalidControlInput({ message: 'No such admin operation route' })
     }
     if (response.status === 400 || response.status === 422) {
-      return yield* Effect.fail(new InvalidControlInput({ message: 'Admin endpoint rejected the operation payload' }))
+      return yield* new InvalidControlInput({ message: 'Admin endpoint rejected the operation payload' })
     }
     if (response.status >= 500) {
-      return yield* Effect.fail(
-        new ControlDependencyUnavailable({
-          dependency: 'admin-endpoint',
-          message: `Admin endpoint answered ${response.status}`,
-        }),
-      )
+      return yield* new ControlDependencyUnavailable({
+        dependency: 'admin-endpoint',
+        message: `Admin endpoint answered ${response.status}`,
+      })
     }
-    return yield* Effect.fail(new InvalidControlInput({ message: 'Malformed admin response' }))
+    return yield* new InvalidControlInput({ message: 'Malformed admin response' })
   })

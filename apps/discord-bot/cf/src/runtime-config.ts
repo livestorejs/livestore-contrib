@@ -1,16 +1,11 @@
 import * as Effect from 'effect/Effect'
-import type * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
 import * as Schema from 'effect/Schema'
 import * as Semaphore from 'effect/Semaphore'
+import type * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
 
 // The node-free schema twin: src/runtime/config.ts itself pulls node:fs via
 // loadRuntimeConfig and must never enter this worker graph.
-import {
-  canonicalizeRuntimeConfig,
-  RuntimeConfigPayload,
-  summarizeConfig,
-} from '../../src/runtime/config-schema.ts'
-
+import { canonicalizeRuntimeConfig, RuntimeConfigPayload, summarizeConfig } from '../../src/runtime/config-schema.ts'
 import { keyValueStoreFromDurableStorage, type DurableStorage } from './storage.ts'
 
 export { RuntimeConfigPayload }
@@ -45,56 +40,56 @@ const releaseIdFromEnv = (): string => {
 }
 
 const rawDefaultRuntimeConfig = (releaseId: string) => ({
-    _tag: 'real',
-    schemaVersion: 1,
-    environment: 'staging',
-    applicationId: '1541431832195633232',
-    guildId: '1154415661842452532',
-    commandScope: { _tag: 'GuildCommandScope', applicationId: '1541431832195633232', guildId: '1154415661842452532' },
-    actionChannelIds: [channelId],
-    aiTitleChannelIds: [],
-    stagingOnlyChannelIds: [channelId],
-    legacyCommands: [],
-    docsAudience: {
-      publicChannelIds: [channelId],
-      roleRestrictedChannelIds: ['1541442247864623114'],
-      contributorMaintainerRoleIds: ['1373662624948162570', '1310653672786755584'],
+  _tag: 'real',
+  schemaVersion: 1,
+  environment: 'staging',
+  applicationId: '1541431832195633232',
+  guildId: '1154415661842452532',
+  commandScope: { _tag: 'GuildCommandScope', applicationId: '1541431832195633232', guildId: '1154415661842452532' },
+  actionChannelIds: [channelId],
+  aiTitleChannelIds: [],
+  stagingOnlyChannelIds: [channelId],
+  legacyCommands: [],
+  docsAudience: {
+    publicChannelIds: [channelId],
+    roleRestrictedChannelIds: ['1541442247864623114'],
+    contributorMaintainerRoleIds: ['1373662624948162570', '1310653672786755584'],
+  },
+  botTokenSecretRef: 'cf-secret/DISCORD_BOT_TOKEN',
+  openAi: {
+    projectId: 'livestore-discord-staging',
+    serviceAccountSecretRef: 'cf-secret/OPENAI_SERVICE_ACCOUNT',
+    retentionPosture: 'standard-store-false',
+    limits: {
+      requestsPerMemberPerHour: 10,
+      requestsPerMinute: 2,
+      inputTokensPerRequest: 40000,
+      outputTokensPerRequest: 2000,
+      monthlyCostUsdMicros: 1000000,
     },
-    botTokenSecretRef: 'cf-secret/DISCORD_BOT_TOKEN',
-    openAi: {
-      projectId: 'livestore-discord-staging',
-      serviceAccountSecretRef: 'cf-secret/OPENAI_SERVICE_ACCOUNT',
-      retentionPosture: 'standard-store-false',
-      limits: {
-        requestsPerMemberPerHour: 10,
-        requestsPerMinute: 2,
-        inputTokensPerRequest: 40000,
-        outputTokensPerRequest: 2000,
-        monthlyCostUsdMicros: 1000000,
-      },
-    },
-    releaseId,
-    diagnostics: {
-      sink: 'cloudflare-provider',
-      delivery: 'best-effort',
-      accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
-      retentionDays: 30,
-    },
-    e2e: {
-      actorApplicationId: '1541440368212705380',
-      actorTokenSecretRef: 'cf-secret/E2E_ACTOR_TOKEN',
-      targetChannelId: channelId,
-      requiredPurposeMarker: 'livestore-discord-e2e-cutover-required',
-    },
-    stateDirectory: '/var/lib/livestore-discord',
-    controlSocketPath: '/var/lib/livestore-discord/control.sock',
-    health: { host: '127.0.0.1', port: 8787 },
-    credentials: {
-      discordTokenFile: '/secrets/discord-token',
-      openAiApiKeyFile: '/secrets/openai-api-key',
-      docsCorrelationKeyFile: '/secrets/docs-correlation-key',
-    },
-  })
+  },
+  releaseId,
+  diagnostics: {
+    sink: 'cloudflare-provider',
+    delivery: 'best-effort',
+    accessPolicyId: 'cloudflare-access-policy/discord-bot-admin',
+    retentionDays: 30,
+  },
+  e2e: {
+    actorApplicationId: '1541440368212705380',
+    actorTokenSecretRef: 'cf-secret/E2E_ACTOR_TOKEN',
+    targetChannelId: channelId,
+    requiredPurposeMarker: 'livestore-discord-e2e-cutover-required',
+  },
+  stateDirectory: '/var/lib/livestore-discord',
+  controlSocketPath: '/var/lib/livestore-discord/control.sock',
+  health: { host: '127.0.0.1', port: 8787 },
+  credentials: {
+    discordTokenFile: '/secrets/discord-token',
+    openAiApiKeyFile: '/secrets/openai-api-key',
+    docsCorrelationKeyFile: '/secrets/docs-correlation-key',
+  },
+})
 
 /**
  * The raw literal is decoded through the full `RuntimeConfigPayload` schema —
@@ -104,7 +99,6 @@ const rawDefaultRuntimeConfig = (releaseId: string) => ({
  */
 export const makeDefaultRuntimeConfig = (releaseId: string = releaseIdFromEnv()): RuntimeConfigPayload =>
   Schema.decodeUnknownSync(RuntimeConfigPayload)(rawDefaultRuntimeConfig(releaseId))
-
 
 const ConfigRevision = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
@@ -139,10 +133,7 @@ export interface RuntimeConfigStore {
    * the first successful CAS write creates revision one. A corrupt persisted
    * document fails loudly because config controls policy boundaries.
    */
-  readonly read: Effect.Effect<
-    RuntimeConfigDocument,
-    KeyValueStore.KeyValueStoreError | Schema.SchemaError
-  >
+  readonly read: Effect.Effect<RuntimeConfigDocument, KeyValueStore.KeyValueStoreError | Schema.SchemaError>
   /**
    * Validates the candidate before touching storage, then compares the
    * caller's revision against the current durable document and persists the
@@ -188,11 +179,15 @@ export const makeRuntimeConfigStore = (
     raw === undefined
       ? Effect.succeed({ revision: 0, config: makeDefaultRuntimeConfig(releaseId) })
       : Effect.map(decodeDocument(raw), (stored) =>
-          withCurrentRelease('revision' in stored ? stored : { revision: 0, config: stored })),
+          withCurrentRelease('revision' in stored ? stored : { revision: 0, config: stored }),
+        ),
   )
 
   const write: RuntimeConfigStore['write'] = ({ expectedRevision, config: input }) =>
-    Semaphore.withPermits(writeLock, 1)(
+    Semaphore.withPermits(
+      writeLock,
+      1,
+    )(
       Effect.gen(function* () {
         // Validation is intentionally first: an invalid candidate never reaches
         // the storage read/CAS path and can never alter the repair document.

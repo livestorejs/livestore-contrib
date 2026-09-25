@@ -1,6 +1,7 @@
 #!/usr/bin/env -S node --experimental-strip-types
 
-import { openCleanupLedger, type CleanupLedgerIdentity } from './cleanup-ledger.ts'
+import { makeHttpCaptureBrokerDriver } from './attended-broker-driver.ts'
+import { makeDfxRecoveryTransport } from './attended-broker-recovery.ts'
 import {
   dispatchBrokerOperation,
   makeDfxBrokerCorrelator,
@@ -10,8 +11,7 @@ import {
   type BrokerLedgerInput,
   type GesturePerformer,
 } from './attended-broker.ts'
-import { makeHttpCaptureBrokerDriver } from './attended-broker-driver.ts'
-import { makeDfxRecoveryTransport } from './attended-broker-recovery.ts'
+import { openCleanupLedger, type CleanupLedgerIdentity } from './cleanup-ledger.ts'
 import { recoverCleanupLedger } from './cleanup-ledger.ts'
 import type { Snowflake } from './model.ts'
 

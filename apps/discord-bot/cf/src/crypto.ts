@@ -34,8 +34,7 @@ export const makeCrypto = (): CryptoService => ({
     Effect.tryPromise({
       // subtle.digest resolves only for supported algorithm names; 'SHA-256'
       // is part of the baseline every workers/Bun/Node runtime ships.
-      try: () =>
-        crypto.subtle.digest('SHA-256', typeof data === 'string' ? new TextEncoder().encode(data) : data),
+      try: () => crypto.subtle.digest('SHA-256', typeof data === 'string' ? new TextEncoder().encode(data) : data),
       catch: (cause) => new CryptoFailure({ operation: 'sha256Hex', cause }),
     }).pipe(
       Effect.map((digest) => {
@@ -47,4 +46,3 @@ export const makeCrypto = (): CryptoService => ({
       }),
     ),
 })
-

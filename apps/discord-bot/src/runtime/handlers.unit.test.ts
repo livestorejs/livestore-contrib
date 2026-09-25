@@ -45,7 +45,7 @@ describe('Discord docs delivery', () => {
   )
 })
 
-const route = Schema.decodeUnknownSync(InteractionRoute)({
+const route = Schema.decodeSync(InteractionRoute)({
   interactionId: '100000000000000001',
   applicationId: '100000000000000002',
   token: Redacted.make('interaction-token'),

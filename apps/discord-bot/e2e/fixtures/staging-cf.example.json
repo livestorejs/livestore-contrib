@@ -10,11 +10,7 @@
       "public": "0000000000000000002",
       "restricted": "0000000000000000003"
     },
-    "allowedChannelIds": [
-      "0000000000000000001",
-      "0000000000000000002",
-      "0000000000000000003"
-    ],
+    "allowedChannelIds": ["0000000000000000001", "0000000000000000002", "0000000000000000003"],
     "requiredTopicSentinel": "livestore-discord-e2e-only",
     "pollIntervalMs": 1000,
     "timeoutMs": 30000

@@ -197,7 +197,7 @@ describe('SQLite thread action journal', () => {
           { concurrency: 'unbounded' },
         )
         const WorkerResult = Schema.fromJsonString(Schema.Struct({ acquired: Schema.Boolean }))
-        const results = outputs.map((output) => Schema.decodeUnknownSync(WorkerResult)(output.trim()))
+        const results = outputs.map((output) => Schema.decodeSync(WorkerResult)(output.trim()))
         expect(results.filter((result) => result.acquired)).toHaveLength(1)
 
         yield* Effect.scoped(

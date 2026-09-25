@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest'
-
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
+import { describe, expect, it } from 'vitest'
 
+import { ControlResult } from '../../src/control/schema.ts'
+import type { ThreadObservation } from '../../src/reconciliation/model.ts'
+import type { ThreadObservationPort } from '../../src/reconciliation/port.ts'
+import { OperatorSourceReadError } from '../../src/runtime/threading-adapter.ts'
+import type { OperatorSourceFacts, OperatorSourceReader } from '../../src/runtime/threading-adapter.ts'
+import { DiscordSnowflake } from '../../src/threading/model.ts'
+import type { ThreadCandidate, ThreadOutcome } from '../../src/threading/model.ts'
 import {
   commandsSyncOutcome,
   controlResultFromThreadOutcome,
@@ -12,23 +18,18 @@ import {
   OperatorThreadCreatePayload,
   type AdminOperationOutcome,
 } from './admin-ops.ts'
-import type { ThreadObservation } from '../../src/reconciliation/model.ts'
-import { ControlResult } from '../../src/control/schema.ts'
-import type { ThreadObservationPort } from '../../src/reconciliation/port.ts'
-import { OperatorSourceReadError } from '../../src/runtime/threading-adapter.ts'
-import { DiscordSnowflake } from '../../src/threading/model.ts'
-import type { OperatorSourceFacts, OperatorSourceReader } from '../../src/runtime/threading-adapter.ts'
-import type { ThreadCandidate, ThreadOutcome } from '../../src/threading/model.ts'
 import { makeFakeDoStorage } from './fake-do-storage.ts'
 import { makeRuntimeConfigStore, type RuntimeConfigDocument } from './runtime-config.ts'
 
 // Branded snowflakes: the workflow layer's types are schema-branded, so the
 // fixtures decode through the same schemas production uses.
-const source = Schema.decodeUnknownSync(Schema.Struct({
-  guildId: DiscordSnowflake,
-  channelId: DiscordSnowflake,
-  messageId: DiscordSnowflake,
-}))({
+const source = Schema.decodeUnknownSync(
+  Schema.Struct({
+    guildId: DiscordSnowflake,
+    channelId: DiscordSnowflake,
+    messageId: DiscordSnowflake,
+  }),
+)({
   guildId: '1154415661842452532',
   channelId: '1373597443798859776',
   messageId: '3456789012345678901',
@@ -64,10 +65,7 @@ describe('controlResultFromThreadOutcome', () => {
     [{ _tag: 'AuthorizationRejected', source }, 'ControlApplicationFailure'],
     [{ _tag: 'PolicyRejected', source, reason: 'not_eligible' }, 'ControlApplicationFailure'],
     [{ _tag: 'TerminalFailure', source, failureCode: 'discord_definitive_failure' }, 'ControlApplicationFailure'],
-    [
-      { _tag: 'TransientFailure', source, failureCode: 'discord_create_outcome_unknown' },
-      'ControlAmbiguousOutcome',
-    ],
+    [{ _tag: 'TransientFailure', source, failureCode: 'discord_create_outcome_unknown' }, 'ControlAmbiguousOutcome'],
   ] as ReadonlyArray<readonly [ThreadOutcome, string]>)(
     'maps %j to a decodable outcome tagged %s',
     (outcome, expectedTag) => {
@@ -101,22 +99,28 @@ describe('makeOperatorThreadCreate', () => {
       sourceReader: okReader,
       sourceObserver: okObserver,
       thread: (_candidate: ThreadCandidate) =>
-        Effect.succeed({ _tag: 'Created', source, threadId: threadId('4200000000000000042') }) as Effect.Effect<ThreadOutcome>,
+        Effect.succeed({
+          _tag: 'Created',
+          source,
+          threadId: threadId('4200000000000000042'),
+        }) as Effect.Effect<ThreadOutcome>,
       ...overrides,
     }) satisfies Parameters<typeof makeOperatorThreadCreate>[0]
 
   it('runs the real workflow on an admitted source and reports Success with correlation id', async () => {
     const candidates: Array<ThreadCandidate> = []
-    const create = makeOperatorThreadCreate(buildDeps({
-      thread: (candidate) => {
-        candidates.push(candidate)
-        return Effect.succeed({
-          _tag: 'Created',
-          source: candidate.source,
-          threadId: threadId('4200000000000000042'),
-        })
-      },
-    }))
+    const create = makeOperatorThreadCreate(
+      buildDeps({
+        thread: (candidate) => {
+          candidates.push(candidate)
+          return Effect.succeed({
+            _tag: 'Created',
+            source: candidate.source,
+            threadId: threadId('4200000000000000042'),
+          })
+        },
+      }),
+    )
     const result = await Effect.runPromise(
       create({ source, environment: 'staging', apply: true, reason: 'operator asked' }),
     )
@@ -129,18 +133,18 @@ describe('makeOperatorThreadCreate', () => {
 
   it('rejects environment mismatch without touching Discord or the journal', async () => {
     let reads = 0
-    const create = makeOperatorThreadCreate(buildDeps({
-      sourceReader: {
-        read: () =>
-          Effect.sync(() => {
-            reads += 1
-            return facts
-          }),
-      },
-    }))
-    const result = await Effect.runPromise(
-      create({ source, environment: 'production', apply: true, reason: 'why' }),
+    const create = makeOperatorThreadCreate(
+      buildDeps({
+        sourceReader: {
+          read: () =>
+            Effect.sync(() => {
+              reads += 1
+              return facts
+            }),
+        },
+      }),
     )
+    const result = await Effect.runPromise(create({ source, environment: 'production', apply: true, reason: 'why' }))
     expect(result.ok).toBe(false)
     expect(result.body).toMatchObject({ _tag: 'ControlApplicationFailure' })
     expect(reads).toBe(0)
@@ -160,58 +164,61 @@ describe('makeOperatorThreadCreate', () => {
   })
 
   it('surfaces an unavailable source read as ControlDependencyUnavailable', async () => {
-    const create = makeOperatorThreadCreate(buildDeps({
-      sourceReader: {
-        read: () =>
-          Effect.fail(
-            new OperatorSourceReadError({
-              kind: 'unavailable',
-              message: 'Discord source message could not be read',
-            }),
-          ),
-      },
-    }))
-    const result = await Effect.runPromise(
-      create({ source, environment: 'staging', apply: true, reason: 'why' }),
+    const create = makeOperatorThreadCreate(
+      buildDeps({
+        sourceReader: {
+          read: () =>
+            Effect.fail(
+              new OperatorSourceReadError({
+                kind: 'unavailable',
+                message: 'Discord source message could not be read',
+              }),
+            ),
+        },
+      }),
     )
+    const result = await Effect.runPromise(create({ source, environment: 'staging', apply: true, reason: 'why' }))
     expect(result.status).toBe(503)
     expect(result.body).toMatchObject({ _tag: 'ControlDependencyUnavailable', dependency: 'discord-source-read' })
   })
 
   it('maps an Unrun thread observation to a dependency-unavailable outcome (no blind create)', async () => {
-    const create = makeOperatorThreadCreate(buildDeps({
-      sourceObserver: {
-        observeSourceThread: () => Effect.succeed({ _tag: 'Unrun', reason: 'discord_read_unavailable' }),
-      },
-    }))
-    const result = await Effect.runPromise(
-      create({ source, environment: 'staging', apply: true, reason: 'why' }),
+    const create = makeOperatorThreadCreate(
+      buildDeps({
+        sourceObserver: {
+          observeSourceThread: () => Effect.succeed({ _tag: 'Unrun', reason: 'discord_read_unavailable' }),
+        },
+      }),
     )
+    const result = await Effect.runPromise(create({ source, environment: 'staging', apply: true, reason: 'why' }))
     expect(result.status).toBe(503)
-    expect(result.body).toMatchObject({ _tag: 'ControlDependencyUnavailable', dependency: 'discord-thread-observation' })
+    expect(result.body).toMatchObject({
+      _tag: 'ControlDependencyUnavailable',
+      dependency: 'discord-thread-observation',
+    })
   })
 
   it('reuses an exactly-anchored source thread as AlreadySatisfied via existingThreadId', async () => {
-    const create = makeOperatorThreadCreate(buildDeps({
-      sourceObserver: {
-        observeSourceThread: () =>
-          Effect.succeed({
-            _tag: 'ExactSourceThread',
+    const create = makeOperatorThreadCreate(
+      buildDeps({
+        sourceObserver: {
+          observeSourceThread: () =>
+            Effect.succeed({
+              _tag: 'ExactSourceThread',
+              threadId: threadId('5550000000000000055'),
+            }) as Effect.Effect<ThreadObservation>,
+        },
+        thread: (candidate) => {
+          expect(candidate.existingThreadId).toBe(threadId('5550000000000000055'))
+          return Effect.succeed({
+            _tag: 'AlreadySatisfied',
+            source: candidate.source,
             threadId: threadId('5550000000000000055'),
-          }) as Effect.Effect<ThreadObservation>,
-      },
-      thread: (candidate) => {
-        expect(candidate.existingThreadId).toBe(threadId('5550000000000000055'))
-        return Effect.succeed({
-          _tag: 'AlreadySatisfied',
-          source: candidate.source,
-          threadId: threadId('5550000000000000055'),
-        })
-      },
-    }))
-    const result = await Effect.runPromise(
-      create({ source, environment: 'staging', apply: true, reason: 'why' }),
+          })
+        },
+      }),
     )
+    const result = await Effect.runPromise(create({ source, environment: 'staging', apply: true, reason: 'why' }))
     expect(result.body).toMatchObject({ _tag: 'AlreadySatisfied' })
   })
 })
@@ -249,9 +256,7 @@ describe('payload schema parity with the CLI', () => {
           return { _tag: 'Created', source, threadId: threadId('4200000000000000042') }
         }),
     })
-    await Effect.runPromise(
-      create({ source, environment: 'staging', apply: true, reason: 'why', name: 'My title' }),
-    )
+    await Effect.runPromise(create({ source, environment: 'staging', apply: true, reason: 'why', name: 'My title' }))
     expect(requestedTitle).toBe('My title')
   })
 })
@@ -381,7 +386,11 @@ describe('revisioned runtime config control', () => {
       // Models one durable telemetry activation defect. The serialized runtime
       // helper activates before stopping/publishing, so the prior owner stays live.
       activateCandidate: (candidate) =>
-        activationFails === true ? Effect.die('telemetry activation failed') : Effect.sync(() => { running = candidate }),
+        activationFails === true
+          ? Effect.die('telemetry activation failed')
+          : Effect.sync(() => {
+              running = candidate
+            }),
     })
 
     const failed = await Effect.runPromise(
@@ -414,7 +423,6 @@ describe('revisioned runtime config control', () => {
     })
     expect(running.revision).toBe(2)
   })
-
 })
 
 describe('guarded command sync', () => {
@@ -433,8 +441,7 @@ describe('guarded command sync', () => {
     const operation = makeCommandsSyncOperation({
       running,
       readStored: store.read,
-      plan: (_scope) =>
-        Effect.succeed({ created: ['1:docs'], updated: [], deleted: [], unchanged: 1 }),
+      plan: (_scope) => Effect.succeed({ created: ['1:docs'], updated: [], deleted: [], unchanged: 1 }),
       apply: (_scope) =>
         Effect.sync(() => {
           applyCount += 1

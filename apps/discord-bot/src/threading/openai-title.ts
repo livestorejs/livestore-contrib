@@ -28,7 +28,7 @@ export const makeOpenAiThreadTitlePort = (config: OpenAiThreadTitleConfig) =>
   Effect.gen(function* () {
     const client = yield* HttpClient.HttpClient
     const propose: ThreadTitlePort['propose'] = Effect.fn('threading.title.openai')(function* (input: string) {
-      const projectedInput = yield* Schema.decodeUnknownEffect(ProjectedTitleInput)(input).pipe(
+      const projectedInput = yield* Schema.decodeEffect(ProjectedTitleInput)(input).pipe(
         Effect.mapError(() => titleFailure('decode', 'The title input did not match the projected-input boundary')),
       )
       const request = HttpClientRequest.post(config.endpoint ?? openAiTitleConfiguration.endpoint).pipe(
@@ -55,7 +55,7 @@ export const makeOpenAiThreadTitlePort = (config: OpenAiThreadTitleConfig) =>
       if (outputText === undefined) {
         return yield* titleFailure('decode', 'The title provider returned no structured output text')
       }
-      const proposal = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(TitleProposal), {
+      const proposal = yield* Schema.decodeEffect(Schema.fromJsonString(TitleProposal), {
         onExcessProperty: 'error',
       })(outputText).pipe(
         Effect.mapError(() =>

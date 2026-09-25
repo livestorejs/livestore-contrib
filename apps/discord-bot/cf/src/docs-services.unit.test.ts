@@ -4,15 +4,14 @@ import { expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
 
-import { DocumentationCorpus } from '../../src/docs/services.ts'
 import { makeCanonicalCorpusLayer, canonicalCorpusUrl } from '../../src/docs/corpus.ts'
+import { DocumentationCorpus } from '../../src/docs/services.ts'
 import { DocsWorkflow } from '../../src/docs/services.ts'
-
 import { makeCrypto } from './crypto.ts'
+import { correlateWithWebCryptoKey, makeDocsServices } from './docs-services.ts'
+import { makeKeyValueDocsStateStore } from './docs-state.ts'
 import { makeFakeDoStorage } from './fake-do-storage.ts'
 import { keyValueStoreFromDurableStorage } from './storage.ts'
-import { makeKeyValueDocsStateStore } from './docs-state.ts'
-import { correlateWithWebCryptoKey, makeDocsServices } from './docs-services.ts'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -51,7 +50,10 @@ const stubHttpLayer = Layer.succeed(
     const body = url.includes('llms-full') === true ? corpusFixture : openAiBody
     const contentType = url.includes('llms-full') === true ? 'text/plain; charset=utf-8' : 'application/json'
     return Effect.succeed(
-      HttpClientResponse.fromWeb(request, new Response(body, { status: 200, headers: { 'content-type': contentType } })),
+      HttpClientResponse.fromWeb(
+        request,
+        new Response(body, { status: 200, headers: { 'content-type': contentType } }),
+      ),
     )
   }),
 )
@@ -90,7 +92,8 @@ it.effect('digests the canonical corpus served by a stub client without real net
       expect(second.cacheStatus).toBe('hit')
       expect(second.snapshot.digest).toBe(first.snapshot.digest)
     }).pipe(Effect.provide(layer))
-  }))
+  }),
+)
 
 // ---------------------------------------------------------------------------
 // Admission key generation uniqueness (+ node HMAC parity)
@@ -117,7 +120,8 @@ it.effect('web-crypto admission keys are unique per principal and byte-parity wi
     const firstKey = yield* crypto.randomBytes(32)
     const secondKey = yield* crypto.randomBytes(32)
     expect(Array.from(firstKey)).not.toEqual(Array.from(secondKey))
-  }))
+  }),
+)
 
 // ---------------------------------------------------------------------------
 // Monthly quota reserve/deny over the existing CF docs-state store
@@ -138,7 +142,8 @@ it.effect('the KV-backed docs-state store reserves and denies against the monthl
 
     const denied = yield* store.reserveMonthly({ atMillis, costUsdMicros: 700, ceilingUsdMicros: 1_000 })
     expect(denied._tag).toBe('Denied')
-  }))
+  }),
+)
 
 // ---------------------------------------------------------------------------
 // Full assembly: handler-facing R satisfied end-to-end
@@ -177,7 +182,8 @@ it.effect('makeDocsServices answers a query and records correlated quota state',
       expect(recent.quota[0]?.costUsdMicros).toBe(72)
       expect(yield* stateStore.monthlySpent(Date.now())).toBe(72)
     }).pipe(Effect.provide(services))
-  }))
+  }),
+)
 
 // The production assembly must target the canonical corpus URL.
 it('the canonical corpus endpoint is unchanged', () => {

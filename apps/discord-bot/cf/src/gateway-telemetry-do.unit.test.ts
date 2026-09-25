@@ -4,10 +4,7 @@ import * as Effect from 'effect/Effect'
 import { expect } from 'vitest'
 
 import { makeFakeDoStorage } from './fake-do-storage.ts'
-import {
-  gatewayTelemetryAggregateKey,
-  makeDurableObjectGatewayTelemetrySink,
-} from './gateway-telemetry-do.ts'
+import { gatewayTelemetryAggregateKey, makeDurableObjectGatewayTelemetrySink } from './gateway-telemetry-do.ts'
 
 it.effect('persists one bounded aggregate across runtime recreation', () =>
   Effect.gen(function* () {
@@ -42,10 +39,9 @@ it.effect('persists one bounded aggregate across runtime recreation', () =>
         lastReadyAt: 1_020,
       },
     })
-    expect([...((yield* Effect.promise(() => storage.list())).keys())]).toEqual([
-      gatewayTelemetryAggregateKey,
-    ])
-  }))
+    expect([...(yield* Effect.promise(() => storage.list())).keys()]).toEqual([gatewayTelemetryAggregateKey])
+  }),
+)
 
 it.effect('serializes concurrent updates without losing monotonic counters or timestamps', () =>
   Effect.gen(function* () {
@@ -61,7 +57,8 @@ it.effect('serializes concurrent updates without losing monotonic counters or ti
           at: 1_010 + index,
           attempt: index + 1,
           mode: 'identify' as const,
-        })),
+        }),
+      ),
       { concurrency: 'unbounded' },
     )
     yield* Effect.all(
@@ -71,7 +68,8 @@ it.effect('serializes concurrent updates without losing monotonic counters or ti
           activationId: 'activation-a',
           at: 1_100 + index,
           attempt: index + 1,
-        })),
+        }),
+      ),
       { concurrency: 'unbounded' },
     )
     yield* sink.append({ _tag: 'Ready', activationId: 'activation-a', at: 2_000, attempt: 20 })
@@ -89,8 +87,8 @@ it.effect('serializes concurrent updates without losing monotonic counters or ti
         lastReadyAt: 2_000,
       },
     })
-  }))
-
+  }),
+)
 
 it.effect('rejects a late old-runtime write after a concurrent new activation claim', () =>
   Effect.gen(function* () {
@@ -105,22 +103,29 @@ it.effect('rejects a late old-runtime write after a concurrent new activation cl
     })
 
     const newActivationStored = yield* Deferred.make<void>()
-    yield* Effect.all([
-      Deferred.await(newActivationStored).pipe(
-        Effect.andThen(sink.append({
-          _tag: 'TerminalClose',
-          activationId: 'old-activation',
-          at: 1_100,
-          attempt: 1,
-          code: 4_014,
-        })),
-      ),
-      sink.append({
-        _tag: 'Activated',
-        activationId: 'new-activation',
-        at: 1_090,
-      }).pipe(Effect.andThen(Deferred.succeed(newActivationStored, undefined))),
-    ], { concurrency: 'unbounded' })
+    yield* Effect.all(
+      [
+        Deferred.await(newActivationStored).pipe(
+          Effect.andThen(
+            sink.append({
+              _tag: 'TerminalClose',
+              activationId: 'old-activation',
+              at: 1_100,
+              attempt: 1,
+              code: 4_014,
+            }),
+          ),
+        ),
+        sink
+          .append({
+            _tag: 'Activated',
+            activationId: 'new-activation',
+            at: 1_090,
+          })
+          .pipe(Effect.andThen(Deferred.succeed(newActivationStored, undefined))),
+      ],
+      { concurrency: 'unbounded' },
+    )
 
     expect(yield* sink.aggregate).toMatchObject({
       lifetime: {
@@ -137,4 +142,5 @@ it.effect('rejects a late old-runtime write after a concurrent new activation cl
         lastDisconnectedAt: null,
       },
     })
-  }))
+  }),
+)

@@ -1,11 +1,10 @@
 import { expect, it } from '@effect/vitest'
-
 import * as Effect from 'effect/Effect'
 
-import { makeFakeDoStorage } from './fake-do-storage.ts'
 import { makeCrypto } from './crypto.ts'
-import { keyValueStoreFromDurableStorage } from './storage.ts'
 import { makeKeyValueDocsStateStore } from './docs-state.ts'
+import { makeFakeDoStorage } from './fake-do-storage.ts'
+import { keyValueStoreFromDurableStorage } from './storage.ts'
 
 // The schema pins correlation/principal to exactly 64 lowercase hex chars.
 const hex = (suffix: number) => suffix.toString(16).padStart(64, '0')
@@ -43,7 +42,8 @@ it.effect('records, prunes after the rolling window, and sums monthly spend', ()
     expect((yield* store.recent(26 * 60 * 60 * 1_000)).provenance).toHaveLength(1)
 
     expect(yield* store.monthlySpent(new Date('2026-08-03T00:00:00Z').getTime())).toBe(0)
-  }))
+  }),
+)
 
 it.effect('reserveMonthly denies past the ceiling and settles charged reservations', () =>
   Effect.gen(function* () {
@@ -60,4 +60,5 @@ it.effect('reserveMonthly denies past the ceiling and settles charged reservatio
 
     const denied = yield* store.reserveMonthly({ atMillis, costUsdMicros: 700, ceilingUsdMicros: 1_000 })
     expect(denied._tag).toBe('Denied')
-  }))
+  }),
+)

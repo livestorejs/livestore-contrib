@@ -43,12 +43,12 @@ const runWithClient = (
   }).pipe(Effect.scoped, Effect.runPromise)
 }
 
-const source = Schema.decodeUnknownSync(DiscordMessageRef)({
+const source = Schema.decodeSync(DiscordMessageRef)({
   guildId: '10000000000000001',
   channelId: '10000000000000002',
   messageId: '10000000000000003',
 })
-const reason = Schema.decodeUnknownSync(OperatorReason)('operator retry')
+const reason = Schema.decodeSync(OperatorReason)('operator retry')
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -95,7 +95,8 @@ describe('HTTPS bot control client', () => {
 
   it('maps a decodable 401 body to ControlAuthorizationRejected', async () => {
     const result = await runWithClient(
-      () => Promise.resolve(jsonResponse({ _tag: 'ControlAuthorizationRejected', message: 'bearer token mismatch' }, 401)),
+      () =>
+        Promise.resolve(jsonResponse({ _tag: 'ControlAuthorizationRejected', message: 'bearer token mismatch' }, 401)),
       (client) => client.RuntimeStatus({}),
     )
     expect(result.failure).toMatchObject({
@@ -115,7 +116,10 @@ describe('HTTPS bot control client', () => {
 
   it('maps 400/422 validation failures to InvalidControlInput', async () => {
     const result = await runWithClient(
-      () => Promise.resolve(jsonResponse({ _tag: 'InvalidControlInput', message: 'payload failed schema validation' }, 422)),
+      () =>
+        Promise.resolve(
+          jsonResponse({ _tag: 'InvalidControlInput', message: 'payload failed schema validation' }, 422),
+        ),
       (client) => client.ThreadCreate({ source, environment: 'staging', apply: true, reason }),
     )
     expect(result.failure).toMatchObject({
@@ -150,8 +154,9 @@ describe('HTTPS bot control client', () => {
   })
 
   it('maps network failure to ControlDependencyUnavailable without throwing', async () => {
-    const result = await runWithClient(() => Promise.reject(new TypeError('fetch failed')), (client) =>
-      client.RuntimeStatus({}),
+    const result = await runWithClient(
+      () => Promise.reject(new TypeError('fetch failed')),
+      (client) => client.RuntimeStatus({}),
     )
     expect((result.failure as ControlDependencyUnavailable).dependency).toBe('admin-endpoint')
   })
@@ -164,7 +169,6 @@ describe('HTTPS bot control client', () => {
     expect(result.failure).toMatchObject({ _tag: 'InvalidControlInput', message: 'Malformed admin response' })
     expect(result.failure).toBeInstanceOf(InvalidControlInput)
   })
-
 
   it('decodes results against the shared ControlResult schema shape', async () => {
     const result = await runWithClient(

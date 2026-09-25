@@ -1,6 +1,5 @@
 import * as Cloudflare from 'alchemy/Cloudflare'
 import { WorkerEnvironment } from 'alchemy/Cloudflare'
-
 import * as Config from 'effect/Config'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
@@ -8,13 +7,12 @@ import * as HttpServerRequest from 'effect/unstable/http/HttpServerRequest'
 import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse'
 
 import { AdminToken, makeAdminRouter, runAdminRouter, toFetchHandler } from './admin.ts'
-import { readSecret } from './env.ts'
 import { BotState } from './bot-state.ts'
+import { readSecret } from './env.ts'
 import { evaluateReadiness } from './readiness.ts'
 import { releaseIdConfig } from './release.ts'
 
 const configuredWorkerName = process.env['CF_WORKER_NAME']?.trim()
-
 
 /**
  * Discord bot Worker — the main module. Hosts one Durable Object class
@@ -30,9 +28,7 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
     main: import.meta.url,
     // Remote stacks pin the existing script name before adopting local state
     // into Cloudflare state. Local workerd keeps Alchemy's generated name.
-    ...(configuredWorkerName === undefined || configuredWorkerName === ''
-      ? {}
-      : { name: configuredWorkerName }),
+    ...(configuredWorkerName === undefined || configuredWorkerName === '' ? {} : { name: configuredWorkerName }),
     // nodejs_compat must stay OFF: the worker graph is node-builtin-free by
     // construction and bundle-check.unit.test.ts enforces it (source recrawl
     // plus post-build dist scan when dist/ exists).
@@ -71,24 +67,25 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
       if (adminHandler === undefined) {
         const gateway = botState.getByName('gateway')
         adminHandler = toFetchHandler(
-          runAdminRouter(makeAdminRouter({
-            runtimeStatus: () => gateway.status(),
-            threadCreate: (payload) => gateway.threadCreate(payload),
-            configGet: gateway.configGet(),
-            configPut: (payload) => gateway.configPut(payload),
-            commandsSync: (payload) => gateway.commandsSync(payload),
-            threadReconcile: (payload) => gateway.threadReconcile(payload),
-          })),
+          runAdminRouter(
+            makeAdminRouter({
+              runtimeStatus: () => gateway.status(),
+              threadCreate: (payload) => gateway.threadCreate(payload),
+              configGet: gateway.configGet(),
+              configPut: (payload) => gateway.configPut(payload),
+              commandsSync: (payload) => gateway.commandsSync(payload),
+              threadReconcile: (payload) => gateway.threadReconcile(payload),
+            }),
+          ),
           Context.make(AdminToken, { token: readSecret(env, 'ADMIN_TOKEN') }),
         )
       }
       return adminHandler
     }
 
-    yield* Cloudflare.Workers.cron('* * * * *', () =>
-      Effect.asVoid(botState.getByName('gateway').tick())).pipe(
-        Effect.provide(Cloudflare.Workers.CronEventSourceLive),
-      )
+    yield* Cloudflare.Workers.cron('* * * * *', () => Effect.asVoid(botState.getByName('gateway').tick())).pipe(
+      Effect.provide(Cloudflare.Workers.CronEventSourceLive),
+    )
 
     return {
       fetch: Effect.gen(function* () {

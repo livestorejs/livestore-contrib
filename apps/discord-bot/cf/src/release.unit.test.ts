@@ -1,14 +1,8 @@
-import { expect, it } from 'vitest'
-
 import * as ConfigProvider from 'effect/ConfigProvider'
 import * as Effect from 'effect/Effect'
+import { expect, it } from 'vitest'
 
-import {
-  deploymentIdentityMismatch,
-  readReleaseId,
-  readWorkerVersionId,
-  releaseIdConfig,
-} from './release.ts'
+import { deploymentIdentityMismatch, readReleaseId, readWorkerVersionId, releaseIdConfig } from './release.ts'
 
 const parse = (local: boolean, values: Record<string, unknown>) =>
   releaseIdConfig(local).parse(ConfigProvider.fromUnknown(values))
@@ -39,12 +33,16 @@ it('fails remote deployment identity closed on Worker or namespace drift', () =>
     botStateNamespaceId: '11111111111111111111111111111111',
   }
   expect(deploymentIdentityMismatch(expected, expected)).toBeUndefined()
-  expect(deploymentIdentityMismatch(expected, {
-    ...expected,
-    workerName: 'discordbot-staging-fork',
-  })).toMatch(/Worker identity mismatch/)
-  expect(deploymentIdentityMismatch(expected, {
-    ...expected,
-    botStateNamespaceId: '22222222222222222222222222222222',
-  })).toMatch(/BotState namespace mismatch/)
+  expect(
+    deploymentIdentityMismatch(expected, {
+      ...expected,
+      workerName: 'discordbot-staging-fork',
+    }),
+  ).toMatch(/Worker identity mismatch/)
+  expect(
+    deploymentIdentityMismatch(expected, {
+      ...expected,
+      botStateNamespaceId: '22222222222222222222222222222222',
+    }),
+  ).toMatch(/BotState namespace mismatch/)
 })

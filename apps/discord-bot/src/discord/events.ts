@@ -1,5 +1,4 @@
 import { GatewayIntentBits } from 'dfx/types'
-
 import * as Context from 'effect/Context'
 import type * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'

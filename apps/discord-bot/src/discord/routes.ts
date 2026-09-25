@@ -63,7 +63,7 @@ export const routeInteraction = Effect.fn('discord.routeInteraction')(function* 
     )
     if (Option.isNone(decodedSource) === true) return
 
-    const input = yield* Schema.decodeUnknownEffect(CreateThreadInteractionSchema)({
+    const input = yield* Schema.decodeEffect(CreateThreadInteractionSchema)({
       route: interactionRoute(interaction),
       guildId: interaction.guild_id,
       channelId: interaction.channel_id,
@@ -86,7 +86,7 @@ export const routeInteraction = Effect.fn('discord.routeInteraction')(function* 
   ) {
     const query = readStringOption(interaction.data.options, 'query')
     if (query === undefined) return
-    const input = yield* Schema.decodeUnknownEffect(DocsInteractionSchema)({
+    const input = yield* Schema.decodeEffect(DocsInteractionSchema)({
       route: interactionRoute(interaction),
       guildId: interaction.guild_id,
       channelId: interaction.channel_id,
@@ -105,8 +105,8 @@ export const routeInteraction = Effect.fn('discord.routeInteraction')(function* 
 const decodeAutomaticMessage = (
   message: DiscordMessageLike,
 ): Effect.Effect<Option.Option<AutomaticMessage>, DiscordSourceMessageDecodeError> => {
-  if (message.guild_id === undefined) return Effect.succeed(Option.none())
-  const expected = Schema.decodeUnknownSync(DiscordMessageRef)({
+  if (message.guild_id === undefined) return Effect.succeedNone
+  const expected = Schema.decodeSync(DiscordMessageRef)({
     guildId: message.guild_id,
     channelId: message.channel_id,
     messageId: message.id,
@@ -120,7 +120,7 @@ const decodeAutomaticMessage = (
       }),
   }).pipe(
     Effect.flatMap((facts) =>
-      Schema.decodeUnknownEffect(AutomaticMessageSchema)({
+      Schema.decodeEffect(AutomaticMessageSchema)({
         guildId: facts.source.guildId,
         channelId: facts.source.channelId,
         messageId: facts.source.messageId,
@@ -138,7 +138,7 @@ const decodeAutomaticMessage = (
         sourceChannelKind: facts.sourceChannelKind,
       }),
     ),
-    Effect.map(Option.some),
+    Effect.asSome,
     Effect.mapError((cause) =>
       cause instanceof DiscordSourceMessageDecodeError
         ? cause

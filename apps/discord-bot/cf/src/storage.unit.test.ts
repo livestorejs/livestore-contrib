@@ -1,5 +1,4 @@
 import { expect, it } from '@effect/vitest'
-
 import * as Effect from 'effect/Effect'
 import type * as KeyValueStore from 'effect/unstable/persistence/KeyValueStore'
 
@@ -30,7 +29,8 @@ it.effect('KeyValueStore adapter round-trips strings and sizes over DO storage',
     yield* store.set('b', '2')
     yield* store.clear
     expect(yield* store.size).toBe(0)
-  }))
+  }),
+)
 
 it.effect('shard state helpers share the dfx key layout', () =>
   Effect.gen(function* () {
@@ -58,4 +58,5 @@ it.effect('shard state helpers share the dfx key layout', () =>
 
     yield* clearShardState(storage, shard)
     expect(yield* loadShardState(storage, shard)).toBeUndefined()
-  }))
+  }),
+)

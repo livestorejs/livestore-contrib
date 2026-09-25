@@ -38,14 +38,14 @@ export const validateThreadName = (proposal: string): ThreadName | undefined => 
   const normalized = normalizeWhitespace(proposal)
   if (normalized.length === 0 || [...normalized].length > maxThreadNameCodePoints || /\p{C}/u.test(normalized) === true)
     return undefined
-  return Schema.decodeUnknownSync(ThreadName)(normalized)
+  return Schema.decodeSync(ThreadName)(normalized)
 }
 
 /** Local naming is deterministic and cannot fail thread creation. */
 export const deriveLocalThreadName = (content: string): ThreadName => {
   const normalized = normalizeWhitespace(content).replace(/\p{C}/gu, '')
   const bounded = takeCodePoints(normalized, maxThreadNameCodePoints)
-  return Schema.decodeUnknownSync(ThreadName)(bounded.length === 0 ? fallbackTitle : bounded)
+  return Schema.decodeSync(ThreadName)(bounded.length === 0 ? fallbackTitle : bounded)
 }
 
 export const resolveThreadName = Effect.fn('threading.resolveThreadName')(function* (

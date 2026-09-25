@@ -46,7 +46,7 @@ const base = {
 
 describe('deployment contract', () => {
   it('decodes and canonicalizes action and audience sets', () => {
-    const decoded = Schema.decodeUnknownSync(BotDeploymentConfig)(base)
+    const decoded = Schema.decodeSync(BotDeploymentConfig)(base)
     const normalized = normalizeDeploymentConfig(decoded)
     expect(normalized.actionChannelIds).toEqual(['100000000000000002'])
   })
@@ -63,7 +63,7 @@ describe('deployment contract', () => {
       { ...base, docsAudience: { ...base.docsAudience, roleRestrictedChannelIds: ['100000000000000003'] } },
     ],
   ])('rejects %s', (_label, value) => {
-    const decoded = Schema.decodeUnknownSync(BotDeploymentConfig)(value)
+    const decoded = Schema.decodeSync(BotDeploymentConfig)(value)
     expect(() => normalizeDeploymentConfig(decoded)).toThrow()
   })
 })

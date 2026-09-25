@@ -1,8 +1,14 @@
 import { SqliteClient } from '@effect/sql-sqlite-do'
-
 import * as Cloudflare from 'alchemy/Cloudflare'
 import { WorkerEnvironment } from 'alchemy/Cloudflare'
-
+import { DiscordREST, DiscordRESTMemoryLive } from 'dfx'
+import { DiscordConfig, layer as discordConfigLayer, type DiscordConfigService } from 'dfx/DiscordConfig'
+import { JsonDiscordWSCodecLive } from 'dfx/DiscordGateway/DiscordWS'
+import { Messaging, MesssagingLive } from 'dfx/DiscordGateway/Messaging'
+import { Shard, ShardLive, type RunningShard } from 'dfx/DiscordGateway/Shard'
+import { ShardStateStore } from 'dfx/DiscordGateway/Shard/StateStore'
+import { MemoryRateLimitStoreLive, RateLimitStore, type RateLimitStoreService } from 'dfx/RateLimit'
+import type * as Discord from 'dfx/types'
 import * as Cause from 'effect/Cause'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
@@ -10,49 +16,37 @@ import * as Fiber from 'effect/Fiber'
 import * as Layer from 'effect/Layer'
 import * as Option from 'effect/Option'
 import * as Redacted from 'effect/Redacted'
-import type * as Scope from 'effect/Scope'
 import * as Schema from 'effect/Schema'
+import type * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import type * as Stream from 'effect/Stream'
-import * as Reactivity from 'effect/unstable/reactivity/Reactivity'
 import { FetchHttpClient } from 'effect/unstable/http'
+import * as Reactivity from 'effect/unstable/reactivity/Reactivity'
 import { layerWebSocketConstructorGlobal, WebSocketConstructor } from 'effect/unstable/socket/Socket'
 
-import { DiscordREST, DiscordRESTMemoryLive } from 'dfx'
-import { DiscordConfig, layer as discordConfigLayer, type DiscordConfigService } from 'dfx/DiscordConfig'
-import type * as Discord from 'dfx/types'
-import { JsonDiscordWSCodecLive } from 'dfx/DiscordGateway/DiscordWS'
-import { Messaging, MesssagingLive } from 'dfx/DiscordGateway/Messaging'
-import { Shard, ShardLive, type RunningShard } from 'dfx/DiscordGateway/Shard'
-import { ShardStateStore } from 'dfx/DiscordGateway/Shard/StateStore'
-import { MemoryRateLimitStoreLive, RateLimitStore, type RateLimitStoreService } from 'dfx/RateLimit'
-
-// Selective imports ONLY: src/docs/index.ts re-exports node-bound modules
-// (admission/workflow crypto, file state store) and must never enter this
-// worker graph; src/runtime/config.ts (node:fs) is likewise avoided via its
-// portable config-schema twin.
+import { makeDfxApplicationCommandsPort } from '../../src/application-commands/dfx.ts'
+import { makeApplicationCommandsReconciler } from '../../src/application-commands/reconcile.ts'
+import { type DiscordMessageRef } from '../../src/control/schema.ts'
+import { DiscordActionsDfxLive } from '../../src/discord/actions-dfx.ts'
+import { DiscordActions } from '../../src/discord/actions.ts'
+import { DiscordEventHandlers, gatewayIntents } from '../../src/discord/events.ts'
+import { routeInteraction, routeMessage } from '../../src/discord/routes.ts'
+import { makeDfxThreadMutation } from '../../src/discord/thread-mutation-dfx.ts'
+import { DocsWorkflow } from '../../src/docs/services.ts'
+import type { DocsStateStore } from '../../src/docs/state-schema.ts'
+import type { JournalUnavailableError, ThreadActionJournalService } from '../../src/journal/service.ts'
+import { makeDfxThreadObservation } from '../../src/reconciliation/dfx.ts'
+import type { ReconciliationSelection } from '../../src/reconciliation/model.ts'
+import { makeThreadReconciliationWorkflowCore } from '../../src/reconciliation/workflow-core.ts'
+import { DocsChannelResolutionError, makeDiscordEventHandlersLayer } from '../../src/runtime/handlers.ts'
 import {
-  clearShardState,
-  keyValueStoreFromDurableStorage,
-  loadShardState,
-  saveShardState,
-} from './storage.ts'
-import { readSecret } from './env.ts'
-import { makeCrypto } from './crypto.ts'
-import { makeSupervisorGate } from './loop-gate.ts'
-import { makeKeyValueDocsStateStore } from './docs-state.ts'
-import { makeSqliteDoThreadActionJournal, migrateJournal } from './journal.ts'
-import { make as makeSupervisorLoop, makeShardAcquire } from './supervisor.ts'
-import type { Supervisor, SupervisorState } from './supervisor.ts'
-import {
-  makeGatewayTelemetryRecorder,
-  type GatewayTelemetryRecorder,
-  type GatewayTelemetrySink,
-  type GatewayTelemetrySnapshot,
-} from './gateway-telemetry.ts'
-import { makeDurableObjectGatewayTelemetrySink } from './gateway-telemetry-do.ts'
-import type { GatewayHealthSummary } from './readiness.ts'
-import { makeSerializedRuntime } from './runtime-install.ts'
+  candidateForOperator,
+  makeDfxOperatorSourceReader,
+  makeJournalReconciliation,
+  OperatorSourceTransportError,
+} from '../../src/runtime/threading-adapter.ts'
+import { makeOpenAiThreadTitlePort } from '../../src/threading/openai-title.ts'
+import { makeThreadWorkflow } from '../../src/threading/workflow.ts'
 import {
   commandsSyncResultFromDiff,
   makeCommandsSyncOperation,
@@ -64,6 +58,22 @@ import {
   ThreadReconcilePayload,
   type AdminOperationOutcome,
 } from './admin-ops.ts'
+import { syncApplicationCommands } from './command-sync.ts'
+import { makeCrypto } from './crypto.ts'
+import { makeDocsServices } from './docs-services.ts'
+import { makeKeyValueDocsStateStore } from './docs-state.ts'
+import { readSecret } from './env.ts'
+import { makeDurableObjectGatewayTelemetrySink } from './gateway-telemetry-do.ts'
+import {
+  makeGatewayTelemetryRecorder,
+  type GatewayTelemetryRecorder,
+  type GatewayTelemetrySink,
+  type GatewayTelemetrySnapshot,
+} from './gateway-telemetry.ts'
+import { makeSqliteDoThreadActionJournal, migrateJournal } from './journal.ts'
+import { makeSupervisorGate } from './loop-gate.ts'
+import type { GatewayHealthSummary } from './readiness.ts'
+import { readReleaseId, readWorkerVersionId } from './release.ts'
 import {
   encodeConfigSummary,
   makeDefaultRuntimeConfig,
@@ -72,32 +82,14 @@ import {
   type RuntimeConfigStore,
   type RuntimeConfigSummary,
 } from './runtime-config.ts'
-import { makeDocsServices } from './docs-services.ts'
-import { syncApplicationCommands } from './command-sync.ts'
-import { makeDfxApplicationCommandsPort } from '../../src/application-commands/dfx.ts'
-import { makeApplicationCommandsReconciler } from '../../src/application-commands/reconcile.ts'
-import { readReleaseId, readWorkerVersionId } from './release.ts'
-import { DiscordActions } from '../../src/discord/actions.ts'
-import { DiscordActionsDfxLive } from '../../src/discord/actions-dfx.ts'
-import { DiscordEventHandlers, gatewayIntents } from '../../src/discord/events.ts'
-import { routeInteraction, routeMessage } from '../../src/discord/routes.ts'
-import { DocsWorkflow } from '../../src/docs/services.ts'
-import { type DiscordMessageRef } from '../../src/control/schema.ts'
-import type { DocsStateStore } from '../../src/docs/state-schema.ts'
-import { makeThreadWorkflow } from '../../src/threading/workflow.ts'
-import { makeOpenAiThreadTitlePort } from '../../src/threading/openai-title.ts'
-import { makeDfxThreadMutation } from '../../src/discord/thread-mutation-dfx.ts'
-import { makeDfxThreadObservation } from '../../src/reconciliation/dfx.ts'
-import { makeThreadReconciliationWorkflowCore } from '../../src/reconciliation/workflow-core.ts'
-import type { ReconciliationSelection } from '../../src/reconciliation/model.ts'
-import {
-  candidateForOperator,
-  makeDfxOperatorSourceReader,
-  makeJournalReconciliation,
-  OperatorSourceTransportError,
-} from '../../src/runtime/threading-adapter.ts'
-import { DocsChannelResolutionError, makeDiscordEventHandlersLayer } from '../../src/runtime/handlers.ts'
-import type { JournalUnavailableError, ThreadActionJournalService } from '../../src/journal/service.ts'
+import { makeSerializedRuntime } from './runtime-install.ts'
+// Selective imports ONLY: src/docs/index.ts re-exports node-bound modules
+// (admission/workflow crypto, file state store) and must never enter this
+// worker graph; src/runtime/config.ts (node:fs) is likewise avoided via its
+// portable config-schema twin.
+import { clearShardState, keyValueStoreFromDurableStorage, loadShardState, saveShardState } from './storage.ts'
+import { make as makeSupervisorLoop, makeShardAcquire } from './supervisor.ts'
+import type { Supervisor, SupervisorState } from './supervisor.ts'
 
 /** The alchemy DurableObjectState service instance yielded inside DO handlers. */
 type DoInstanceState = InstanceType<typeof Cloudflare.DurableObjectState>
@@ -178,7 +170,8 @@ const shardStoreLayerFor = (rawStorage: DurableObjectStorage): Layer.Layer<Shard
         get: Effect.map(loadShardState(rawStorage, [id, count]), (state) =>
           state === undefined || (state.sessionId === '' && state.sequence === null)
             ? Option.none()
-            : Option.some(state)),
+            : Option.some(state),
+        ),
         set: (state) => saveShardState(rawStorage, [id, count], state),
         clear: clearShardState(rawStorage, [id, count]),
       }),
@@ -247,9 +240,8 @@ const buildRuntime = (
     // Built once per BotState instance (inert in-memory Map closure); shared
     // across every shard-connect attempt so identify throttling survives
     // reconnect storms.
-    const rateLimitStore = yield* Effect.map(
-      Effect.scoped(Layer.build(MemoryRateLimitStoreLive)),
-      (context) => Context.getUnsafe(context, RateLimitStore),
+    const rateLimitStore = yield* Effect.map(Effect.scoped(Layer.build(MemoryRateLimitStoreLive)), (context) =>
+      Context.getUnsafe(context, RateLimitStore),
     )
 
     // The SQLite client's connection is an inert closure over the storage
@@ -333,23 +325,24 @@ const buildRuntime = (
     )
 
     const docsContext = yield* Effect.scoped(
-      Layer.build(makeDocsServices({
-        openAiApiKey,
-        ...(correlationKey.trim() === '' ? {} : { correlationKey }),
-        // Only the real deployment variant carries OpenAI ceilings; the fake
-        // variant runs the docs workflow on its defaults.
-        ...(config._tag === 'real' ? { openAiLimits: config.openAi.limits } : {}),
-        monthlyCostUsdMicros: config._tag === 'real' ? config.openAi.limits.monthlyCostUsdMicros : undefined,
-        stateStore: docsStore,
-      })),
+      Layer.build(
+        makeDocsServices({
+          openAiApiKey,
+          ...(correlationKey.trim() === '' ? {} : { correlationKey }),
+          // Only the real deployment variant carries OpenAI ceilings; the fake
+          // variant runs the docs workflow on its defaults.
+          ...(config._tag === 'real' ? { openAiLimits: config.openAi.limits } : {}),
+          monthlyCostUsdMicros: config._tag === 'real' ? config.openAi.limits.monthlyCostUsdMicros : undefined,
+          stateStore: docsStore,
+        }),
+      ),
     )
     const docs = Context.get(docsContext, DocsWorkflow)
 
     const resolveDocsChannelParent = ({ guildId, channelId }: { guildId: string; channelId: string }) =>
       rest.getChannel(channelId).pipe(
         Effect.map((channel) => {
-          const canonicalGuildId =
-            'guild_id' in channel && typeof channel.guild_id === 'string' ? channel.guild_id : ''
+          const canonicalGuildId = 'guild_id' in channel && typeof channel.guild_id === 'string' ? channel.guild_id : ''
           return {
             // Both independently supplied identities must agree; an absent or
             // inconsistent REST ancestry therefore fails audience admission.
@@ -368,11 +361,7 @@ const buildRuntime = (
           thread: threadWorkflow,
           docsReady: true,
           resolveDocsChannelParent,
-        }).pipe(
-          Layer.provide(
-            Layer.merge(Layer.succeed(DiscordActions, actions), Layer.succeed(DocsWorkflow, docs)),
-          ),
-        ),
+        }).pipe(Layer.provide(Layer.merge(Layer.succeed(DiscordActions, actions), Layer.succeed(DocsWorkflow, docs)))),
       ),
     )
 
@@ -395,9 +384,7 @@ const buildRuntime = (
       // At-least-once redelivery after a resume re-runs the idempotent
       // handlers for anything lost mid-failure.
       return routed.pipe(
-        Effect.catchCause((cause) =>
-          Effect.logError(`[bot-state] dispatch handler ended: ${Cause.pretty(cause)}`),
-        ),
+        Effect.catchCause((cause) => Effect.logError(`[bot-state] dispatch handler ended: ${Cause.pretty(cause)}`)),
       )
     }
 
@@ -405,11 +392,13 @@ const buildRuntime = (
       config,
       sourceReader: makeDfxOperatorSourceReader({
         getMessage: (channelId, messageId) =>
-          rest.getMessage(channelId, messageId).pipe(
-            Effect.mapError(
-              () => new OperatorSourceTransportError({ message: 'Discord source message request failed' }),
+          rest
+            .getMessage(channelId, messageId)
+            .pipe(
+              Effect.mapError(
+                () => new OperatorSourceTransportError({ message: 'Discord source message request failed' }),
+              ),
             ),
-          ),
       }),
       sourceObserver: makeDfxThreadObservation(rest),
       thread: threadWorkflow,
@@ -440,25 +429,27 @@ const buildRuntime = (
     const renderReconcile = (payload: Record<string, unknown>): Effect.Effect<AdminOperationOutcome> =>
       Effect.suspend(() => {
         if (payload.all !== (payload.source !== undefined)) {
-          return Effect.succeed({ ok: false, status: 422, body: { _tag: 'InvalidControlInput', message: 'Choose exactly one source or --all' } })
+          return Effect.succeed({
+            ok: false,
+            status: 422,
+            body: { _tag: 'InvalidControlInput', message: 'Choose exactly one source or --all' },
+          })
         }
-        if (
-          payload.apply === true &&
-          (payload.environment !== config.environment || payload.reason === undefined)
-        ) {
+        if (payload.apply === true && (payload.environment !== config.environment || payload.reason === undefined)) {
           return Effect.succeed({
             ok: false,
             status: 409,
-            body: { _tag: 'ControlApplicationFailure', message: 'Apply requires the running environment and an operator reason' },
+            body: {
+              _tag: 'ControlApplicationFailure',
+              message: 'Apply requires the running environment and an operator reason',
+            },
           })
         }
         const selection: ReconciliationSelection =
           payload.all === true
             ? {
                 _tag: 'All',
-                ...(payload.state === undefined
-                  ? {}
-                  : { state: payload.state as 'creating' | 'unknown_external' }),
+                ...(payload.state === undefined ? {} : { state: payload.state as 'creating' | 'unknown_external' }),
                 ...(payload.limit === undefined ? {} : { limit: payload.limit as number }),
               }
             : {
@@ -476,11 +467,13 @@ const buildRuntime = (
           now: Date.now(),
         }).pipe(
           Effect.map((result) => reconcileOutcome(applied, result)),
-          Effect.mapError((): AdminOperationOutcome => ({
-            ok: false,
-            status: 500,
-            body: { _tag: 'ControlApplicationFailure', message: 'Thread reconciliation failed' },
-          })),
+          Effect.mapError(
+            (): AdminOperationOutcome => ({
+              ok: false,
+              status: 500,
+              body: { _tag: 'ControlApplicationFailure', message: 'Thread reconciliation failed' },
+            }),
+          ),
           Effect.catchIf(
             (error): error is AdminOperationOutcome => true,
             (error) => Effect.succeed<AdminOperationOutcome>(error),
@@ -489,9 +482,8 @@ const buildRuntime = (
       })
 
     const threadReconcile = (raw: unknown): Effect.Effect<AdminOperationOutcome> =>
-      Effect.flatMap(
-        Schema.decodeUnknownEffect(ThreadReconcilePayload)(raw),
-        (payload) => renderReconcile(payload),
+      Effect.flatMap(Schema.decodeUnknownEffect(ThreadReconcilePayload)(raw), (payload) =>
+        renderReconcile(payload),
       ).pipe(
         Effect.catchIf(
           (error): error is Schema.SchemaError => true,
@@ -505,9 +497,8 @@ const buildRuntime = (
       )
 
     const threadCreate = (payload: unknown): Effect.Effect<AdminOperationOutcome> =>
-      Effect.flatMap(
-        Schema.decodeUnknownEffect(OperatorThreadCreatePayload)(payload),
-        (input) => operatorThreadCreate(input),
+      Effect.flatMap(Schema.decodeUnknownEffect(OperatorThreadCreatePayload)(payload), (input) =>
+        operatorThreadCreate(input),
       ).pipe(
         Effect.catchIf(
           (error): error is Schema.SchemaError => true,
@@ -542,11 +533,12 @@ const buildRuntime = (
           loadSession: Effect.map(loadShardState(rawStorage, shardLayout), (state) =>
             state !== undefined && state.sessionId !== '' && typeof state.sequence === 'number'
               ? {
-                sessionId: state.sessionId,
-                sequence: state.sequence,
-                ...(state.resumeUrl !== '' ? { resumeUrl: state.resumeUrl } : {}),
-              }
-              : null),
+                  sessionId: state.sessionId,
+                  sequence: state.sequence,
+                  ...(state.resumeUrl !== '' ? { resumeUrl: state.resumeUrl } : {}),
+                }
+              : null,
+          ),
           saveSession: (session) =>
             saveShardState(rawStorage, shardLayout, {
               resumeUrl: session.resumeUrl ?? '',
@@ -613,7 +605,8 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       let supervisorFiber: Fiber.Fiber<void, unknown> | undefined
       const runtimeInstall = yield* makeSerializedRuntime(
         Effect.flatMap(Effect.orDie(configStore.read), (document) =>
-          buildRuntime(doState, env, document, configStore, telemetrySink)),
+          buildRuntime(doState, env, document, configStore, telemetrySink),
+        ),
         (candidate) => candidate.telemetry.activated,
       )
 
@@ -625,19 +618,24 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         getRunning: () => runtimeInstall.peek()?.configDocument,
         buildCandidate: (document) => buildRuntime(doState, env, document, configStore, telemetrySink),
         activateCandidate: (candidate) =>
-          runtimeInstall.replace(candidate, () =>
-            Effect.gen(function* () {
-              // Replacement holds the same mutex as cold install and tick
-              // startup while it stops the exact detached gateway owner.
-              if (supervisorFiber !== undefined) {
-                yield* Fiber.interrupt(supervisorFiber)
-                supervisorFiber = undefined
-              }
-            })).pipe(
-            Effect.tap(() => Effect.sync(() => {
-              lastError = undefined
-            })),
-          ),
+          runtimeInstall
+            .replace(candidate, () =>
+              Effect.gen(function* () {
+                // Replacement holds the same mutex as cold install and tick
+                // startup while it stops the exact detached gateway owner.
+                if (supervisorFiber !== undefined) {
+                  yield* Fiber.interrupt(supervisorFiber)
+                  supervisorFiber = undefined
+                }
+              }),
+            )
+            .pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  lastError = undefined
+                }),
+              ),
+            ),
       })
 
       // Node parity (app.ts): the FIRST boot closes every pre-existing pending
@@ -662,22 +660,25 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
               return null
             }
             lastError = undefined
-            supervisorFiber = yield* Effect.forkDetach(rt.supervisor.run.pipe(
-              // The detached fiber is retained above so a config reload can
-              // interrupt and await the old gateway before swapping runtimes.
-              // Abnormal exits stay visible and always release the restart gate.
-              Effect.onExit((exit) =>
-                exit._tag === 'Failure'
-                  ? Effect.sync(() => {
-                    lastError = Cause.pretty(exit.cause)
-                    console.error('[bot-state] supervision loop ended', lastError)
-                  })
-                  : Effect.void,
+            supervisorFiber = yield* Effect.forkDetach(
+              rt.supervisor.run.pipe(
+                // The detached fiber is retained above so a config reload can
+                // interrupt and await the old gateway before swapping runtimes.
+                // Abnormal exits stay visible and always release the restart gate.
+                Effect.onExit((exit) =>
+                  exit._tag === 'Failure'
+                    ? Effect.sync(() => {
+                        lastError = Cause.pretty(exit.cause)
+                        console.error('[bot-state] supervision loop ended', lastError)
+                      })
+                    : Effect.void,
+                ),
+                Effect.ensuring(gate.end),
               ),
-              Effect.ensuring(gate.end),
-            ))
+            )
             return rt
-          }))
+          }),
+        )
         if (installed === null) return undefined
         const rt = installed
 
@@ -717,18 +718,19 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         // An unmigrated/unreadable journal reports schemaVersion 0, which the
         // /readyz probe maps to 503 — migration failure must degrade here,
         // not surface as an unhandled 500.
-        const journalStatus = rt.migrationError._tag === 'Some'
-          ? { schemaVersion: 0, error: rt.migrationError.value.message }
-          : yield* rt.journal.inspectStorage.pipe(
-            Effect.map((settings): { readonly schemaVersion: number; readonly error: string | undefined } => ({
-              schemaVersion: settings.schemaVersion,
-              error: undefined,
-            })),
-            Effect.catchIf(
-              (_error): _error is JournalUnavailableError => true,
-              (error) => Effect.succeed({ schemaVersion: 0, error: error.message }),
-            ),
-          )
+        const journalStatus =
+          rt.migrationError._tag === 'Some'
+            ? { schemaVersion: 0, error: rt.migrationError.value.message }
+            : yield* rt.journal.inspectStorage.pipe(
+                Effect.map((settings): { readonly schemaVersion: number; readonly error: string | undefined } => ({
+                  schemaVersion: settings.schemaVersion,
+                  error: undefined,
+                })),
+                Effect.catchIf(
+                  (_error): _error is JournalUnavailableError => true,
+                  (error) => Effect.succeed({ schemaVersion: 0, error: error.message }),
+                ),
+              )
         const supervisor = yield* rt.supervisor.state
         const sessionPresent = session !== undefined && session.sessionId !== ''
         return {
@@ -757,15 +759,12 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
 
         configGet: () => configAdmin.configGet,
 
-        configPut: (payload: unknown) =>
-          Semaphore.withPermits(controlMutationLock, 1)(configAdmin.configPut(payload)),
+        configPut: (payload: unknown) => Semaphore.withPermits(controlMutationLock, 1)(configAdmin.configPut(payload)),
 
         // Hold both control mutation and runtime lifecycle ownership through
         // the final stored/running recheck and REST mutation/verification.
         commandsSync: (payload: unknown) =>
-          Semaphore.withPermits(controlMutationLock, 1)(
-            runtimeInstall.withCurrent((rt) => rt.commandsSync(payload)),
-          ),
+          Semaphore.withPermits(controlMutationLock, 1)(runtimeInstall.withCurrent((rt) => rt.commandsSync(payload))),
 
         /** Cloudflare DO alarm entry point — the same heartbeat as `tick`. */
         alarm: () => tick,
@@ -773,4 +772,3 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
     })
   }),
 ) {}
-

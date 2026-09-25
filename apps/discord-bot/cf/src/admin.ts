@@ -13,17 +13,16 @@
  * Cloudflare Worker, Bun, or Node.
  */
 import { Context, Effect, Layer, Schema } from 'effect'
-
 import { HttpRouter, HttpServerRequest, HttpServerError } from 'effect/unstable/http'
 import { HttpMiddleware, HttpServerResponse } from 'effect/unstable/http'
 
 import { EmptyPayload } from '../../src/control/schema.ts'
-import { CommandsSyncPayload, OperatorThreadCreatePayload } from './admin-ops.ts'
 import type { ControlResult } from '../../src/control/schema.ts'
-import { schemaVersion as journalSchemaVersion } from './journal.ts'
+import { CommandsSyncPayload, OperatorThreadCreatePayload } from './admin-ops.ts'
 import type { AdminOperationOutcome } from './admin-ops.ts'
-import type { RuntimeConfigSummary } from './runtime-config.ts'
+import { schemaVersion as journalSchemaVersion } from './journal.ts'
 import { evaluateReadiness, type GatewayHealthSummary } from './readiness.ts'
+import type { RuntimeConfigSummary } from './runtime-config.ts'
 
 // ---------------------------------------------------------------------------
 // Bridge: worker fetch Request <-> Effect HttpRouter
@@ -57,17 +56,18 @@ export const toFetchHandler = (
         Effect.provideService(HttpServerRequest.HttpServerRequest, fromWorkerRequest(request)),
         Effect.map(HttpServerResponse.toWeb),
         Effect.catchCause((cause) =>
-          Effect.map(
-            HttpServerError.causeResponse(cause),
-            ([response]) => HttpServerResponse.toWeb(withDecodableErrorBody(response)),
-          )
+          Effect.map(HttpServerError.causeResponse(cause), ([response]) =>
+            HttpServerResponse.toWeb(withDecodableErrorBody(response)),
+          ),
         ),
       ),
     )
 }
 
 /** Fills empty error bodies with the encoded ControlError shapes clients decode. */
-const withDecodableErrorBody = (response: HttpServerResponse.HttpServerResponse): HttpServerResponse.HttpServerResponse => {
+const withDecodableErrorBody = (
+  response: HttpServerResponse.HttpServerResponse,
+): HttpServerResponse.HttpServerResponse => {
   if (response.body._tag !== 'Empty' || response.status < 400) return response
   if (response.status === 404) {
     return errorJson({ _tag: 'InvalidControlInput', message: 'No such admin operation route' }, 404)
@@ -86,9 +86,7 @@ const errorJson = (body: Record<string, unknown>, status: number): HttpServerRes
 // ---------------------------------------------------------------------------
 
 /** Injected admin credential; provided by the host environment (Worker secret / env var). */
-export class AdminToken extends Context.Service<AdminToken, { readonly token: string }>()(
-  'discord-bot/AdminToken',
-) {}
+export class AdminToken extends Context.Service<AdminToken, { readonly token: string }>()('discord-bot/AdminToken') {}
 
 export const AdminTokenLive = (token: string): Layer.Layer<AdminToken> => Layer.succeed(AdminToken, { token })
 
@@ -127,13 +125,17 @@ export const bearerAuth = HttpMiddleware.make((httpApp) =>
         normalized.startsWith(bearerPrefix.toLowerCase()) === false ||
         constantTimeEquals(authorization.slice(bearerPrefix.length), token) === false
       ) {
-        return Effect.succeed(HttpServerResponse.text(
-          JSON.stringify({ _tag: 'ControlAuthorizationRejected', message: 'Missing or invalid admin token' }),
-          { status: 401, contentType: 'application/json' },
-        ))
+        return Effect.succeed(
+          HttpServerResponse.text(
+            JSON.stringify({ _tag: 'ControlAuthorizationRejected', message: 'Missing or invalid admin token' }),
+            { status: 401, contentType: 'application/json' },
+          ),
+        )
       }
       return httpApp
-    })))
+    }),
+  ),
+)
 
 // ---------------------------------------------------------------------------
 // Payload schemas + responses
@@ -166,17 +168,21 @@ const decodePayload = <S extends Schema.Top>(
       Effect.catchIf(
         () => true,
         () =>
-          Effect.fail(errorJson(
-            { _tag: 'InvalidControlInput', message: 'Request payload failed schema validation' },
-            422,
-          )),
+          Effect.fail(
+            errorJson({ _tag: 'InvalidControlInput', message: 'Request payload failed schema validation' }, 422),
+          ),
       ),
     ) as unknown as Effect.Effect<Schema.Schema.Type<S>, HttpServerResponse.HttpServerResponse>
 }
 
 /** Reads the JSON body, treating an absent/unparseable body as `{}` (the encoded EmptyPayload). */
 const readJsonBody = (request: HttpServerRequest.HttpServerRequest): Effect.Effect<unknown, unknown> =>
-  request.json.pipe(Effect.catchIf(() => true, () => Effect.succeed({})))
+  request.json.pipe(
+    Effect.catchIf(
+      () => true,
+      () => Effect.succeed({}),
+    ),
+  )
 
 /**
  * Fallback when no thread-creation runtime is wired into this admin plane
@@ -188,8 +194,7 @@ const threadCreateUnavailable = errorJson(
   {
     _tag: 'ControlDependencyUnavailable',
     dependency: 'thread-creation-runtime',
-    message:
-      'ThreadCreate is not served by this deployment yet; use the socket control plane on the dev4 runtime',
+    message: 'ThreadCreate is not served by this deployment yet; use the socket control plane on the dev4 runtime',
   },
   503,
 )
@@ -203,14 +208,15 @@ export interface RuntimeStatusSnapshot {
   readonly configSummary?: RuntimeConfigSummary | undefined
 }
 
-const runtimeStatusResponse = (
-  snapshot: RuntimeStatusSnapshot,
-): HttpServerResponse.HttpServerResponse => {
+const runtimeStatusResponse = (snapshot: RuntimeStatusSnapshot): HttpServerResponse.HttpServerResponse => {
   const readiness = evaluateReadiness(snapshot)
   return json(
     {
       _tag: 'Success',
-      summary: readiness.ready === true ? `supervisor=${snapshot.health.supervisor} session=${snapshot.health.sessionPresent} docsSpendUsdMicros=${snapshot.docsMonthlySpentUsdMicros}` : `runtime unavailable (schemaVersion=${snapshot.journalSchemaVersion})`,
+      summary:
+        readiness.ready === true
+          ? `supervisor=${snapshot.health.supervisor} session=${snapshot.health.sessionPresent} docsSpendUsdMicros=${snapshot.docsMonthlySpentUsdMicros}`
+          : `runtime unavailable (schemaVersion=${snapshot.journalSchemaVersion})`,
       health: snapshot.health,
       ...(snapshot.configSummary === undefined ? {} : { configSummary: snapshot.configSummary }),
     },
@@ -297,7 +303,6 @@ export interface AdminRouterOptions {
 const outcomeResponse = (outcome: AdminOperationOutcome): HttpServerResponse.HttpServerResponse =>
   HttpServerResponse.text(JSON.stringify(outcome.body), { status: outcome.status, contentType: 'application/json' })
 
-
 /**
  * Builds the admin router. The returned effect carries dispatch-time phantom
  * markers (global bearer auth needs AdminToken; handler failures surface as
@@ -321,26 +326,37 @@ export const makeAdminRouter = (options: AdminRouterOptions = {}): AdminRouterEf
         Effect.flatMap(parseThreadCreate(body), () =>
           options.threadCreate === undefined
             ? Effect.succeed(threadCreateUnavailable)
-            : Effect.map(options.threadCreate(body), outcomeResponse))))
+            : Effect.map(options.threadCreate(body), outcomeResponse),
+        ),
+      ),
+    )
     // Real reconciliation over ambiguous journal entries (Node control-plane
     // parity); absent runtime ⇒ 503 unavailable.
     yield* router.add('POST', '/admin/rpc/ThreadReconcile', (request) =>
       Effect.flatMap(readJsonBody(request), (body) =>
         options.threadReconcile === undefined
           ? Effect.succeed(threadReconcileUnavailable)
-          : Effect.map(options.threadReconcile(body), outcomeResponse)))
+          : Effect.map(options.threadReconcile(body), outcomeResponse),
+      ),
+    )
     yield* router.add('POST', '/admin/rpc/RuntimeStatus', (request) =>
       Effect.flatMap(readJsonBody(request), (body) =>
         Effect.flatMap(parseEmpty(body), () =>
           options.runtimeStatus === undefined
             ? Effect.succeed(runtimeStatusUnavailable)
-            : Effect.map(options.runtimeStatus(), runtimeStatusResponse))))
+            : Effect.map(options.runtimeStatus(), runtimeStatusResponse),
+        ),
+      ),
+    )
     yield* router.add('POST', '/admin/commands-sync', (request) =>
       Effect.flatMap(readJsonBody(request), (body) =>
         Effect.flatMap(parseCommandsSync(body), (payload) =>
           options.commandsSync === undefined
             ? Effect.succeed(commandsSyncUnavailable)
-            : Effect.map(options.commandsSync(payload), outcomeResponse))))
+            : Effect.map(options.commandsSync(payload), outcomeResponse),
+        ),
+      ),
+    )
 
     // Policy/config plane over the SAME durable config document the handlers
     // consume: GET returns the validated summary plus the stored payload,
@@ -348,12 +364,15 @@ export const makeAdminRouter = (options: AdminRouterOptions = {}): AdminRouterEf
     yield* router.add('GET', '/admin/config', () =>
       options.configGet === undefined
         ? Effect.succeed(configUnavailable)
-        : Effect.map(options.configGet, outcomeResponse))
+        : Effect.map(options.configGet, outcomeResponse),
+    )
     yield* router.add('PUT', '/admin/config', (request) =>
       Effect.flatMap(readJsonBody(request), (body) =>
         options.configPut === undefined
           ? Effect.succeed(configUnavailable)
-          : Effect.map(options.configPut(body), outcomeResponse)))
+          : Effect.map(options.configPut(body), outcomeResponse),
+      ),
+    )
 
     return router
   }).pipe(Effect.provide(Layer.succeed(HttpRouter.RouterConfig, {}))) as unknown as AdminRouterEffect

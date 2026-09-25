@@ -52,9 +52,9 @@ export const parseCanonicalCorpus = (content: string): ReadonlyArray<Documentati
     const idInput = `${url.hostname}${url.pathname}`.replace(/\/$/, '')
     return [
       {
-        id: Schema.decodeUnknownSync(SourceId)(idInput),
+        id: Schema.decodeSync(SourceId)(idInput),
         title,
-        canonicalUrl: Schema.decodeUnknownSync(CanonicalUrl)(canonicalUrl),
+        canonicalUrl: Schema.decodeSync(CanonicalUrl)(canonicalUrl),
         content: section,
       },
     ]
@@ -64,7 +64,7 @@ export const parseCanonicalCorpus = (content: string): ReadonlyArray<Documentati
 export const digestCorpus = Effect.fn('docs.corpus.digest')(function* (content: string) {
   const bytes = new TextEncoder().encode(content)
   const digest = yield* Effect.tryPromise({
-        // Bare global `crypto` (not `globalThis.crypto`): the Workers types
+    // Bare global `crypto` (not `globalThis.crypto`): the Workers types
     // declare it as a global binding, which `typeof globalThis` does not see.
     try: () => crypto.subtle.digest('SHA-256', bytes),
     catch: (cause) =>
@@ -75,7 +75,7 @@ export const digestCorpus = Effect.fn('docs.corpus.digest')(function* (content: 
       }),
   })
   const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-  return yield* Schema.decodeUnknownEffect(CorpusDigest)(`sha256:${hex}`).pipe(
+  return yield* Schema.decodeEffect(CorpusDigest)(`sha256:${hex}`).pipe(
     Effect.mapError(
       (cause) =>
         new CorpusUnavailable({

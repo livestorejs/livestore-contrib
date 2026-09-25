@@ -1,13 +1,13 @@
 import { Effect, Schema } from 'effect'
 
 import { DeploymentEnvironment, DiscordMessageRef, DiscordSnowflake, OperatorReason } from '../../src/control/schema.ts'
+import type { ThreadObservationPort } from '../../src/reconciliation/port.ts'
 import {
   candidateForOperator,
   type OperatorSourceFacts,
   type OperatorSourceReader,
   type OperatorSourceReadError,
 } from '../../src/runtime/threading-adapter.ts'
-import type { ThreadObservationPort } from '../../src/reconciliation/port.ts'
 import type { ThreadCandidate, ThreadOutcome } from '../../src/threading/model.ts'
 import { EnvironmentName } from '../../src/threading/model.ts'
 import {
@@ -43,10 +43,11 @@ const successOutcome = (summary: string, tag: string, correlationId?: string): A
   },
 })
 
-const failureOutcome = (
-  error: Record<string, unknown>,
-  status: number,
-): AdminOperationOutcome => ({ ok: false, status, body: error })
+const failureOutcome = (error: Record<string, unknown>, status: number): AdminOperationOutcome => ({
+  ok: false,
+  status,
+  body: error,
+})
 
 /**
  * Ports the Node control plane's thread-outcome → ControlResult mapping
@@ -138,36 +139,38 @@ const factsFromReadError = (error: OperatorSourceReadError): AdminOperationOutco
  * Discord API create → outcome, mirroring the Node control plane's `create`.
  */
 export const makeOperatorThreadCreate = (deps: OperatorThreadCreateDeps) => {
-  const readFacts = (source: OperatorThreadCreateInput['source']): Effect.Effect<OperatorSourceFacts, AdminOperationOutcome> =>
+  const readFacts = (
+    source: OperatorThreadCreateInput['source'],
+  ): Effect.Effect<OperatorSourceFacts, AdminOperationOutcome> =>
     deps.sourceReader.read(source).pipe(
       Effect.mapError(factsFromReadError),
       Effect.flatMap((facts) =>
-        deps.sourceObserver.observeSourceThread({
-          sourceMessageId: source.messageId,
-          channelId: source.channelId,
-        }).pipe(
-          Effect.mapError(() =>
-            dependencyUnavailable(
-              'discord-thread-observation',
-              'Existing source thread could not be authoritatively checked',
-            )
-          ),
-          Effect.flatMap((observation) => {
-            if (observation._tag === 'Unrun') {
-              return Effect.fail(
-                dependencyUnavailable(
-                  'discord-thread-observation',
-                  'Existing source thread could not be authoritatively checked',
-                ),
+        deps.sourceObserver
+          .observeSourceThread({
+            sourceMessageId: source.messageId,
+            channelId: source.channelId,
+          })
+          .pipe(
+            Effect.mapError(() =>
+              dependencyUnavailable(
+                'discord-thread-observation',
+                'Existing source thread could not be authoritatively checked',
+              ),
+            ),
+            Effect.flatMap((observation) => {
+              if (observation._tag === 'Unrun') {
+                return Effect.fail(
+                  dependencyUnavailable(
+                    'discord-thread-observation',
+                    'Existing source thread could not be authoritatively checked',
+                  ),
+                )
+              }
+              return Effect.succeed(
+                observation._tag === 'ExactSourceThread' ? { ...facts, existingThreadId: observation.threadId } : facts,
               )
-            }
-            return Effect.succeed(
-              observation._tag === 'ExactSourceThread'
-                ? { ...facts, existingThreadId: observation.threadId }
-                : facts,
-            )
-          }),
-        ),
+            }),
+          ),
       ),
     )
 
@@ -179,9 +182,7 @@ export const makeOperatorThreadCreate = (deps: OperatorThreadCreateDeps) => {
       input.source.guildId !== deps.config.guildId ||
       deps.config.actionChannelIds.includes(input.source.channelId) === false
     ) {
-      return Effect.succeed(
-        applicationFailure('Requested source is outside the configured guild/channel scope'),
-      )
+      return Effect.succeed(applicationFailure('Requested source is outside the configured guild/channel scope'))
     }
     // Every failure in this pipeline is already an encoded outcome body, so
     // the error channel folds back into the success channel here — the admin
@@ -337,101 +338,97 @@ export const makeRuntimeConfigAdminOperations = <TCandidate>(deps: {
         diverged,
       },
     }
-  }).pipe(
-    Effect.catch(() => Effect.succeed(storeUnavailable())),
-  )
+  }).pipe(Effect.catch(() => Effect.succeed(storeUnavailable())))
 
   const configPut = (raw: unknown): Effect.Effect<AdminOperationOutcome> =>
-    Effect.flatMap(
-      Schema.decodeUnknownEffect(RuntimeConfigPutPayload, { onExcessProperty: 'error' })(raw),
-      (payload) =>
-        Effect.gen(function* () {
-          const current = yield* deps.store.read
-          if (current.revision !== payload.expectedRevision) {
-            return failureOutcome(
-              {
-                _tag: 'InvalidControlInput',
-                message: `Stale runtime config revision: expected ${payload.expectedRevision}, current ${current.revision}`,
-              },
-              409,
-            )
-          }
+    Effect.flatMap(Schema.decodeUnknownEffect(RuntimeConfigPutPayload, { onExcessProperty: 'error' })(raw), (payload) =>
+      Effect.gen(function* () {
+        const current = yield* deps.store.read
+        if (current.revision !== payload.expectedRevision) {
+          return failureOutcome(
+            {
+              _tag: 'InvalidControlInput',
+              message: `Stale runtime config revision: expected ${payload.expectedRevision}, current ${current.revision}`,
+            },
+            409,
+          )
+        }
 
-          const candidateDocument: RuntimeConfigDocument = {
-            revision: current.revision + 1,
-            // releaseId is deploy-owned, never writable through the admin plane.
-            config: { ...payload.config, releaseId: current.config.releaseId },
-          }
+        const candidateDocument: RuntimeConfigDocument = {
+          revision: current.revision + 1,
+          // releaseId is deploy-owned, never writable through the admin plane.
+          config: { ...payload.config, releaseId: current.config.releaseId },
+        }
 
-          if (payload.reload === false) {
-            const stored = yield* deps.store.write({
-              expectedRevision: payload.expectedRevision,
-              config: candidateDocument.config,
-            })
-            return {
-              ok: true,
-              status: 200,
-              body: {
-                _tag: 'Planned',
-                summary: `Runtime config persisted at revision ${stored.revision}; reload not requested.`,
-                revision: stored.revision,
-                applied: false,
-              },
-            }
-          }
-
-          const candidateExit = yield* Effect.exit(deps.buildCandidate(candidateDocument))
-          if (candidateExit._tag === 'Failure') {
-            return applicationFailure(
-              `Runtime config candidate could not be built; revision ${current.revision} remains stored and running`,
-            )
-          }
-
+        if (payload.reload === false) {
           const stored = yield* deps.store.write({
             expectedRevision: payload.expectedRevision,
             config: candidateDocument.config,
           })
-          const activationExit = yield* Effect.exit(deps.activateCandidate(candidateExit.value))
-          if (activationExit._tag === 'Failure') {
-            const runningRevision = deps.getRunning()?.revision
-            return {
-              ok: false,
-              status: 502,
-              body: {
-                _tag: 'ControlAmbiguousOutcome',
-                message:
-                  `Runtime config persisted at revision ${stored.revision} but activation failed; the prior runtime remains installed`,
-                state: 'persisted-but-not-activated',
-                storedRevision: stored.revision,
-                runningRevision: runningRevision ?? null,
-                diverged: runningRevision !== stored.revision,
-              },
-            }
-          }
           return {
             ok: true,
             status: 200,
             body: {
-              _tag: 'Success',
-              summary: `Runtime config revision ${stored.revision} persisted and reloaded.`,
+              _tag: 'Planned',
+              summary: `Runtime config persisted at revision ${stored.revision}; reload not requested.`,
               revision: stored.revision,
-              applied: true,
+              applied: false,
             },
           }
-        }).pipe(
-          Effect.catch((error) =>
-            error instanceof RuntimeConfigRevisionConflict
-              ? Effect.succeed(
-                  failureOutcome(
-                    {
-                      _tag: 'InvalidControlInput',
-                      message: `Stale runtime config revision: expected ${error.expectedRevision}, current ${error.actualRevision}`,
-                    },
-                    409,
-                  ),
-                )
-              : Effect.succeed(storeUnavailable())),
+        }
+
+        const candidateExit = yield* Effect.exit(deps.buildCandidate(candidateDocument))
+        if (candidateExit._tag === 'Failure') {
+          return applicationFailure(
+            `Runtime config candidate could not be built; revision ${current.revision} remains stored and running`,
+          )
+        }
+
+        const stored = yield* deps.store.write({
+          expectedRevision: payload.expectedRevision,
+          config: candidateDocument.config,
+        })
+        const activationExit = yield* Effect.exit(deps.activateCandidate(candidateExit.value))
+        if (activationExit._tag === 'Failure') {
+          const runningRevision = deps.getRunning()?.revision
+          return {
+            ok: false,
+            status: 502,
+            body: {
+              _tag: 'ControlAmbiguousOutcome',
+              message: `Runtime config persisted at revision ${stored.revision} but activation failed; the prior runtime remains installed`,
+              state: 'persisted-but-not-activated',
+              storedRevision: stored.revision,
+              runningRevision: runningRevision ?? null,
+              diverged: runningRevision !== stored.revision,
+            },
+          }
+        }
+        return {
+          ok: true,
+          status: 200,
+          body: {
+            _tag: 'Success',
+            summary: `Runtime config revision ${stored.revision} persisted and reloaded.`,
+            revision: stored.revision,
+            applied: true,
+          },
+        }
+      }).pipe(
+        Effect.catch((error) =>
+          error instanceof RuntimeConfigRevisionConflict
+            ? Effect.succeed(
+                failureOutcome(
+                  {
+                    _tag: 'InvalidControlInput',
+                    message: `Stale runtime config revision: expected ${error.expectedRevision}, current ${error.actualRevision}`,
+                  },
+                  409,
+                ),
+              )
+            : Effect.succeed(storeUnavailable()),
         ),
+      ),
     ).pipe(
       Effect.catch(() =>
         Effect.succeed(
@@ -439,7 +436,8 @@ export const makeRuntimeConfigAdminOperations = <TCandidate>(deps: {
             { _tag: 'InvalidControlInput', message: 'Runtime config request failed schema validation' },
             422,
           ),
-        )),
+        ),
+      ),
     )
 
   return { configGet, configPut }
@@ -458,15 +456,19 @@ export const CommandsSyncPayload = Schema.Struct({
  * mutate REST state. Applies additionally require durable/running config
  * convergence immediately before the synchronizer is invoked.
  */
-export const makeCommandsSyncOperation = (deps: {
-  readonly running: RuntimeConfigDocument
-  readonly readStored: Effect.Effect<RuntimeConfigDocument, unknown>
-  readonly plan: (scope: RuntimeConfigDocument['config']['commandScope']) => Effect.Effect<CommandsSyncResult, unknown>
-  readonly apply: (scope: RuntimeConfigDocument['config']['commandScope']) => Effect.Effect<CommandsSyncResult, unknown>
-}) => (raw: unknown): Effect.Effect<AdminOperationOutcome> =>
-  Effect.flatMap(
-    Schema.decodeUnknownEffect(CommandsSyncPayload, { onExcessProperty: 'error' })(raw),
-    (payload) => {
+export const makeCommandsSyncOperation =
+  (deps: {
+    readonly running: RuntimeConfigDocument
+    readonly readStored: Effect.Effect<RuntimeConfigDocument, unknown>
+    readonly plan: (
+      scope: RuntimeConfigDocument['config']['commandScope'],
+    ) => Effect.Effect<CommandsSyncResult, unknown>
+    readonly apply: (
+      scope: RuntimeConfigDocument['config']['commandScope'],
+    ) => Effect.Effect<CommandsSyncResult, unknown>
+  }) =>
+  (raw: unknown): Effect.Effect<AdminOperationOutcome> =>
+    Effect.flatMap(Schema.decodeUnknownEffect(CommandsSyncPayload, { onExcessProperty: 'error' })(raw), (payload) => {
       const config = deps.running.config
       // Logs stay on the OPS-R10 allowlist: no Discord identifiers or
       // operator-supplied reason/content. The authenticated response below
@@ -516,7 +518,8 @@ export const makeCommandsSyncOperation = (deps: {
           deps.plan(config.commandScope).pipe(
             Effect.map((result) => commandsSyncOutcome(result, 'plan')),
             Effect.catch(() =>
-              Effect.succeed(dependencyUnavailable('discord-application-commands', 'Command sync plan failed'))),
+              Effect.succeed(dependencyUnavailable('discord-application-commands', 'Command sync plan failed')),
+            ),
           ),
         )
       }
@@ -538,16 +541,18 @@ export const makeCommandsSyncOperation = (deps: {
                 Effect.catch(() =>
                   Effect.succeed(
                     dependencyUnavailable('discord-application-commands', 'Application-command sync failed'),
-                  )),
-              )),
-      )
-    },
-  ).pipe(
-    Effect.catch(() =>
-      Effect.succeed(
-        failureOutcome(
-          { _tag: 'InvalidControlInput', message: 'Command sync request failed schema validation' },
-          422,
+                  ),
+                ),
+              ),
         ),
-      )),
-  )
+      )
+    }).pipe(
+      Effect.catch(() =>
+        Effect.succeed(
+          failureOutcome(
+            { _tag: 'InvalidControlInput', message: 'Command sync request failed schema validation' },
+            422,
+          ),
+        ),
+      ),
+    )

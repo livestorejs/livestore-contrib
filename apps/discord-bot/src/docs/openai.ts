@@ -113,7 +113,7 @@ export const makeOpenAiAnswerEngineLayer = (config: OpenAiAnswerEngineConfig) =>
             message: 'The documentation answer provider returned no structured output text',
           })
         }
-        const candidate = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(AnswerCandidate), {
+        const candidate = yield* Schema.decodeEffect(Schema.fromJsonString(AnswerCandidate), {
           onExcessProperty: 'error',
         })(outputText).pipe(
           Effect.mapError(
@@ -126,7 +126,7 @@ export const makeOpenAiAnswerEngineLayer = (config: OpenAiAnswerEngineConfig) =>
         )
         return {
           candidate,
-          usage: yield* Schema.decodeUnknownEffect(AnswerUsage)({
+          usage: yield* Schema.decodeEffect(AnswerUsage)({
             inputTokens: decoded.usage.input_tokens,
             outputTokens: decoded.usage.output_tokens,
           }).pipe(

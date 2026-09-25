@@ -162,7 +162,6 @@ livestore-discord thread create MESSAGE_URL \
 its RPC client. It takes precedence over `LIVESTORE_DISCORD_CONTROL_SOCKET` and
 the environment default; malformed or duplicate overrides fail before connect.
 
-
 ### Deploy targets
 
 The manifest selects one operator transport, never both:

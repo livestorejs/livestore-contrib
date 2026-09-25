@@ -2,6 +2,7 @@ import { Array as Arr, Effect, Layer, Redacted, Result, Schema } from 'effect'
 import { FetchHttpClient } from 'effect/unstable/http'
 import type { HttpClient } from 'effect/unstable/http'
 
+import { makeCanonicalCorpusLayer } from '../../src/docs/corpus.ts'
 import type {
   DocsOutcome,
   DocsQueryInput,
@@ -16,8 +17,6 @@ import {
 } from '../../src/docs/openai.ts'
 import { selectDocumentationSources } from '../../src/docs/retrieval.ts'
 import { AnswerEngine, DocsTelemetry, DocsWorkflow, DocumentationCorpus } from '../../src/docs/services.ts'
-import { makeCanonicalCorpusLayer } from '../../src/docs/corpus.ts'
-
 import { makeCrypto, type CryptoService } from './crypto.ts'
 
 // ---------------------------------------------------------------------------
@@ -146,7 +145,6 @@ export const correlateWithWebCryptoKey = (
     catch: (cause) => new WorkerCorrelationFailure({ operation: 'correlateWithWebCryptoKey', cause }),
   })
 
-
 // ---------------------------------------------------------------------------
 // Persistent state store contract (structural port of src/docs/state.ts types)
 // ---------------------------------------------------------------------------
@@ -172,9 +170,7 @@ export interface DocsQuotaSampleRecord {
   readonly costUsdMicros: number
 }
 
-export type DocsMonthlyReservation =
-  | { readonly _tag: 'Reserved'; readonly id: string }
-  | { readonly _tag: 'Denied' }
+export type DocsMonthlyReservation = { readonly _tag: 'Reserved'; readonly id: string } | { readonly _tag: 'Denied' }
 
 export interface DocsStateFile {
   readonly version: 1
@@ -290,7 +286,12 @@ const isEmpty = (state: MutableAdmissionState) =>
 export const makeCryptoDocsAdmission = (options: DocsAdmissionOptions): DocsAdmissionService => {
   const limits = options.limits ?? defaultWorkerDocsAdmissionLimits
   const now = options.now ?? Date.now
-  const emptyState = (): MutableAdmissionState => ({ inFlight: 0, reservedTokens: 0, requestTimes: [], tokenSamples: [] })
+  const emptyState = (): MutableAdmissionState => ({
+    inFlight: 0,
+    reservedTokens: 0,
+    requestTimes: [],
+    tokenSamples: [],
+  })
   const principals = new Map<string, PrincipalState>()
   const globalState = emptyState()
 
@@ -359,8 +360,7 @@ export const makeCryptoDocsAdmission = (options: DocsAdmissionOptions): DocsAdmi
  * events go to the structured console logger instead.
  */
 export const makeConsoleDocsTelemetry = (): DocsTelemetry['Service'] => ({
-  emit: (event: DocsTelemetryEvent) =>
-    Effect.logDebug('docs telemetry').pipe(Effect.annotateLogs({ ...event })),
+  emit: (event: DocsTelemetryEvent) => Effect.logDebug('docs telemetry').pipe(Effect.annotateLogs({ ...event })),
 })
 
 // ---------------------------------------------------------------------------
@@ -428,11 +428,10 @@ export const makeCryptoDocsWorkflowLayer = (options: DocsWorkflowOptions = {}) =
           stateStore !== undefined && monthlyCostUsdMicros !== undefined
             ? yield* stateStore.reserveMonthly({
                 atMillis: Date.now(),
-                costUsdMicros:
-                  lunaCostUsdMicros({
-                    inputTokens: estimatedInputTokens,
-                    outputTokens: (options.limits ?? defaultWorkerDocsAdmissionLimits).maximumOutputTokensPerRequest,
-                  }),
+                costUsdMicros: lunaCostUsdMicros({
+                  inputTokens: estimatedInputTokens,
+                  outputTokens: (options.limits ?? defaultWorkerDocsAdmissionLimits).maximumOutputTokensPerRequest,
+                }),
                 ceilingUsdMicros: monthlyCostUsdMicros,
               })
             : undefined
@@ -658,8 +657,7 @@ export const makeDocsServices = (
     Layer.succeed(DocsTelemetry, DocsTelemetry.of(makeConsoleDocsTelemetry())),
   ).pipe(Layer.provide(input.httpLayer ?? FetchHttpClient.layer))
   return makeCryptoDocsWorkflowLayer({
-    limits:
-      input.openAiLimits === undefined ? undefined : workerDocsAdmissionLimitsFromDeployment(input.openAiLimits),
+    limits: input.openAiLimits === undefined ? undefined : workerDocsAdmissionLimitsFromDeployment(input.openAiLimits),
     monthlyCostUsdMicros: input.monthlyCostUsdMicros,
     stateStore: input.stateStore,
     correlationKey: input.correlationKey,

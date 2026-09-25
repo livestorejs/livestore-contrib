@@ -139,7 +139,7 @@ const isReactionSymbolsOnly = (content: string): boolean =>
   content
     .replace(/<a?:[a-zA-Z0-9_]+:\d+>/gu, '')
     .replace(/[0-9#*]\uFE0F?\u20E3/gu, '')
-    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F\u200D\u20E3\u{1F3FB}-\u{1F3FF}]/gu, '')
+    .replace(/(?:\p{Emoji_Presentation}|\p{Extended_Pictographic}|\uFE0F|\u200D|\u20E3|\p{Emoji_Modifier})/gu, '')
     .replace(/[\p{P}\p{S}\s]/gu, '').length === 0
 
 const isGuildChannelKind = (kind: SourceChannelKind): boolean =>

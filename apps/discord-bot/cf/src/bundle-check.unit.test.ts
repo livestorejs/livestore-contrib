@@ -1,7 +1,7 @@
-import { expect, it } from 'vitest'
-
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+
+import { expect, it } from 'vitest'
 
 const workerEntry = resolve(import.meta.dirname, './worker.ts')
 

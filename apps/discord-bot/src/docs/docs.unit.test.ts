@@ -23,7 +23,7 @@ import { AnswerEngine, DocsTelemetry, DocsWorkflow, DocumentationCorpus } from '
 import { makeFileDocsStateStore } from './state.ts'
 import { DocsWorkflowLive, makeDocsWorkflowLayer } from './workflow.ts'
 
-const snapshot = Schema.decodeUnknownSync(DocumentationSnapshot)({
+const snapshot = Schema.decodeSync(DocumentationSnapshot)({
   digest: `sha256:${'a'.repeat(64)}`,
   retrievedAtMillis: 0,
   byteLength: 200,
@@ -101,7 +101,7 @@ it.effect('caches for the bounded TTL and never serves stale on refresh failure'
 it.effect('uses one explicit-query workflow for CLI and Discord without content telemetry', () => {
   const telemetry: Array<DocsTelemetryEvent> = []
   const engineCalls: Array<{ readonly query: string; readonly sourceCount: number }> = []
-  const result = Schema.decodeUnknownSync(AnswerEngineResult)({
+  const result = Schema.decodeSync(AnswerEngineResult)({
     candidate: {
       supported: true,
       answer: 'Define events and materializers, then create the store with that schema.',
@@ -160,7 +160,7 @@ it.effect('uses one explicit-query workflow for CLI and Discord without content 
 })
 
 it.effect('fails closed for duplicate or out-of-snapshot citations', () => {
-  const candidate = Schema.decodeUnknownSync(AnswerEngineResult)({
+  const candidate = Schema.decodeSync(AnswerEngineResult)({
     candidate: {
       supported: true,
       answer: 'Invented answer',
@@ -230,7 +230,7 @@ it.effect('bounds concurrent and rate-limited provider admission with one-way pr
   Effect.gen(function* () {
     let now = 1_000
     const correlated: Array<string> = []
-    const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
+    const limits = yield* Schema.decodeEffect(DocsAdmissionLimits)({
       maximumConcurrentPerPrincipal: 1,
       maximumConcurrentGlobal: 2,
       maximumRequestsPerPrincipalWindow: 1,
@@ -274,7 +274,7 @@ it.effect('bounds concurrent and rate-limited provider admission with one-way pr
 it.effect('shares global concurrency, rate, and token ceilings across principals', () =>
   Effect.gen(function* () {
     let now = 1_000
-    const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
+    const limits = yield* Schema.decodeEffect(DocsAdmissionLimits)({
       ...defaultTestAdmissionLimits,
       maximumConcurrentGlobal: 1,
       maximumRequestsGlobalWindow: 1,
@@ -305,7 +305,7 @@ it.effect('shares global concurrency, rate, and token ceilings across principals
 it.effect('charges the full reservation when provider usage is unknown', () =>
   Effect.gen(function* () {
     let now = 1_000
-    const limits = yield* Schema.decodeUnknownEffect(DocsAdmissionLimits)({
+    const limits = yield* Schema.decodeEffect(DocsAdmissionLimits)({
       ...defaultTestAdmissionLimits,
       maximumTokensPerPrincipalWindow: 50,
     })
@@ -325,11 +325,11 @@ it.effect('charges the full reservation when provider usage is unknown', () =>
 it.effect('denies oversized input before the provider and emits content-free telemetry', () => {
   const telemetry: Array<DocsTelemetryEvent> = []
   let providerCalls = 0
-  const oversizedCandidate = Schema.decodeUnknownSync(AnswerEngineResult)({
+  const oversizedCandidate = Schema.decodeSync(AnswerEngineResult)({
     candidate: { supported: false, answer: 'unused', citations: [] },
     usage: { inputTokens: 0, outputTokens: 0 },
   })
-  const limits = Schema.decodeUnknownSync(DocsAdmissionLimits)({
+  const limits = Schema.decodeSync(DocsAdmissionLimits)({
     ...defaultTestAdmissionLimits,
     maximumInputTokensPerRequest: 1,
   })
@@ -386,7 +386,7 @@ it.effect('cancels a monthly reservation when local admission denies', () =>
     (root) => {
       const stateStore = makeFileDocsStateStore(root, () => 2_000_000)
       const layer = makeDocsWorkflowLayer({
-        limits: Schema.decodeUnknownSync(DocsAdmissionLimits)({
+        limits: Schema.decodeSync(DocsAdmissionLimits)({
           ...defaultTestAdmissionLimits,
           maximumInputTokensPerRequest: 1,
         }),
@@ -422,7 +422,7 @@ it.effect('cancels a monthly reservation when local admission denies', () =>
 )
 
 it('renders bounded Discord follow-ups without splitting a code fence', () => {
-  const result = Schema.decodeUnknownSync(DocsQueryResult)({
+  const result = Schema.decodeSync(DocsQueryResult)({
     _tag: 'Answered',
     answer: `Use this example:\n\n\`\`\`ts\n${'const value = 1\n'.repeat(8)}\`\`\``,
     citations: [

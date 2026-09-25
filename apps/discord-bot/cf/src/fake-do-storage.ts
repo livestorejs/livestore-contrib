@@ -4,7 +4,10 @@ import type { DurableStorage } from './storage.ts'
 
 export interface FakeDoStorage extends DurableStorage {
   readonly sql: {
-    readonly exec: (query: string, ...bindings: SqlStorageValue[]) => {
+    readonly exec: (
+      query: string,
+      ...bindings: SqlStorageValue[]
+    ) => {
       readonly columnNames: string[]
       readonly rowsRead: number
       readonly rowsWritten: number
@@ -74,28 +77,28 @@ export const makeFakeDoStorage = (dbFile = ':memory:'): FakeDoStorage => {
           }
         },
       }
-      return Promise.resolve().then(
-        () => fn(txn),
-      ).then(
-        (out) => {
-          if (settled === false) {
-            settled = true
-            db.exec('COMMIT')
-          }
-          return out
-        },
-        (cause) => {
-          if (settled === false) {
-            settled = true
-            try {
-              db.exec('ROLLBACK')
-            } catch {
-              // SQLite already aborted; surface the original failure.
+      return Promise.resolve()
+        .then(() => fn(txn))
+        .then(
+          (out) => {
+            if (settled === false) {
+              settled = true
+              db.exec('COMMIT')
             }
-          }
-          throw cause
-        },
-      )
+            return out
+          },
+          (cause) => {
+            if (settled === false) {
+              settled = true
+              try {
+                db.exec('ROLLBACK')
+              } catch {
+                // SQLite already aborted; surface the original failure.
+              }
+            }
+            throw cause
+          },
+        )
     },
 
     get: async <T>(key: string): Promise<T | undefined> => keyValues.get(key) as T | undefined,

@@ -1,18 +1,17 @@
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { spawnSync } from 'node:child_process'
 
 import { expect, it } from 'vitest'
 
 const migrationScript = resolve(import.meta.dirname, 'state-migrate.ts')
 
 const runSourceProbe = (cwd: string) =>
-  spawnSync(
-    process.execPath,
-    ['--experimental-strip-types', migrationScript, '--source-probe'],
-    { cwd, encoding: 'utf8' },
-  )
+  spawnSync(process.execPath, ['--experimental-strip-types', migrationScript, '--source-probe'], {
+    cwd,
+    encoding: 'utf8',
+  })
 
 it('reads cf/.alchemy from the cf working directory and rejects an empty app-root state', () => {
   const appRoot = mkdtempSync(join(tmpdir(), 'discord-bot-state-source-'))

@@ -21,4 +21,3 @@ export const parseControlSocketOption = (args: ReadonlyArray<string>): ControlSo
   }
   return { _tag: 'Parsed', path }
 }
-

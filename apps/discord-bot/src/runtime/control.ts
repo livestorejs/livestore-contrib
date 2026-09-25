@@ -169,7 +169,7 @@ export const makeLocalBotControl = (options: {
                 : options.thread(
                     candidateForOperator(
                       input.source,
-                      Schema.decodeUnknownSync(EnvironmentName)(options.config.environment),
+                      Schema.decodeSync(EnvironmentName)(options.config.environment),
                       input.name,
                       input.reason,
                       principal.id,
@@ -250,7 +250,7 @@ export const makeLocalBotControl = (options: {
                         )
                       const candidate = candidateForOperator(
                         input.source,
-                        Schema.decodeUnknownSync(EnvironmentName)(options.config.environment),
+                        Schema.decodeSync(EnvironmentName)(options.config.environment),
                         input.name,
                         'operator plan',
                         'operator',

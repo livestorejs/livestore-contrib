@@ -130,7 +130,7 @@ export const makeJournalReconciliation = (journal: ThreadActionJournalService): 
           sourceMessageId,
           claimToken,
           now: currentTime,
-          threadId: Schema.decodeUnknownSync(JournalSnowflake)(threadId),
+          threadId: Schema.decodeSync(JournalSnowflake)(threadId),
           resolution: 'created',
         }),
       ),
@@ -170,10 +170,8 @@ const transition = Effect.fn('runtime.reconciliation.transition')(function* (
   )
 })
 
-const decodeJournalSnowflake = (value: string): JournalSnowflakeType =>
-  Schema.decodeUnknownSync(JournalSnowflake)(value)
-const decodeDiscordSnowflake = (value: string): DiscordSnowflakeType =>
-  Schema.decodeUnknownSync(DiscordSnowflake)(value)
+const decodeJournalSnowflake = (value: string): JournalSnowflakeType => Schema.decodeSync(JournalSnowflake)(value)
+const decodeDiscordSnowflake = (value: string): DiscordSnowflakeType => Schema.decodeSync(DiscordSnowflake)(value)
 
 function outcomeCode(code: string, ambiguous: true): 'discord_timeout' | 'stale_creating'
 function outcomeCode(code: string, ambiguous: false): 'discord_definitive_failure'
