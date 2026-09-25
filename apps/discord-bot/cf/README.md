@@ -46,8 +46,12 @@ derived from `package.json.genie.ts`:
 pnpm check:cf
 pnpm cf:preflight
 pnpm cf:plan --stage staging
-pnpm cf:deploy --stage staging
+pnpm cf:deploy --stage staging --yes
 ```
+
+`cf:deploy` requires explicit approval: pass `--yes` after reviewing the plan,
+or set `ALCHEMY_TUI=1` to approve interactively. Without either, it exits 2
+before running preflight or Alchemy; it never adds `--yes` automatically.
 
 `alchemy.run.ts` always uses `Cloudflare.state()`. It has no local-state
 fallback. `alchemy.local.ts` is the only stack allowed to use

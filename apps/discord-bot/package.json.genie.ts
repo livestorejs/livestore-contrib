@@ -29,8 +29,7 @@ export default packageJson({
     'check:cf': 'tsc -p cf/tsconfig.json --noEmit && vitest run cf',
     'check:effect': 'tsgo --build --force tsconfig.json && tsgo --build --force e2e/tsconfig.json',
     'check:e2e': 'tsc -p e2e/tsconfig.json --noEmit',
-    'cf:deploy':
-      'node --experimental-strip-types cf/src/deploy-preflight.ts && (cd cf && node --experimental-strip-types scripts/state-migrate.ts --verify-remote-authoritative) && alchemy deploy cf/alchemy.run.ts',
+    'cf:deploy': 'bash cf/scripts/deploy.sh',
     'cf:dev': 'ALCHEMY_LOCAL=1 alchemy dev cf/alchemy.local.ts',
     'cf:plan':
       'node --experimental-strip-types cf/src/deploy-preflight.ts && (cd cf && node --experimental-strip-types scripts/state-migrate.ts --verify-remote-authoritative) && alchemy plan cf/alchemy.run.ts',
