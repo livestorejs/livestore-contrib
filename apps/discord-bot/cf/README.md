@@ -45,8 +45,8 @@ derived from `package.json.genie.ts`:
 ```sh
 pnpm check:cf
 pnpm cf:preflight
-pnpm cf:plan -- --stage staging
-pnpm cf:deploy -- --stage staging
+pnpm cf:plan --stage staging
+pnpm cf:deploy --stage staging
 ```
 
 `alchemy.run.ts` always uses `Cloudflare.state()`. It has no local-state
@@ -133,8 +133,8 @@ window; Alchemy state has no compare-and-set primitive. Then:
    zero-write readback; require `destinationEqual`, `noOp`, and `verified`.
 7. Run `pnpm cf:state:verify-remote-authoritative`; it must also pass before
    the cutover deploy.
-8. Only then run `pnpm cf:deploy -- --stage staging --dry-run`. Require zero
-   create, replace, and delete actions before considering a remote-state deploy.
+8. Only then run `pnpm cf:plan --stage staging`. Require zero create,
+   replace, and delete actions before considering a remote-state deploy.
 
 After cutover, remote state/output is authoritative; the frozen local migration
 source is not. Every official plan/deploy requires the read-only live identity

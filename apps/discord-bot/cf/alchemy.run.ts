@@ -4,6 +4,7 @@
  */
 import * as Alchemy from 'alchemy'
 import * as Cloudflare from 'alchemy/Cloudflare'
+import * as Output from 'alchemy/Output'
 import * as Config from 'effect/Config'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
@@ -47,22 +48,27 @@ export default Alchemy.Stack(
       )
     }
     const worker = yield* DiscordBot
-    const workerName = yield* yield* worker.workerName
     const botStateNamespace = worker.durableObjectNamespaces['BotState']
     if (botStateNamespace === undefined) {
       return yield* Effect.die('remote Worker has no BotState Durable Object namespace')
     }
-    const botStateNamespaceId = yield* yield* botStateNamespace
-    const identityMismatch = deploymentIdentityMismatch(deploymentIdentity, {
-      workerName,
-      botStateNamespaceId,
-    })
-    if (identityMismatch !== undefined) return yield* Effect.die(identityMismatch)
+    // Resource outputs are not available while the stack is being declared.
+    // Resolve and compare them only after reconciliation, when Alchemy evaluates
+    // the stack output against the Worker's actual attributes.
+    const verifiedReleaseId = Output.mapEffect(([workerName, botStateNamespaceId]) => {
+      const identityMismatch = deploymentIdentityMismatch(deploymentIdentity, {
+        workerName,
+        botStateNamespaceId,
+      })
+      return identityMismatch === undefined
+        ? Effect.succeed(deploymentIdentity.releaseId)
+        : Effect.die(identityMismatch)
+    })(Output.all(worker.workerName, botStateNamespace))
     return {
       url: worker.url,
       crons: worker.crons,
       durableObjects: worker.durableObjectNamespaces,
-      releaseId: deploymentIdentity.releaseId,
+      releaseId: verifiedReleaseId,
     }
   }),
 )
