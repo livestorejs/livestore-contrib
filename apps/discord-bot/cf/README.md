@@ -133,8 +133,11 @@ window; Alchemy state has no compare-and-set primitive. Then:
    zero-write readback; require `destinationEqual`, `noOp`, and `verified`.
 7. Run `pnpm cf:state:verify-remote-authoritative`; it must also pass before
    the cutover deploy.
-8. Only then run `pnpm cf:plan --stage staging`. Require zero create,
-   replace, and delete actions before considering a remote-state deploy.
+8. Only then run `pnpm cf:plan --stage staging`. Require the top-level Worker
+   and `BotState` Durable Object namespace to be update/noop, with zero replace
+   and delete actions. Worker binding-child creates (such as
+   `CF_VERSION_METADATA` or `RELEASE_ID`) are allowed: preflight and
+   `--verify-remote-authoritative` already prove canonical Worker/DO identity.
 
 After cutover, remote state/output is authoritative; the frozen local migration
 source is not. Every official plan/deploy requires the read-only live identity

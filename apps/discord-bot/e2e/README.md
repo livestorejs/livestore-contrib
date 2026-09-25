@@ -178,12 +178,11 @@ The manifest selects one operator transport, never both:
 
 ### Attended human handoff
 
-Pass `--human-handoff-broker EXECUTABLE` only while a named human is available
-to complete the checklist. With no option, the executable is never spawned and
-all seven human lanes remain `UNRUN`. This protocol is a coordination boundary,
-not a user-account automation API: the broker must pause for a human using the
-official Discord client and must never accept, resolve, or use a Discord user
-token.
+Pass `--human-handoff-broker EXECUTABLE` only when the two dedicated,
+authenticated official-client sessions have been prepared and an operator can
+attend calibration or takeover. With no option, the executable is never spawned
+and all seven attended lanes remain `UNRUN`. The broker drives the official
+Discord web client through http-capture, never a Discord user token or user API.
 
 The runner invokes the executable as
 `EXECUTABLE OPERATION --request-json JSON --run-id ID --ledger FILE`; the
@@ -200,11 +199,11 @@ follow-up messages; every correlated response is independently cleaned. Each
 successful action response must attest its performer with either
 `"attendedByHuman": true` or `"performedBy": "official-client-session"`, plus
 the correlated IDs, marker, and channel fields represented by the E2E snapshots.
-Client-driven cleanup additionally returns
-`{ "attendedByHuman": true, "deleted": true, "id": "..." }` for the exact
-requested artifact. Exit `7`, a missing attestation, or no human produces
-`UNRUN`; invalid correlation or cleanup confirmation cannot produce `PASS`.
-The broker receives no credentials from the runner.
+Client-driven cleanup confirms `{ "deleted": true, "id": "..." }` for the
+exact requested artifact with its performer attestation. Exit `7`, a missing
+attestation, or an unavailable client session produces `UNRUN`; invalid
+correlation or cleanup confirmation cannot produce `PASS`. The broker receives
+no credentials from the runner.
 
 A reference broker ships as `livestore-discord-e2e-broker` (source runner:
 `node --experimental-strip-types e2e/src/attended-broker-main.ts`). It drives
@@ -219,17 +218,44 @@ require the exact recorded guild/channel before `deleteMessage(channelId, id)`.
 Each successful or already-gone artifact is resolved independently; failed
 entries remain open for the next recovery pass.
 
-The broker attests each gesture with either `"attendedByHuman": true` or
-`"performedBy": "official-client-session"`; receipts never overclaim which
-executor ran a lane. Gesture locators are calibrated against the live client in
-the attended window before the matrix runs.
+The bundled broker attests `"performedBy": "official-client-session"` and
+uses two dedicated http-capture profiles: `e2e-maintainer` (with the docs
+contributor/maintainer role) and `e2e-member` (unprivileged). Start and await
+one accepted, authenticated official Discord web-client session per profile,
+with declared Discord origins and `externalEffects: "allowed"`. Export their
+UUIDs as `LIVESTORE_DISCORD_E2E_CAPTURE_SESSION_MAINTAINER` and
+`LIVESTORE_DISCORD_E2E_CAPTURE_SESSION_MEMBER` in the broker process. The
+`docs-denied` gesture (`persona: member`, `location: restricted`) uses the
+member session; every other gesture uses the maintainer session. Missing or
+invalid required session UUIDs decline with exit 7 (`UNRUN`); the old shared
+`LIVESTORE_DISCORD_E2E_CAPTURE_SESSION`/`_EPOCH` configuration is unsupported.
+The v2 CLI obtains the current `health.control.epoch` and embeds it in the
+authority envelope on each browser invocation; it has no caller `--epoch`
+option. Handback/control ownership must be checked before each attended run.
+
+The broker calls `http-capture browser OPERATION SESSION_UUID --request FILE`
+with a private request file and pipes fill values only into stdin. Before
+enabling the attended matrix, inspect `browser snapshot` separately for both
+sessions and calibrate every `uncalibrated` entry in
+`e2e/src/attended-broker-driver.ts`'s `gestureLocators` table: channel
+composer, message row and More menu, Apps action, `/docs` choice/query field,
+delete menu/confirmation, and message/ephemeral response ID evidence. Confirm
+each locator is unique, verify the response ID is the actual created artifact,
+and confirm deletion against that exact ID. Do not run write gestures just to
+guess a selector. v2 exposes click but **no hover or context-menu operation**
+(`browser-control.ts` operation union, lines 404–458; CLI allowlist, lines
+1380–1398). If Discord's More control needs hover, that gesture is blocked
+pending a v2 capability or a freshly observed click-accessible alternative;
+it must remain `UNRUN`, not be credited as a pass. Likewise ephemeral response
+IDs not available from the DOM read cannot be fabricated from completed effect
+receipts.
 
 ```text
 pnpm e2e:live -- \
   --live \
   --manifest ./staging.json \
   --confirm-live-write I_UNDERSTAND_THIS_WRITES_TO_DISCORD_STAGING \
-  --human-handoff-broker /opt/livestore/discord-human-handoff
+  --human-handoff-broker livestore-discord-e2e-broker
 ```
 
 The runner writes exactly one receipt to stdout. Its exit codes are `0` for

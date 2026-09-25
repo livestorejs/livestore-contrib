@@ -4,7 +4,12 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { buildCreateMessageSteps, buildDocsCommandSteps, buildMessageActionSteps } from './attended-broker-driver.ts'
+import {
+  buildCreateMessageSteps,
+  buildDeleteMessageSteps,
+  buildDocsCommandSteps,
+  buildMessageActionSteps,
+} from './attended-broker-driver.ts'
 import {
   dispatchBrokerOperation,
   parseBrokerInvocation,
@@ -251,26 +256,82 @@ describe('broker dispatch', () => {
 })
 
 describe('http-capture gesture step builders', () => {
-  it('navigates to the exact channel and sends content through the composer', () => {
+  it('navigates to the channel, fills through stdin, and submits', () => {
     expect(buildCreateMessageSteps({ guildId, channelId, content: 'hello [m]' })).toEqual([
-      { operation: 'navigate', url: `https://discord.com/channels/${guildId}/${channelId}` },
-      { operation: 'wait', locator: { kind: 'role', name: 'textbox' }, state: 'visible', timeoutMs: 15000 },
-      { operation: 'fill', locator: { kind: 'role', name: 'textbox' }, value: 'hello [m]', timeoutMs: 10000 },
-      { operation: 'press', locator: { kind: 'role', name: 'textbox' }, key: 'Enter', timeoutMs: 5000 },
+      {
+        operation: {
+          kind: 'navigate',
+          url: `https://discord.com/channels/${guildId}/${channelId}`,
+          intent: 'Open selected staging channel',
+          effect: 'read',
+        },
+      },
+      {
+        operation: {
+          kind: 'wait',
+          locator: { kind: 'role', role: 'textbox', name: 'Message' },
+          state: 'visible',
+          timeoutMs: 15000,
+        },
+      },
+      {
+        operation: {
+          kind: 'fill',
+          locator: { kind: 'role', role: 'textbox', name: 'Message' },
+          valueSource: 'stdin',
+          intent: 'Enter attended staging gesture',
+          effect: 'write',
+        },
+        stdinValue: 'hello [m]',
+      },
+      {
+        operation: {
+          kind: 'press',
+          locator: { kind: 'role', role: 'textbox', name: 'Message' },
+          key: 'Enter',
+          intent: 'Submit attended staging gesture',
+          effect: 'write',
+        },
+      },
     ])
   })
 
-  it('scopes the message action menu to the marked source row', () => {
+  it('scopes the message menu to the marker then opens Apps and the action', () => {
     const steps = buildMessageActionSteps({ guildId, channelId, sourceMarkerText: '[m]' })
-    expect(steps[0]).toMatchObject({ operation: 'navigate' })
-    expect(steps.at(-1)).toMatchObject({ operation: 'click', locator: { kind: 'role', name: 'Create Thread' } })
+    expect(steps[2]).toMatchObject({
+      operation: {
+        kind: 'click',
+        locator: {
+          kind: 'within',
+          scope: { kind: 'text', value: '[m]' },
+          target: { kind: 'role', role: 'button', name: 'More' },
+        },
+      },
+    })
+    expect(steps.slice(3).map((step) => step.operation)).toMatchObject([
+      { kind: 'click', locator: { kind: 'role', role: 'menuitem', name: 'Apps' } },
+      { kind: 'click', locator: { kind: 'role', role: 'menuitem', name: 'Create Thread' }, effect: 'write' },
+    ])
   })
 
-  it('invokes the docs slash command with the query', () => {
+  it('selects /docs then fills the query via stdin', () => {
     const steps = buildDocsCommandSteps({ guildId, channelId, query: 'how does syncing work?' })
-    expect(steps[2]).toMatchObject({
-      operation: 'fill',
-      value: '/docs how does syncing work?',
+    expect(steps[2]).toMatchObject({ operation: { kind: 'fill', valueSource: 'stdin' }, stdinValue: '/docs' })
+    expect(steps[3]).toMatchObject({
+      operation: { kind: 'click', locator: { kind: 'role', role: 'option', name: '/docs' } },
     })
+    expect(steps[4]).toMatchObject({
+      operation: { kind: 'fill', valueSource: 'stdin' },
+      stdinValue: 'how does syncing work?',
+    })
+    expect(steps[5]).toMatchObject({ operation: { kind: 'press', key: 'Enter' } })
+  })
+  it('opens and confirms deletion in the marked row', () => {
+    const steps = buildDeleteMessageSteps({ guildId, channelId, markerText: '[m]' })
+    expect(steps.slice(2).map((step) => step.operation)).toMatchObject([
+      { kind: 'click', locator: { kind: 'within', scope: { kind: 'text', value: '[m]' } } },
+      { kind: 'click', locator: { kind: 'role', role: 'menuitem', name: 'Delete Message' } },
+      { kind: 'click', locator: { kind: 'role', role: 'button', name: 'Delete' }, effect: 'write' },
+    ])
   })
 })
