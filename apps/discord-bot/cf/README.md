@@ -169,10 +169,11 @@ identifiers, config contents, and spend.
 
 A successful `PUT /admin/config` with `reload: true` stops the previous
 Gateway owner, installs the candidate, and schedules an immediate Durable Object
-alarm. The alarm starts the replacement supervisor in its own invocation rather
-than forking a gateway from the admin request. Readiness stays false until the
-new Gateway session reports READY or RESUMED; a persisted session alone is not
-evidence that the replacement is running.
+alarm. The alarm starts the replacement supervisor using the Durable Object
+instance's Effect context, not the admin request's or alarm invocation's
+closing scope. The previous owner is interrupted and awaited before replacement.
+Readiness stays false until the new Gateway session reports READY or RESUMED;
+a persisted session alone is not evidence that the replacement is running.
 
 The gateway supervisor bounds each connection's wait for READY/RESUMED to 30
 seconds. If a RESUME stalls, it clears the persisted session before retrying
