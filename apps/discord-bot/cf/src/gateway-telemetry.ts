@@ -3,6 +3,7 @@ import * as Effect from 'effect/Effect'
 import * as Ref from 'effect/Ref'
 
 export type GatewayAttemptMode = 'identify' | 'resume'
+export type GatewaySocketFailure = 'socket-transport-error' | `socket-close:${number}`
 
 /**
  * Content-free gateway observations. These deliberately contain no Discord
@@ -40,6 +41,19 @@ export type GatewayObservation =
       readonly attempt: number
     }
   | {
+      readonly _tag: 'HandshakeTimeout'
+      readonly activationId: string
+      readonly at: number
+      readonly attempt: number
+    }
+  | {
+      readonly _tag: 'SocketFailure'
+      readonly activationId: string
+      readonly at: number
+      readonly attempt: number
+      readonly failure: GatewaySocketFailure
+    }
+  | {
       readonly _tag: 'HeartbeatAck'
       readonly activationId: string
       readonly at: number
@@ -61,7 +75,7 @@ export type GatewayObservation =
 
 export type GatewayConnectionState = 'activated' | 'connecting' | 'ready' | 'disconnected' | 'terminal'
 
-export type GatewayLastError = 'disconnected' | 'terminal-close' | null
+export type GatewayLastError = 'disconnected' | 'terminal-close' | 'handshake-timeout' | GatewaySocketFailure | null
 
 export interface GatewayTelemetryLifetime {
   readonly attempts: number
@@ -113,6 +127,8 @@ export interface GatewayTelemetryRecorder {
   readonly ready: (attempt: number) => Effect.Effect<void>
   readonly resumed: (attempt: number) => Effect.Effect<void>
   readonly disconnected: (attempt: number) => Effect.Effect<void>
+  readonly handshakeTimeout: (attempt: number) => Effect.Effect<void>
+  readonly socketFailure: (attempt: number, failure: GatewaySocketFailure) => Effect.Effect<void>
   /** DFX currently does not expose ACKs; this is ready for a future adapter. */
   readonly heartbeatAck: (attempt: number) => Effect.Effect<void>
   readonly terminalClose: (attempt: number, code: number) => Effect.Effect<void>
@@ -253,6 +269,26 @@ export const reduceGatewayObservation = (
           lastError: 'disconnected',
         },
       }
+    case 'HandshakeTimeout':
+      return {
+        ...snapshot,
+        current: {
+          ...snapshot.current,
+          state: 'disconnected',
+          connectedAt: null,
+          lastError: 'handshake-timeout',
+        },
+      }
+    case 'SocketFailure':
+      return {
+        ...snapshot,
+        current: {
+          ...snapshot.current,
+          state: 'disconnected',
+          connectedAt: null,
+          lastError: observation.failure,
+        },
+      }
     case 'HeartbeatAck':
       return {
         lifetime: {
@@ -349,6 +385,9 @@ export const makeGatewayTelemetryRecorder = (
         at,
         attempt,
       })),
+    handshakeTimeout: (attempt) => appendAt((at) => ({ _tag: 'HandshakeTimeout', activationId, at, attempt })),
+    socketFailure: (attempt, failure) =>
+      appendAt((at) => ({ _tag: 'SocketFailure', activationId, at, attempt, failure })),
     heartbeatAck: (attempt) =>
       appendAt((at) => ({
         _tag: 'HeartbeatAck',

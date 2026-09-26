@@ -242,6 +242,9 @@ it.effect('inner DFX reconnect withdraws health until RESUMED without restarting
     yield* waitFor(Effect.map(telemetry.health, (health) => health?.connected === false))
     expect(yield* supervisor.state).toBe('disconnected')
     expect(yield* Ref.get(connects)).toBe(1)
+    expect(yield* telemetry.aggregate).toMatchObject({
+      current: { lastError: 'socket-close:1006' },
+    })
 
     yield* Ref.set(shardState, {
       resumeUrl: 'wss://resume',
@@ -426,6 +429,8 @@ it.effect('observations have only content-free fields', () =>
     yield* telemetry.attemptStarted(1, 'identify')
     yield* telemetry.ready(1)
     yield* telemetry.disconnected(1)
+    yield* telemetry.handshakeTimeout(1)
+    yield* telemetry.socketFailure(1, 'socket-transport-error')
     yield* telemetry.heartbeatAck(1)
     yield* telemetry.terminalClose(1, 4014)
     yield* telemetry.alarmObserved(5)
@@ -436,6 +441,8 @@ it.effect('observations have only content-free fields', () =>
       Ready: ['_tag', 'activationId', 'at', 'attempt'],
       Resumed: ['_tag', 'activationId', 'at', 'attempt'],
       Disconnected: ['_tag', 'activationId', 'at', 'attempt'],
+      HandshakeTimeout: ['_tag', 'activationId', 'at', 'attempt'],
+      SocketFailure: ['_tag', 'activationId', 'at', 'attempt', 'failure'],
       HeartbeatAck: ['_tag', 'activationId', 'at', 'attempt'],
       TerminalClose: ['_tag', 'activationId', 'at', 'attempt', 'code'],
       AlarmObserved: ['_tag', 'activationId', 'at', 'lagMs'],

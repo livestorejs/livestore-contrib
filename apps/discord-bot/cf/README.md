@@ -174,6 +174,17 @@ than forking a gateway from the admin request. Readiness stays false until the
 new Gateway session reports READY or RESUMED; a persisted session alone is not
 evidence that the replacement is running.
 
+The gateway supervisor bounds each connection's wait for READY/RESUMED to 30
+seconds. If a RESUME stalls, it clears the persisted session before retrying
+with IDENTIFY; a stalled IDENTIFY retries with backoff. The timeout withdraws
+readiness, records a content-free `handshake-timeout` gateway observation, and
+sets `errorFree: false` until a successful READY/RESUMED. Gateway telemetry
+also distinguishes `socket-close:<code>` from `socket-transport-error` when
+DFX's lifecycle does not provide a close code. The precise Effect Socket
+Open/Close/Read/Write error class is unavailable from DFX's current lifecycle;
+exposing it requires a DFX lifecycle change, ideally upstreamed alongside the
+existing terminal-close patch.
+
 The boot fallback is intentionally not matrix-ready: AI-title channels are
 empty, the dedicated E2E actor is selected, and its cutover-required purpose
 marker cannot match a live channel. Operators must persist the accepted fresh

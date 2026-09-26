@@ -10,6 +10,7 @@ import * as Result from 'effect/Result'
 import * as Stream from 'effect/Stream'
 import * as TestClock from 'effect/testing/TestClock'
 
+import { makeGatewayTelemetryRecorder, makeInMemoryGatewayTelemetrySink } from './gateway-telemetry.ts'
 import {
   DisconnectedError,
   make,
@@ -191,6 +192,53 @@ it.effect('cold boot identifies freshly; graceful shutdown keeps the session for
       _tag: 'Resume',
       session: { sessionId: 's1', sequence: 7 },
     })
+  }),
+)
+
+it.effect('times out a stalled resume, clears its session, and retries with identify', () =>
+  Effect.gen(function* () {
+    const gateway = yield* makeGateway
+    const store = yield* makeStore
+    yield* store.save({ sessionId: 'stalled-session', sequence: 42 })
+    const telemetry = makeGatewayTelemetryRecorder('stalled-activation', yield* makeInMemoryGatewayTelemetrySink)
+    let lastError: string | undefined
+    const supervisor = yield* make(
+      {
+        acquire: gateway.acquire,
+        loadSession: store.load,
+        saveSession: store.save,
+        clearSession: store.clear,
+      },
+      {
+        initialBackoff: Duration.seconds(1),
+        maxBackoff: Duration.seconds(8),
+        random: Effect.succeed(1),
+        telemetry,
+        onHandshakeTimeout: (error) =>
+          Effect.sync(() => {
+            lastError = error._tag
+          }),
+        onEstablished: Effect.sync(() => {
+          lastError = undefined
+        }),
+      },
+    )
+    yield* fork(supervisor)
+
+    yield* waitForSessions(gateway, 1)
+    expect((yield* gateway.lastMode)?._tag).toBe('Resume')
+    yield* TestClock.adjust(Duration.seconds(31))
+    expect((yield* store.inspect).session).toBeNull()
+    expect((yield* store.inspect).clears).toBe(1)
+    expect(lastError).toBe('GatewayHandshakeTimeoutError')
+    expect((yield* telemetry.aggregate)?.current.lastError).toBe('handshake-timeout')
+    yield* TestClock.adjust(Duration.seconds(2))
+    yield* waitForSessions(gateway, 2)
+    expect(yield* gateway.lastMode).toEqual({ _tag: 'Identify' })
+    yield* gateway.emitOn(1, { _tag: 'Ready', session: { sessionId: 'fresh-session', sequence: 1 } })
+    yield* waitFor(supervisor.state.pipe(Effect.map((state) => state === 'ready')))
+    expect(lastError).toBeUndefined()
+    expect((yield* telemetry.aggregate)?.current.lastError).toBeNull()
   }),
 )
 

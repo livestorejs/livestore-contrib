@@ -230,6 +230,7 @@ const buildRuntime = (
   configDocument: RuntimeConfigDocument,
   configStore: RuntimeConfigStore,
   telemetrySink: GatewayTelemetrySink,
+  onGatewayError: (error: string | undefined) => void,
 ): Effect.Effect<BotRuntime> =>
   Effect.gen(function* () {
     const rawStorage = doState.raw.storage
@@ -551,6 +552,13 @@ const buildRuntime = (
           initialBackoff: '1 seconds',
           maxBackoff: '60 seconds',
           telemetry,
+          onHandshakeTimeout: (error) =>
+            Effect.sync(() => {
+              onGatewayError(error._tag)
+            }),
+          onEstablished: Effect.sync(() => {
+            onGatewayError(undefined)
+          }),
         },
       ),
       telemetry,
@@ -605,7 +613,9 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       let supervisorFiber: Fiber.Fiber<void, unknown> | undefined
       const runtimeInstall = yield* makeSerializedRuntime(
         Effect.flatMap(Effect.orDie(configStore.read), (document) =>
-          buildRuntime(doState, env, document, configStore, telemetrySink),
+          buildRuntime(doState, env, document, configStore, telemetrySink, (error) => {
+            lastError = error
+          }),
         ),
         (candidate) => candidate.telemetry.activated,
       )
@@ -616,7 +626,10 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       const configAdmin = makeRuntimeConfigAdminOperations({
         store: configStore,
         getRunning: () => runtimeInstall.peek()?.configDocument,
-        buildCandidate: (document) => buildRuntime(doState, env, document, configStore, telemetrySink),
+        buildCandidate: (document) =>
+          buildRuntime(doState, env, document, configStore, telemetrySink, (error) => {
+            lastError = error
+          }),
         activateCandidate: (candidate) =>
           runtimeInstall
             .replace(candidate, () =>
