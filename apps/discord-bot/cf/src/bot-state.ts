@@ -619,15 +619,22 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         buildCandidate: (document) => buildRuntime(doState, env, document, configStore, telemetrySink),
         activateCandidate: (candidate) =>
           runtimeInstall
-            .replace(candidate, () =>
-              Effect.gen(function* () {
-                // Replacement holds the same mutex as cold install and tick
-                // startup while it stops the exact detached gateway owner.
-                if (supervisorFiber !== undefined) {
-                  yield* Fiber.interrupt(supervisorFiber)
-                  supervisorFiber = undefined
-                }
-              }),
+            .replaceAndWake(
+              candidate,
+              () =>
+                Effect.gen(function* () {
+                  // Replacement holds the lifecycle mutex while stopping the
+                  // exact old gateway owner; the wake runs after publication.
+                  if (supervisorFiber !== undefined) {
+                    yield* Fiber.interrupt(supervisorFiber)
+                    supervisorFiber = undefined
+                  }
+                  // The detached loop may have been interrupted before its
+                  // ensuring finalizer started. Release its claim after
+                  // interruption while replacement still owns the mutex.
+                  yield* gate.end
+                }),
+              Effect.asVoid(tick),
             )
             .pipe(
               Effect.tap(() =>

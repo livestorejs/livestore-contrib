@@ -16,6 +16,12 @@ export interface SerializedRuntime<TRuntime> {
     /** Must be an infallible stop/handoff after activation ownership succeeds. */
     beforeReplace: (current: TRuntime | undefined) => Effect.Effect<void>,
   ) => Effect.Effect<void>
+  /** Publishes a replacement, then wakes its gateway owner without waiting for the next alarm. */
+  readonly replaceAndWake: (
+    candidate: TRuntime,
+    beforeReplace: (current: TRuntime | undefined) => Effect.Effect<void>,
+    wake: Effect.Effect<void>,
+  ) => Effect.Effect<void>
 }
 
 /**
@@ -67,11 +73,14 @@ export const makeSerializedRuntime = <TRuntime>(
           current = candidate
         }),
       )
+    const replaceAndWake: SerializedRuntime<TRuntime>['replaceAndWake'] = (candidate, beforeReplace, wake) =>
+      replace(candidate, beforeReplace).pipe(Effect.andThen(wake))
 
     return {
       get,
       peek: () => current,
       withCurrent,
       replace,
+      replaceAndWake,
     }
   })

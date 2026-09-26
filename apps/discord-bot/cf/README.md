@@ -167,6 +167,12 @@ The JSON body contains only `ready`, `releaseId`, the Cloudflare
 object with those five booleans. It intentionally omits error text, session
 identifiers, config contents, and spend.
 
+A successful `PUT /admin/config` with `reload: true` stops the previous
+Gateway owner, installs the candidate, and immediately starts its supervisor;
+it does not wait for the next Durable Object alarm or minute cron. Readiness
+stays false until the new Gateway session reports READY or RESUMED. A persisted
+session alone is not evidence that the replacement is running.
+
 The boot fallback is intentionally not matrix-ready: AI-title channels are
 empty, the dedicated E2E actor is selected, and its cutover-required purpose
 marker cannot match a live channel. Operators must persist the accepted fresh

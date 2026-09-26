@@ -1,8 +1,13 @@
 import { it } from '@effect/vitest'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
 import { expect } from 'vitest'
 
+import { makeRuntimeConfigAdminOperations } from './admin-ops.ts'
+import { makeFakeDoStorage } from './fake-do-storage.ts'
+import { makeSupervisorGate } from './loop-gate.ts'
+import { makeRuntimeConfigStore } from './runtime-config.ts'
 import { makeSerializedRuntime } from './runtime-install.ts'
 
 it.effect('a concurrent cold tick and status install and activate one supervisor runtime', () =>
@@ -153,5 +158,56 @@ it.effect('holds replacement behind an in-flight withCurrent operation', () =>
     expect(appliedRuntime).toBe(initial)
     expect(beforeReplaceCalled).toBe(true)
     expect(runtime.peek()).toBe(candidate)
+  }),
+)
+
+it.effect('a successful config reload immediately starts the replacement gateway without a later alarm', () =>
+  Effect.gen(function* () {
+    const storage = makeFakeDoStorage()
+    const store = makeRuntimeConfigStore(storage, 'test-release')
+    const gate = yield* makeSupervisorGate
+    const runtime = yield* makeSerializedRuntime(
+      Effect.map(store.read, (document) => ({ document, state: 'disconnected' as 'disconnected' | 'ready' })),
+      () => Effect.void,
+    )
+    let gatewayFiber: Fiber.Fiber<void> | undefined
+    const wake = runtime.withCurrent((current) =>
+      Effect.gen(function* () {
+        if ((yield* gate.tryBegin) === false) return
+        current.state = 'ready'
+        gatewayFiber = yield* Effect.forkDetach(Effect.never.pipe(Effect.ensuring(gate.end)))
+      }),
+    )
+    yield* wake
+    const old = yield* runtime.get
+    expect(old.state).toBe('ready')
+    const config = structuredClone(old.document.config)
+    const operations = makeRuntimeConfigAdminOperations({
+      store,
+      getRunning: () => runtime.peek()?.document,
+      buildCandidate: (document) => Effect.succeed({ document, state: 'disconnected' as 'disconnected' | 'ready' }),
+      activateCandidate: (candidate) =>
+        runtime.replaceAndWake(
+          candidate,
+          () =>
+            Effect.gen(function* () {
+              if (gatewayFiber !== undefined) {
+                yield* Fiber.interrupt(gatewayFiber)
+                gatewayFiber = undefined
+                // A detached loop can be interrupted before its finalizer starts.
+                yield* gate.end
+              }
+              old.state = 'disconnected'
+            }),
+          wake,
+        ),
+    })
+
+    const outcome = yield* operations.configPut({ expectedRevision: 0, reload: true, config })
+    expect(outcome).toMatchObject({ ok: true, body: { _tag: 'Success', applied: true } })
+    expect((yield* runtime.get).state).toBe('ready')
+    expect(old.state).toBe('disconnected')
+    if (gatewayFiber !== undefined) yield* Fiber.interrupt(gatewayFiber)
+    storage.close()
   }),
 )
