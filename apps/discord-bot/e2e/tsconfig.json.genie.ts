@@ -1,0 +1,13 @@
+import { packageTsconfigExclude } from '../../../genie/repo.ts'
+import { tsconfigJson } from '../../../repos/effect-utils/genie/external.ts'
+import { discordBotCompilerOptions } from '../tsconfig.json.genie.ts'
+
+export default tsconfigJson({
+  compilerOptions: {
+    ...discordBotCompilerOptions,
+    rootDir: '..',
+    types: ['node', 'vitest/globals'],
+  },
+  include: ['src/**/*.ts'],
+  exclude: [...packageTsconfigExclude],
+})

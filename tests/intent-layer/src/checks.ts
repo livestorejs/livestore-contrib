@@ -204,12 +204,17 @@ export const runChecks = (opts: Options): CheckResult => {
         : [`${rel(file)} — missing or invalid ## Status (got ${JSON.stringify(status)})`]
     })
 
-  // 6. no empty companion dirs
+  // 6. product vision is core-owned; contrib never carries a vision.md.
+  v['no contrib vision'] = mdFiles
+    .filter((file) => path.basename(file) === 'vision.md')
+    .map((file) => `${rel(file)} — product vision is owned by the core intent-layer root`)
+
+  // 7. no empty companion dirs
   v['no empty dirs'] = walkDirs(contextDir)
     .filter((dir) => walkFiles(dir).length === 0)
     .map((d) => rel(d))
 
-  // 7. decision records well-formed, no committed .proposed/
+  // 8. decision records well-formed, no committed .proposed/
   v['decisions'] = walkDirs(contextDir)
     .filter((d) => path.basename(d) === '.decisions')
     .flatMap((dir) =>
@@ -226,7 +231,7 @@ export const runChecks = (opts: Options): CheckResult => {
       }),
     )
 
-  // 8. maturity vocabulary (only `experimental`)
+  // 9. maturity vocabulary (only `experimental`)
   v['maturity'] = mdFiles.flatMap((file) =>
     fs
       .readFileSync(file, 'utf8')

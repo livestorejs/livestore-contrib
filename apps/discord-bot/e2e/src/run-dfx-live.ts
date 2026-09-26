@@ -1,0 +1,102 @@
+import { defaultRunCommand, makeDfxLiveTransport, type CommandRunner } from './dfx-live-transport.ts'
+import { makeCommandHumanHandoffBroker } from './human-handoff.ts'
+import type { LiveManifest } from './live-manifest.ts'
+import { runLiveStaging } from './live-runner.ts'
+import {
+  fullScenarioSelection,
+  type MessageSnapshot,
+  type RunReceipt,
+  type ScenarioSelection,
+  type Snowflake,
+} from './model.ts'
+
+export interface RunDfxLiveInput {
+  readonly manifest: LiveManifest | undefined
+  readonly confirmation: string | undefined
+  /** Resolved from manifest.actorBotTokenRef only by an approved op-proxy wrapper. */
+  readonly actorBotToken: string | undefined
+  /** Resolved from LIVESTORE_DISCORD_ADMIN_TOKEN only when the manifest names an admin endpoint. */
+  readonly adminToken?: string | undefined
+  readonly selection?: ScenarioSelection
+  readonly cliExecutable?: string
+  readonly runCommand?: CommandRunner
+  /** Explicit attended broker executable; absence keeps every human lane UNRUN. */
+  readonly humanHandoffBrokerExecutable?: string
+  readonly createHumanMessage?: (input: {
+    readonly channelId: Snowflake
+    readonly marker: string
+    readonly content: string
+  }) => Promise<MessageSnapshot>
+  readonly invokeMessageAction?: Parameters<typeof makeDfxLiveTransport>[0]['invokeMessageAction']
+  readonly invokeDocs?: Parameters<typeof makeDfxLiveTransport>[0]['invokeDocs']
+  readonly deleteHumanResponse?: Parameters<typeof makeDfxLiveTransport>[0]['deleteHumanResponse']
+  readonly humanAssisted?: boolean
+}
+
+/** Runs configured lanes; absent human-assisted callbacks truthfully produce UNRUN. */
+export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunReceipt> => {
+  const selection = input.selection ?? fullScenarioSelection
+  if (input.manifest === undefined || input.actorBotToken === undefined || input.actorBotToken.trim() === '') {
+    return runLiveStaging({
+      manifest: input.manifest,
+      confirmation: input.confirmation,
+      transport: undefined,
+      selection,
+      humanAssisted: false,
+    })
+  }
+  // An admin-endpoint manifest without its injected credential is UNRUN, never a socket fallback.
+  if (
+    input.manifest.botAdminEndpoint !== undefined &&
+    (input.adminToken === undefined || input.adminToken.trim() === '')
+  ) {
+    return runLiveStaging({
+      manifest: input.manifest,
+      confirmation: input.confirmation,
+      transport: undefined,
+      selection,
+      humanAssisted: false,
+    })
+  }
+  const humanBroker =
+    input.humanHandoffBrokerExecutable === undefined
+      ? undefined
+      : makeCommandHumanHandoffBroker({
+          executable: input.humanHandoffBrokerExecutable,
+          runCommand: input.runCommand ?? defaultRunCommand,
+          context: {
+            guildId: input.manifest.target.guildId,
+            channelId: input.manifest.target.channelId,
+          },
+        })
+  const createHumanMessage = input.createHumanMessage ?? humanBroker?.createMessage
+  const invokeMessageAction = input.invokeMessageAction ?? humanBroker?.invokeMessageAction
+  const invokeDocs = input.invokeDocs ?? humanBroker?.invokeDocs
+  const deleteHumanResponse = input.deleteHumanResponse ?? humanBroker?.deleteResponse
+  const live = makeDfxLiveTransport({
+    actorBotToken: input.actorBotToken,
+    target: input.manifest.target,
+    ...(input.manifest.botControlSocket === undefined ? {} : { botControlSocket: input.manifest.botControlSocket }),
+    ...(input.manifest.botAdminEndpoint === undefined ? {} : { botAdminEndpoint: input.manifest.botAdminEndpoint }),
+    ...(input.adminToken === undefined ? {} : { adminToken: input.adminToken }),
+    ...(input.cliExecutable === undefined ? {} : { cliExecutable: input.cliExecutable }),
+    ...(input.runCommand === undefined ? {} : { runCommand: input.runCommand }),
+    ...(createHumanMessage === undefined ? {} : { createHumanMessage }),
+    ...(invokeMessageAction === undefined ? {} : { invokeMessageAction }),
+    ...(invokeDocs === undefined ? {} : { invokeDocs }),
+    ...(deleteHumanResponse === undefined ? {} : { deleteHumanResponse }),
+    ...(humanBroker?.deleteMessage === undefined ? {} : { deleteHumanMessage: humanBroker.deleteMessage }),
+    ...(humanBroker?.resolveThread === undefined ? {} : { resolveHumanThread: humanBroker.resolveThread }),
+  })
+  try {
+    return await runLiveStaging({
+      manifest: input.manifest,
+      confirmation: input.confirmation,
+      transport: live.transport,
+      selection,
+      humanAssisted: input.humanAssisted === true || input.humanHandoffBrokerExecutable !== undefined,
+    })
+  } finally {
+    await live.dispose()
+  }
+}

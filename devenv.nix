@@ -55,6 +55,7 @@ in
     (taskModules.clean { packages = pnpmPackages; })
     (taskModules.lint-oxc {
       lintPaths = [
+        "apps"
         "packages"
         "tests/scenarios"
         ".github"
@@ -107,6 +108,7 @@ in
     pkgs.oxfmt
     effectUtilsPackages.genie
     effectUtilsPackages.megarepo
+    pkgs.tsgolint
     pkgs.jq
   ];
 
@@ -165,6 +167,7 @@ in
     description = "Run PR quality checks for contrib";
     after = [
       "genie:check"
+      "discord-bot:lint"
       "lint:check"
       "mr:lock-sync-check"
       "workspace:shape-check"
@@ -172,11 +175,18 @@ in
   };
   tasks."ci:types" = {
     description = "Run PR type checks for contrib";
-    after = [ "ts:check" ];
+    after = [
+      "ts:check"
+      "discord-bot:ts:check"
+    ];
   };
   tasks."ci:packages" = {
     description = "Run PR package unit tests for contrib";
-    after = [ "test:packages" ];
+    after = [
+      "test:packages"
+      "discord-bot:test"
+      "discord-bot:nix:check"
+    ];
   };
   tasks."ci:examples-build" = {
     description = "Build PR-covered contrib examples";
@@ -199,6 +209,29 @@ in
       DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios storybook:build
       DEVENV_TASK_PASSTHROUGH=1 pnpm --dir tests/scenarios viewer:parity
     '';
+  };
+  tasks."discord-bot:install" = {
+    description = "Install the isolated Discord bot dependency graph";
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir apps/discord-bot install --frozen-lockfile";
+  };
+  tasks."discord-bot:ts:check" = {
+    description = "Type-check the Discord bot with strict Effect diagnostics";
+    after = [ "discord-bot:install" ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir apps/discord-bot check:effect";
+  };
+  tasks."discord-bot:lint" = {
+    description = "Lint the Discord bot with warnings denied and type-aware rules enabled";
+    after = [ "discord-bot:install" ];
+    exec = "PATH=${lib.makeBinPath [ pkgs.tsgolint ]}:$PATH DEVENV_TASK_PASSTHROUGH=1 oxlint --import-plugin --deny-warnings --type-aware --tsconfig apps/discord-bot/tsconfig.json apps/discord-bot/src apps/discord-bot/e2e/src";
+  };
+  tasks."discord-bot:test" = {
+    description = "Run the Discord bot unit, integration, and credential-free E2E suites";
+    after = [ "discord-bot:install" ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 pnpm --dir apps/discord-bot test && DEVENV_TASK_PASSTHROUGH=1 pnpm --dir apps/discord-bot test:e2e";
+  };
+  tasks."discord-bot:nix:check" = {
+    description = "Build and exercise the immutable Discord bot package";
+    exec = "nix flake check path:$DEVENV_ROOT/apps/discord-bot";
   };
   tasks."release:surface:check" = {
     description = "Validate the contrib release workflow surface";
