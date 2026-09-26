@@ -9,7 +9,6 @@ import { Shard, ShardLive, type RunningShard } from 'dfx/DiscordGateway/Shard'
 import { ShardStateStore } from 'dfx/DiscordGateway/Shard/StateStore'
 import { MemoryRateLimitStoreLive, RateLimitStore, type RateLimitStoreService } from 'dfx/RateLimit'
 import type * as Discord from 'dfx/types'
-import * as Cause from 'effect/Cause'
 import * as Context from 'effect/Context'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
@@ -30,6 +29,7 @@ import { type DiscordMessageRef } from '../../src/control/schema.ts'
 import { DiscordActionsDfxLive } from '../../src/discord/actions-dfx.ts'
 import { DiscordActions } from '../../src/discord/actions.ts'
 import { DiscordEventHandlers, gatewayIntents } from '../../src/discord/events.ts'
+import { discordSafeLoggerLayer, safeDiscordFailureMessage } from '../../src/discord/rest-error-redaction.ts'
 import { routeInteraction, routeMessage } from '../../src/discord/routes.ts'
 import { makeDfxThreadMutation } from '../../src/discord/thread-mutation-dfx.ts'
 import { DocsWorkflow } from '../../src/docs/services.ts'
@@ -385,7 +385,9 @@ const buildRuntime = (
       // At-least-once redelivery after a resume re-runs the idempotent
       // handlers for anything lost mid-failure.
       return routed.pipe(
-        Effect.catchCause((cause) => Effect.logError(`[bot-state] dispatch handler ended: ${Cause.pretty(cause)}`)),
+        Effect.catchCause((cause) =>
+          Effect.logError(`[bot-state] dispatch handler ended: ${safeDiscordFailureMessage(cause)}`),
+        ),
       )
     }
 
@@ -422,7 +424,9 @@ const buildRuntime = (
         yield* journal.deleteExpiredTerminal({ now: Date.now() })
       }).pipe(
         Effect.catchCause((cause) =>
-          Effect.logError(`[bot-state] journal maintenance (${pendingPolicy}) failed: ${Cause.pretty(cause)}`),
+          Effect.logError(
+            `[bot-state] journal maintenance (${pendingPolicy}) failed: ${safeDiscordFailureMessage(cause)}`,
+          ),
         ),
         Effect.withSpan('discord.cf.journal.maintenance'),
       )
@@ -700,7 +704,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                   Effect.onExit((exit) =>
                     exit._tag === 'Failure'
                       ? Effect.sync(() => {
-                          lastError = Cause.pretty(exit.cause)
+                          lastError = safeDiscordFailureMessage(exit.cause)
                           console.error('[bot-state] supervision loop ended', lastError)
                         })
                       : Effect.void,
@@ -796,28 +800,37 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
           docsMonthlySpentUsdMicros: yield* rt.docsStore.monthlySpent(Date.now()),
           configSummary: rt.configSummary,
         }
-      }).pipe(Effect.catchCause((cause) => Effect.succeed(degradedStatus(Cause.pretty(cause)))))
+      }).pipe(Effect.catchCause((cause) => Effect.succeed(degradedStatus(safeDiscordFailureMessage(cause)))))
 
       return {
-        tick: () => tick('cron'),
+        tick: () => tick('cron').pipe(Effect.provide(discordSafeLoggerLayer)),
 
-        status: () => status,
+        status: () => status.pipe(Effect.provide(discordSafeLoggerLayer)),
 
-        threadCreate: (payload: unknown) => withRuntime((rt) => rt.threadCreate(payload)),
+        threadCreate: (payload: unknown) =>
+          withRuntime((rt) => rt.threadCreate(payload)).pipe(Effect.provide(discordSafeLoggerLayer)),
 
-        threadReconcile: (payload: unknown) => withRuntime((rt) => rt.threadReconcile(payload)),
+        threadReconcile: (payload: unknown) =>
+          withRuntime((rt) => rt.threadReconcile(payload)).pipe(Effect.provide(discordSafeLoggerLayer)),
 
-        configGet: () => configAdmin.configGet,
+        configGet: () => configAdmin.configGet.pipe(Effect.provide(discordSafeLoggerLayer)),
 
-        configPut: (payload: unknown) => Semaphore.withPermits(controlMutationLock, 1)(configAdmin.configPut(payload)),
+        configPut: (payload: unknown) =>
+          Semaphore.withPermits(
+            controlMutationLock,
+            1,
+          )(configAdmin.configPut(payload)).pipe(Effect.provide(discordSafeLoggerLayer)),
 
         // Hold both control mutation and runtime lifecycle ownership through
         // the final stored/running recheck and REST mutation/verification.
         commandsSync: (payload: unknown) =>
-          Semaphore.withPermits(controlMutationLock, 1)(runtimeInstall.withCurrent((rt) => rt.commandsSync(payload))),
+          Semaphore.withPermits(
+            controlMutationLock,
+            1,
+          )(runtimeInstall.withCurrent((rt) => rt.commandsSync(payload))).pipe(Effect.provide(discordSafeLoggerLayer)),
 
         /** Cloudflare DO alarm entry point — the same heartbeat as `tick`. */
-        alarm: () => tick('alarm'),
+        alarm: () => tick('alarm').pipe(Effect.provide(discordSafeLoggerLayer)),
       }
     })
   }),

@@ -185,6 +185,12 @@ Open/Close/Read/Write error class is unavailable from DFX's current lifecycle;
 exposing it requires a DFX lifecycle change, ideally upstreamed alongside the
 existing terminal-close patch.
 
+DFX's DiscordREST currently annotates 429 debug logs with raw `request.url`;
+webhook and interaction callback paths include credential tokens. Upstream
+follow-up: replace that annotation with a route template in DFX. Until then,
+the shared Discord logger redacts URL token segments and authorization values
+before output, and runtime/Worker/E2E scopes enforce Info minimum logging.
+
 The boot fallback is intentionally not matrix-ready: AI-title channels are
 empty, the dedicated E2E actor is selected, and its cutover-required purpose
 marker cannot match a live channel. Operators must persist the accepted fresh

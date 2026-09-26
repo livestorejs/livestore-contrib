@@ -1,5 +1,6 @@
 #!/usr/bin/env -S node --experimental-strip-types
 
+import { safeDiscordFailureMessage } from '../../src/discord/rest-error-redaction.ts'
 import { makeHttpCaptureBrokerDriver } from './attended-broker-driver.ts'
 import { makeDfxRecoveryTransport } from './attended-broker-recovery.ts'
 import {
@@ -61,7 +62,7 @@ if (args[0] === 'recover-ledger') {
         await recovery.dispose()
       }
     } catch (error) {
-      process.stderr.write(`${error instanceof Error ? error.message : 'recovery failed'}\n`)
+      process.stderr.write(`${safeDiscordFailureMessage(error)}\n`)
       process.exitCode = 1
     }
   }
@@ -115,7 +116,7 @@ if (args[0] === 'recover-ledger') {
     process.stdout.write(`${JSON.stringify(result.payload)}\n`)
     if (result.declineExitCode !== undefined) process.exitCode = result.declineExitCode
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : 'broker operation failed'}\n`)
+    process.stderr.write(`${safeDiscordFailureMessage(error)}\n`)
     process.exitCode = 1
   }
 }

@@ -47,7 +47,8 @@
     "types": [
       "node",
       "vitest/globals"
-    ]
+    ],
+    "rootDir": ".."
   },
   "include": [
     "src/**/*.ts"

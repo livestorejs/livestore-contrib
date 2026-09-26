@@ -4,6 +4,7 @@ import { NodeHttpClient } from '@effect/platform-node'
 import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
 import { Effect, Layer, ManagedRuntime, Redacted } from 'effect'
 
+import { discordSafeLoggerLayer, redactDiscordRestCause } from '../../src/discord/rest-error-redaction.ts'
 import type { MessageSnapshot, ResponseSnapshot, Snowflake } from './model.ts'
 import { E2EPrerequisiteUnavailableError } from './transport.ts'
 
@@ -194,8 +195,9 @@ export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string 
     Layer.provide(NodeHttpClient.layerUndici),
     Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
   )
-  const runtime = ManagedRuntime.make(DiscordLive)
-  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> => runtime.runPromise(effect)
+  const runtime = ManagedRuntime.make(Layer.merge(DiscordLive, discordSafeLoggerLayer))
+  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> =>
+    runtime.runPromise(effect.pipe(Effect.catchCause((cause) => Effect.fail(redactDiscordRestCause(cause)))))
 
   return {
     waitForMessage: async ({ channelId, marker, timeoutMs, pollIntervalMs }) => {

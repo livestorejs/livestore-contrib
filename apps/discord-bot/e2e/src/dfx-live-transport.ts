@@ -3,7 +3,9 @@ import { execFile } from 'node:child_process'
 import { NodeHttpClient } from '@effect/platform-node'
 import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
 import { Effect, Layer, ManagedRuntime, Redacted } from 'effect'
+import type { HttpClient } from 'effect/unstable/http'
 
+import { discordSafeLoggerLayer, redactDiscordRestCause } from '../../src/discord/rest-error-redaction.ts'
 import { makeHttpsBotControlClient } from './admin-http-client.ts'
 import type {
   ChannelSnapshot,
@@ -26,6 +28,8 @@ export type CommandRunner = (executable: string, args: ReadonlyArray<string>) =>
 export interface DfxLiveTransportInput {
   /** Resolved only in process by the approved op-proxy invocation. */
   readonly actorBotToken: string
+  /** Dependency seam for offline REST failure tests. */
+  readonly httpClientLayer?: Layer.Layer<HttpClient.HttpClient>
   readonly target: StagingTarget
   /** Exact staging control socket admitted by the manifest; absent with botAdminEndpoint. */
   readonly botControlSocket?: string
@@ -112,10 +116,10 @@ export const operatorCreateThreadArguments = (input: {
  */
 export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTransport => {
   const DiscordLive = DiscordRESTMemoryLive.pipe(
-    Layer.provide(NodeHttpClient.layerUndici),
+    Layer.provide(input.httpClientLayer ?? NodeHttpClient.layerUndici),
     Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
   )
-  const runtime = ManagedRuntime.make(DiscordLive)
+  const runtime = ManagedRuntime.make(Layer.merge(DiscordLive, discordSafeLoggerLayer))
   const sourceMarkers = new Map<Snowflake, string>()
   const sourceAuthors = new Map<Snowflake, MessageSnapshot['author']>()
   const sources = new Map<Snowflake, MessageSnapshot>()
@@ -127,7 +131,8 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     input.botAdminEndpoint === undefined || input.adminToken === undefined
       ? undefined
       : makeHttpsBotControlClient({ endpoint: input.botAdminEndpoint, adminToken: input.adminToken })
-  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> => runtime.runPromise(effect)
+  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> =>
+    runtime.runPromise(effect.pipe(Effect.catchCause((cause) => Effect.fail(redactDiscordRestCause(cause)))))
 
   const findThread = async (guildId: Snowflake, sourceMessageId: Snowflake): Promise<ThreadSnapshot | undefined> => {
     const response = await rest(Effect.flatMap(DiscordREST, (discord) => discord.getActiveGuildThreads(guildId)))

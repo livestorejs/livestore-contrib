@@ -10,6 +10,7 @@ import { runCli } from './cli/index.ts'
 import { selectControlTransport } from './cli/transport-option.ts'
 import { makeHttpsBotControlClient } from './control/http-client.ts'
 import { defaultControlSocket } from './control/transport.ts'
+import { discordSafeLoggerLayer, redactDiscordRestCause } from './discord/rest-error-redaction.ts'
 import { gatewayIntents, loadRuntimeConfig, makeUnixBotControlClient, runRuntime } from './runtime/index.ts'
 
 export { gatewayIntents }
@@ -73,4 +74,8 @@ const observability =
         },
       }).pipe(Layer.provide(NodeHttpClient.layerUndici))
 
-program.pipe(Effect.provide(Layer.merge(observability, NodeServices.layer)), NodeRuntime.runMain)
+program.pipe(
+  Effect.provide(Layer.mergeAll(observability, NodeServices.layer, discordSafeLoggerLayer)),
+  Effect.catchCause((cause) => Effect.die(cause.pipe(redactDiscordRestCause))),
+  NodeRuntime.runMain,
+)

@@ -12,12 +12,13 @@
  * Runtime-agnostic: no node builtins — the identical module runs inside a
  * Cloudflare Worker, Bun, or Node.
  */
-import { Cause, Context, Effect, Layer, Schema } from 'effect'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerError } from 'effect/unstable/http'
 import { HttpMiddleware, HttpServerResponse } from 'effect/unstable/http'
 
 import { EmptyPayload } from '../../src/control/schema.ts'
 import type { ControlResult } from '../../src/control/schema.ts'
+import { discordSafeLoggerLayer, safeDiscordFailureMessage } from '../../src/discord/rest-error-redaction.ts'
 import { CommandsSyncPayload, OperatorThreadCreatePayload } from './admin-ops.ts'
 import type { AdminOperationOutcome } from './admin-ops.ts'
 import { schemaVersion as journalSchemaVersion } from './journal.ts'
@@ -58,13 +59,13 @@ export const toFetchHandler = (
         Effect.catchCause((cause) =>
           Effect.map(HttpServerError.causeResponse(cause), ([response]) => {
             if (response.status >= 500) {
-              // The client receives a stable ControlError, but the underlying
-              // DO RPC failure must remain visible in Worker diagnostics.
-              console.error('[admin] request failed', Cause.pretty(cause))
+              // Never render a cause: HTTP failures carry requests with Authorization headers.
+              console.error('[admin] request failed', safeDiscordFailureMessage(cause))
             }
             return HttpServerResponse.toWeb(withDecodableErrorBody(response))
           }),
         ),
+        Effect.provide(discordSafeLoggerLayer),
       ),
     )
 }

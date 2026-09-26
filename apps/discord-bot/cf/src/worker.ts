@@ -6,6 +6,7 @@ import * as Effect from 'effect/Effect'
 import * as HttpServerRequest from 'effect/unstable/http/HttpServerRequest'
 import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse'
 
+import { discordSafeLoggerLayer } from '../../src/discord/rest-error-redaction.ts'
 import { AdminToken, makeAdminGatewayOptions, makeAdminRouter, runAdminRouter, toFetchHandler } from './admin.ts'
 import { BotState } from './bot-state.ts'
 import { readSecret } from './env.ts'
@@ -110,7 +111,7 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
         }
 
         return HttpServerResponse.text('not found', { status: 404 })
-      }),
+      }).pipe(Effect.provide(discordSafeLoggerLayer)),
     }
   }),
 ) {}

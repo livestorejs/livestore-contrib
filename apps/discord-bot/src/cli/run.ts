@@ -7,6 +7,7 @@ import {
   type ControlError as ControlErrorType,
   type ControlResult as ControlResultType,
 } from '../control/schema.ts'
+import { safeDiscordFailureMessage } from '../discord/rest-error-redaction.ts'
 import { CliExit, type CliIo, type OutputMode } from './model.ts'
 import { parseCli } from './parse.ts'
 
@@ -36,7 +37,7 @@ export const runCli = (args: readonly string[], client: BotControlClient, io: Cl
       renderError(failure.value, parsed.invocation.output, io)
       return exitForError(failure.value)
     }
-    io.stderr(`CRITICAL runtime defect: ${Cause.pretty(exit.cause)}`)
+    io.stderr(`CRITICAL runtime defect: ${safeDiscordFailureMessage(exit.cause)}`)
     return CliExit.UnexpectedDefect
   })
 

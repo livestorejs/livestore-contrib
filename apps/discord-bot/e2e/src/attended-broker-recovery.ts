@@ -2,6 +2,11 @@ import { NodeHttpClient } from '@effect/platform-node'
 import { DiscordConfig, DiscordREST, DiscordRESTMemoryLive } from 'dfx'
 import { Effect, Layer, ManagedRuntime, Redacted } from 'effect'
 
+import {
+  DiscordRestFailure,
+  discordSafeLoggerLayer,
+  redactDiscordRestCause,
+} from '../../src/discord/rest-error-redaction.ts'
 import { CleanupArtifactNotFoundError } from './cleanup-ledger.ts'
 import type { ChannelSnapshot, Snowflake, ThreadSnapshot } from './model.ts'
 import { E2EPrerequisiteUnavailableError, type E2ETransport } from './transport.ts'
@@ -28,6 +33,7 @@ const asRecord = (value: unknown, label: string): Record<string, unknown> => {
 }
 
 const isNotFound = (error: unknown): boolean => {
+  if (error instanceof DiscordRestFailure) return error.status === 404
   if (typeof error !== 'object' || error === null || !('response' in error)) return false
   const response = error.response
   return typeof response === 'object' && response !== null && 'status' in response && response.status === 404
@@ -126,8 +132,9 @@ export const makeDfxRecoveryTransport = (input: {
     Layer.provide(NodeHttpClient.layerUndici),
     Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
   )
-  const runtime = ManagedRuntime.make(DiscordLive)
-  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> => runtime.runPromise(effect)
+  const runtime = ManagedRuntime.make(Layer.merge(DiscordLive, discordSafeLoggerLayer))
+  const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> =>
+    runtime.runPromise(effect.pipe(Effect.catchCause((cause) => Effect.fail(redactDiscordRestCause(cause)))))
   const transport = makeRecoveryTransport({
     getChannel: (channelId) => rest(Effect.flatMap(DiscordREST, (discord) => discord.getChannel(channelId))),
     listMessages: (channelId, before) =>
