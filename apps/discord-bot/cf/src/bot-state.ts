@@ -619,27 +619,31 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         buildCandidate: (document) => buildRuntime(doState, env, document, configStore, telemetrySink),
         activateCandidate: (candidate) =>
           runtimeInstall
-            .replaceAndWake(
-              candidate,
-              () =>
-                Effect.gen(function* () {
-                  // Replacement holds the lifecycle mutex while stopping the
-                  // exact old gateway owner; the wake runs after publication.
-                  if (supervisorFiber !== undefined) {
-                    console.info('[bot-state] reload old-fiber interrupt begin')
-                    yield* Fiber.interrupt(supervisorFiber)
-                    supervisorFiber = undefined
-                    console.info('[bot-state] reload old-fiber interrupt end')
-                  }
-                  // The detached loop may have been interrupted before its
-                  // ensuring finalizer started. Release its claim after
-                  // interruption while replacement still owns the mutex.
-                  yield* gate.end
-                  console.info('[bot-state] reload gate released')
-                }),
-              Effect.asVoid(tick('inline-wake')),
+            .replace(candidate, () =>
+              Effect.gen(function* () {
+                // Replacement holds the lifecycle mutex while stopping the
+                // exact old gateway owner; an alarm starts the new one.
+                if (supervisorFiber !== undefined) {
+                  console.info('[bot-state] reload old-fiber interrupt begin')
+                  yield* Fiber.interrupt(supervisorFiber)
+                  supervisorFiber = undefined
+                  console.info('[bot-state] reload old-fiber interrupt end')
+                }
+                // The detached loop may have been interrupted before its
+                // ensuring finalizer started. Release its claim after
+                // interruption while replacement still owns the mutex.
+                yield* gate.end
+                console.info('[bot-state] reload gate released')
+              }),
             )
             .pipe(
+              Effect.andThen(
+                Effect.gen(function* () {
+                  const deadline = Date.now()
+                  yield* Effect.promise(() => doState.raw.storage.setAlarm(deadline))
+                  console.info(`[bot-state] reload alarmDeadlineMs=${deadline}`)
+                }),
+              ),
               Effect.tap(() =>
                 Effect.sync(() => {
                   lastError = undefined
@@ -652,7 +656,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       // claim as interrupted before any handler can observe it.
       let startupMaintenanceDone = false
 
-      const tick = (origin: 'alarm' | 'cron' | 'inline-wake'): Effect.Effect<number | undefined> =>
+      const tick = (origin: 'alarm' | 'cron'): Effect.Effect<number | undefined> =>
         Effect.gen(function* () {
           yield* ensureRuntime
           const scheduledAlarm = yield* Effect.promise(() => doState.raw.storage.getAlarm())

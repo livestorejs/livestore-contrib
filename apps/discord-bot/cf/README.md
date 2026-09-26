@@ -168,10 +168,11 @@ object with those five booleans. It intentionally omits error text, session
 identifiers, config contents, and spend.
 
 A successful `PUT /admin/config` with `reload: true` stops the previous
-Gateway owner, installs the candidate, and immediately starts its supervisor;
-it does not wait for the next Durable Object alarm or minute cron. Readiness
-stays false until the new Gateway session reports READY or RESUMED. A persisted
-session alone is not evidence that the replacement is running.
+Gateway owner, installs the candidate, and schedules an immediate Durable Object
+alarm. The alarm starts the replacement supervisor in its own invocation rather
+than forking a gateway from the admin request. Readiness stays false until the
+new Gateway session reports READY or RESUMED; a persisted session alone is not
+evidence that the replacement is running.
 
 The boot fallback is intentionally not matrix-ready: AI-title channels are
 empty, the dedicated E2E actor is selected, and its cutover-required purpose

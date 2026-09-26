@@ -330,8 +330,15 @@ it('PUT /admin/config validates before persisting; invalid bodies get a 422', as
   expect(await jsonBody(bad)).toMatchObject({ _tag: 'InvalidControlInput' })
 })
 
-it('reloads a persisted identical config through the real admin route and fake DO storage', async () => {
-  const storage = makeFakeDoStorage()
+it('persists and installs an identical config through the real admin route and fake DO storage', async () => {
+  const backing = makeFakeDoStorage()
+  let alarm: number | undefined
+  const storage = {
+    ...backing,
+    setAlarm: async (when: number | Date) => {
+      alarm = Number(when)
+    },
+  }
   try {
     const store = makeRuntimeConfigStore(storage, 'test-release')
     const first = await Effect.runPromise(store.read)
@@ -343,19 +350,14 @@ it('reloads a persisted identical config through the real admin route and fake D
       ),
     )
     await Effect.runPromise(installed.get)
-    let wakes = 0
     const operations = makeRuntimeConfigAdminOperations({
       store,
       getRunning: () => installed.peek()?.document,
       buildCandidate: (document) => Effect.succeed({ document }),
       activateCandidate: (candidate) =>
-        installed.replaceAndWake(
-          candidate,
-          () => Effect.void,
-          Effect.sync(() => {
-            wakes++
-          }),
-        ),
+        installed
+          .replace(candidate, () => Effect.void)
+          .pipe(Effect.andThen(Effect.promise(() => storage.setAlarm(Date.now())))),
     })
     let requestId = 0
     const route = makeAdminHandler(
@@ -401,7 +403,7 @@ it('reloads a persisted identical config through the real admin route and fake D
       running: { revision: 2 },
       diverged: false,
     })
-    expect(wakes).toBe(1)
+    expect(alarm).toBeGreaterThan(0)
   } finally {
     storage.close()
   }

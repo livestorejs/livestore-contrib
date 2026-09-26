@@ -1,7 +1,6 @@
 import { it } from '@effect/vitest'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
-import * as Fiber from 'effect/Fiber'
 import { expect } from 'vitest'
 
 import { makeRuntimeConfigAdminOperations } from './admin-ops.ts'
@@ -161,9 +160,20 @@ it.effect('holds replacement behind an in-flight withCurrent operation', () =>
   }),
 )
 
-it.effect('a successful config reload immediately starts the replacement gateway without a later alarm', () =>
+it.effect('reload recovers when the admin request ends before its detached gateway begins', () =>
   Effect.gen(function* () {
-    const storage = makeFakeDoStorage()
+    const backing = makeFakeDoStorage()
+    let alarm: number | undefined
+    const storage = {
+      ...backing,
+      getAlarm: async () => alarm,
+      setAlarm: async (when: number | Date) => {
+        alarm = Number(when)
+      },
+      deleteAlarm: async () => {
+        alarm = undefined
+      },
+    }
     const store = makeRuntimeConfigStore(storage, 'test-release')
     const gate = yield* makeSupervisorGate
     const runtime = yield* makeSerializedRuntime(
@@ -173,44 +183,53 @@ it.effect('a successful config reload immediately starts the replacement gateway
       })),
       () => Effect.void,
     )
-    let gatewayFiber: Fiber.Fiber<void> | undefined
-    const wake = runtime.withCurrent((current) =>
-      Effect.gen(function* () {
-        if ((yield* gate.tryBegin) === false) return
-        current.state = 'ready'
-        gatewayFiber = yield* Effect.forkDetach(Effect.never.pipe(Effect.ensuring(gate.end)))
-      }),
-    )
-    yield* wake
     const old = yield* runtime.get
-    expect(old.state).toBe('ready')
-    const config = structuredClone(old.document.config)
+    old.state = 'ready'
+    yield* gate.tryBegin
+
+    // Model a bridge that drops queued detached children when the request
+    // returns: gateway startup must be owned by the subsequent alarm instead.
+    let pendingRequestChild: (() => void) | undefined
+    const tick = (origin: 'request' | 'alarm') =>
+      runtime.withCurrent((current) =>
+        Effect.gen(function* () {
+          if ((yield* gate.tryBegin) === false) return
+          if (origin === 'request') {
+            pendingRequestChild = () => {
+              current.state = 'ready'
+            }
+          } else {
+            current.state = 'ready'
+          }
+          yield* Effect.promise(() => storage.setAlarm(Date.now() + 5_000))
+        }),
+      )
     const operations = makeRuntimeConfigAdminOperations({
       store,
       getRunning: () => runtime.peek()?.document,
       buildCandidate: (document) => Effect.succeed({ document, state: 'disconnected' as 'disconnected' | 'ready' }),
       activateCandidate: (candidate) =>
-        runtime.replaceAndWake(
-          candidate,
-          () =>
-            Effect.gen(function* () {
-              if (gatewayFiber !== undefined) {
-                yield* Fiber.interrupt(gatewayFiber)
-                gatewayFiber = undefined
-                // A detached loop can be interrupted before its finalizer starts.
-                yield* gate.end
-              }
+        runtime
+          .replace(candidate, () =>
+            Effect.sync(() => {
               old.state = 'disconnected'
-            }),
-          wake,
-        ),
+            }).pipe(Effect.andThen(gate.end)),
+          )
+          .pipe(Effect.andThen(Effect.promise(() => storage.setAlarm(Date.now())))),
     })
 
-    const outcome = yield* operations.configPut({ expectedRevision: 0, reload: true, config })
+    const outcome = yield* operations.configPut({
+      expectedRevision: 0,
+      reload: true,
+      config: structuredClone(old.document.config),
+    })
     expect(outcome).toMatchObject({ ok: true, body: { _tag: 'Success', applied: true } })
-    expect((yield* runtime.get).state).toBe('ready')
+    expect(pendingRequestChild).toBeUndefined()
     expect(old.state).toBe('disconnected')
-    if (gatewayFiber !== undefined) yield* Fiber.interrupt(gatewayFiber)
-    storage.close()
+    expect(alarm).toBeDefined()
+    expect(alarm).toBeLessThanOrEqual(Date.now())
+    yield* tick('alarm')
+    expect((yield* runtime.get).state).toBe('ready')
+    backing.close()
   }),
 )
