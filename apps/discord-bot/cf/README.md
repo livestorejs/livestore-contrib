@@ -62,9 +62,14 @@ stage fails before yielding a resource. Production remains separately gated.
 
 ### Required remote environment
 
-Provision secrets through op-proxy/Alchemy config; export the non-secret
-deployment identity in the invoking environment (not only `--env-file`, because
-the Worker resource name is fixed while the module is loaded):
+Local operators can provision secrets through op-proxy/Alchemy config. CI does
+not use op-proxy: the manual `deploy-discord-bot.yml` workflow injects all five
+Worker secrets and the Cloudflare token from GitHub `staging` environment
+secrets. `Config.redacted` binds these as Cloudflare `secret_text` on each
+plan/deploy; they are not references to pre-existing Secrets Store values.
+Export the non-secret deployment identity in the invoking environment (not
+only `--env-file`, because the Worker resource name is fixed while the module
+is loaded):
 
 | Binding / variable          | Purpose                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------ |
@@ -78,6 +83,23 @@ the Worker resource name is fixed while the module is loaded):
 | `RELEASE_ID`                | required, non-empty immutable source/build identity (max 256 characters)       |
 | `CF_WORKER_NAME`            | expected existing Worker script name; also pins the resource name              |
 | `CF_BOT_STATE_NAMESPACE_ID` | expected 32-hex `BotState` Durable Object namespace                            |
+
+The CI job uses `CLOUDFLARE_ACCOUNT_ID` as an environment secret,
+`CF_WORKER_NAME`, `CF_BOT_STATE_NAMESPACE_ID`, and `CF_WORKER_URL` as environment
+variables, and `github.sha` as `RELEASE_ID`. The account-scoped API token needs
+Workers Scripts Write, Account Settings Read, and Secrets Store Read/Write:
+Alchemy's remote state store recovers its bearer from Cloudflare Secrets Store
+on a fresh runner. The state store must already be bootstrapped and its
+`DiscordBot/staging` state must pass `--verify-remote-authoritative`; CI cannot
+migrate missing state. Deployments are serialized by stage and never cancel a
+running deploy. Dispatch on an approved SHA with
+`gh workflow run deploy-discord-bot.yml --ref <approved-branch-or-tag> -f stage=staging`;
+inspect the gated plan and require the final `/readyz` check to report HTTP
+200, all five checks true, and `releaseId` equal to the dispatched SHA.
+Production is not a dispatch choice: first admit and pin its identity in
+`alchemy.run.ts` and the preflight/state verifier, then add the protected
+`production` GitHub environment (required reviewer, stage-specific credentials
+and identity) and only then add the choice to the workflow.
 
 `cf:preflight` performs a read-only Cloudflare Worker-settings request and
 compares the live script name and `BotState` namespace before Alchemy runs.
