@@ -1,5 +1,16 @@
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
 import * as Semaphore from 'effect/Semaphore'
+
+/**
+ * Capture the Durable Object instance's Effect context once, before any
+ * request/alarm context is installed. A gateway fork must not inherit the
+ * closing per-invocation scope or its scoped transport services.
+ */
+export const makeInstanceFiberRunner = Effect.map(Effect.context(), (instanceContext) => ({
+  fork: (program: Effect.Effect<void>): Effect.Effect<Fiber.Fiber<void, unknown>> =>
+    Effect.sync(() => Effect.runForkWith(instanceContext)(program)),
+}))
 
 export interface SerializedRuntime<TRuntime> {
   /** Installs the lazy runtime at most once and returns the installed value. */

@@ -1,16 +1,20 @@
 import { expect, it } from '@effect/vitest'
 import * as Cause from 'effect/Cause'
+import * as Context from 'effect/Context'
 import * as Deferred from 'effect/Deferred'
 import * as Duration from 'effect/Duration'
 import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
 import * as Fiber from 'effect/Fiber'
 import * as Queue from 'effect/Queue'
 import * as Ref from 'effect/Ref'
 import * as Result from 'effect/Result'
+import * as Scope from 'effect/Scope'
 import * as Stream from 'effect/Stream'
 import * as TestClock from 'effect/testing/TestClock'
 
 import { makeGatewayTelemetryRecorder, makeInMemoryGatewayTelemetrySink } from './gateway-telemetry.ts'
+import { makeInstanceFiberRunner } from './runtime-install.ts'
 import {
   DisconnectedError,
   make,
@@ -192,6 +196,63 @@ it.effect('cold boot identifies freshly; graceful shutdown keeps the session for
       _tag: 'Resume',
       session: { sessionId: 's1', sequence: 7 },
     })
+  }),
+)
+
+it.effect('two live-session reloads resume after each request scope closes', () =>
+  Effect.gen(function* () {
+    // A per-invocation transport is revoked at the end of its call. A gateway
+    // inheriting that invocation's context cannot connect after the alarm
+    // handler returns; the instance context remains usable across both swaps.
+    const Transport = Context.Reference<{ readonly available: () => boolean }>('test/GatewayTransport', {
+      defaultValue: () => ({ available: () => false }),
+    })
+    const lifetime = { available: () => true }
+    const runner = yield* makeInstanceFiberRunner.pipe(Effect.provideService(Transport, lifetime))
+    const store = yield* makeStore
+    const gateway = yield* makeGateway
+
+    let previous: Fiber.Fiber<void, unknown> | undefined
+    for (let reload = 0; reload < 3; reload++) {
+      if (previous !== undefined) yield* Fiber.interrupt(previous)
+      const supervisor = yield* make(
+        {
+          acquire: (mode, emit) =>
+            Effect.gen(function* () {
+              const transport = yield* Transport
+              if (!transport.available()) return yield* Effect.never
+              return yield* gateway.acquire(mode, emit)
+            }),
+          loadSession: store.load,
+          saveSession: store.save,
+          clearSession: store.clear,
+        },
+        { initialBackoff: Duration.seconds(1), maxBackoff: Duration.seconds(8), random: Effect.succeed(1) },
+      )
+      const requestScope = yield* Scope.make()
+      let active = true
+      yield* Scope.addFinalizer(
+        requestScope,
+        Effect.sync(() => {
+          active = false
+        }),
+      )
+      previous = yield* Scope.provide(
+        runner.fork(supervisor.run).pipe(Effect.provideService(Transport, { available: () => active })),
+        requestScope,
+      )
+      yield* Scope.close(requestScope, Exit.void)
+      yield* waitForSessions(gateway, reload + 1)
+      expect(yield* gateway.lastMode).toEqual(
+        reload === 0 ? { _tag: 'Identify' } : { _tag: 'Resume', session: { sessionId: 'live', sequence: reload } },
+      )
+      yield* gateway.emitOn(reload, {
+        _tag: reload === 0 ? 'Ready' : 'Resumed',
+        session: { sessionId: 'live', sequence: reload + 1 },
+      })
+      yield* waitFor(Effect.map(supervisor.state, (state) => state === 'ready'))
+    }
+    if (previous !== undefined) yield* Fiber.interrupt(previous)
   }),
 )
 

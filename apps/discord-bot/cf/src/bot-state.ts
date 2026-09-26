@@ -82,7 +82,7 @@ import {
   type RuntimeConfigStore,
   type RuntimeConfigSummary,
 } from './runtime-config.ts'
-import { makeSerializedRuntime } from './runtime-install.ts'
+import { makeInstanceFiberRunner, makeSerializedRuntime } from './runtime-install.ts'
 // Selective imports ONLY: src/docs/index.ts re-exports node-bound modules
 // (admission/workflow crypto, file state store) and must never enter this
 // worker graph; src/runtime/config.ts (node:fs) is likewise avoided via its
@@ -562,6 +562,7 @@ const buildRuntime = (
             }),
           onEstablished: Effect.sync(() => {
             onGatewayError(undefined)
+            console.info('[bot-state] gateway established READY/RESUMED')
           }),
         },
       ),
@@ -604,6 +605,9 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
     // Runtime phase: storage methods are RuntimeContext-colored and may only
     // run inside these handlers.
     return Effect.gen(function* () {
+      // Alchemy closes each RPC/alarm call scope after replying. Capture the
+      // constructor's context so the gateway and its timers outlive that call.
+      const instanceFibers = yield* makeInstanceFiberRunner
       const releaseId = readReleaseId(env)
       const configStore = makeRuntimeConfigStore(doState.raw.storage, releaseId)
       const telemetrySink = makeDurableObjectGatewayTelemetrySink(doState.raw.storage)
@@ -696,7 +700,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                 return null
               }
               lastError = undefined
-              const startedFiber = yield* Effect.forkDetach(
+              const startedFiber = yield* instanceFibers.fork(
                 rt.supervisor.run.pipe(
                   // The detached fiber is retained above so a config reload can
                   // interrupt and await the old gateway before swapping runtimes.
@@ -710,6 +714,9 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                       : Effect.void,
                   ),
                   Effect.ensuring(gate.end),
+                  // The instance context deliberately excludes per-call
+                  // layers; retain the gateway's content-redacting logger.
+                  Effect.provide(discordSafeLoggerLayer),
                 ),
               )
               supervisorFiber = startedFiber
