@@ -626,15 +626,18 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                   // Replacement holds the lifecycle mutex while stopping the
                   // exact old gateway owner; the wake runs after publication.
                   if (supervisorFiber !== undefined) {
+                    console.info('[bot-state] reload old-fiber interrupt begin')
                     yield* Fiber.interrupt(supervisorFiber)
                     supervisorFiber = undefined
+                    console.info('[bot-state] reload old-fiber interrupt end')
                   }
                   // The detached loop may have been interrupted before its
                   // ensuring finalizer started. Release its claim after
                   // interruption while replacement still owns the mutex.
                   yield* gate.end
+                  console.info('[bot-state] reload gate released')
                 }),
-              Effect.asVoid(tick),
+              Effect.asVoid(tick('inline-wake')),
             )
             .pipe(
               Effect.tap(() =>
@@ -649,59 +652,82 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       // claim as interrupted before any handler can observe it.
       let startupMaintenanceDone = false
 
-      const tick: Effect.Effect<number | undefined> = Effect.gen(function* () {
-        yield* ensureRuntime
-        const scheduledAlarm = yield* Effect.promise(() => doState.raw.storage.getAlarm())
+      const tick = (origin: 'alarm' | 'cron' | 'inline-wake'): Effect.Effect<number | undefined> =>
+        Effect.gen(function* () {
+          yield* ensureRuntime
+          const scheduledAlarm = yield* Effect.promise(() => doState.raw.storage.getAlarm())
+          console.info(`[bot-state] tick origin=${origin} alarmScheduled=${scheduledAlarm !== null}`)
 
-        // Re-read the installed runtime under the lifecycle mutex AFTER the
-        // alarm await. Reload cannot swap between this selection, the gate
-        // claim, and fiber publication; if it ran first, this tick starts B.
-        const installed = yield* runtimeInstall.withCurrent((rt) =>
-          Effect.gen(function* () {
-            if (scheduledAlarm !== null) {
-              yield* rt.telemetry.alarmObserved(Math.max(0, Date.now() - scheduledAlarm))
-            }
-            if ((yield* gate.tryBegin) === false) return rt
-            if ((yield* rt.supervisor.state) === 'stopped') {
-              yield* gate.end
-              return null
-            }
-            lastError = undefined
-            supervisorFiber = yield* Effect.forkDetach(
-              rt.supervisor.run.pipe(
-                // The detached fiber is retained above so a config reload can
-                // interrupt and await the old gateway before swapping runtimes.
-                // Abnormal exits stay visible and always release the restart gate.
-                Effect.onExit((exit) =>
-                  exit._tag === 'Failure'
-                    ? Effect.sync(() => {
-                        lastError = Cause.pretty(exit.cause)
-                        console.error('[bot-state] supervision loop ended', lastError)
-                      })
-                    : Effect.void,
+          // Re-read the installed runtime under the lifecycle mutex AFTER the
+          // alarm await. Reload cannot swap between this selection, the gate
+          // claim, and fiber publication; if it ran first, this tick starts B.
+          const installed = yield* runtimeInstall.withCurrent((rt) =>
+            Effect.gen(function* () {
+              if (scheduledAlarm !== null) {
+                yield* rt.telemetry.alarmObserved(Math.max(0, Date.now() - scheduledAlarm))
+              }
+              const gateClaimed = yield* gate.tryBegin
+              const state = yield* rt.supervisor.state
+              console.info(`[bot-state] tick origin=${origin} gateClaimed=${gateClaimed} supervisor=${state}`)
+              if (gateClaimed === false) return rt
+              if (state === 'stopped') {
+                yield* gate.end
+                return null
+              }
+              lastError = undefined
+              const startedFiber = yield* Effect.forkDetach(
+                rt.supervisor.run.pipe(
+                  // The detached fiber is retained above so a config reload can
+                  // interrupt and await the old gateway before swapping runtimes.
+                  // Abnormal exits stay visible and always release the restart gate.
+                  Effect.onExit((exit) =>
+                    exit._tag === 'Failure'
+                      ? Effect.sync(() => {
+                          lastError = Cause.pretty(exit.cause)
+                          console.error('[bot-state] supervision loop ended', lastError)
+                        })
+                      : Effect.void,
+                  ),
+                  Effect.ensuring(gate.end),
                 ),
-                Effect.ensuring(gate.end),
-              ),
-            )
-            return rt
-          }),
-        )
-        if (installed === null) return undefined
-        const rt = installed
+              )
+              supervisorFiber = startedFiber
+              yield* Effect.forkDetach(
+                Effect.sleep('1 second').pipe(
+                  Effect.andThen(
+                    Effect.gen(function* () {
+                      const settled = startedFiber.pollUnsafe() !== undefined
+                      console.info(
+                        `[bot-state] supervisor origin=${origin} settledAfter1s=${settled} state=${yield* rt.supervisor.state}`,
+                      )
+                    }),
+                  ),
+                ),
+              )
+              return rt
+            }),
+          )
+          if (installed === null) return undefined
+          const rt = installed
 
-        if (startupMaintenanceDone === false) {
-          startupMaintenanceDone = true
-          yield* rt.runJournalMaintenance('close-interrupted')
-        } else {
-          yield* rt.runJournalMaintenance('stale-only')
-        }
+          if (startupMaintenanceDone === false) {
+            startupMaintenanceDone = true
+            yield* rt.runJournalMaintenance('close-interrupted')
+          } else {
+            yield* rt.runJournalMaintenance('stale-only')
+          }
 
-        const delay = alarmDelayByState[yield* rt.supervisor.state]
-        yield* delay === undefined
-          ? Effect.promise(() => doState.raw.storage.deleteAlarm())
-          : Effect.promise(() => doState.raw.storage.setAlarm(new Date(Date.now() + delay)))
-        return delay
-      })
+          const delay = alarmDelayByState[yield* rt.supervisor.state]
+          if (delay === undefined) {
+            yield* Effect.promise(() => doState.raw.storage.deleteAlarm())
+            console.info(`[bot-state] tick origin=${origin} alarmDeleted=true`)
+          } else {
+            const deadline = Date.now() + delay
+            yield* Effect.promise(() => doState.raw.storage.setAlarm(new Date(deadline)))
+            console.info(`[bot-state] tick origin=${origin} alarmDeadlineMs=${deadline}`)
+          }
+          return delay
+        })
 
       // A runtime that cannot build (corrupt stored config, dead journal) must
       // degrade /readyz to 503-with-cause instead of answering 500: report
@@ -756,7 +782,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       }).pipe(Effect.catchCause((cause) => Effect.succeed(degradedStatus(Cause.pretty(cause)))))
 
       return {
-        tick: () => tick,
+        tick: () => tick('cron'),
 
         status: () => status,
 
@@ -774,7 +800,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
           Semaphore.withPermits(controlMutationLock, 1)(runtimeInstall.withCurrent((rt) => rt.commandsSync(payload))),
 
         /** Cloudflare DO alarm entry point — the same heartbeat as `tick`. */
-        alarm: () => tick,
+        alarm: () => tick('alarm'),
       }
     })
   }),

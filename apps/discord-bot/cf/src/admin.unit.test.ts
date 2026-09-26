@@ -1,6 +1,7 @@
 import { expect, it } from '@effect/vitest'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
+import { vi } from 'vitest'
 
 import { makeRuntimeConfigAdminOperations } from './admin-ops.ts'
 import { makeAdminGatewayOptions, makeAdminHandler, constantTimeEquals } from './admin.ts'
@@ -170,6 +171,24 @@ it('unknown authenticated routes return the mapped 404 shape', async () => {
   const response = await handler(post('/admin/rpc/NoSuchOperation', {}, `Bearer ${token}`))
   expect(response.status).toBe(404)
   expect(await jsonBody(response)).toMatchObject({ _tag: 'InvalidControlInput' })
+})
+
+it('keeps an unexpected gateway failure out of the response while reporting its cause', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const route = makeAdminHandler(token, {
+      configGet: Effect.die(new Error('injected gateway RPC failure')),
+    })
+    const response = await route(get('/admin/config', `Bearer ${token}`))
+    expect(response.status).toBe(500)
+    expect(await jsonBody(response)).toEqual({
+      _tag: 'ControlApplicationFailure',
+      message: 'Admin plane internal error',
+    })
+    expect(log).toHaveBeenCalledWith('[admin] request failed', expect.stringContaining('injected gateway RPC failure'))
+  } finally {
+    log.mockRestore()
+  }
 })
 
 it('constantTimeEquals never leaks length or content through timing shortcuts', () => {
