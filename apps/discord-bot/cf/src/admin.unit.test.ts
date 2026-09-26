@@ -2,9 +2,13 @@ import { expect, it } from '@effect/vitest'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
+import { makeRuntimeConfigAdminOperations } from './admin-ops.ts'
 import { makeAdminHandler, constantTimeEquals } from './admin.ts'
+import { makeFakeDoStorage } from './fake-do-storage.ts'
 import { emptyGatewayTelemetrySnapshot } from './gateway-telemetry.ts'
 import { RuntimeConfigPutPayload } from './runtime-config.ts'
+import { makeRuntimeConfigStore } from './runtime-config.ts'
+import { makeSerializedRuntime } from './runtime-install.ts'
 
 /**
  * Drives the assembled admin router through the worker bridge — the exact
@@ -305,6 +309,62 @@ it('PUT /admin/config validates before persisting; invalid bodies get a 422', as
   )
   expect(bad.status).toBe(422)
   expect(await jsonBody(bad)).toMatchObject({ _tag: 'InvalidControlInput' })
+})
+
+it('reloads a persisted identical config through the real admin route and fake DO storage', async () => {
+  const storage = makeFakeDoStorage()
+  try {
+    const store = makeRuntimeConfigStore(storage, 'test-release')
+    const first = await Effect.runPromise(store.read)
+    await Effect.runPromise(store.write({ expectedRevision: 0, config: first.config }))
+    const installed = await Effect.runPromise(
+      makeSerializedRuntime(
+        Effect.map(store.read, (document) => ({ document })),
+        () => Effect.void,
+      ),
+    )
+    await Effect.runPromise(installed.get)
+    let wakes = 0
+    const operations = makeRuntimeConfigAdminOperations({
+      store,
+      getRunning: () => installed.peek()?.document,
+      buildCandidate: (document) => Effect.succeed({ document }),
+      activateCandidate: (candidate) =>
+        installed.replaceAndWake(
+          candidate,
+          () => Effect.void,
+          Effect.sync(() => {
+            wakes++
+          }),
+        ),
+    })
+    const route = makeAdminHandler(token, {
+      configGet: operations.configGet,
+      configPut: operations.configPut,
+    })
+    const before = await route(get('/admin/config', `Bearer ${token}`))
+    expect(before.status).toBe(200)
+    const config = (await jsonBody(before)).stored as { config: unknown }
+    const put = await route(
+      new Request('https://bot.example.test/admin/config', {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedRevision: 1, config: config.config, reload: true }),
+      }),
+    )
+    expect(put.status).toBe(200)
+    expect(await jsonBody(put)).toMatchObject({ _tag: 'Success', revision: 2, applied: true })
+    const after = await route(get('/admin/config', `Bearer ${token}`))
+    expect(after.status).toBe(200)
+    expect(await jsonBody(after)).toMatchObject({
+      stored: { revision: 2 },
+      running: { revision: 2 },
+      diverged: false,
+    })
+    expect(wakes).toBe(1)
+  } finally {
+    storage.close()
+  }
 })
 
 it('POST /admin/commands-sync reports AlreadySatisfied when no drift exists', async () => {

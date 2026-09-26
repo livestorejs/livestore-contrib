@@ -12,7 +12,7 @@
  * Runtime-agnostic: no node builtins — the identical module runs inside a
  * Cloudflare Worker, Bun, or Node.
  */
-import { Context, Effect, Layer, Schema } from 'effect'
+import { Cause, Context, Effect, Layer, Schema } from 'effect'
 import { HttpRouter, HttpServerRequest, HttpServerError } from 'effect/unstable/http'
 import { HttpMiddleware, HttpServerResponse } from 'effect/unstable/http'
 
@@ -56,9 +56,14 @@ export const toFetchHandler = (
         Effect.provideService(HttpServerRequest.HttpServerRequest, fromWorkerRequest(request)),
         Effect.map(HttpServerResponse.toWeb),
         Effect.catchCause((cause) =>
-          Effect.map(HttpServerError.causeResponse(cause), ([response]) =>
-            HttpServerResponse.toWeb(withDecodableErrorBody(response)),
-          ),
+          Effect.map(HttpServerError.causeResponse(cause), ([response]) => {
+            if (response.status >= 500) {
+              // The client receives a stable ControlError, but the underlying
+              // DO RPC failure must remain visible in Worker diagnostics.
+              console.error('[admin] request failed', Cause.pretty(cause))
+            }
+            return HttpServerResponse.toWeb(withDecodableErrorBody(response))
+          }),
         ),
       ),
     )
