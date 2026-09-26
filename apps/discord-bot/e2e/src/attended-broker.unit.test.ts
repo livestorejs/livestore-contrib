@@ -10,16 +10,20 @@ import {
   buildDocsCommandSteps,
   buildMessageActionSteps,
 } from './attended-broker-driver.ts'
+import { makeRecoveryTransport } from './attended-broker-recovery.ts'
 import {
   dispatchBrokerOperation,
   parseBrokerInvocation,
   type AttendedBrokerDeps,
   type BrokerLedgerInput,
   type BrokerOperation,
+  type BrokerMessageIntent,
   type GestureEvidence,
 } from './attended-broker.ts'
-import { openCleanupLedger, readUnresolvedEntries } from './cleanup-ledger.ts'
-import type { Snowflake } from './model.ts'
+import { openCleanupLedger, readUnresolvedEntries, recoverCleanupLedger } from './cleanup-ledger.ts'
+import { makeFakeWorld } from './fake-transport.ts'
+import { runE2EMatrix } from './harness.ts'
+import { topicSentinel, type ScenarioId, type Snowflake } from './model.ts'
 
 const guildId = '111111111111111111' as Snowflake
 const channelId = '222222222222222222' as Snowflake
@@ -56,6 +60,8 @@ const makeDeps = (input: {
   performer: 'official-client-session',
   openLedger: () => ({
     record: (entry: BrokerLedgerInput) => input.recordOrder.push(`record:${entry.kind}:${entry.messageId}`),
+    recordMessageIntent: (entry: BrokerMessageIntent) => input.recordOrder.push(`intent:${entry.marker}`),
+    resolveMessageIntent: (entry: BrokerMessageIntent) => input.recordOrder.push(`resolve-intent:${entry.marker}`),
     resolve: (entry: BrokerLedgerInput) => input.recordOrder.push(`resolve:${entry.kind}:${entry.messageId}`),
     close: () => input.recordOrder.push('close'),
   }),
@@ -113,23 +119,31 @@ describe('broker dispatch', () => {
       recordOrder,
     })
     const result = await dispatchBrokerOperation(
-      makeInvocation('create-message', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'),
+      makeInvocation(
+        'create-message',
+        { ...baseRequest, marker: 'm', content: 'hello m' },
+        '/tmp/broker-test-ledger.jsonl',
+      ),
       deps,
     )
     expect(result.declineExitCode).toBeUndefined()
     expect(result.payload).toMatchObject({ id: '333333333333333333', performedBy: 'official-client-session' })
-    expect(recordOrder).toEqual(['record:message:333333333333333333', 'close'])
+    expect(recordOrder).toEqual(['intent:m', 'record:message:333333333333333333', 'resolve-intent:m', 'close'])
   })
 
-  it('maps an operator decline to exit code 7 without touching the ledger', async () => {
+  it('maps an operator decline to exit code 7 and resolves its unsent intent', async () => {
     const recordOrder: string[] = []
     const deps = makeDeps({ evidence: { declined: true }, recordOrder })
     const result = await dispatchBrokerOperation(
-      makeInvocation('create-message', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'),
+      makeInvocation(
+        'create-message',
+        { ...baseRequest, marker: 'm', content: 'hello m' },
+        '/tmp/broker-test-ledger.jsonl',
+      ),
       deps,
     )
     expect(result.declineExitCode).toBe(7)
-    expect(recordOrder).toEqual([])
+    expect(recordOrder).toEqual(['intent:m', 'resolve-intent:m', 'close'])
   })
 
   it('records thread and response artifacts for a created message action', async () => {
@@ -226,11 +240,28 @@ describe('broker dispatch', () => {
           record: (entry) => writer.record(cleanupIdentity(entry)),
           resolve: (entry) => writer.resolve(cleanupIdentity(entry)),
           close: writer.close,
+          recordMessageIntent: (entry) =>
+            writer.recordMessageIntent({
+              runId,
+              guildId: entry.guildId as Snowflake,
+              channelId: entry.channelId as Snowflake,
+              marker: entry.marker,
+            }),
+          resolveMessageIntent: (entry) =>
+            writer.resolveMessageIntent({
+              runId,
+              guildId: entry.guildId as Snowflake,
+              channelId: entry.channelId as Snowflake,
+              marker: entry.marker,
+            }),
         }
       },
     }
 
-    await dispatchBrokerOperation(makeInvocation('create-message', { ...baseRequest, marker: 'm' }, ledgerPath), deps)
+    await dispatchBrokerOperation(
+      makeInvocation('create-message', { ...baseRequest, marker: 'm', content: 'hello m' }, ledgerPath),
+      deps,
+    )
     await dispatchBrokerOperation(
       makeInvocation('invoke-message-action', { ...baseRequest, marker: 'm', sourceMessageId: sourceId }, ledgerPath),
       deps,
@@ -246,6 +277,155 @@ describe('broker dispatch', () => {
     )
 
     expect(readUnresolvedEntries(ledgerPath).unresolved).toEqual([])
+  })
+
+  it('recovers the marker message after correlation times out', async () => {
+    const ledgerPath = join(mkdtempSync(join(tmpdir(), 'broker-timeout-')), 'cleanup.jsonl')
+    const marker = '[unique-marker]'
+    const messageId = '333333333333333333' as Snowflake
+    const deps: AttendedBrokerDeps = {
+      ...makeDeps({
+        evidence: {},
+        recordOrder: [],
+        waitForMessage: async () => {
+          throw new Error('correlation timed out')
+        },
+      }),
+      driver: {
+        perform: async () => {
+          expect(readUnresolvedEntries(ledgerPath).unresolved).toEqual([
+            expect.objectContaining({ kind: 'message-intent', marker }),
+          ])
+          return {}
+        },
+      },
+      openLedger: ({ filePath, runId }) => {
+        const writer = openCleanupLedger({ filePath, runId })
+        return {
+          record: () => {
+            throw new Error('unexpected exact record')
+          },
+          resolve: () => {
+            throw new Error('unexpected exact resolve')
+          },
+          recordMessageIntent: (entry) =>
+            writer.recordMessageIntent({
+              runId,
+              guildId: entry.guildId as Snowflake,
+              channelId: entry.channelId as Snowflake,
+              marker: entry.marker,
+            }),
+          resolveMessageIntent: (entry) =>
+            writer.resolveMessageIntent({
+              runId,
+              guildId: entry.guildId as Snowflake,
+              channelId: entry.channelId as Snowflake,
+              marker: entry.marker,
+            }),
+          close: writer.close,
+        }
+      },
+    }
+    await expect(
+      dispatchBrokerOperation(
+        makeInvocation('create-message', { ...baseRequest, marker, content: `thanks ${marker}` }, ledgerPath),
+        deps,
+      ),
+    ).rejects.toThrow('correlation timed out')
+    const deleted: string[] = []
+    const recovery = makeRecoveryTransport({
+      getChannel: async () => ({ id: channelId, guild_id: guildId }),
+      listMessages: async () => [
+        { id: messageId, channel_id: channelId, content: `thanks ${marker}`, author: { bot: false } },
+      ],
+      deleteChannel: async () => {
+        throw new Error('unexpected thread deletion')
+      },
+      deleteMessage: async (_channel, id) => {
+        deleted.push(id)
+      },
+    })
+    const outcomes = await recoverCleanupLedger({
+      filePath: ledgerPath,
+      transport: recovery,
+      findMessageByMarker: recovery.findMessageByMarker,
+    })
+    expect(outcomes.map((outcome) => outcome.outcome)).toEqual(['deleted'])
+    expect(deleted).toEqual([messageId])
+    expect(readUnresolvedEntries(ledgerPath).unresolved).toEqual([])
+  })
+  it('keeps an unmatched intent open rather than declaring it already gone', async () => {
+    const filePath = join(mkdtempSync(join(tmpdir(), 'broker-unmatched-')), 'cleanup.jsonl')
+    const writer = openCleanupLedger({ filePath, runId: 'test-run' })
+    writer.recordMessageIntent({ runId: 'test-run', guildId, channelId, marker: '[missing]' })
+    writer.close()
+    const recovery = makeRecoveryTransport({
+      getChannel: async () => ({ id: channelId, guild_id: guildId }),
+      listMessages: async () => [],
+      deleteChannel: async () => {
+        throw new Error('unexpected thread deletion')
+      },
+      deleteMessage: async () => {
+        throw new Error('unexpected message deletion')
+      },
+    })
+    const outcomes = await recoverCleanupLedger({
+      filePath,
+      transport: recovery,
+      findMessageByMarker: recovery.findMessageByMarker,
+    })
+    expect(outcomes).toMatchObject([{ outcome: 'failed', entry: { kind: 'message-intent', marker: '[missing]' } }])
+    expect(readUnresolvedEntries(filePath).unresolved).toHaveLength(1)
+  })
+
+  it('sends each scenario marker and preserves eligible and filtered admission verdicts', async () => {
+    const target = {
+      guildId,
+      channelId,
+      docsChannelIds: { public: channelId, restricted: channelId },
+      allowedChannelIds: new Set([channelId]),
+      requiredTopicSentinel: topicSentinel,
+      pollIntervalMs: 1,
+      timeoutMs: 4,
+    }
+    const world = makeFakeWorld(target)
+    const scenarios: ScenarioId[] = [
+      'automatic-eligible',
+      'automatic-filtered',
+      'automated-author-rejected',
+      'operator-retroactive',
+      'operator-idempotent',
+      'operator-concurrent',
+    ]
+    const contents: Array<{ scenario: ScenarioId; content: string; marker: string }> = []
+    let index = 0
+    const receipt = await runE2EMatrix({
+      environment: 'fake',
+      target,
+      selection: { _tag: 'Scenarios', scenarios },
+      allowHumanAssisted: true,
+      transport: {
+        ...world.transport,
+        createMessage: async (request) => {
+          const scenario = scenarios[index++]!
+          contents.push({ scenario, content: request.content, marker: request.marker })
+          return world.transport.createMessage(request)
+        },
+      },
+    })
+    expect(
+      receipt.scenarios
+        .filter((scenario) => scenarios.includes(scenario.scenario))
+        .every((scenario) => scenario.verdict === 'PASS'),
+    ).toBe(true)
+    expect(contents.map(({ scenario }) => scenario)).toEqual(scenarios)
+    for (const { content, marker } of contents) {
+      expect(content).toContain(marker)
+      expect(buildCreateMessageSteps({ guildId, channelId, content })[2]?.stdinValue).toContain(marker)
+    }
+    expect(contents[0]!.content.startsWith('https://')).toBe(false)
+    expect(new URL(contents[1]!.content).protocol).toBe('https:')
+    expect(contents[1]!.content.startsWith('https://example.invalid/#')).toBe(true)
   })
 
   it('rejects non-object requests', async () => {

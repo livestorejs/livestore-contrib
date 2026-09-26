@@ -97,6 +97,9 @@ const cleanup = async (
   return result
 }
 
+/** URL-only policy rejection with a literal correlation marker in the fragment. */
+const filteredContent = (marker: string): string => `https://example.invalid/#${marker}`
+
 const runScenario = async (input: {
   readonly scenario: ScenarioDefinition
   readonly marker: string
@@ -165,9 +168,9 @@ const runScenario = async (input: {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          // Keep this exact low-information payload: adding the marker to the
-          // visible content would intentionally make it policy-eligible.
-          content: 'thanks',
+          // A URL-only source remains policy-rejected while carrying the
+          // literal marker needed for attended correlation and recovery.
+          content: filteredContent(marker),
           author: 'human',
         })
         const candidate = await pollForThread(transport, target, source.id)
@@ -197,7 +200,7 @@ const runScenario = async (input: {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: 'thanks',
+          content: filteredContent(marker),
           author: 'human',
         })
         const result = await transport.operatorCreateThread({
@@ -214,7 +217,7 @@ const runScenario = async (input: {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: 'thanks',
+          content: filteredContent(marker),
           author: 'human',
         })
         const first = await transport.operatorCreateThread({
@@ -240,7 +243,7 @@ const runScenario = async (input: {
         const source = await createOwnedMessage({
           channelId: target.channelId,
           marker,
-          content: 'thanks',
+          content: filteredContent(marker),
           author: 'human',
         })
         const [first, second] = await Promise.all([

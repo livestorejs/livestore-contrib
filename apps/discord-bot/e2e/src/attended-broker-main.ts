@@ -9,6 +9,7 @@ import {
   type AttendedBrokerDeps,
   type AttendedBrokerDriver,
   type BrokerLedgerInput,
+  type BrokerMessageIntent,
   type GesturePerformer,
 } from './attended-broker.ts'
 import { openCleanupLedger, type CleanupLedgerIdentity } from './cleanup-ledger.ts'
@@ -49,9 +50,12 @@ if (args[0] === 'recover-ledger') {
         const outcomes = await recoverCleanupLedger({
           filePath: ledgerPath,
           transport: recovery,
+          findMessageByMarker: recovery.findMessageByMarker,
         })
         for (const outcome of outcomes) {
-          process.stdout.write(`${outcome.outcome} ${outcome.entry.kind}:${outcome.entry.messageId}\n`)
+          process.stdout.write(
+            `${outcome.outcome} ${outcome.entry.kind}:${outcome.entry._tag === 'intent' ? 'pending' : outcome.entry.messageId}\n`,
+          )
         }
       } finally {
         await recovery.dispose()
@@ -88,6 +92,20 @@ if (args[0] === 'recover-ledger') {
         return {
           record: (entry) => writer.record(identity(entry)),
           resolve: (entry) => writer.resolve(identity(entry)),
+          recordMessageIntent: (entry: BrokerMessageIntent) =>
+            writer.recordMessageIntent({
+              runId,
+              guildId: entry.guildId as Snowflake,
+              channelId: entry.channelId as Snowflake,
+              marker: entry.marker,
+            }),
+          resolveMessageIntent: (entry: BrokerMessageIntent) =>
+            writer.resolveMessageIntent({
+              runId,
+              guildId: entry.guildId as Snowflake,
+              channelId: entry.channelId as Snowflake,
+              marker: entry.marker,
+            }),
           close: () => writer.close(),
         }
       },

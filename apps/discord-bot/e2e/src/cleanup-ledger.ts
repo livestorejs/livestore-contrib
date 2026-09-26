@@ -21,32 +21,50 @@ export interface CleanupLedgerIdentity {
 }
 
 export interface CleanupLedgerEntry extends CleanupLedgerIdentity {
+  readonly _tag: 'artifact'
   readonly schemaVersion: 1
   readonly status: CleanupEntryStatus
 }
 
+export interface CleanupMessageIntent {
+  readonly _tag: 'intent'
+  readonly schemaVersion: 2
+  readonly status: CleanupEntryStatus
+  readonly runId: string
+  readonly kind: 'message-intent'
+  readonly guildId: Snowflake
+  readonly channelId: Snowflake
+  readonly marker: string
+}
+
+export type RecoverableEntry = CleanupLedgerEntry | CleanupMessageIntent
+export type MessageIntentInput = Pick<CleanupMessageIntent, 'runId' | 'guildId' | 'channelId' | 'marker'>
+
 /**
- * Crash-resumable per-run ledger. Every artifact must be recorded before the
- * caller acknowledges it to Discord, and resolved only after its deletion
- * succeeded, so a crash can never orphan an untracked staging artifact.
+ * Crash-resumable per-run ledger. A create-message intent precedes the send;
+ * once correlated, its exact artifact identity is recorded before the intent
+ * closes. Exact identities resolve only after deletion succeeds.
  */
 export interface CleanupLedgerWriter {
   /** Appends an open-status line; writeSync makes it visible to any subsequent process before returning. */
   readonly record: (identity: CleanupLedgerIdentity) => void
+  /** Persist correlation scope before the official-client gesture can send a message. */
+  readonly recordMessageIntent: (input: MessageIntentInput) => void
+  readonly resolveMessageIntent: (input: MessageIntentInput) => void
   /** Appends a resolved-status line after successful deletion. */
   readonly resolve: (identity: CleanupLedgerIdentity) => void
   readonly close: () => void
 }
 
 export interface UnresolvedEntries {
-  readonly unresolved: ReadonlyArray<CleanupLedgerEntry>
+  readonly unresolved: ReadonlyArray<RecoverableEntry>
   readonly warnings: ReadonlyArray<string>
 }
 
 export type RecoveryOutcome =
-  | { readonly entry: CleanupLedgerEntry; readonly outcome: 'deleted' }
-  | { readonly entry: CleanupLedgerEntry; readonly outcome: 'already-gone' }
-  | { readonly entry: CleanupLedgerEntry; readonly outcome: 'failed'; readonly error: unknown }
+  | { readonly entry: RecoverableEntry; readonly outcome: 'deleted' }
+  | { readonly entry: RecoverableEntry; readonly outcome: 'already-gone' }
+  | { readonly entry: RecoverableEntry; readonly outcome: 'failed'; readonly error: unknown }
 
 /** Transport-level signal that an exact Discord artifact vanished between validation and deletion. */
 export class CleanupArtifactNotFoundError extends Error {
@@ -56,6 +74,7 @@ export class CleanupArtifactNotFoundError extends Error {
 const kinds: Record<string, true> = { message: true, thread: true, response: true }
 
 const entryOf = (identity: CleanupLedgerIdentity, status: CleanupEntryStatus): CleanupLedgerEntry => ({
+  _tag: 'artifact',
   schemaVersion: 1,
   runId: identity.runId,
   scenario: identity.scenario,
@@ -66,8 +85,10 @@ const entryOf = (identity: CleanupLedgerIdentity, status: CleanupEntryStatus): C
   status,
 })
 
-const entryKey = (entry: CleanupLedgerEntry): string =>
-  [entry.runId, entry.kind, entry.guildId, entry.channelId, entry.messageId].join('\u0000')
+const entryKey = (entry: RecoverableEntry): string =>
+  entry._tag === 'intent'
+    ? [entry.runId, entry.kind, entry.guildId, entry.channelId, entry.marker].join('\u0000')
+    : [entry.runId, entry.kind, entry.guildId, entry.channelId, entry.messageId].join('\u0000')
 
 /** Owner-only access regardless of umask or looser pre-existing bits. */
 const appendFd = (filePath: string): number => {
@@ -76,7 +97,7 @@ const appendFd = (filePath: string): number => {
   return fd
 }
 
-const appendLine = (fd: number, entry: CleanupLedgerEntry): void => {
+const appendLine = (fd: number, entry: RecoverableEntry): void => {
   writeSync(fd, `${JSON.stringify(entry)}\n`)
 }
 
@@ -86,9 +107,30 @@ const isSnowflakeString = (value: unknown): value is string =>
 const decodeSnowflake = (value: unknown): Snowflake | undefined =>
   isSnowflakeString(value) === true ? (value as Snowflake) : undefined
 
-const decodeEntry = (value: unknown): CleanupLedgerEntry | undefined => {
+const decodeEntry = (value: unknown): RecoverableEntry | undefined => {
   if (typeof value !== 'object' || value === null || Array.isArray(value) === true) return undefined
   const decoded = value as Record<string, unknown>
+  if (
+    decoded.schemaVersion === 2 &&
+    decoded.kind === 'message-intent' &&
+    (decoded.status === 'open' || decoded.status === 'resolved') &&
+    typeof decoded.runId === 'string' &&
+    decodeSnowflake(decoded.guildId) !== undefined &&
+    decodeSnowflake(decoded.channelId) !== undefined &&
+    typeof decoded.marker === 'string' &&
+    decoded.marker.length > 0
+  ) {
+    return {
+      _tag: 'intent',
+      schemaVersion: 2,
+      status: decoded.status,
+      runId: decoded.runId,
+      kind: 'message-intent',
+      guildId: decoded.guildId as Snowflake,
+      channelId: decoded.channelId as Snowflake,
+      marker: decoded.marker,
+    }
+  }
   if (decoded.schemaVersion !== 1) return undefined
   if (decoded.status !== 'open' && decoded.status !== 'resolved') return undefined
   if (typeof decoded.runId !== 'string') return undefined
@@ -99,6 +141,7 @@ const decodeEntry = (value: unknown): CleanupLedgerEntry | undefined => {
   const messageId = decodeSnowflake(decoded.messageId)
   if (guildId === undefined || channelId === undefined || messageId === undefined) return undefined
   return {
+    _tag: 'artifact',
     schemaVersion: 1,
     runId: decoded.runId,
     scenario: decoded.scenario,
@@ -116,7 +159,7 @@ const decodeEntry = (value: unknown): CleanupLedgerEntry | undefined => {
  */
 export const openCleanupLedger = (input: { filePath: string; runId: string }): CleanupLedgerWriter => {
   const fd = appendFd(input.filePath)
-  const assertRun = (identity: CleanupLedgerIdentity): void => {
+  const assertRun = (identity: { readonly runId: string }): void => {
     if (identity.runId !== input.runId) {
       throw new Error(`Cleanup ledger ${input.filePath} is scoped to run ${input.runId}`)
     }
@@ -129,6 +172,14 @@ export const openCleanupLedger = (input: { filePath: string; runId: string }): C
     resolve: (identity) => {
       assertRun(identity)
       appendLine(fd, entryOf(identity, 'resolved'))
+    },
+    recordMessageIntent: (intent) => {
+      assertRun(intent)
+      appendLine(fd, { ...intent, _tag: 'intent', schemaVersion: 2, kind: 'message-intent', status: 'open' })
+    },
+    resolveMessageIntent: (intent) => {
+      assertRun(intent)
+      appendLine(fd, { ...intent, _tag: 'intent', schemaVersion: 2, kind: 'message-intent', status: 'resolved' })
     },
     close: () => closeSync(fd),
   }
@@ -148,7 +199,7 @@ export const readUnresolvedEntries = (filePath: string): UnresolvedEntries => {
   }
   const warnings: string[] = []
   const resolvedKeys = new Set<string>()
-  const openEntries: CleanupLedgerEntry[] = []
+  const openEntries: RecoverableEntry[] = []
   for (const [index, line] of raw.split('\n').entries()) {
     if (line.trim() === '') continue
     let parsed: unknown
@@ -208,15 +259,14 @@ const deleteArtifact = (transport: E2ETransport, entry: CleanupLedgerEntry): Pro
 }
 
 /**
- * Replays every unresolved ledger entry against the live transport using only
- * exact ids recorded before the artifact was acknowledged — never content
- * matching — marking each entry resolved after its deletion succeeded. An
- * entry that cannot be validated or deleted stays unresolved and the rest
- * continue, so one bad artifact never blocks recovery of the others.
+ * Replays exact artifact identities and pre-send intents. An intent is first
+ * resolved to a unique human-authored message in its validated channel; the
+ * exact ID is recorded before the intent closes or any deletion is attempted.
  */
 export const recoverCleanupLedger = async (input: {
   filePath: string
   transport: E2ETransport
+  findMessageByMarker?: (channelId: Snowflake, marker: string) => Promise<Snowflake | undefined>
 }): Promise<ReadonlyArray<RecoveryOutcome>> => {
   const { unresolved } = readUnresolvedEntries(input.filePath)
   const outcomes: RecoveryOutcome[] = []
@@ -225,6 +275,28 @@ export const recoverCleanupLedger = async (input: {
   try {
     for (const entry of unresolved) {
       try {
+        if (entry._tag === 'intent') {
+          if (input.findMessageByMarker === undefined) throw new Error('Marker recovery is unavailable')
+          const channel = await input.transport.inspectChannel(entry.channelId)
+          if (channel.id !== entry.channelId || channel.guildId !== entry.guildId)
+            throw new Error('Cleanup intent channel did not match its recorded guild')
+          const messageId = await input.findMessageByMarker(entry.channelId, entry.marker)
+          if (messageId === undefined) throw new Error('Marked message not found; intent remains open for retry')
+          const exact = entryOf({ ...entry, scenario: undefined, kind: 'message', messageId }, 'open')
+          appendLine(fd, exact)
+          appendLine(fd, { ...entry, status: 'resolved' })
+          try {
+            await input.transport.deleteMessage(entry.channelId, messageId)
+            appendLine(fd, { ...exact, status: 'resolved' })
+            outcomes.push({ entry, outcome: 'deleted' })
+          } catch (error) {
+            if (error instanceof CleanupArtifactNotFoundError) {
+              appendLine(fd, { ...exact, status: 'resolved' })
+              outcomes.push({ entry, outcome: 'already-gone' })
+            } else throw error
+          }
+          continue
+        }
         if ((await validatedAlive(input.transport, entry)) === false) {
           // A validated-absent artifact has nothing left to clean; resolving it
           // keeps repeated recovery passes from re-validating it forever.
@@ -236,7 +308,7 @@ export const recoverCleanupLedger = async (input: {
         appendLine(fd, entryOf(entry, 'resolved'))
         outcomes.push({ entry, outcome: 'deleted' })
       } catch (error) {
-        if (error instanceof CleanupArtifactNotFoundError) {
+        if (error instanceof CleanupArtifactNotFoundError && entry._tag === 'artifact') {
           appendLine(fd, entryOf(entry, 'resolved'))
           outcomes.push({ entry, outcome: 'already-gone' })
         } else {

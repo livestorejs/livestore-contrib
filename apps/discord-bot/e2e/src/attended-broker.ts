@@ -36,9 +36,17 @@ export interface BrokerLedgerInput {
   readonly messageId: string
 }
 
+export interface BrokerMessageIntent {
+  readonly guildId: string
+  readonly channelId: string
+  readonly marker: string
+}
+
 export interface BrokerLedger {
   readonly record: (entry: BrokerLedgerInput) => void
   readonly resolve: (entry: BrokerLedgerInput) => void
+  readonly recordMessageIntent: (entry: BrokerMessageIntent) => void
+  readonly resolveMessageIntent: (entry: BrokerMessageIntent) => void
   readonly close: () => void
 }
 
@@ -250,17 +258,8 @@ export const dispatchBrokerOperation = async (
   }
   const request = invocation.request as Record<string, unknown>
 
-  // resolve-thread acknowledges a deletion already completed through the bot
-  // REST seam; it is ledger bookkeeping, not another official-client gesture.
-  const evidence =
-    invocation.operation === 'resolve-thread'
-      ? {}
-      : await deps.driver.perform({ operation: invocation.operation, request })
-  if (evidence.declined === true) {
-    return { payload: { declinedByOperator: true }, declineExitCode: 7 }
-  }
-
-  // Every request carries the staging target context appended by the runner.
+  // Open the ledger before any gesture; a pre-send intent survives crashes and
+  // correlation timeouts even when the client already submitted the message.
   const context = {
     guildId: asSnowflake(readRequestString(request, 'guildId', 'broker'), 'broker'),
     channelId: asSnowflake(readRequestString(request, 'channelId', 'broker'), 'broker'),
@@ -269,14 +268,27 @@ export const dispatchBrokerOperation = async (
     invocation.ledgerPath === undefined || invocation.runId === undefined
       ? undefined
       : deps.openLedger({ filePath: invocation.ledgerPath, runId: invocation.runId })
-
   try {
+    if (invocation.operation === 'create-message') {
+      const marker = readRequestString(request, 'marker', 'create-message')
+      if (readRequestString(request, 'content', 'create-message').includes(marker) === false)
+        throw new Error('create-message content must contain its correlation marker')
+      ledger?.recordMessageIntent({ ...context, marker })
+    }
+    const evidence =
+      invocation.operation === 'resolve-thread'
+        ? {}
+        : await deps.driver.perform({ operation: invocation.operation, request })
+    if (evidence.declined === true) {
+      if (invocation.operation === 'create-message')
+        ledger?.resolveMessageIntent({ ...context, marker: readRequestString(request, 'marker', 'create-message') })
+      return { payload: { declinedByOperator: true }, declineExitCode: 7 }
+    }
     return await dispatchWithLedger(invocation, deps, evidence, context, ledger)
   } finally {
     ledger?.close()
   }
 }
-
 const dispatchWithLedger = async (
   invocation: ParsedBrokerInvocation,
   deps: AttendedBrokerDeps,
@@ -299,7 +311,10 @@ const dispatchWithLedger = async (
       timeoutMs: 30_000,
       pollIntervalMs: readTiming(request).pollIntervalMs,
     })
+    if (message.channelId !== context.channelId || message.marker !== marker || message.author !== 'human')
+      throw new Error('Correlated message did not match requested channel, marker, and human author')
     record('message', message.id)
+    ledger?.resolveMessageIntent({ ...context, marker })
     return { payload: { ...message, performedBy: deps.performer }, declineExitCode: undefined }
   }
 

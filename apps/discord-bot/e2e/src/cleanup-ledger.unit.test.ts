@@ -105,7 +105,9 @@ describe('cleanup ledger', () => {
     writer.resolve(identity())
 
     const { unresolved } = readUnresolvedEntries(filePath)
-    expect(unresolved.map((entry) => entry.messageId)).toEqual([resolvedId])
+    expect(unresolved.filter((entry) => entry._tag === 'artifact').map((entry) => entry.messageId)).toEqual([
+      resolvedId,
+    ])
     writer.close()
   })
 
@@ -286,7 +288,11 @@ describe('cleanup ledger', () => {
       { entry: expect.objectContaining({ messageId: failingId }), outcome: 'failed', error: failure },
       { entry: expect.objectContaining({ messageId: survivingId }), outcome: 'deleted' },
     ])
-    expect(readUnresolvedEntries(filePath).unresolved.map((entry) => entry.messageId)).toEqual([failingId])
+    expect(
+      readUnresolvedEntries(filePath)
+        .unresolved.filter((entry) => entry._tag === 'artifact')
+        .map((entry) => entry.messageId),
+    ).toEqual([failingId])
 
     failFirst = false
     const retry = await recoverCleanupLedger({ filePath, transport })

@@ -27,7 +27,13 @@ export interface FakeWorld {
 
 const isFiltered = (content: string): boolean => {
   const normalized = content.trim().toLocaleLowerCase('en')
-  return normalized === 'thanks' || normalized === 'hello' || normalized === ''
+  if (normalized === 'thanks' || normalized === 'hello' || normalized === '') return true
+  try {
+    const url = new URL(normalized)
+    return url.protocol === 'https:' || url.protocol === 'http:'
+  } catch {
+    return false
+  }
 }
 
 export const makeFakeWorld = (target: StagingTarget): FakeWorld => {

@@ -8,6 +8,7 @@ import { E2EPrerequisiteUnavailableError, type E2ETransport } from './transport.
 
 export interface RecoveryDiscordApi {
   readonly getChannel: (channelId: Snowflake) => Promise<unknown>
+  readonly listMessages?: (channelId: Snowflake, before?: Snowflake) => Promise<unknown>
   readonly deleteChannel: (channelId: Snowflake) => Promise<void>
   readonly deleteMessage: (channelId: Snowflake, messageId: Snowflake) => Promise<void>
 }
@@ -42,7 +43,37 @@ const translateNotFound = async <T>(action: () => Promise<T>): Promise<T> => {
 }
 
 /** Exact-ID recovery seam; getChannel also sees archived and private threads. */
-export const makeRecoveryTransport = (discord: RecoveryDiscordApi): E2ETransport => ({
+export interface RecoveryTransport extends E2ETransport {
+  readonly findMessageByMarker: (channelId: Snowflake, marker: string) => Promise<Snowflake | undefined>
+}
+
+export const makeRecoveryTransport = (discord: RecoveryDiscordApi): RecoveryTransport => ({
+  findMessageByMarker: async (channelId, marker) => {
+    if (discord.listMessages === undefined) throw new Error('Recovery message listing is unavailable')
+    let before: Snowflake | undefined
+    let match: Snowflake | undefined
+    for (;;) {
+      const page = await discord.listMessages(channelId, before)
+      if (Array.isArray(page) === false) throw new Error('Recovery message listing was invalid')
+      for (const raw of page) {
+        const message = asRecord(raw, 'recover-message')
+        const id = asSnowflake(message.id, 'recover-message')
+        if (
+          message.channel_id === channelId &&
+          typeof message.content === 'string' &&
+          message.content.includes(marker) === true
+        ) {
+          const author = asRecord(message.author, 'recover-author')
+          if (author.bot === false || author.bot === undefined) {
+            if (match !== undefined && match !== id) throw new Error('Multiple human messages match cleanup marker')
+            match = id
+          }
+        }
+        before = id
+      }
+      if (page.length < 100) return match
+    }
+  },
   inspectChannel: async (channelId): Promise<ChannelSnapshot> => {
     const channel = asRecord(await translateNotFound(() => discord.getChannel(channelId)), 'recover-inspect')
     return {
@@ -90,7 +121,7 @@ export const makeRecoveryTransport = (discord: RecoveryDiscordApi): E2ETransport
 
 export const makeDfxRecoveryTransport = (input: {
   readonly actorBotToken: string
-}): E2ETransport & { readonly dispose: () => Promise<void> } => {
+}): RecoveryTransport & { readonly dispose: () => Promise<void> } => {
   const DiscordLive = DiscordRESTMemoryLive.pipe(
     Layer.provide(NodeHttpClient.layerUndici),
     Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
@@ -99,6 +130,8 @@ export const makeDfxRecoveryTransport = (input: {
   const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> => runtime.runPromise(effect)
   const transport = makeRecoveryTransport({
     getChannel: (channelId) => rest(Effect.flatMap(DiscordREST, (discord) => discord.getChannel(channelId))),
+    listMessages: (channelId, before) =>
+      rest(Effect.flatMap(DiscordREST, (discord) => discord.listMessages(channelId, { limit: 100, before }))),
     deleteChannel: async (channelId) => {
       await rest(Effect.flatMap(DiscordREST, (discord) => discord.deleteChannel(channelId)))
     },
