@@ -5,24 +5,66 @@ import { join } from 'node:path'
 
 import type { AttendedBrokerDriver, GestureEvidence } from './attended-broker.ts'
 
-// CALIBRATION TABLE — all selectors/labels below are uncalibrated until observed
-// in BOTH dedicated official-client profiles. Never infer a PASS from a click.
+// Observed in the official Discord web client on 2026-09-26. The message
+// toolbar appears after clicking the message article; no hover is required.
 export const gestureLocators = {
-  composer: { kind: 'role', role: 'textbox', name: 'Message' }, // uncalibrated
-  messageRow: { kind: 'text', value: '' }, // uncalibrated: replace value with exact marker
-  moreButton: { kind: 'role', role: 'button', name: 'More' }, // uncalibrated; may require hover (unsupported by v2)
-  apps: { kind: 'role', role: 'menuitem', name: 'Apps' }, // uncalibrated
-  createThread: { kind: 'role', role: 'menuitem', name: 'Create Thread' }, // uncalibrated
-  docsChoice: { kind: 'role', role: 'option', name: '/docs' }, // uncalibrated
-  docsQuery: { kind: 'role', role: 'textbox', name: 'query' }, // uncalibrated
-  deleteItem: { kind: 'role', role: 'menuitem', name: 'Delete Message' }, // uncalibrated
-  confirmDelete: { kind: 'role', role: 'button', name: 'Delete' }, // uncalibrated
-  messageIdAttribute: 'data-list-item-id', // uncalibrated; response IDs may not be rendered here
+  composer: {
+    locator: { kind: 'css', selector: '[role="textbox"][aria-label^="Message #"]' },
+    calibrated: '2026-09-26',
+  },
+  messageRow: {
+    selector: 'li[id^="chat-messages-"]',
+    calibrated: '2026-09-26',
+  },
+  moreButton: { locator: { kind: 'role', role: 'button', name: 'More' }, calibrated: '2026-09-26' },
+  apps: { locator: { kind: 'role', role: 'menuitem', name: 'Apps' }, calibrated: '2026-09-26' },
+  app: {
+    locator: { kind: 'role', role: 'menuitem', name: 'LiveStore Auto Threads Staging' },
+    calibrated: '2026-09-26',
+  },
+  createThread: {
+    locator: {
+      kind: 'within',
+      scope: {
+        kind: 'css',
+        selector: '[role="menu"][aria-activedescendant^="message-actions-apps--"]:not(:has([role="menu"]))',
+      },
+      target: { kind: 'role', role: 'menuitem', name: 'Create Thread' },
+    },
+    calibrated: '2026-09-26',
+  },
+  docsChoice: {
+    locator: {
+      kind: 'role',
+      role: 'option',
+      name: '/docs Ask LiveStore docs via OpenAI (store:false); no ambient chat or bot-retained query/answer content. LiveStore Auto Threads Staging',
+    },
+    calibrated: '2026-09-26',
+  },
+  docsQuery: {
+    locator: { kind: 'css', selector: '[role="textbox"][aria-label^="Message #"]' },
+    calibrated: '2026-09-26',
+    submit: 'needs-live-check', // Discord renders the query inline in the composer; submission was not exercised.
+  },
+  deleteItem: { locator: { kind: 'role', role: 'menuitem', name: 'Delete Message' }, calibrated: '2026-09-26' },
+  confirmDelete: {
+    locator: {
+      kind: 'within',
+      scope: { kind: 'role', role: 'dialog', name: 'Delete Message' },
+      target: { kind: 'role', role: 'button', name: 'Delete' },
+    },
+    calibrated: '2026-09-26', // Located in confirmation dialog; canceled without deleting.
+  },
+  messageIdAttribute: {
+    selector: 'li[id^="chat-messages-"]',
+    attribute: 'id',
+    calibrated: '2026-09-26',
+  },
 } as const
 
 type Locator =
   | { readonly kind: 'role'; readonly role: string; readonly name: string }
-  | { readonly kind: 'text'; readonly value: string }
+  | { readonly kind: 'css'; readonly selector: string }
   | { readonly kind: 'within'; readonly scope: Locator; readonly target: Locator }
 
 type BrowserOperation =
@@ -53,8 +95,11 @@ export interface HttpCaptureDriverInput {
   readonly memberSessionId?: string
 }
 
-const composer = gestureLocators.composer
-const markedRow = (marker: string): Locator => ({ kind: gestureLocators.messageRow.kind, value: marker })
+const composer = gestureLocators.composer.locator
+const markedRow = (marker: string): Locator => ({
+  kind: 'css',
+  selector: `${gestureLocators.messageRow.selector}:has-text(${JSON.stringify(marker)})`,
+})
 const withinRow = (marker: string, target: Locator): Locator => ({ kind: 'within', scope: markedRow(marker), target })
 const channelUrl = (guildId: string, channelId: string) => `https://discord.com/channels/${guildId}/${channelId}`
 const navigate = (guildId: string, channelId: string): BrowserControlStep => ({
@@ -98,9 +143,9 @@ export const buildDocsCommandSteps = (input: {
   navigate(input.guildId, input.channelId),
   ready(composer),
   fill(composer, '/docs'),
-  click(gestureLocators.docsChoice, 'Choose docs slash command'),
-  fill(gestureLocators.docsQuery, input.query),
-  send(gestureLocators.docsQuery),
+  click(gestureLocators.docsChoice.locator, 'Choose docs slash command'),
+  fill(gestureLocators.docsQuery.locator, input.query),
+  send(gestureLocators.docsQuery.locator),
 ]
 
 export const buildMessageActionSteps = (input: {
@@ -110,11 +155,12 @@ export const buildMessageActionSteps = (input: {
 }): ReadonlyArray<BrowserControlStep> => [
   navigate(input.guildId, input.channelId),
   ready(markedRow(input.sourceMarkerText)),
-  click(withinRow(input.sourceMarkerText, gestureLocators.moreButton), 'Open marked message menu'),
-  click(gestureLocators.apps, 'Open Apps submenu'),
-  click(gestureLocators.createThread, 'Invoke Create Thread action', 'write'),
+  click(markedRow(input.sourceMarkerText), 'Reveal marked message actions'),
+  click(withinRow(input.sourceMarkerText, gestureLocators.moreButton.locator), 'Open marked message menu'),
+  click(gestureLocators.apps.locator, 'Open Apps submenu'),
+  click(gestureLocators.app.locator, 'Open LiveStore Auto Threads Staging commands'),
+  click(gestureLocators.createThread.locator, 'Invoke Create Thread action', 'write'),
 ]
-
 export const buildDeleteMessageSteps = (input: {
   readonly guildId: string
   readonly channelId: string
@@ -122,9 +168,10 @@ export const buildDeleteMessageSteps = (input: {
 }): ReadonlyArray<BrowserControlStep> => [
   navigate(input.guildId, input.channelId),
   ready(markedRow(input.markerText)),
-  click(withinRow(input.markerText, gestureLocators.moreButton), 'Open marked message menu'),
-  click(gestureLocators.deleteItem, 'Choose deletion'),
-  click(gestureLocators.confirmDelete, 'Confirm deletion of owned message', 'write'),
+  click(markedRow(input.markerText), 'Reveal marked message actions'),
+  click(withinRow(input.markerText, gestureLocators.moreButton.locator), 'Open marked message menu'),
+  click(gestureLocators.deleteItem.locator, 'Choose deletion'),
+  click(gestureLocators.confirmDelete.locator, 'Confirm deletion of owned message', 'write'),
 ]
 
 const runBrowserStep = async (sessionId: string, step: BrowserControlStep): Promise<unknown> => {
@@ -221,7 +268,7 @@ export const makeHttpCaptureBrokerDriver = (input: HttpCaptureDriverInput = {}):
     // v2 effect receipts have only {kind:'completed'}; never interpret one as
     // a response, deletion proof, or Discord message ID.
     const readMessages = async (): Promise<ReadonlyArray<{ id: string; text: string }>> => {
-      const expression = `Array.from(document.querySelectorAll('[${gestureLocators.messageIdAttribute}]')).map(e => ({id: e.getAttribute('${gestureLocators.messageIdAttribute}'), text: e.textContent})).filter(e => e.id && /\\\\d{17,20}/.test(e.id)).map(e => ({id: e.id.match(/\\\\d{17,20}/)[0], text: e.text.slice(0, 2048)}))`
+      const expression = `Array.from(document.querySelectorAll('${gestureLocators.messageIdAttribute.selector}')).map(function(e){return {id:e.getAttribute('${gestureLocators.messageIdAttribute.attribute}').match(/-(\\d{17,20})$/)?.[1],text:(e.textContent??'').slice(0,2048)}}).filter(function(e){return e.id!==undefined})`
       const response = await runBrowserStep(sessionId, { operation: { kind: 'evaluate', expression } })
       if (
         typeof response !== 'object' ||

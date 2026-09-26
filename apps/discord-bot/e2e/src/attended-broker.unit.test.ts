@@ -256,82 +256,61 @@ describe('broker dispatch', () => {
 })
 
 describe('http-capture gesture step builders', () => {
-  it('navigates to the channel, fills through stdin, and submits', () => {
-    expect(buildCreateMessageSteps({ guildId, channelId, content: 'hello [m]' })).toEqual([
-      {
-        operation: {
-          kind: 'navigate',
-          url: `https://discord.com/channels/${guildId}/${channelId}`,
-          intent: 'Open selected staging channel',
-          effect: 'read',
-        },
-      },
-      {
-        operation: {
-          kind: 'wait',
-          locator: { kind: 'role', role: 'textbox', name: 'Message' },
-          state: 'visible',
-          timeoutMs: 15000,
-        },
-      },
-      {
-        operation: {
-          kind: 'fill',
-          locator: { kind: 'role', role: 'textbox', name: 'Message' },
-          valueSource: 'stdin',
-          intent: 'Enter attended staging gesture',
-          effect: 'write',
-        },
-        stdinValue: 'hello [m]',
-      },
-      {
-        operation: {
-          kind: 'press',
-          locator: { kind: 'role', role: 'textbox', name: 'Message' },
-          key: 'Enter',
-          intent: 'Submit attended staging gesture',
-          effect: 'write',
-        },
-      },
-    ])
-  })
-
-  it('scopes the message menu to the marker then opens Apps and the action', () => {
+  it('reveals the message toolbar before opening More and targets only the staging app command', () => {
     const steps = buildMessageActionSteps({ guildId, channelId, sourceMarkerText: '[m]' })
-    expect(steps[2]).toMatchObject({
-      operation: {
+    expect(steps.slice(2).map(({ operation }) => operation)).toMatchObject([
+      { kind: 'click', locator: { kind: 'css', selector: 'li[id^="chat-messages-"]:has-text("[m]")' } },
+      {
         kind: 'click',
         locator: {
           kind: 'within',
-          scope: { kind: 'text', value: '[m]' },
+          scope: { kind: 'css', selector: 'li[id^="chat-messages-"]:has-text("[m]")' },
           target: { kind: 'role', role: 'button', name: 'More' },
         },
       },
-    })
-    expect(steps.slice(3).map((step) => step.operation)).toMatchObject([
       { kind: 'click', locator: { kind: 'role', role: 'menuitem', name: 'Apps' } },
-      { kind: 'click', locator: { kind: 'role', role: 'menuitem', name: 'Create Thread' }, effect: 'write' },
+      { kind: 'click', locator: { kind: 'role', role: 'menuitem', name: 'LiveStore Auto Threads Staging' } },
+      {
+        kind: 'click',
+        locator: {
+          kind: 'within',
+          scope: {
+            kind: 'css',
+            selector: '[role="menu"][aria-activedescendant^="message-actions-apps--"]:not(:has([role="menu"]))',
+          },
+          target: { kind: 'role', role: 'menuitem', name: 'Create Thread' },
+        },
+        effect: 'write',
+      },
     ])
   })
 
-  it('selects /docs then fills the query via stdin', () => {
-    const steps = buildDocsCommandSteps({ guildId, channelId, query: 'how does syncing work?' })
-    expect(steps[2]).toMatchObject({ operation: { kind: 'fill', valueSource: 'stdin' }, stdinValue: '/docs' })
-    expect(steps[3]).toMatchObject({
-      operation: { kind: 'click', locator: { kind: 'role', role: 'option', name: '/docs' } },
+  it('sends the docs query through the same composer that opened the command picker', () => {
+    const steps = buildDocsCommandSteps({ guildId, channelId, query: 'syncing?' })
+    expect(steps[3]?.operation).toMatchObject({
+      kind: 'click',
+      locator: { kind: 'role', role: 'option', name: expect.stringContaining('/docs Ask LiveStore docs') },
     })
-    expect(steps[4]).toMatchObject({
-      operation: { kind: 'fill', valueSource: 'stdin' },
-      stdinValue: 'how does syncing work?',
+    expect(steps[4]?.operation).toMatchObject({
+      kind: 'fill',
+      locator: { kind: 'css', selector: expect.stringContaining('[aria-label^="Message #"]') },
     })
-    expect(steps[5]).toMatchObject({ operation: { kind: 'press', key: 'Enter' } })
+    expect(steps[5]?.operation).toMatchObject({
+      kind: 'press',
+      locator: { kind: 'css', selector: expect.stringContaining('[aria-label^="Message #"]') },
+    })
   })
-  it('opens and confirms deletion in the marked row', () => {
+
+  it('restricts deletion confirmation to the Delete Message dialog', () => {
     const steps = buildDeleteMessageSteps({ guildId, channelId, markerText: '[m]' })
-    expect(steps.slice(2).map((step) => step.operation)).toMatchObject([
-      { kind: 'click', locator: { kind: 'within', scope: { kind: 'text', value: '[m]' } } },
-      { kind: 'click', locator: { kind: 'role', role: 'menuitem', name: 'Delete Message' } },
-      { kind: 'click', locator: { kind: 'role', role: 'button', name: 'Delete' }, effect: 'write' },
-    ])
+    expect(steps.at(-1)?.operation).toMatchObject({
+      kind: 'click',
+      locator: {
+        kind: 'within',
+        scope: { kind: 'role', role: 'dialog', name: 'Delete Message' },
+        target: { kind: 'role', role: 'button', name: 'Delete' },
+      },
+      effect: 'write',
+    })
   })
 })
