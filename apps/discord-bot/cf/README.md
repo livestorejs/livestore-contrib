@@ -205,12 +205,58 @@ HTTP traffic is split. Candidate proof must therefore use a separate
 stage/Discord identity, inspect `/readyz`'s gateway version, then activate
 production atomically.
 
-Beta.72 exposes no Alchemy command/resource that selects an already-uploaded
-version or rolls a deployment back. A known-good source redeploy creates a new
-version; it is a compensating deploy, not rollback proof. Durable Object
-migrations additionally require 100% deployment and cannot roll back to a
-version from before the migration. Production remains blocked until a
-first-class rollback/select-version path is implemented and exercised.
+Alchemy beta.72 cannot select an already-uploaded Worker version, so
+`cf:rollback` selects one through Cloudflare's
+[Versions list](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/versions/methods/list/),
+[version detail](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/versions/methods/get/),
+[Deployments list](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/deployments/methods/list/),
+and [Create Deployment](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/deployments/methods/create/)
+APIs. Use an account-scoped token with **Workers Scripts Write** permission
+(Cloudflare's deployment-create API names this permission explicitly).
+The scoped ephemeral token minted by
+`tmp/discord-bot/mint-ephemeral-cf-token.sh` includes account-level
+`Workers Scripts Write` (permission group `e086da7e2179491d91ee5f35b3ca210a`).
+Export `CF_WORKER_NAME`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN`
+as above; `list` is read-only and prints deployable version IDs, creation
+metadata, `RELEASE_ID` when exposed in the version's plain-text binding, and
+the platform migration tag. Before selection, independently establish that
+the recorded known-good version and the current code read the same DO state
+and API contracts:
+
+```sh
+pnpm cf:rollback list
+AGENT_ACTION_APPROVAL=deploy pnpm cf:rollback select --version <known-good-UUID> --yes --assert-do-compatible
+```
+
+Selection creates a new 100% deployment of existing code, without rebuilding
+or reverting DO storage/configuration. It requires `--yes` and the deploy
+approval, refuses a split current deployment, unknown/nondeployable version,
+and different Cloudflare DO migration tags. Alchemy derives the `BotState`
+class migration from the same-worker binding in `src/worker.ts`, rather than
+declaring a hand-maintained migration list. Cloudflare version detail exposes
+`script_runtime.migration_tag`, but neither it nor the deployment API proves
+that application SQL journal migrations or admin/runtime APIs are backward
+compatible. Thus `--assert-do-compatible` is mandatory even if tags match or
+are absent. After the sanitized selection receipt, independently require
+`/readyz` HTTP 200 with all checks true, `releaseId` matching the target,
+and `workerVersionId` matching the selected UUID (this field is the gateway
+Durable Object's version, not merely the HTTP Worker). A receipt marked
+`readiness: UNVERIFIED` is not rollback PASS until that check succeeds. If an
+incompatible state/API migration has occurred, keep the Gateway disabled and
+deploy a forward fix, never select older code.
+
+Staging rollback proof (operator-owned; never perform an unapproved live
+selection): record N−1 as known-good via `pnpm cf:rollback list` and `/readyz`;
+deploy N through `pnpm cf:plan --stage staging` then
+`AGENT_ACTION_APPROVAL=deploy pnpm cf:deploy --stage staging --yes`; require
+`/readyz` 200 with `releaseId=N` and gateway `workerVersionId=N`.
+After checking schema/API compatibility, select N−1 with the command above
+and require `/readyz` 200 with all checks true, `releaseId=N−1` and
+`workerVersionId=<N−1 UUID>`; then select N with the same approval/assertion
+flags and require `/readyz` 200 with `releaseId=N` and
+`workerVersionId=<N UUID>`. Compare the IDs with the latest 100% deployment
+from the Deployments list API. Any 503, release/version mismatch, or failed
+gateway check is a failed redeploy proof, not a PASS.
 
 ## Local development
 

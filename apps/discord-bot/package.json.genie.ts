@@ -31,6 +31,7 @@ export default packageJson({
       'tsgo --build --force tsconfig.json && tsgo --build --force e2e/tsconfig.json && tsc -p cf/tsconfig.json --noEmit',
     'check:e2e': 'tsc -p e2e/tsconfig.json --noEmit',
     'cf:deploy': 'bash cf/scripts/deploy.sh',
+    'cf:rollback': 'bun cf/scripts/rollback.ts',
     'cf:dev': 'ALCHEMY_LOCAL=1 alchemy dev cf/alchemy.local.ts',
     'cf:plan':
       'node --experimental-strip-types cf/src/deploy-preflight.ts && (cd cf && node --experimental-strip-types scripts/state-migrate.ts --verify-remote-authoritative) && alchemy plan cf/alchemy.run.ts',
