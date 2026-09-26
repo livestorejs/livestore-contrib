@@ -55,7 +55,7 @@ export default Alchemy.Stack(
     // Resource outputs are not available while the stack is being declared.
     // Resolve and compare them only after reconciliation, when Alchemy evaluates
     // the stack output against the Worker's actual attributes.
-    const verifiedReleaseId = Output.mapEffect(([workerName, botStateNamespaceId]) => {
+    const verifiedReleaseId = Output.mapEffect(([workerName, botStateNamespaceId]: [string, string]) => {
       const identityMismatch = deploymentIdentityMismatch(deploymentIdentity, {
         workerName,
         botStateNamespaceId,
@@ -63,7 +63,7 @@ export default Alchemy.Stack(
       return identityMismatch === undefined
         ? Effect.succeed(deploymentIdentity.releaseId)
         : Effect.die(identityMismatch)
-    })(Output.all(worker.workerName, botStateNamespace))
+    })(Output.all<[Output.Output<string>, Output.Output<string>]>(worker.workerName, botStateNamespace))
     return {
       url: worker.url,
       crons: worker.crons,

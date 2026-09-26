@@ -304,6 +304,25 @@ export interface AdminRouterOptions {
   readonly threadReconcile?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
 }
 
+/** A fresh gateway stub is required for each invocation, not each Worker isolate. */
+export interface AdminGateway {
+  readonly status: NonNullable<AdminRouterOptions['runtimeStatus']>
+  readonly threadCreate: NonNullable<AdminRouterOptions['threadCreate']>
+  readonly configGet: () => NonNullable<AdminRouterOptions['configGet']>
+  readonly configPut: NonNullable<AdminRouterOptions['configPut']>
+  readonly commandsSync: NonNullable<AdminRouterOptions['commandsSync']>
+  readonly threadReconcile: NonNullable<AdminRouterOptions['threadReconcile']>
+}
+
+export const makeAdminGatewayOptions = (getGateway: () => AdminGateway): AdminRouterOptions => ({
+  runtimeStatus: () => getGateway().status(),
+  threadCreate: (payload) => getGateway().threadCreate(payload),
+  configGet: Effect.suspend(() => getGateway().configGet()),
+  configPut: (payload) => getGateway().configPut(payload),
+  commandsSync: (payload) => getGateway().commandsSync(payload),
+  threadReconcile: (payload) => getGateway().threadReconcile(payload),
+})
+
 /** Renders a plain JSON operation outcome as an HTTP response. */
 const outcomeResponse = (outcome: AdminOperationOutcome): HttpServerResponse.HttpServerResponse =>
   HttpServerResponse.text(JSON.stringify(outcome.body), { status: outcome.status, contentType: 'application/json' })

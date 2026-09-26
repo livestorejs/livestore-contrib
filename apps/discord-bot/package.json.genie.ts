@@ -27,7 +27,8 @@ export default packageJson({
   scripts: {
     check: 'tsc --noEmit && tsc -p e2e/tsconfig.json --noEmit && tsc -p cf/tsconfig.json --noEmit',
     'check:cf': 'tsc -p cf/tsconfig.json --noEmit && vitest run cf',
-    'check:effect': 'tsgo --build --force tsconfig.json && tsgo --build --force e2e/tsconfig.json',
+    'check:effect':
+      'tsgo --build --force tsconfig.json && tsgo --build --force e2e/tsconfig.json && tsc -p cf/tsconfig.json --noEmit',
     'check:e2e': 'tsc -p e2e/tsconfig.json --noEmit',
     'cf:deploy': 'bash cf/scripts/deploy.sh',
     'cf:dev': 'ALCHEMY_LOCAL=1 alchemy dev cf/alchemy.local.ts',

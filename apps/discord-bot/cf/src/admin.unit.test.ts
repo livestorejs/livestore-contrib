@@ -3,7 +3,7 @@ import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 
 import { makeRuntimeConfigAdminOperations } from './admin-ops.ts'
-import { makeAdminHandler, constantTimeEquals } from './admin.ts'
+import { makeAdminGatewayOptions, makeAdminHandler, constantTimeEquals } from './admin.ts'
 import { makeFakeDoStorage } from './fake-do-storage.ts'
 import { emptyGatewayTelemetrySnapshot } from './gateway-telemetry.ts'
 import { RuntimeConfigPutPayload } from './runtime-config.ts'
@@ -319,7 +319,7 @@ it('reloads a persisted identical config through the real admin route and fake D
     await Effect.runPromise(store.write({ expectedRevision: 0, config: first.config }))
     const installed = await Effect.runPromise(
       makeSerializedRuntime(
-        Effect.map(store.read, (document) => ({ document })),
+        Effect.map(Effect.orDie(store.read), (document) => ({ document })),
         () => Effect.void,
       ),
     )
@@ -338,14 +338,35 @@ it('reloads a persisted identical config through the real admin route and fake D
           }),
         ),
     })
-    const route = makeAdminHandler(token, {
-      configGet: operations.configGet,
-      configPut: operations.configPut,
-    })
-    const before = await route(get('/admin/config', `Bearer ${token}`))
+    let requestId = 0
+    const route = makeAdminHandler(
+      token,
+      makeAdminGatewayOptions(() => {
+        const ownerRequestId = requestId
+        const withinRequest = <A>(operation: Effect.Effect<A>): Effect.Effect<A> =>
+          Effect.sync(() => {
+            if (ownerRequestId !== requestId) {
+              throw new Error('Durable Object stub reused in a different request')
+            }
+          }).pipe(Effect.andThen(operation))
+        return {
+          status: () => withinRequest(Effect.succeed(readySnapshot)),
+          threadCreate: () => withinRequest(Effect.die('unexpected thread create')),
+          configGet: () => withinRequest(operations.configGet),
+          configPut: (payload) => withinRequest(operations.configPut(payload)),
+          commandsSync: () => withinRequest(Effect.die('unexpected command sync')),
+          threadReconcile: () => withinRequest(Effect.die('unexpected reconciliation')),
+        }
+      }),
+    )
+    const dispatch = (request: Request) => {
+      requestId++
+      return route(request)
+    }
+    const before = await dispatch(get('/admin/config', `Bearer ${token}`))
     expect(before.status).toBe(200)
     const config = (await jsonBody(before)).stored as { config: unknown }
-    const put = await route(
+    const put = await dispatch(
       new Request('https://bot.example.test/admin/config', {
         method: 'PUT',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -354,7 +375,7 @@ it('reloads a persisted identical config through the real admin route and fake D
     )
     expect(put.status).toBe(200)
     expect(await jsonBody(put)).toMatchObject({ _tag: 'Success', revision: 2, applied: true })
-    const after = await route(get('/admin/config', `Bearer ${token}`))
+    const after = await dispatch(get('/admin/config', `Bearer ${token}`))
     expect(after.status).toBe(200)
     expect(await jsonBody(after)).toMatchObject({
       stored: { revision: 2 },

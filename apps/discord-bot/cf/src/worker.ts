@@ -6,7 +6,7 @@ import * as Effect from 'effect/Effect'
 import * as HttpServerRequest from 'effect/unstable/http/HttpServerRequest'
 import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse'
 
-import { AdminToken, makeAdminRouter, runAdminRouter, toFetchHandler } from './admin.ts'
+import { AdminToken, makeAdminGatewayOptions, makeAdminRouter, runAdminRouter, toFetchHandler } from './admin.ts'
 import { BotState } from './bot-state.ts'
 import { readSecret } from './env.ts'
 import { evaluateReadiness } from './readiness.ts'
@@ -59,24 +59,15 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
 
     const env = yield* WorkerEnvironment
     // Secret reads stay lazy: the deploy phase evaluates this init with
-    // placeholder bindings, so ADMIN_TOKEN resolves on first request. Every
-    // admin operation delegates into the gateway DO, which owns the runtime
-    // (config store, journal, thread workflow, command sync).
+    // placeholder bindings. Cache the pure router/auth configuration, but
+    // obtain a fresh Durable Object stub for every admin invocation. A stub
+    // whose RPC failed is poisoned for subsequent calls, so caching it across
+    // requests would break the admin plane until the isolate is recycled.
     let adminHandler: ((request: globalThis.Request) => Promise<Response>) | undefined
     const getAdminHandler = () => {
       if (adminHandler === undefined) {
-        const gateway = botState.getByName('gateway')
         adminHandler = toFetchHandler(
-          runAdminRouter(
-            makeAdminRouter({
-              runtimeStatus: () => gateway.status(),
-              threadCreate: (payload) => gateway.threadCreate(payload),
-              configGet: gateway.configGet(),
-              configPut: (payload) => gateway.configPut(payload),
-              commandsSync: (payload) => gateway.commandsSync(payload),
-              threadReconcile: (payload) => gateway.threadReconcile(payload),
-            }),
-          ),
+          runAdminRouter(makeAdminRouter(makeAdminGatewayOptions(() => botState.getByName('gateway')))),
           Context.make(AdminToken, { token: readSecret(env, 'ADMIN_TOKEN') }),
         )
       }

@@ -167,7 +167,10 @@ it.effect('a successful config reload immediately starts the replacement gateway
     const store = makeRuntimeConfigStore(storage, 'test-release')
     const gate = yield* makeSupervisorGate
     const runtime = yield* makeSerializedRuntime(
-      Effect.map(store.read, (document) => ({ document, state: 'disconnected' as 'disconnected' | 'ready' })),
+      Effect.map(Effect.orDie(store.read), (document) => ({
+        document,
+        state: 'disconnected' as 'disconnected' | 'ready',
+      })),
       () => Effect.void,
     )
     let gatewayFiber: Fiber.Fiber<void> | undefined
