@@ -18,10 +18,6 @@ let
 
   rootPackageJson = builtins.fromJSON (builtins.readFile ./package.json);
   pnpmPackages = rootPackageJson.workspaces or [ ];
-  generatedInstalledWorkspaceTasks = [
-    "genie:run"
-    "pnpm:install"
-  ];
 
   oxlintNpm = effectUtils.lib.mkOxlintNpm {
     inherit pkgs;
@@ -48,9 +44,6 @@ in
       packages = pnpmPackages;
       installAfter = [ "mr:bootstrap" ];
       inherit pnpmPkg;
-    })
-    (taskModules.ts {
-      tsBinPkg = effectTsgo;
     })
     (taskModules.clean { packages = pnpmPackages; })
     (taskModules.lint-oxc {
@@ -158,11 +151,28 @@ in
     test -d repos/livestore
     test ! -L repos/livestore
   '';
-  tasks."ts:build".after = lib.mkForce generatedInstalledWorkspaceTasks;
-  tasks."ts:build-watch".after = lib.mkForce generatedInstalledWorkspaceTasks;
-  tasks."ts:check".after = lib.mkForce generatedInstalledWorkspaceTasks;
-  tasks."ts:check:strict".after = lib.mkForce generatedInstalledWorkspaceTasks;
-  tasks."ts:emit".after = lib.mkForce generatedInstalledWorkspaceTasks;
+
+  # Keep TypeScript tasks local until contrib adopts Buck TypeScript authority (effect-utils #1343).
+  tasks."ts:check" = {
+    after = [ "genie:run" "pnpm:install" ];
+    exec = "${effectTsgo}/bin/tsgo --build tsconfig.check.json";
+  };
+  tasks."ts:check:strict" = {
+    after = [ "genie:run" "pnpm:install" ];
+    exec = "${effectTsgo}/bin/tsgo --build --force tsconfig.check.json";
+  };
+  tasks."ts:build" = {
+    after = [ "genie:run" "pnpm:install" ];
+    exec = "${effectTsgo}/bin/tsgo --build tsconfig.check.json";
+  };
+  tasks."ts:watch" = {
+    after = [ "genie:run" "pnpm:install" ];
+    exec = "${effectTsgo}/bin/tsgo --build --watch tsconfig.check.json";
+  };
+  tasks."ts:emit" = {
+    after = [ "genie:run" "pnpm:install" ];
+    exec = "${effectTsgo}/bin/tsgo --build tsconfig.emit.json --noCheck";
+  };
   tasks."ci:quality" = {
     description = "Run PR quality checks for contrib";
     after = [

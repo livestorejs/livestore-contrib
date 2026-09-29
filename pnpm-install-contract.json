@@ -19,7 +19,7 @@
     },
     "packageManager": {
       "name": "pnpm",
-      "version": "12.4.1"
+      "version": "12.7.0"
     }
   },
   "dependencyMaterializationProfile": {
@@ -86,7 +86,7 @@
   },
   "packageManager": {
     "name": "pnpm",
-    "version": "12.4.1"
+    "version": "12.7.0"
   },
   "schemaVersion": 2,
   "storeContract": {
