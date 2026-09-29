@@ -58,8 +58,11 @@ fallback. `alchemy.local.ts` is the only stack allowed to use
 `Alchemy.localState()`.
 
 The existing `cf:plan`/`cf:deploy` scripts remain the staging path. Production
-uses the explicit stage-aware `cf/scripts/remote.sh` runner. CI deploys both
-stages after the operator-owned initial production creation described below.
+uses the explicit stage-aware `cf/scripts/remote.sh` runner. After the
+operator-owned initial production creation below, a merge to `main` that
+changes `apps/discord-bot/**` or the deploy workflow automatically deploys
+staging, then production only after staging's exact-release readiness and
+command-sync verification succeed.
 
 ### First production deploy (operator-owned; passive verification only)
 
@@ -160,19 +163,20 @@ Alchemy's remote state store recovers its bearer from Cloudflare Secrets Store
 on a fresh runner. The state store must already be bootstrapped and each
 stage's remote state must pass `--verify-remote-authoritative`; CI cannot
 migrate missing state or create the initial production Worker. Deployments are
-serialized by stage and never cancel a running deploy. Production dispatch is
-restricted to `main` and waits for the GitHub `production` environment's
-required reviewer approval. Dispatch staging on an approved ref with
-`gh workflow run deploy-discord-bot.yml --ref <approved-ref> -f stage=staging`,
-or production from `main` with
-`gh workflow run deploy-discord-bot.yml --ref main -f stage=production`.
-Inspect the gated plan and require `/readyz` HTTP 200, all five checks true,
-and `releaseId` equal to the dispatched SHA. Once ready, CI calls the
-authenticated `/admin/commands-sync` endpoint to plan, apply, and plan again;
-the final plan must show `changes=false` with registered commands
-(`unchanged>0`). The application/guild fingerprint comes from the validated
-default runtime config; production supplies `DISCORD_APPLICATION_ID` from its
-GitHub environment.
+serialized per stage and never cancel a running deploy. An eligible push to
+`main` deploys staging first and production only if staging succeeds, including
+its `/readyz` and application-command checks. The production stage uses the
+GitHub `production` environment and protected `main` branch; it cannot run
+from a failed staging job. Manual single-stage dispatch remains available:
+`gh workflow run deploy-discord-bot.yml --ref <approved-ref> -f stage=staging`
+or `gh workflow run deploy-discord-bot.yml --ref main -f stage=production`.
+Manual production dispatch is restricted to `main` and does not rerun staging.
+Each stage requires `/readyz` HTTP 200, all five checks true, and `releaseId`
+equal to the deployed SHA. Once ready, CI calls the authenticated
+`/admin/commands-sync` endpoint to plan, apply, and plan again; the final plan
+must show `changes=false` with registered commands (`unchanged>0`). The
+application/guild fingerprint comes from validated default runtime config;
+production supplies `DISCORD_APPLICATION_ID` from its GitHub environment.
 
 Runtime config reloads that change `docsAudience` can change the desired
 commands without a deploy. After such a reload reaches `/readyz` 200, manually

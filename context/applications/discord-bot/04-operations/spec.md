@@ -331,28 +331,33 @@ Worker version to source/release ID, dependency-lock digest, configuration
 digest, sanitized application identity, and previous known-good Rollback Target
 (R12).
 
-The CI deploy path gates command registration on gateway-aware `/readyz`
-readiness for the exact release. It then calls the authenticated
-`POST /admin/commands-sync` with the stage and running application/guild
-fingerprint: read-only plan, apply after durable/running config convergence,
-and a second plan requiring `changes=false` and at least one unchanged
-registered command. An API error, mismatched fingerprint, or residual drift
-fails the deploy job. Runtime config reloads that change `docsAudience`
-require an operator to plan and apply command sync separately; reload alone
-does not register commands (R12).
+The CI deployment workflow runs on pushes to `main` that change the bot or
+its deploy workflow. It deploys staging first and starts production only when
+the staging job succeeds, including gateway-aware `/readyz` for the exact
+release and command registration verification. A manual dispatch selects one
+stage; production dispatch requires a `main` ref, while initial Worker
+creation remains operator-owned. Each stage serializes its deployments
+without cancelling a running one. Following each stage's readiness check,
+CI calls authenticated `POST /admin/commands-sync` with the stage and running
+application/guild fingerprint: read-only plan, apply after durable/running
+config convergence, and a second plan requiring `changes=false` and at least
+one unchanged registered command. An API error, mismatched fingerprint, or
+residual drift fails that stage's deploy job. Runtime config reloads that
+change `docsAudience` require an operator to plan and apply command sync
+separately; reload alone does not register commands (R12).
 
-Functional and Operational Verdicts are independent records for that exact
-staging release. Functional PASS requires all eleven live matrix lanes and zero
-owned artifacts. Operational PASS requires remote Alchemy state, externally
-verified release identity, gateway-aware readiness, binary deployment and
-backward-compatible known-good code redeploy proof, a CI-owned deploy path, and
-long-duration reconnect observation. Production remains disabled if either
-verdict is absent, FAIL, BLOCKED, or UNRUN (R19; decisions 0008 and 0010).
+Initial production admission requires independent Functional and Operational
+Verdicts for the staging release. Functional PASS requires all eleven live
+matrix lanes and zero owned artifacts. Operational PASS requires remote Alchemy
+state, externally verified release identity, gateway-aware readiness, binary
+deployment and backward-compatible known-good code redeploy proof, a CI-owned
+deploy path, and long-duration reconnect observation. Production remains
+disabled until both verdicts pass (R19; decisions 0008 and 0010).
 
-After both verdicts pass, Alchemy deploys the same immutable release identity
-and artifact to production without rebuilding. This is one binary change for
-the production Worker and its singleton Durable Object, not a percentage
-traffic ramp. Production has its own Discord application, Worker, Durable
+After initial admission, CI promotes an eligible `main` release through staging
+to production without rebuilding. This is one binary change for the production
+Worker and its singleton Durable Object, not a percentage traffic ramp.
+Production has its own Discord application, Worker, Durable
 Object storage, configuration, and secret projection. A percentage split would
 only divide requests to the singleton bot deployment; it neither creates an
 independent bot candidate nor qualifies as canary evidence. Verification checks
