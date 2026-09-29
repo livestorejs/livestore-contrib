@@ -152,12 +152,14 @@ const cleanup = async (
     failures: [],
   }
 
-  if (owned.responses.length > 0) {
+  const deletableResponses = owned.responses.filter(
+    (response): response is ResponseSnapshot & { readonly id: Snowflake } => response.id !== undefined,
+  )
+  if (deletableResponses.length > 0) {
     const unresolvedThreadSources = new Set<Snowflake>()
-    for (const response of owned.responses) {
+    for (const response of deletableResponses) {
       try {
-        // A response can itself become an automatic-thread source. Preserve
-        // its identity until the exact source-anchored thread is removed.
+        // A non-ephemeral response can itself become an automatic-thread source.
         const thread = await transport.findThreadForMessage(target.guildId, response.id)
         if (thread === undefined) continue
         if (isOwnedThread(thread, response, target, response.marker, response.channelId) === false) {
@@ -172,7 +174,7 @@ const cleanup = async (
       }
     }
     const outcomes = await Promise.allSettled(
-      owned.responses
+      deletableResponses
         .filter((response) => unresolvedThreadSources.has(response.id) === false)
         .map((response) => transport.deleteResponse(response.channelId, response.id)),
     )

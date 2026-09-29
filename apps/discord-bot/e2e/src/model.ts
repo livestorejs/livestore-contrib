@@ -160,13 +160,12 @@ export interface ThreadSnapshot {
   readonly marker: string
 }
 
-export interface ResponseSnapshot {
-  readonly id: Snowflake
+export type ResponseSnapshot = {
   readonly channelId: Snowflake
   readonly marker: string
   readonly hasAnswer: boolean
   readonly hasSources: boolean
-}
+} & ({ readonly id: Snowflake; readonly ephemeral?: false } | { readonly id?: never; readonly ephemeral: true })
 
 export interface StagingTarget {
   readonly guildId: Snowflake
