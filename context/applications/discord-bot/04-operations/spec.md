@@ -331,6 +331,16 @@ Worker version to source/release ID, dependency-lock digest, configuration
 digest, sanitized application identity, and previous known-good Rollback Target
 (R12).
 
+The CI deploy path gates command registration on gateway-aware `/readyz`
+readiness for the exact release. It then calls the authenticated
+`POST /admin/commands-sync` with the stage and running application/guild
+fingerprint: read-only plan, apply after durable/running config convergence,
+and a second plan requiring `changes=false` and at least one unchanged
+registered command. An API error, mismatched fingerprint, or residual drift
+fails the deploy job. Runtime config reloads that change `docsAudience`
+require an operator to plan and apply command sync separately; reload alone
+does not register commands (R12).
+
 Functional and Operational Verdicts are independent records for that exact
 staging release. Functional PASS requires all eleven live matrix lanes and zero
 owned artifacts. Operational PASS requires remote Alchemy state, externally

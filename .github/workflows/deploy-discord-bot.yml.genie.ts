@@ -160,6 +160,19 @@ while (Date.now() < deadline) {
 throw new Error('Discord bot readiness did not reach expected release within 120 seconds')
 NODE`,
         },
+        {
+          name: 'Converge application commands',
+          env: {
+            ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}',
+            DISCORD_APPLICATION_ID: '${{ vars.DISCORD_APPLICATION_ID }}',
+          },
+          run: `set -euo pipefail
+echo "::add-mask::$ADMIN_TOKEN"
+DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
+  cd apps/discord-bot
+  node --experimental-strip-types cf/scripts/commands-sync.ts "$STAGE"
+'`,
+        },
         nixDiagnosticsArtifactStep(),
       ],
     },

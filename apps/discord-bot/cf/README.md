@@ -166,8 +166,21 @@ required reviewer approval. Dispatch staging on an approved ref with
 `gh workflow run deploy-discord-bot.yml --ref <approved-ref> -f stage=staging`,
 or production from `main` with
 `gh workflow run deploy-discord-bot.yml --ref main -f stage=production`.
-Inspect the gated plan and require the final `/readyz` check to report HTTP
-200, all five checks true, and `releaseId` equal to the dispatched SHA.
+Inspect the gated plan and require `/readyz` HTTP 200, all five checks true,
+and `releaseId` equal to the dispatched SHA. Once ready, CI calls the
+authenticated `/admin/commands-sync` endpoint to plan, apply, and plan again;
+the final plan must show `changes=false` with registered commands
+(`unchanged>0`). The application/guild fingerprint comes from the validated
+default runtime config; production supplies `DISCORD_APPLICATION_ID` from its
+GitHub environment.
+
+Runtime config reloads that change `docsAudience` can change the desired
+commands without a deploy. After such a reload reaches `/readyz` 200, manually
+POST `/admin/commands-sync` with `Authorization: Bearer $ADMIN_TOKEN`,
+`environment`, a reason (at least three characters), `apply: false`, and
+`expectedApplicationId`/`expectedGuildId` from the running config. Review the
+`Planned` counts, repeat the same request with `apply: true`, then repeat the
+plan and require `changes=false` with `unchanged>0`. Never log the bearer token.
 
 `cf:preflight` performs a read-only Cloudflare Worker-settings request and
 compares the live script name and `BotState` namespace before Alchemy runs.
