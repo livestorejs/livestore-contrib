@@ -81,18 +81,17 @@ export type ParseBrokerResult =
   | { readonly _tag: 'Parsed'; readonly value: ParsedBrokerInvocation }
   | { readonly _tag: 'UsageError'; readonly message: string }
 
-/**
- * Evidence a driver extracted from the official client after performing one
- * gesture. Ephemeral interaction responses are invisible to bot REST reads, so
- * their exact IDs may only come from the client session itself.
- */
+/** Browser-observed replies may be ephemeral and have no REST-visible message ID. */
 export interface GestureEvidence {
-  /** The driver observed the human/operator decline or abort the gesture. */
   readonly declined?: true
   readonly messageActionOutcome?: 'created' | 'denied'
   readonly docsOutcome?: 'answered' | 'denied'
-  /** Exact message IDs of interaction responses read from the client UI. */
+  /** ID-backed responses (when available) are journaled and deleted by the actor. */
   readonly responseMessageIds?: ReadonlyArray<string>
+  /** UI-observed ephemeral replies cannot be deleted by the actor. */
+  readonly ephemeralResponseCount?: number
+  /** Count of public docs rows; exact deletable IDs come from the actor REST seam. */
+  readonly publicResponseCount?: number
 }
 
 export interface AttendedBrokerDriver {
@@ -124,6 +123,14 @@ export interface BrokerCorrelator {
     readonly timeoutMs: number
     readonly pollIntervalMs: number
   }) => Promise<Snowflake | undefined>
+  readonly snapshotPublicResponseIds: (channelId: Snowflake) => Promise<ReadonlyArray<Snowflake>>
+  readonly waitForPublicResponses: (input: {
+    readonly channelId: Snowflake
+    readonly beforeIds: ReadonlyArray<Snowflake>
+    readonly expectedCount: number
+    readonly timeoutMs: number
+    readonly pollIntervalMs: number
+  }) => Promise<ReadonlyArray<Snowflake>>
   readonly dispose: () => Promise<void>
 }
 
@@ -189,8 +196,20 @@ const readRequestString = (request: Record<string, unknown>, key: string, label:
   return value
 }
 
-/** DFX-backed correlator: polls the actor-bot REST seam until the gesture's effect appears. */
-export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string }): BrokerCorrelator => {
+/** A broker subprocess receives the configured staging application via its request, not package layout. */
+export const readBrokerApplicationId = (request: unknown): Snowflake => {
+  if (typeof request !== 'object' || request === null || Array.isArray(request) === true)
+    throw new Error('broker request must be a JSON object')
+  if ('applicationId' in request === false || typeof request.applicationId !== 'string')
+    throw new Error('broker request is missing applicationId')
+  return asSnowflake(request.applicationId, 'application ID')
+}
+
+/** DFX-backed correlator: the actor bot observes the staging application's replies. */
+export const makeDfxBrokerCorrelator = (input: {
+  readonly actorBotToken: string
+  readonly targetApplicationId: string
+}): BrokerCorrelator => {
   const DiscordLive = DiscordRESTMemoryLive.pipe(
     Layer.provide(NodeHttpClient.layerUndici),
     Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
@@ -198,6 +217,24 @@ export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string 
   const runtime = ManagedRuntime.make(Layer.merge(DiscordLive, discordSafeLoggerLayer))
   const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> =>
     runtime.runPromise(effect.pipe(Effect.catchCause((cause) => Effect.fail(redactDiscordRestCause(cause)))))
+  const listPublicResponses = async (channelId: Snowflake): Promise<ReadonlyArray<Snowflake>> => {
+    const messages: unknown = await rest(
+      Effect.flatMap(DiscordREST, (discord) => discord.listMessages(channelId, { limit: 100 })),
+    )
+    if (Array.isArray(messages) === false) throw new Error('Public response listing was invalid')
+    return messages.flatMap((item): ReadonlyArray<Snowflake> => {
+      if (
+        typeof item !== 'object' ||
+        item === null ||
+        !('id' in item) ||
+        typeof item.id !== 'string' ||
+        !('application_id' in item) ||
+        item.application_id !== input.targetApplicationId
+      )
+        return []
+      return [asSnowflake(item.id, 'public docs response')]
+    })
+  }
 
   return {
     waitForMessage: async ({ channelId, marker, timeoutMs, pollIntervalMs }) => {
@@ -236,6 +273,19 @@ export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string 
         await sleep(pollIntervalMs)
       }
       return undefined
+    },
+    snapshotPublicResponseIds: listPublicResponses,
+    waitForPublicResponses: async ({ channelId, beforeIds, expectedCount, timeoutMs, pollIntervalMs }) => {
+      const before = new Set(beforeIds)
+      const deadline = Date.now() + timeoutMs
+      let lastCount = 0
+      while (Date.now() < deadline) {
+        const found = (await listPublicResponses(channelId)).filter((id) => before.has(id) === false)
+        if (found.length >= expectedCount && found.length === lastCount) return found.toReversed()
+        lastCount = found.length
+        await sleep(pollIntervalMs)
+      }
+      throw new E2EPrerequisiteUnavailableError('Public docs replies did not correlate before the deadline')
     },
     dispose: () => runtime.dispose(),
   }
@@ -277,6 +327,8 @@ export const dispatchBrokerOperation = async (
         throw new Error('create-message content must contain its correlation marker')
       ledger?.recordMessageIntent({ ...context, marker })
     }
+    const publicResponseIdsBefore =
+      invocation.operation === 'invoke-docs' ? await deps.correlator.snapshotPublicResponseIds(context.channelId) : []
     const evidence =
       invocation.operation === 'resolve-thread' ||
       invocation.operation === 'resolve-message' ||
@@ -291,7 +343,7 @@ export const dispatchBrokerOperation = async (
         declineExitCode: 7,
       }
     }
-    return await dispatchWithLedger(invocation, deps, evidence, context, ledger)
+    return await dispatchWithLedger(invocation, deps, evidence, context, ledger, publicResponseIdsBefore)
   } finally {
     ledger?.close()
   }
@@ -302,6 +354,7 @@ const dispatchWithLedger = async (
   evidence: GestureEvidence,
   context: { readonly guildId: Snowflake; readonly channelId: Snowflake },
   ledger: BrokerLedger | undefined,
+  publicResponseIdsBefore: ReadonlyArray<Snowflake>,
 ): Promise<BrokerDispatchResult> => {
   const request = invocation.request as Record<string, unknown>
   const record = (kind: BrokerLedgerInput['kind'], messageId: string): void => {
@@ -333,6 +386,8 @@ const dispatchWithLedger = async (
       'message action',
     )
     const responseIds = (evidence.responseMessageIds ?? []).map((id) => asSnowflake(id, 'message action'))
+    const ephemeralCount = evidence.ephemeralResponseCount ?? 0
+    if (responseIds.length + ephemeralCount === 0) throw new Error('message action evidence carried no response')
     if (outcome === 'created') {
       const threadId = await deps.correlator.waitForThread({
         guildId: context.guildId,
@@ -340,7 +395,6 @@ const dispatchWithLedger = async (
         ...readTiming(request),
       })
       if (threadId === undefined) throw new Error('client reported creation but no correlated thread appeared')
-      if (responseIds.length === 0) throw new Error('creation evidence carried no response artifact id')
       record('thread', threadId)
       for (const id of responseIds) record('response', id)
       return {
@@ -354,7 +408,7 @@ const dispatchWithLedger = async (
             // The runner's ownership check compares this against its own marker.
             marker: readRequestString(invocation.request as Record<string, unknown>, 'marker', 'message action'),
           },
-          response: responseSnapshot(responseIds[0] as Snowflake, invocation.request as Record<string, unknown>, {
+          response: responseSnapshot(responseIds[0], invocation.request as Record<string, unknown>, {
             hasAnswer: false,
             hasSources: false,
           }),
@@ -363,12 +417,11 @@ const dispatchWithLedger = async (
         declineExitCode: undefined,
       }
     }
-    if (responseIds.length === 0) throw new Error('denial evidence carried no response artifact id')
     for (const id of responseIds) record('response', id)
     return {
       payload: {
         _tag: 'Denied',
-        response: responseSnapshot(responseIds[0] as Snowflake, invocation.request as Record<string, unknown>, {
+        response: responseSnapshot(responseIds[0], invocation.request as Record<string, unknown>, {
           hasAnswer: false,
           hasSources: false,
         }),
@@ -381,14 +434,28 @@ const dispatchWithLedger = async (
   if (invocation.operation === 'invoke-docs') {
     const outcome = evidence.docsOutcome
     if (outcome === undefined) throw new Error('driver returned no docs outcome')
-    const responseIds = (evidence.responseMessageIds ?? []).map((id) => asSnowflake(id, 'docs'))
-    if (responseIds.length === 0) throw new Error('docs evidence carried no response artifact ids')
+    const publicCount = evidence.publicResponseCount ?? 0
+    const publicIds =
+      publicCount > 0
+        ? await deps.correlator.waitForPublicResponses({
+            channelId: context.channelId,
+            beforeIds: publicResponseIdsBefore,
+            expectedCount: publicCount,
+            ...readTiming(request),
+          })
+        : []
+    const responseIds = [...(evidence.responseMessageIds ?? []).map((id) => asSnowflake(id, 'docs')), ...publicIds]
+    const ephemeralCount = evidence.ephemeralResponseCount ?? 0
+    if (responseIds.length + ephemeralCount === 0) throw new Error('docs evidence carried no responses')
     for (const id of responseIds) record('response', id)
     const answered = outcome === 'answered'
-    const responses: ReadonlyArray<ResponseSnapshot> = responseIds.map((id, index) =>
+    const ids: ReadonlyArray<Snowflake | undefined> = [
+      ...responseIds,
+      ...Array.from({ length: ephemeralCount }, () => undefined),
+    ]
+    const responses: ReadonlyArray<ResponseSnapshot> = ids.map((id) =>
       responseSnapshot(id, invocation.request as Record<string, unknown>, {
-        // Only the first chunked reply carries the answer and citation footer.
-        hasAnswer: answered && index === 0,
+        hasAnswer: answered,
         hasSources: answered,
       }),
     )
@@ -415,11 +482,11 @@ const dispatchWithLedger = async (
 }
 
 const responseSnapshot = (
-  id: Snowflake,
+  id: Snowflake | undefined,
   request: Record<string, unknown>,
   flags: { readonly hasAnswer: boolean; readonly hasSources: boolean },
 ): ResponseSnapshot => ({
-  id,
+  ...(id === undefined ? { ephemeral: true as const } : { id }),
   channelId: asSnowflake(readRequestString(request, 'channelId', 'response'), 'response'),
   marker: readRequestString(request, 'marker', 'response'),
   hasAnswer: flags.hasAnswer,

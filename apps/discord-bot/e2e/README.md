@@ -87,6 +87,7 @@ The non-secret manifest shape is:
   "actorBotTokenRef": "op://VAULT/ITEM/FIELD",
   "botControlSocket": "/run/discord-bot/staging/control.sock",
   "target": {
+    "applicationId": "444444444444444444",
     "guildId": "111111111111111111",
     "channelId": "222222222222222222",
     "docsChannelIds": {
@@ -102,8 +103,10 @@ The non-secret manifest shape is:
 }
 ```
 
-`target.channelId` owns threading, message actions, and operator-control flows.
-The docs lanes use their explicit `public` and `restricted` channel IDs. Every
+`target.applicationId` is the staging bot application that authors `/docs`
+replies, not the actor bot that observes and cleans them. `target.channelId`
+owns threading, message actions, and operator-control flows. The docs lanes
+use their explicit `public` and `restricted` channel IDs. Every
 distinct target is allowlisted and independently checked for the configured
 guild and topic sentinel before the first write. The attended broker receives
 the exact channel ID for each docs gesture; `location` remains descriptive and
@@ -207,30 +210,36 @@ per-gesture invocations, and `recover-ledger --ledger FILE` validates and
 deletes any unresolved artifacts after a crash. Supported operations are
 `create-message`, `invoke-message-action`, `invoke-docs`,
 `resolve-message`, `resolve-response`, and `resolve-thread`. The E2E Actor
-deletes every owned source, response, and thread through Discord REST, including
-human-authored messages; the broker drives only the human gestures under test.
-After successful REST deletion (or Discord's already-gone `404`/`10008` for
+deletes every owned source, public response, and thread through Discord REST,
+including human-authored messages; ephemeral replies have no REST deletion
+operation. The broker drives only the human gestures under test. After
+successful REST deletion (or Discord's already-gone `404`/`10008` for
 messages), each `resolve-*` operation appends the exact guild/channel/artifact
 identity to the broker ledger without performing a client gesture. Failed actor
 deletions leave ledger entries open for recovery; the receipt records sanitized
 REST status and Discord error code. Docs results return a non-empty `responses`
-array because one interaction can produce multiple follow-up messages; every
-correlated response is independently cleaned. Each successful action response
+array because one interaction can produce multiple follow-up messages; each
+public response is independently cleaned. Each successful action response
 must attest its performer with either `"attendedByHuman": true` or
-`"performedBy": "official-client-session"`, plus the correlated IDs, marker,
-and channel fields represented by the E2E snapshots. The broker receives no
+`"performedBy": "official-client-session"`, plus the marker and channel;
+deletable responses also carry their correlated IDs. The broker receives no
 credentials from the runner.
 
 A reference broker ships as `livestore-discord-e2e-broker` (source runner:
 `node --experimental-strip-types e2e/src/attended-broker-main.ts`). It drives
 the official Discord web client through the
-`http-capture` browser-control seam, correlates exact artifact IDs through the
-actor-bot REST read seam, and journals every created artifact into a private
-mode-0600 per-run cleanup ledger (`--ledger FILE`) before acknowledging it.
+`http-capture` browser-control seam, correlates source, thread, and public `/docs`
+reply IDs through the actor-bot REST read seam using the manifest target
+application ID, and journals each deletable artifact into a private mode-0600
+per-run cleanup ledger (`--ledger FILE`) before acknowledging it. Ephemeral
+message-action replies and `/docs` denials are observed through projected
+accessibility snapshots; they have no
+REST-visible message ID and cannot be deleted by the actor. They are therefore
+represented without an ID and never entered in the cleanup ledger.
 Recovery addresses threads with `getChannel(threadId)`, which includes archived
 and private threads, and requires the exact recorded thread, guild, and parent
-before deletion. A `404` is resolved as already gone. Messages and responses
-require the exact recorded guild/channel before `deleteMessage(channelId, id)`.
+before deletion. A `404` is resolved as already gone. Sources and non-ephemeral
+responses require the exact recorded guild/channel before `deleteMessage(channelId, id)`.
 Each successful or already-gone artifact is resolved independently; failed
 entries remain open for the next recovery pass.
 
@@ -250,20 +259,30 @@ authority envelope on each browser invocation; it has no caller `--epoch`
 option. Handback/control ownership must be checked before each attended run.
 
 The broker calls `http-capture browser OPERATION SESSION_UUID --request FILE`
-with a private request file and pipes fill values only into stdin. Before
-enabling the attended matrix, inspect `browser snapshot` separately for both
-sessions and calibrate every `uncalibrated` entry in
+with a private request file and pipes fill values only into stdin. Message
+history and deferred-reply settlement use the value-free `browser snapshot`
+projection; the source-message precheck uses `browser locate` on the exact
+source row ID and marker. Snapshots and worker-generated refs do not expose
+Discord message IDs. Public `/docs` reply IDs are correlated with the staging
+application's REST-visible messages created since the pre-gesture baseline;
+the E2E actor bot reads and cleans these replies but is a different application.
+Ephemeral replies require no ID. No `evaluate` or response-ID extraction from
+capture receipts is required.
+
+When Discord's "New in the Shop" or "Additional Protections for Teens"
+announcement covers a channel after an account switch, the broker closes it
+before interaction gestures; a visible message row behind a dialog is not
+otherwise clickable. Unknown dialogs are not dismissed automatically.
+
+Before enabling the attended matrix, inspect `browser snapshot` separately
+for both sessions and calibrate every `uncalibrated` entry in
 `e2e/src/attended-broker-driver.ts`'s `gestureLocators` table: channel
 composer, message row and More menu, Apps action, `/docs` choice/query field,
-and message/ephemeral response ID evidence. Confirm each locator is unique and
-verify the response ID is the actual created artifact. Do not run write
-gestures just to guess a selector. v2 exposes click but **no hover or context-menu operation**
-(`browser-control.ts` operation union, lines 404–458; CLI allowlist, lines
-1380–1398). If Discord's More control needs hover, that gesture is blocked
-pending a v2 capability or a freshly observed click-accessible alternative;
-it must remain `UNRUN`, not be credited as a pass. Likewise ephemeral response
-IDs not available from the DOM read cannot be fabricated from completed effect
-receipts.
+and ephemeral reply row boundaries. Confirm each locator is unique. Do not run
+write gestures just to guess a selector. HTTP Capture exposes click but no
+hover or context-menu operation; if Discord's More control needs hover, that
+gesture is blocked pending a supported capability or a freshly observed
+click-accessible alternative and remains `UNRUN`.
 
 ```text
 pnpm e2e:live -- \

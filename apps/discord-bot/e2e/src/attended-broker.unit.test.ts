@@ -10,6 +10,8 @@ import {
   buildMessageActionSteps,
   CaptureGestureFailure,
   classifyReplies,
+  newAppReplies,
+  parseMessageRows,
   runReadStepAcrossDocumentReplacement,
   settledAppReplies,
 } from './attended-broker-driver.ts'
@@ -17,6 +19,7 @@ import { makeRecoveryTransport } from './attended-broker-recovery.ts'
 import {
   dispatchBrokerOperation,
   parseBrokerInvocation,
+  readBrokerApplicationId,
   type AttendedBrokerDeps,
   type BrokerLedgerInput,
   type BrokerOperation,
@@ -44,6 +47,8 @@ const makeDeps = (input: {
   readonly evidence: GestureEvidence
   readonly waitForMessage?: () => Promise<{ id: Snowflake; channelId: Snowflake; marker: string; author: 'human' }>
   readonly waitForThread?: () => Promise<Snowflake | undefined>
+  readonly snapshotPublicResponseIds?: () => Promise<ReadonlyArray<Snowflake>>
+  readonly waitForPublicResponses?: () => Promise<ReadonlyArray<Snowflake>>
   readonly recordOrder: string[]
 }): AttendedBrokerDeps => ({
   driver: { perform: async () => input.evidence },
@@ -56,6 +61,12 @@ const makeDeps = (input: {
     waitForThread:
       input.waitForThread ??
       (() => {
+        throw new Error('not expected')
+      }),
+    snapshotPublicResponseIds: input.snapshotPublicResponseIds ?? (async () => []),
+    waitForPublicResponses:
+      input.waitForPublicResponses ??
+      (async () => {
         throw new Error('not expected')
       }),
     dispose: async () => undefined,
@@ -85,6 +96,12 @@ describe('broker invocation parsing', () => {
       _tag: 'Parsed',
       value: { operation: 'create-message', request: baseRequest, ledgerPath: '/tmp/ledger.jsonl', runId: 'run-1' },
     })
+  })
+
+  it('accepts only a declared snowflake application identity for public reply correlation', () => {
+    expect(readBrokerApplicationId({ applicationId: '444444444444444444' })).toBe('444444444444444444')
+    expect(() => readBrokerApplicationId({})).toThrow(/missing applicationId/)
+    expect(() => readBrokerApplicationId({ applicationId: 'not-an-id' })).toThrow(/invalid snowflake/)
   })
 
   it('requires the run id when a ledger is configured', () => {
@@ -168,7 +185,60 @@ describe('broker dispatch', () => {
     expect(recordOrder).toEqual(['record:thread:555555555555555555', 'record:response:444444444444444444', 'close'])
   })
 
-  it('marks only the first chunked docs reply as carrying the answer', async () => {
+  it('keeps ephemeral responses ID-free while journaling the created thread', async () => {
+    const recordOrder: string[] = []
+    const deps = makeDeps({
+      evidence: { messageActionOutcome: 'created', ephemeralResponseCount: 1 },
+      waitForThread: async () => '555555555555555555' as Snowflake,
+      recordOrder,
+    })
+    const result = await dispatchBrokerOperation(
+      makeInvocation(
+        'invoke-message-action',
+        { ...baseRequest, marker: 'm', sourceMessageId: '666666666666666666' },
+        '/tmp/broker-test-ledger.jsonl',
+      ),
+      deps,
+    )
+    expect(result.payload).toMatchObject({ _tag: 'Created', response: { ephemeral: true } })
+    expect(result.payload).not.toHaveProperty('response.id')
+    expect(recordOrder).toEqual(['record:thread:555555555555555555', 'close'])
+  })
+
+  it('returns observed docs replies without synthetic message IDs or ledger entries', async () => {
+    const recordOrder: string[] = []
+    const result = await dispatchBrokerOperation(
+      makeInvocation('invoke-docs', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'),
+      makeDeps({ evidence: { docsOutcome: 'answered', ephemeralResponseCount: 1 }, recordOrder }),
+    )
+    expect(result.payload).toMatchObject({ _tag: 'Answered', responses: [{ ephemeral: true, hasAnswer: true }] })
+    expect(recordOrder).toEqual(['close'])
+  })
+
+  it('correlates public docs rows to app-authored REST IDs before journaling deletion', async () => {
+    const recordOrder: string[] = []
+    const observed: string[] = []
+    const result = await dispatchBrokerOperation(
+      makeInvocation('invoke-docs', { ...baseRequest, marker: 'm' }, '/tmp/broker-test-ledger.jsonl'),
+      makeDeps({
+        evidence: { docsOutcome: 'answered', publicResponseCount: 1 },
+        snapshotPublicResponseIds: async () => {
+          observed.push('before')
+          return ['333333333333333333' as Snowflake]
+        },
+        waitForPublicResponses: async () => {
+          observed.push('after')
+          return ['444444444444444444' as Snowflake]
+        },
+        recordOrder,
+      }),
+    )
+    expect(observed).toEqual(['before', 'after'])
+    expect(result.payload).toMatchObject({ _tag: 'Answered', responses: [{ id: '444444444444444444' }] })
+    expect(recordOrder).toEqual(['record:response:444444444444444444', 'close'])
+  })
+
+  it('marks each chunked docs answer as part of the answer', async () => {
     const deps = makeDeps({
       evidence: { docsOutcome: 'answered', responseMessageIds: ['444444444444444444', '477777777777777776'] },
       recordOrder: [],
@@ -178,7 +248,7 @@ describe('broker dispatch', () => {
       deps,
     )
     const payload = result.payload as { responses: Array<{ hasAnswer: boolean; hasSources: boolean }> }
-    expect(payload.responses.map((response) => response.hasAnswer)).toEqual([true, false])
+    expect(payload.responses.map((response) => response.hasAnswer)).toEqual([true, true])
     expect(payload.responses.every((response) => response.hasSources === true)).toBe(true)
   })
 
@@ -229,6 +299,8 @@ describe('broker dispatch', () => {
       correlator: {
         waitForMessage: async () => ({ id: sourceId, channelId, marker: 'm', author: 'human' }),
         waitForThread: async () => threadId,
+        snapshotPublicResponseIds: async () => [],
+        waitForPublicResponses: async () => [],
         dispose: async () => undefined,
       },
       performer: 'official-client-session',
@@ -383,6 +455,7 @@ describe('broker dispatch', () => {
 
   it('sends each scenario marker and preserves eligible and filtered admission verdicts', async () => {
     const target = {
+      applicationId: '444444444444444444' as Snowflake,
       guildId,
       channelId,
       docsChannelIds: { public: channelId, restricted: channelId },
@@ -484,13 +557,13 @@ describe('http-capture gesture step builders', () => {
 })
 
 describe('settledAppReplies', () => {
-  const before = [{ id: '1', text: 'older' }]
+  const before = [{ text: 'older' }]
   const app = 'LiveStore Auto Threads Staging'
 
   it('reads until a new app row has settled past the deferred placeholder', async () => {
     const reads = [
-      [...before, { id: '2', text: `${app} is thinking...` }],
-      [...before, { id: '2', text: `${app} Answer with sources` }],
+      [...before, { text: `${app} is thinking...` }],
+      [...before, { text: `${app} Answer with sources` }],
     ]
     let calls = 0
     const rows = await settledAppReplies(async () => reads[Math.min(calls++, reads.length - 1)]!, before, {
@@ -503,6 +576,85 @@ describe('settledAppReplies', () => {
   it('returns the last read at the deadline when no app row appears', async () => {
     const rows = await settledAppReplies(async () => before, before, { timeoutMs: 5, intervalMs: 1 })
     expect(rows).toEqual(before)
+  })
+})
+
+describe('projected Discord accessibility rows', () => {
+  const marker = 'e2e-unique-marker'
+  const before = parseMessageRows(`- main:
+  - list "Messages":
+    - listitem:
+      - article "Casey":
+        - generic: ${marker} source
+    - listitem:
+      - article "LiveStore Auto Threads Staging":
+        - text: An earlier reply
+`)
+  it('finds new docs replies without mistaking the invoker or stale bot rows for a reply', () => {
+    const after = parseMessageRows(`- main:
+  - list "Messages":
+    - listitem:
+      - article "Casey":
+        - generic: ${marker} source
+    - listitem:
+      - article "LiveStore Auto Threads Staging":
+        - text: An earlier reply
+    - listitem:
+      - article "Casey":
+        - text: /docs query:${marker} How does syncing work?
+    - listitem:
+      - article "LiveStore Auto Threads Staging APP":
+        - paragraph: Syncing uses events and materializers.
+        - paragraph: Sources
+        - list:
+          - listitem:
+            - link "LiveStore documentation" [ref=e17]
+`)
+    expect(newAppReplies('invoke-docs', before, after, marker).map((row) => row.text)).toEqual([
+      expect.stringContaining('Syncing uses events and materializers.'),
+    ])
+    expect(
+      classifyReplies(
+        'invoke-docs',
+        newAppReplies('invoke-docs', before, after, marker).map((row) => row.text),
+      ),
+    ).toEqual({
+      docsOutcome: 'answered',
+    })
+  })
+
+  it('waits for an edited thinking row and classifies a message-action denial by bot text', async () => {
+    const thinking = parseMessageRows(`- main:
+  - listitem:
+    - article "Casey":
+      - text: ${marker} source
+  - listitem:
+    - article "LiveStore Auto Threads Staging APP":
+      - text: ${marker} is thinking...
+`)
+    const denied = parseMessageRows(`- main:
+  - listitem:
+    - article "Casey":
+      - text: ${marker} source
+  - listitem:
+    - article "LiveStore Auto Threads Staging APP":
+      - text: ${marker} You do not have permission to create this thread. Only you can see this
+`)
+    let calls = 0
+    const settled = await settledAppReplies(async () => (calls++ === 0 ? thinking : denied), before.slice(0, 1), {
+      intervalMs: 1,
+      marker,
+    })
+    expect(calls).toBe(2)
+    const replies = newAppReplies('invoke-message-action', before.slice(0, 1), settled, marker)
+    expect(
+      classifyReplies(
+        'invoke-message-action',
+        replies.map((row) => row.text),
+      ),
+    ).toEqual({
+      messageActionOutcome: 'denied',
+    })
   })
 })
 
@@ -521,7 +673,12 @@ describe('runReadStepAcrossDocumentReplacement', () => {
   }
 
   it('re-runs read-only steps after a document replacement', async () => {
-    for (const step of [navigate!, ready!]) {
+    for (const step of [
+      navigate!,
+      ready!,
+      { operation: { kind: 'snapshot' } } as const,
+      { operation: { kind: 'locate', locator: { kind: 'css', selector: 'li[id^="chat-messages-"]' } } } as const,
+    ]) {
       const probe = failing(['browser_unavailable', 'browser_unavailable'])
       await expect(runReadStepAcrossDocumentReplacement(step, probe.run)).resolves.toBe('ok')
       expect(probe.calls()).toBe(3)

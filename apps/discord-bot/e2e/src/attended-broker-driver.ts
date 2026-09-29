@@ -35,11 +35,6 @@ export const gestureLocators = {
     },
     calibrated: '2026-09-26',
   },
-  messageIdAttribute: {
-    selector: 'li[id^="chat-messages-"]',
-    attribute: 'id',
-    calibrated: '2026-09-26',
-  },
 } as const
 
 type Locator =
@@ -65,7 +60,8 @@ type BrowserOperation =
       readonly intent: string
       readonly effect: 'write'
     }
-  | { readonly kind: 'evaluate'; readonly expression: string }
+  | { readonly kind: 'snapshot' }
+  | { readonly kind: 'locate'; readonly locator: Locator }
 
 /** Only fill/type carries a value, out of the request file and into stdin. */
 export type BrowserControlStep = { readonly operation: BrowserOperation; readonly stdinValue?: string }
@@ -103,7 +99,8 @@ export const runReadStepAcrossDocumentReplacement = async <A>(
   maxAttempts = 3,
 ): Promise<A> => {
   const readOnly =
-    step.operation.kind === 'evaluate' ||
+    step.operation.kind === 'snapshot' ||
+    step.operation.kind === 'locate' ||
     step.operation.kind === 'wait' ||
     (step.operation.kind === 'navigate' && step.operation.effect === 'read')
   for (let attempt = 1; ; attempt++) {
@@ -247,7 +244,7 @@ const runBrowserStepOnce = async (
   }
 }
 
-type MessageRow = { readonly id: string; readonly text: string }
+type MessageRow = { readonly text: string }
 
 /**
  * Interaction replies are deferred (a "thinking" row that is later edited), so read the
@@ -257,17 +254,19 @@ type MessageRow = { readonly id: string; readonly text: string }
 export const settledAppReplies = async (
   readMessages: () => Promise<ReadonlyArray<MessageRow>>,
   before: ReadonlyArray<MessageRow>,
-  options: { readonly timeoutMs?: number; readonly intervalMs?: number } = {},
+  options: { readonly timeoutMs?: number; readonly intervalMs?: number; readonly marker?: string } = {},
 ): Promise<ReadonlyArray<MessageRow>> => {
   const deadline = Date.now() + (options.timeoutMs ?? 90_000)
   for (;;) {
     const rows = await readMessages()
-    const settled = rows.some(
-      (row) =>
-        before.every((old) => old.id !== row.id) &&
-        row.text.includes(gestureLocators.app.locator.name) &&
-        /is thinking|sending command/iu.test(row.text) === false,
-    )
+    const settled = rows
+      .slice(before.length)
+      .some(
+        (row) =>
+          (row.text.includes(gestureLocators.app.locator.name) ||
+            (options.marker !== undefined && row.text.includes(options.marker))) &&
+          /is thinking|sending command/iu.test(row.text) === false,
+      )
     if (settled === true || Date.now() >= deadline) return rows
     await new Promise((resolve) => setTimeout(resolve, options.intervalMs ?? 3_000))
   }
@@ -319,61 +318,120 @@ export const makeHttpCaptureBrokerDriver = (input: HttpCaptureDriverInput = {}):
       default:
         throw new Error(`unknown broker operation: ${operation}`)
     }
-    // v2 effect receipts have only {kind:'completed'}; never interpret one as
-    // a response, deletion proof, or Discord message ID.
-    const readMessages = async (): Promise<ReadonlyArray<{ id: string; text: string }>> => {
-      const expression = `Array.from(document.querySelectorAll('${gestureLocators.messageIdAttribute.selector}')).map(function(e){return {id:e.getAttribute('${gestureLocators.messageIdAttribute.attribute}').match(/-(\\d{17,20})$/)?.[1],text:(e.textContent??'').slice(0,2048)}}).filter(function(e){return e.id!==undefined})`
-      const response = await runBrowserStep(sessionId, { operation: { kind: 'evaluate', expression } })
+    // The accessibility snapshot exposes message text and worker-assigned action refs,
+    // not Discord's DOM message IDs. Never treat refs as IDs or persist raw page text.
+    const readSnapshot = async (): Promise<string> => {
+      const response = await runBrowserStep(sessionId, { operation: { kind: 'snapshot' } })
       if (
         typeof response !== 'object' ||
         response === null ||
         !('result' in response) ||
         typeof response.result !== 'object' ||
         response.result === null ||
-        !('value' in response.result) ||
-        Array.isArray(response.result.value) === false
+        !('kind' in response.result) ||
+        response.result.kind !== 'snapshot' ||
+        !('ariaYaml' in response.result) ||
+        typeof response.result.ariaYaml !== 'string'
       )
-        throw new CaptureGestureFailure('evaluate', 0)
-      return response.result.value as ReadonlyArray<{ id: string; text: string }>
+        throw new CaptureGestureFailure('snapshot', 0)
+      return response.result.ariaYaml
     }
+    const readMessages = async (): Promise<ReadonlyArray<MessageRow>> => parseMessageRows(await readSnapshot())
     await runBrowserStep(sessionId, steps[0]!, 0)
     // Read the history only once the channel view has rendered its composer.
     await runBrowserStep(sessionId, ready(composer), 0)
+    let beforeSnapshot = await readSnapshot()
+    // Discord can put informational announcements over a channel on account switch.
+    // The row remains locatable behind these dialogs, but cannot be clicked.
+    if (
+      beforeSnapshot.includes('heading "New in the Shop: Profile Frames"') === true ||
+      beforeSnapshot.includes('heading "We’ve Launched Additional Protections for Teens"') === true
+    ) {
+      await runBrowserStep(
+        sessionId,
+        click({ kind: 'role', role: 'button', name: 'Close' }, 'Dismiss Discord announcement'),
+      )
+      beforeSnapshot = await readSnapshot()
+    }
     // Posting a message needs no history: the correlator proves it over REST. Only interaction
     // replies (ephemeral, invisible to REST) are read from the page.
     if (operation === 'create-message') {
       for (let index = 1; index < steps.length; index++) await runBrowserStep(sessionId, steps[index]!, index)
       return {}
     }
-    const before = await readMessages()
-    if (
-      operation === 'invoke-message-action' &&
-      before.some((item) => item.id === required('sourceMessageId') && item.text.includes(required('marker'))) === false
-    )
-      return { declined: true }
+    const before = parseMessageRows(beforeSnapshot)
+    if (operation === 'invoke-message-action') {
+      const sourceId = required('sourceMessageId')
+      if (/^\d{17,20}$/u.test(sourceId) === false) throw new Error('invalid source message ID')
+      try {
+        await runBrowserStep(sessionId, {
+          operation: {
+            kind: 'locate',
+            locator: {
+              kind: 'css',
+              selector: `${gestureLocators.messageRow.selector}[id$="-${sourceId}"]:has-text(${JSON.stringify(required('marker'))})`,
+            },
+          },
+        })
+      } catch (error) {
+        if (error instanceof CaptureGestureFailure && error.code === 'locator_not_found') return { declined: true }
+        throw error
+      }
+    }
     for (let index = 1; index < steps.length; index++) await runBrowserStep(sessionId, steps[index]!, index)
-    const after = await settledAppReplies(readMessages, before)
     const marker = required('marker')
-    // Docs replies do not echo the query, so they are the new rows authored by the app;
-    // any new row carrying the marker is the invoker's own text, never a reply.
-    const newResponses = after.filter(
-      (item) =>
-        before.every((old) => old.id !== item.id) &&
-        (operation === 'invoke-docs'
-          ? item.text.includes(gestureLocators.app.locator.name) && item.text.includes(marker) === false
-          : item.text.includes(gestureLocators.app.locator.name) || item.text.includes(marker)),
+    const after = await settledAppReplies(readMessages, before, operation === 'invoke-message-action' ? { marker } : {})
+    const newResponses = newAppReplies(operation, before, after, marker)
+    if (newResponses.length === 0) return { declined: true }
+    const outcome = classifyReplies(
+      operation,
+      newResponses.map((item) => item.text),
     )
-    const responseMessageIds = newResponses.map((item) => item.id)
-    if (responseMessageIds.length === 0) return { declined: true }
     return {
-      ...classifyReplies(
-        operation,
-        newResponses.map((item) => item.text),
-      ),
-      responseMessageIds,
+      ...outcome,
+      ...(operation === 'invoke-docs' && outcome.docsOutcome === 'answered'
+        ? { publicResponseCount: newResponses.length }
+        : { ephemeralResponseCount: newResponses.length }),
     }
   },
 })
+
+/** New rows are identified by snapshot row order, not worker refs or inaccessible DOM IDs. */
+export const newAppReplies = (
+  operation: 'invoke-docs' | 'invoke-message-action',
+  before: ReadonlyArray<MessageRow>,
+  after: ReadonlyArray<MessageRow>,
+  marker: string,
+): ReadonlyArray<MessageRow> =>
+  after
+    .slice(before.length)
+    .filter(
+      (item) =>
+        (operation === 'invoke-docs'
+          ? item.text.includes(gestureLocators.app.locator.name) && item.text.includes(marker) === false
+          : item.text.includes(gestureLocators.app.locator.name) || item.text.includes(marker)) &&
+        /is thinking|sending command/iu.test(item.text) === false,
+    )
+
+/** Rows are accessibility listitems, not DOM IDs; preserve row boundaries and duplicates. */
+export const parseMessageRows = (ariaYaml: string): ReadonlyArray<MessageRow> => {
+  const rows: string[] = []
+  let row: string[] = []
+  let depth = -1
+  for (const line of ariaYaml.split('\n')) {
+    const indent = line.length - line.trimStart().length
+    if (row.length > 0 && indent <= depth) {
+      rows.push(row.join(' '))
+      row = []
+    }
+    if (/^\s*- listitem(?:\s|:|$)/u.test(line) === true && row.length === 0) {
+      depth = indent
+      row = [line.trim()]
+    } else if (row.length > 0) row.push(line.trim())
+  }
+  if (row.length > 0) rows.push(row.join(' '))
+  return rows.map((text) => ({ text: text.replaceAll(/\s*\[ref=e\d+\]/gu, '') }))
+}
 
 /** Classifies bot replies by the bot's own user-facing texts; a non-answer never counts as answered. */
 export const classifyReplies = (

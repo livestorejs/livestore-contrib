@@ -236,7 +236,7 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     invokeMessageAction: async (request) => {
       if (input.invokeMessageAction !== undefined) {
         const result = await input.invokeMessageAction(request)
-        responses.set(result.response.id, result.response)
+        if (result.response.id !== undefined) responses.set(result.response.id, result.response)
         if (result._tag === 'Created' && input.resolveHumanThread !== undefined) {
           humanThreads.set(result.thread.id, result.thread)
         }
@@ -247,7 +247,7 @@ export const makeDfxLiveTransport = (input: DfxLiveTransportInput): DfxLiveTrans
     invokeDocs: async (request) => {
       if (input.invokeDocs !== undefined) {
         const result = await input.invokeDocs(request)
-        for (const response of result.responses) responses.set(response.id, response)
+        for (const response of result.responses) if (response.id !== undefined) responses.set(response.id, response)
         return result
       }
       throw new E2EPrerequisiteUnavailableError('Discord has no official API for initiating an application command')

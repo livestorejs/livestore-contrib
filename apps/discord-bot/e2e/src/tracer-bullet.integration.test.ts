@@ -12,6 +12,7 @@ const channelId = '222222222222222222' as Snowflake
 const restrictedDocsChannelId = '333333333333333333' as Snowflake
 
 const target: StagingTarget = {
+  applicationId: '444444444444444444' as Snowflake,
   guildId,
   channelId,
   docsChannelIds: { public: channelId, restricted: restrictedDocsChannelId },
@@ -66,6 +67,48 @@ describe('Discord bot composed E2E tracer bullet', () => {
     expect(serialized).not.toContain(restrictedDocsChannelId)
     expect(serialized).not.toContain('How does LiveStore')
     expect(serialized).not.toContain('syncing work')
+  })
+
+  it('cleans source and thread while never attempting REST deletion of ephemeral replies', async () => {
+    const world = makeFakeWorld(target)
+    let responseDeletes = 0
+    const transport = {
+      ...world.transport,
+      invokeMessageAction: async (request: Parameters<typeof world.transport.invokeMessageAction>[0]) => {
+        const result = await world.transport.invokeMessageAction(request)
+        const { id: _id, ...fields } = result.response
+        return { ...result, response: { ...fields, ephemeral: true as const } }
+      },
+      invokeDocs: async (request: Parameters<typeof world.transport.invokeDocs>[0]) => {
+        const result = await world.transport.invokeDocs(request)
+        if (result._tag !== 'Denied') return result
+        const responses = result.responses.map((response) => {
+          const { id: _id, ...fields } = response
+          return { ...fields, ephemeral: true as const }
+        })
+        return { ...result, responses: [responses[0]!, ...responses.slice(1)] as const }
+      },
+      deleteResponse: async () => {
+        responseDeletes++
+        throw new Error('ephemeral replies cannot be deleted over REST')
+      },
+    }
+    const receipt = await runE2EMatrix({
+      environment: 'fake',
+      target,
+      transport,
+      selection: {
+        _tag: 'Scenarios',
+        scenarios: ['message-action-authorized', 'message-action-denied', 'docs-denied'],
+      },
+      allowHumanAssisted: true,
+    })
+    const selected = receipt.scenarios.filter((scenario) => scenario.verdict !== 'UNRUN')
+    expect(selected.map((scenario) => scenario.verdict)).toEqual(['PASS', 'PASS', 'PASS'])
+    expect(selected.map((scenario) => scenario.cleanup.response)).toEqual(['not-needed', 'not-needed', 'not-needed'])
+    expect(responseDeletes).toBe(0)
+    expect(world.messages.size).toBe(0)
+    expect(world.threads.size).toBe(0)
   })
 
   it('requires a valid non-local title when the staging target opts into AI-title proof', async () => {

@@ -5,6 +5,7 @@ import { CaptureGestureFailure, makeHttpCaptureBrokerDriver } from './attended-b
 import { makeDfxRecoveryTransport } from './attended-broker-recovery.ts'
 import {
   dispatchBrokerOperation,
+  readBrokerApplicationId,
   makeDfxBrokerCorrelator,
   parseBrokerInvocation,
   type AttendedBrokerDeps,
@@ -78,7 +79,10 @@ if (args[0] === 'recover-ledger') {
     const driver: AttendedBrokerDriver = makeHttpCaptureBrokerDriver()
     const deps: AttendedBrokerDeps = {
       driver,
-      correlator: makeDfxBrokerCorrelator({ actorBotToken: token }),
+      correlator: makeDfxBrokerCorrelator({
+        actorBotToken: token,
+        targetApplicationId: readBrokerApplicationId(invocation.value.request),
+      }),
       performer: readPerformer(),
       openLedger: ({ filePath, runId }) => {
         const writer = openCleanupLedger({ filePath, runId })

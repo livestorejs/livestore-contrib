@@ -18,6 +18,7 @@ const manifest = parseLiveManifest({
   actorBotTokenRef: 'op://LiveStore/Discord staging actor/token',
   botControlSocket: '/run/discord-bot/staging/control.sock',
   target: {
+    applicationId: '444444444444444444',
     guildId: '111111111111111111',
     channelId: '222222222222222222',
     docsChannelIds: { public: '222222222222222222', restricted: '333333333333333333' },

@@ -55,7 +55,7 @@ export const makeCommandHumanHandoffBroker = (input: {
   readonly executable: string
   readonly runCommand: CommandRunner
   /** Staging target context appended to every payload so the broker can correlate. */
-  readonly context?: { readonly guildId: string; readonly channelId: string }
+  readonly context?: { readonly guildId: string; readonly channelId: string; readonly applicationId: string }
   /** Durable ledger override; defaults to a private temp file per broker run. */
   readonly ledgerPath?: string
 }): HumanHandoffBroker => {
@@ -152,6 +152,7 @@ export const makeCommandHumanHandoffBroker = (input: {
       resolved(await request('resolve-message', { id: message.id, channelId: message.channelId }), message.id)
     },
     resolveResponse: async (response) => {
+      if (response.id === undefined) throw new Error('Ephemeral response has no REST cleanup artifact')
       resolved(await request('resolve-response', { id: response.id, channelId: response.channelId }), response.id)
     },
     resolveThread: async (thread) => {
@@ -211,13 +212,16 @@ const response = (value: unknown): ResponseSnapshot => {
   if (typeof decoded.hasAnswer !== 'boolean' || typeof decoded.hasSources !== 'boolean') {
     throw new Error('Human handoff broker returned invalid response assertions')
   }
-  return {
-    id: snowflake(decoded.id, 'response id'),
+  const fields = {
     channelId: snowflake(decoded.channelId, 'response channel'),
     marker: text(decoded.marker, 'response marker'),
     hasAnswer: decoded.hasAnswer,
     hasSources: decoded.hasSources,
   }
+  if (decoded.ephemeral === true && decoded.id === undefined) return { ...fields, ephemeral: true }
+  if (decoded.ephemeral !== undefined && decoded.ephemeral !== false)
+    throw new Error('Human handoff broker returned invalid response identity')
+  return { ...fields, id: snowflake(decoded.id, 'response id') }
 }
 
 const thread = (value: unknown): ThreadSnapshot => {

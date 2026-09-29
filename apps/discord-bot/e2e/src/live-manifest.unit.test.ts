@@ -11,6 +11,7 @@ const valid = {
   actorBotTokenRef: 'op://LiveStore/Discord staging actor/token',
   botControlSocket: '/run/discord-bot/staging/control.sock',
   target: {
+    applicationId: '444444444444444444',
     guildId: '111111111111111111',
     channelId: '222222222222222222',
     docsChannelIds: { public: '222222222222222222', restricted: '333333333333333333' },
@@ -26,6 +27,7 @@ describe('live staging manifest', () => {
     const manifest = parseLiveManifest(valid)
     expect(manifest.environment).toBe('staging')
     expect(manifest.target.allowedChannelIds.has(manifest.target.channelId)).toBe(true)
+    expect(manifest.target.applicationId).toBe('444444444444444444')
     expect(manifest.target.expectAiTitles).toBe(false)
     expect(manifest.target.allowedChannelIds.has(manifest.target.docsChannelIds.restricted)).toBe(true)
   })
@@ -76,6 +78,14 @@ describe('live staging manifest', () => {
         expect(manifest.botControlSocket).toBeUndefined()
       }
     }
+  })
+  it('requires the exact staging application identity in the target manifest', () => {
+    expect(() => parseLiveManifest({ ...valid, target: { ...valid.target, applicationId: undefined } })).toThrow(
+      /target.applicationId/,
+    )
+    expect(() =>
+      parseLiveManifest({ ...valid, target: { ...valid.target, applicationId: 'not-a-snowflake' } }),
+    ).toThrow(/target.applicationId must be a snowflake/)
   })
   it.each([
     ['production target', { ...valid, environment: 'production' }],

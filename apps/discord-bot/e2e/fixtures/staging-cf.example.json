@@ -4,6 +4,7 @@
   "actorBotTokenRef": "op://VAULT/ITEM/FIELD",
   "botAdminEndpoint": "https://discordbot-discordbot-staging-PLACEHOLDER.workers.dev",
   "target": {
+    "applicationId": "0000000000000000004",
     "guildId": "0000000000000000009",
     "channelId": "0000000000000000001",
     "expectAiTitles": true,
