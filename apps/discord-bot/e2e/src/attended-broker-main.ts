@@ -1,5 +1,6 @@
 #!/usr/bin/env -S node --experimental-strip-types
 
+import { canonicalStagingApplicationId } from '../../cf/src/release.ts'
 import { redactDiscordRestError, safeDiscordFailureMessage } from '../../src/discord/rest-error-redaction.ts'
 import { CaptureGestureFailure, makeHttpCaptureBrokerDriver } from './attended-broker-driver.ts'
 import { makeDfxRecoveryTransport } from './attended-broker-recovery.ts'
@@ -78,7 +79,7 @@ if (args[0] === 'recover-ledger') {
     const driver: AttendedBrokerDriver = makeHttpCaptureBrokerDriver()
     const deps: AttendedBrokerDeps = {
       driver,
-      correlator: makeDfxBrokerCorrelator({ actorBotToken: token }),
+      correlator: makeDfxBrokerCorrelator({ actorBotToken: token, targetApplicationId: canonicalStagingApplicationId }),
       performer: readPerformer(),
       openLedger: ({ filePath, runId }) => {
         const writer = openCleanupLedger({ filePath, runId })

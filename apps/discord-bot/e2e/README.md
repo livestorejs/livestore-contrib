@@ -259,9 +259,10 @@ with a private request file and pipes fill values only into stdin. Message
 history and deferred-reply settlement use the value-free `browser snapshot`
 projection; the source-message precheck uses `browser locate` on the exact
 source row ID and marker. Snapshots and worker-generated refs do not expose
-Discord message IDs. Public `/docs` reply IDs are correlated with the actor
+Discord message IDs. Public `/docs` reply IDs are correlated with the staging
 application's REST-visible messages created since the pre-gesture baseline;
-ephemeral replies require no ID. No `evaluate` or response-ID extraction from
+the E2E actor bot reads and cleans these replies but is a different application.
+Ephemeral replies require no ID. No `evaluate` or response-ID extraction from
 capture receipts is required.
 Before enabling the attended matrix, inspect `browser snapshot` separately
 for both sessions and calibrate every `uncalibrated` entry in

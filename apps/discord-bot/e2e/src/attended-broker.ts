@@ -196,8 +196,11 @@ const readRequestString = (request: Record<string, unknown>, key: string, label:
   return value
 }
 
-/** DFX-backed correlator: polls the actor-bot REST seam until the gesture's effect appears. */
-export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string }): BrokerCorrelator => {
+/** DFX-backed correlator: the actor bot observes the staging application's replies. */
+export const makeDfxBrokerCorrelator = (input: {
+  readonly actorBotToken: string
+  readonly targetApplicationId: string
+}): BrokerCorrelator => {
   const DiscordLive = DiscordRESTMemoryLive.pipe(
     Layer.provide(NodeHttpClient.layerUndici),
     Layer.provide(DiscordConfig.layer({ token: Redacted.make(input.actorBotToken) })),
@@ -205,11 +208,7 @@ export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string 
   const runtime = ManagedRuntime.make(Layer.merge(DiscordLive, discordSafeLoggerLayer))
   const rest = <A, E>(effect: Effect.Effect<A, E, DiscordREST>): Promise<A> =>
     runtime.runPromise(effect.pipe(Effect.catchCause((cause) => Effect.fail(redactDiscordRestCause(cause)))))
-  let applicationId: Promise<string> | undefined
   const listPublicResponses = async (channelId: Snowflake): Promise<ReadonlyArray<Snowflake>> => {
-    const appId = await (applicationId ??= rest(
-      Effect.flatMap(DiscordREST, (discord) => discord.getMyApplication()),
-    ).then((application) => application.id))
     const messages: unknown = await rest(
       Effect.flatMap(DiscordREST, (discord) => discord.listMessages(channelId, { limit: 100 })),
     )
@@ -221,7 +220,7 @@ export const makeDfxBrokerCorrelator = (input: { readonly actorBotToken: string 
         !('id' in item) ||
         typeof item.id !== 'string' ||
         !('application_id' in item) ||
-        item.application_id !== appId
+        item.application_id !== input.targetApplicationId
       )
         return []
       return [asSnowflake(item.id, 'public docs response')]
