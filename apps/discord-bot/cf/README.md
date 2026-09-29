@@ -154,6 +154,10 @@ Set these non-secret GitHub **environment variables**:
 | `production` | `CF_WORKER_URL`             | `https://discordbot-discordbot-production.livestore.workers.dev`               |
 | `production` | `DISCORD_APPLICATION_ID`    | `1553674978757451776`                                                          |
 
+The CI setup installs both the root workspace (`pnpm:install`) and the
+Discord bot's separate pnpm workspace (`discord-bot:install`) before running
+any stage's preflight, deploy, readiness, or command-sync steps.
+
 The job derives `RELEASE_ID` from `github.sha`, sets `CF_DEPLOY_STAGE=production`
 on production plan and deploy steps and `AGENT_ACTION_APPROVAL=deploy` on the
 deploy step, and never passes `E2E_ACTOR_TOKEN` to production. The

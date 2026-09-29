@@ -33,7 +33,7 @@ const deployJob = (stage: 'staging' | 'production') => ({
   steps: [
     checkoutStep({ ref: '${{ github.sha }}' }),
     ...livestoreContribSetupStepsAfterCheckout,
-    { name: 'Install workspace dependencies', run: runDevenvTasksBefore('pnpm:install') },
+    { name: 'Install workspace dependencies', run: runDevenvTasksBefore('pnpm:install', 'discord-bot:install') },
     {
       name: 'Plan and enforce staging adoption gate',
       if: "${{ env.STAGE == 'staging' }}",
