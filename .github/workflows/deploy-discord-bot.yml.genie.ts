@@ -8,8 +8,8 @@ import {
   runDevenvTasksBefore,
 } from '../../genie/repo.ts'
 
-// Production is deliberately absent: cf/alchemy.run.ts admits only staging.
-// Dispatch with `gh workflow run deploy-discord-bot.yml --ref <approved-branch-or-tag> -f stage=staging`;
+// Production dispatch is admitted only from main and requires GitHub production
+// environment approval; initial Worker creation remains operator-only.
 // github.sha is the dispatch ref's resolved commit, not an independently supplied release ID.
 export default githubWorkflow({
   name: 'Deploy Discord bot',
@@ -18,10 +18,10 @@ export default githubWorkflow({
     workflow_dispatch: {
       inputs: {
         stage: {
-          description: 'Cloudflare stage (production requires separate stack admission)',
+          description: 'Cloudflare stage (production requires protected environment approval)',
           required: true,
           type: 'choice',
-          options: ['staging'],
+          options: ['staging', 'production'],
         },
       },
     },
@@ -40,6 +40,7 @@ export default githubWorkflow({
     deploy: {
       'runs-on': 'ubuntu-24.04',
       'timeout-minutes': 45,
+      if: "${{ inputs.stage != 'production' || github.ref == 'refs/heads/main' }}",
       environment: '${{ inputs.stage }}',
       defaults: bashShellDefaults,
       env: {
@@ -54,7 +55,8 @@ export default githubWorkflow({
         ...livestoreContribSetupStepsAfterCheckout,
         { name: 'Install workspace dependencies', run: runDevenvTasksBefore('pnpm:install') },
         {
-          name: 'Plan and enforce adoption gate',
+          name: 'Plan and enforce staging adoption gate',
+          if: "${{ inputs.stage == 'staging' }}",
           env: {
             CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
             CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}',
@@ -72,7 +74,27 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
 '`,
         },
         {
+          name: 'Plan and enforce production adoption gate',
+          if: "${{ inputs.stage == 'production' }}",
+          env: {
+            CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
+            CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}',
+            DISCORD_BOT_TOKEN: '${{ secrets.DISCORD_BOT_TOKEN }}',
+            DOCS_CORRELATION_KEY: '${{ secrets.DOCS_CORRELATION_KEY }}',
+            ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}',
+            OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
+            DISCORD_APPLICATION_ID: '${{ vars.DISCORD_APPLICATION_ID }}',
+            CF_DEPLOY_STAGE: 'production',
+          },
+          run: `set -euo pipefail
+DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
+  cd apps/discord-bot
+  bash cf/scripts/remote.sh plan --stage production
+'`,
+        },
+        {
           name: 'Deploy approved staging plan',
+          if: "${{ inputs.stage == 'staging' }}",
           env: {
             CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
             CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}',
@@ -87,6 +109,26 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
 DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
   cd apps/discord-bot
   pnpm cf:deploy --stage "$STAGE" --yes
+'`,
+        },
+        {
+          name: 'Deploy approved production plan',
+          if: "${{ inputs.stage == 'production' }}",
+          env: {
+            CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
+            CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}',
+            DISCORD_BOT_TOKEN: '${{ secrets.DISCORD_BOT_TOKEN }}',
+            DOCS_CORRELATION_KEY: '${{ secrets.DOCS_CORRELATION_KEY }}',
+            ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}',
+            OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
+            DISCORD_APPLICATION_ID: '${{ vars.DISCORD_APPLICATION_ID }}',
+            CF_DEPLOY_STAGE: 'production',
+            AGENT_ACTION_APPROVAL: 'deploy',
+          },
+          run: `set -euo pipefail
+DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
+  cd apps/discord-bot
+  bash cf/scripts/remote.sh deploy --stage production --yes
 '`,
         },
         {

@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: Cloudflare stage (production requires separate stack admission)
+        description: Cloudflare stage (production requires protected environment approval)
         required: true
         type: choice
-        options: [staging]
+        options: [staging, production]
 
 permissions:
   contents: read
@@ -29,6 +29,7 @@ jobs:
   deploy:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    if: ${{ inputs.stage != 'production' || github.ref == 'refs/heads/main' }}
     environment: ${{ inputs.stage }}
     defaults:
       run:
@@ -140,7 +141,8 @@ jobs:
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/composition-state/ci-runtime/run-with-nix-gc-race-retry.sh'
           bash "$__genie_ci_retry_script" 'devenv tasks run pnpm:install' 'cd "${GITHUB_WORKSPACE:-$PWD}" && if [ -n "${NIX_CONFIG:-}" ]; then NIX_CONFIG_WITH_APPEND=$(printf '"'"'%s\n%s'"'"' "$NIX_CONFIG" '"'"'restrict-eval = false'"'"'); else NIX_CONFIG_WITH_APPEND='"'"'restrict-eval = false'"'"'; fi; NIX_CONFIG="$NIX_CONFIG_WITH_APPEND" DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" tasks run pnpm:install'
-      - name: Plan and enforce adoption gate
+      - name: Plan and enforce staging adoption gate
+        if: ${{ inputs.stage == 'staging' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -156,7 +158,25 @@ jobs:
             pnpm cf:plan --stage "$STAGE" 2>&1 | tee "$RUNNER_TEMP/discord-bot-plan.log"
             node --experimental-strip-types cf/scripts/check-deploy-plan.ts "$RUNNER_TEMP/discord-bot-plan.log"
           '
+      - name: Plan and enforce production adoption gate
+        if: ${{ inputs.stage == 'production' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DOCS_CORRELATION_KEY: ${{ secrets.DOCS_CORRELATION_KEY }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DISCORD_APPLICATION_ID: ${{ vars.DISCORD_APPLICATION_ID }}
+          CF_DEPLOY_STAGE: production
+        run: |
+          set -euo pipefail
+          DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
+            cd apps/discord-bot
+            bash cf/scripts/remote.sh plan --stage production
+          '
       - name: Deploy approved staging plan
+        if: ${{ inputs.stage == 'staging' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -171,6 +191,24 @@ jobs:
           DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
             cd apps/discord-bot
             pnpm cf:deploy --stage "$STAGE" --yes
+          '
+      - name: Deploy approved production plan
+        if: ${{ inputs.stage == 'production' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DOCS_CORRELATION_KEY: ${{ secrets.DOCS_CORRELATION_KEY }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DISCORD_APPLICATION_ID: ${{ vars.DISCORD_APPLICATION_ID }}
+          CF_DEPLOY_STAGE: production
+          AGENT_ACTION_APPROVAL: deploy
+        run: |
+          set -euo pipefail
+          DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
+            cd apps/discord-bot
+            bash cf/scripts/remote.sh deploy --stage production --yes
           '
       - name: Verify gateway readiness and release
         run: |
