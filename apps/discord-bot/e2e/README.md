@@ -264,6 +264,12 @@ application's REST-visible messages created since the pre-gesture baseline;
 the E2E actor bot reads and cleans these replies but is a different application.
 Ephemeral replies require no ID. No `evaluate` or response-ID extraction from
 capture receipts is required.
+
+When Discord's "New in the Shop" or "Additional Protections for Teens"
+announcement covers a channel after an account switch, the broker closes it
+before interaction gestures; a visible message row behind a dialog is not
+otherwise clickable. Unknown dialogs are not dismissed automatically.
+
 Before enabling the attended matrix, inspect `browser snapshot` separately
 for both sessions and calibrate every `uncalibrated` entry in
 `e2e/src/attended-broker-driver.ts`'s `gestureLocators` table: channel

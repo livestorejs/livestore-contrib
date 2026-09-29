@@ -320,7 +320,7 @@ export const makeHttpCaptureBrokerDriver = (input: HttpCaptureDriverInput = {}):
     }
     // The accessibility snapshot exposes message text and worker-assigned action refs,
     // not Discord's DOM message IDs. Never treat refs as IDs or persist raw page text.
-    const readMessages = async (): Promise<ReadonlyArray<MessageRow>> => {
+    const readSnapshot = async (): Promise<string> => {
       const response = await runBrowserStep(sessionId, { operation: { kind: 'snapshot' } })
       if (
         typeof response !== 'object' ||
@@ -334,18 +334,32 @@ export const makeHttpCaptureBrokerDriver = (input: HttpCaptureDriverInput = {}):
         typeof response.result.ariaYaml !== 'string'
       )
         throw new CaptureGestureFailure('snapshot', 0)
-      return parseMessageRows(response.result.ariaYaml)
+      return response.result.ariaYaml
     }
+    const readMessages = async (): Promise<ReadonlyArray<MessageRow>> => parseMessageRows(await readSnapshot())
     await runBrowserStep(sessionId, steps[0]!, 0)
     // Read the history only once the channel view has rendered its composer.
     await runBrowserStep(sessionId, ready(composer), 0)
+    let beforeSnapshot = await readSnapshot()
+    // Discord can put informational announcements over a channel on account switch.
+    // The row remains locatable behind these dialogs, but cannot be clicked.
+    if (
+      beforeSnapshot.includes('heading "New in the Shop: Profile Frames"') === true ||
+      beforeSnapshot.includes('heading "We’ve Launched Additional Protections for Teens"') === true
+    ) {
+      await runBrowserStep(
+        sessionId,
+        click({ kind: 'role', role: 'button', name: 'Close' }, 'Dismiss Discord announcement'),
+      )
+      beforeSnapshot = await readSnapshot()
+    }
     // Posting a message needs no history: the correlator proves it over REST. Only interaction
     // replies (ephemeral, invisible to REST) are read from the page.
     if (operation === 'create-message') {
       for (let index = 1; index < steps.length; index++) await runBrowserStep(sessionId, steps[index]!, index)
       return {}
     }
-    const before = await readMessages()
+    const before = parseMessageRows(beforeSnapshot)
     if (operation === 'invoke-message-action') {
       const sourceId = required('sourceMessageId')
       if (/^\d{17,20}$/u.test(sourceId) === false) throw new Error('invalid source message ID')
