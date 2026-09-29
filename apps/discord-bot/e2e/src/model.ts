@@ -168,6 +168,8 @@ export type ResponseSnapshot = {
 } & ({ readonly id: Snowflake; readonly ephemeral?: false } | { readonly id?: never; readonly ephemeral: true })
 
 export interface StagingTarget {
+  /** Staging application that authored the interaction replies (not the observer bot). */
+  readonly applicationId: Snowflake
   readonly guildId: Snowflake
   /** Threading, message-action, and operator-control target. */
   readonly channelId: Snowflake

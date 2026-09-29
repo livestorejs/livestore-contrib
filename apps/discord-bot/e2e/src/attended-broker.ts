@@ -196,6 +196,15 @@ const readRequestString = (request: Record<string, unknown>, key: string, label:
   return value
 }
 
+/** A broker subprocess receives the configured staging application via its request, not package layout. */
+export const readBrokerApplicationId = (request: unknown): Snowflake => {
+  if (typeof request !== 'object' || request === null || Array.isArray(request) === true)
+    throw new Error('broker request must be a JSON object')
+  if ('applicationId' in request === false || typeof request.applicationId !== 'string')
+    throw new Error('broker request is missing applicationId')
+  return asSnowflake(request.applicationId, 'application ID')
+}
+
 /** DFX-backed correlator: the actor bot observes the staging application's replies. */
 export const makeDfxBrokerCorrelator = (input: {
   readonly actorBotToken: string

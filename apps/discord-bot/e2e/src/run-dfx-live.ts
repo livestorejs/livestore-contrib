@@ -65,6 +65,7 @@ export const runDfxLiveStaging = async (input: RunDfxLiveInput): Promise<RunRece
           runCommand: input.runCommand ?? defaultRunCommand,
           context: {
             guildId: input.manifest.target.guildId,
+            applicationId: input.manifest.target.applicationId,
             channelId: input.manifest.target.channelId,
           },
         })

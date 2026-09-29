@@ -86,6 +86,7 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
     targetInput,
     new Set([
       'guildId',
+      'applicationId',
       'channelId',
       'expectAiTitles',
       'docsChannelIds',
@@ -96,6 +97,7 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
     ]),
     'target',
   )
+  const applicationId = snowflake(targetInput.applicationId, 'target.applicationId')
   const guildId = snowflake(targetInput.guildId, 'target.guildId')
   if (targetInput.expectAiTitles !== undefined && typeof targetInput.expectAiTitles !== 'boolean') {
     throw new LiveManifestError('target.expectAiTitles must be a boolean')
@@ -155,6 +157,7 @@ export const parseLiveManifest = (input: unknown): LiveManifest => {
     ...(botAdminEndpoint === undefined ? {} : { botAdminEndpoint }),
     ...(botControlSocket === undefined ? {} : { botControlSocket }),
     target: {
+      applicationId,
       guildId,
       channelId,
       expectAiTitles: targetInput.expectAiTitles === true,

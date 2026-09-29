@@ -4,6 +4,7 @@
   "actorBotTokenRef": "op://VAULT/ITEM/FIELD",
   "botControlSocket": "/run/discord-bot/staging/control.sock",
   "target": {
+    "applicationId": "444444444444444444",
     "guildId": "111111111111111111",
     "channelId": "222222222222222222",
     "docsChannelIds": {

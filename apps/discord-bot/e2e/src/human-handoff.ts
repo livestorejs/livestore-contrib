@@ -55,7 +55,7 @@ export const makeCommandHumanHandoffBroker = (input: {
   readonly executable: string
   readonly runCommand: CommandRunner
   /** Staging target context appended to every payload so the broker can correlate. */
-  readonly context?: { readonly guildId: string; readonly channelId: string }
+  readonly context?: { readonly guildId: string; readonly channelId: string; readonly applicationId: string }
   /** Durable ledger override; defaults to a private temp file per broker run. */
   readonly ledgerPath?: string
 }): HumanHandoffBroker => {

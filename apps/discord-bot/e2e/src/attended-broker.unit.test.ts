@@ -19,6 +19,7 @@ import { makeRecoveryTransport } from './attended-broker-recovery.ts'
 import {
   dispatchBrokerOperation,
   parseBrokerInvocation,
+  readBrokerApplicationId,
   type AttendedBrokerDeps,
   type BrokerLedgerInput,
   type BrokerOperation,
@@ -95,6 +96,12 @@ describe('broker invocation parsing', () => {
       _tag: 'Parsed',
       value: { operation: 'create-message', request: baseRequest, ledgerPath: '/tmp/ledger.jsonl', runId: 'run-1' },
     })
+  })
+
+  it('accepts only a declared snowflake application identity for public reply correlation', () => {
+    expect(readBrokerApplicationId({ applicationId: '444444444444444444' })).toBe('444444444444444444')
+    expect(() => readBrokerApplicationId({})).toThrow(/missing applicationId/)
+    expect(() => readBrokerApplicationId({ applicationId: 'not-an-id' })).toThrow(/invalid snowflake/)
   })
 
   it('requires the run id when a ledger is configured', () => {
@@ -448,6 +455,7 @@ describe('broker dispatch', () => {
 
   it('sends each scenario marker and preserves eligible and filtered admission verdicts', async () => {
     const target = {
+      applicationId: '444444444444444444' as Snowflake,
       guildId,
       channelId,
       docsChannelIds: { public: channelId, restricted: channelId },

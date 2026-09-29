@@ -87,6 +87,7 @@ The non-secret manifest shape is:
   "actorBotTokenRef": "op://VAULT/ITEM/FIELD",
   "botControlSocket": "/run/discord-bot/staging/control.sock",
   "target": {
+    "applicationId": "444444444444444444",
     "guildId": "111111111111111111",
     "channelId": "222222222222222222",
     "docsChannelIds": {
@@ -102,8 +103,10 @@ The non-secret manifest shape is:
 }
 ```
 
-`target.channelId` owns threading, message actions, and operator-control flows.
-The docs lanes use their explicit `public` and `restricted` channel IDs. Every
+`target.applicationId` is the staging bot application that authors `/docs`
+replies, not the actor bot that observes and cleans them. `target.channelId`
+owns threading, message actions, and operator-control flows. The docs lanes
+use their explicit `public` and `restricted` channel IDs. Every
 distinct target is allowlisted and independently checked for the configured
 guild and topic sentinel before the first write. The attended broker receives
 the exact channel ID for each docs gesture; `location` remains descriptive and
@@ -226,10 +229,11 @@ A reference broker ships as `livestore-discord-e2e-broker` (source runner:
 `node --experimental-strip-types e2e/src/attended-broker-main.ts`). It drives
 the official Discord web client through the
 `http-capture` browser-control seam, correlates source, thread, and public `/docs`
-reply IDs through the actor-bot REST read seam, and journals each deletable
-artifact into a private mode-0600 per-run cleanup ledger (`--ledger FILE`)
-before acknowledging it. Ephemeral message-action replies and `/docs` denials
-are observed through projected accessibility snapshots; they have no
+reply IDs through the actor-bot REST read seam using the manifest target
+application ID, and journals each deletable artifact into a private mode-0600
+per-run cleanup ledger (`--ledger FILE`) before acknowledging it. Ephemeral
+message-action replies and `/docs` denials are observed through projected
+accessibility snapshots; they have no
 REST-visible message ID and cannot be deleted by the actor. They are therefore
 represented without an ID and never entered in the cleanup ledger.
 Recovery addresses threads with `getChannel(threadId)`, which includes archived

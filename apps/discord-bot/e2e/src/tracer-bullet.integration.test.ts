@@ -12,6 +12,7 @@ const channelId = '222222222222222222' as Snowflake
 const restrictedDocsChannelId = '333333333333333333' as Snowflake
 
 const target: StagingTarget = {
+  applicationId: '444444444444444444' as Snowflake,
   guildId,
   channelId,
   docsChannelIds: { public: channelId, restricted: restrictedDocsChannelId },

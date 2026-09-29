@@ -10,6 +10,7 @@ import { makeDfxLiveTransport, operatorCreateThreadArguments } from './dfx-live-
 import { topicSentinel, type Snowflake, type StagingTarget } from './model.ts'
 
 const target: StagingTarget = {
+  applicationId: '444444444444444444' as Snowflake,
   guildId: '111111111111111111' as Snowflake,
   channelId: '222222222222222222' as Snowflake,
   docsChannelIds: {
