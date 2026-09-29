@@ -131,8 +131,8 @@ the Worker name is fixed while the module loads):
 | `CF_BOT_STATE_NAMESPACE_ID` | expected 32-hex `BotState` Durable Object namespace                            |
 | `DISCORD_APPLICATION_ID`    | production app snowflake (required by production Worker binding)               |
 
-Set these GitHub **environment secrets** for each stage (not repository-wide
-secrets, except the existing shared `CACHIX_AUTH_TOKEN`):
+Set these GitHub **environment secrets** for each stage. The workflow also
+reads `CACHIX_AUTH_TOKEN` from shared secrets when configured:
 
 | Environment  | Secret names                                                                                                                                     |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
