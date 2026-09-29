@@ -1,0 +1,6 @@
+[
+  {
+    "path": "examples/**",
+    "reason": "LiveStore community examples are standalone Tailwind applications"
+  }
+]

@@ -54,13 +54,6 @@ in
     })
     (taskModules.clean { packages = pnpmPackages; })
     (taskModules.lint-oxc {
-      # Permanent exception for standalone examples; library packages stay guarded.
-      tailwindExceptions = [
-        {
-          path = "examples/**";
-          reason = "LiveStore community examples are standalone Tailwind applications";
-        }
-      ];
       lintPaths = [
         "apps"
         "packages"
