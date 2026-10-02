@@ -26,6 +26,8 @@ const config: PlaywrightTestConfig = {
           url: `http://127.0.0.1:${celldPort}/.well-known/celld/health`,
           reuseExistingServer: false,
           timeout: 120_000,
+          // `celld dev` runs the runtime in its own process group, so only a graceful stop reaches it.
+          gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
         },
         {
           command: 'pnpm vite --force --host 127.0.0.1',
