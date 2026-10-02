@@ -15,8 +15,8 @@ so `esbuild` must be on `PATH` too, or set `CELLD_ESBUILD` to its path.
 Start the sync backend and the app in two terminals:
 
 ```bash
-pnpm dev:sync   # celld dev: the sync worker on http://127.0.0.1:9876
-pnpm dev        # Vite: the app on http://localhost:60001, proxies /sync to celld
+celld dev .   # the sync worker on http://127.0.0.1:9876
+pnpm dev      # Vite: the app on http://localhost:60001, proxies /sync to celld
 ```
 
 `celld dev` keeps its state in `.celld/dev`. Set `CELLD_URL` if celld listens
@@ -34,9 +34,8 @@ the [celld documentation](https://celld.dev/docs). celld is alpha software.
 ## Tests
 
 ```bash
-pnpm test:e2e
+pnpm test
 ```
 
 Playwright starts `celld dev` and Vite, then checks that todos sync between two
-isolated browser contexts. The test needs `celld` on `PATH`, so it is not part
-of the default `test` script that CI runs.
+isolated browser contexts. The test needs `celld` on `PATH`.

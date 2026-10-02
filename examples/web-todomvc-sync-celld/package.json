@@ -1,6 +1,6 @@
 {
   "name": "livestore-example-web-todomvc-sync-celld",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "type": "module",
   "private": true,
   "dependencies": {
@@ -33,9 +33,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite --force",
-    "dev:sync": "celld dev .",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test": "playwright test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
