@@ -7,3 +7,6 @@
 /megarepo.kdl @schickling
 /megarepo.lock @schickling
 /release/ @schickling
+
+# Registering an example needs no code-owner review.
+/genie/examples.ts

@@ -5,6 +5,7 @@ import {
   packageDirForPackageName,
   type LivestorePackageName,
 } from '../repos/livestore/genie/external.ts'
+import { contribExampleMembers } from './examples.ts'
 
 export const contribPackageNames = [
   'adapter-expo',
@@ -19,23 +20,6 @@ export const contribPackageNames = [
 ] as const
 
 export const coreOwnedPackageNames = livestoreCorePackageNames
-
-export const contribExampleMembers = [
-  'examples/cf-chat',
-  'examples/cf-chat-solid',
-  'examples/expo-linearlite',
-  'examples/expo-todomvc-sync-cf',
-  'examples/node-effect-cli',
-  'examples/node-todomvc-sync-cf',
-  'examples/web-multi-store',
-  'examples/web-todomvc-custom-elements',
-  'examples/web-todomvc-experimental',
-  'examples/web-todomvc-redwood',
-  'examples/web-todomvc-solid',
-  'examples/web-todomvc-svelte',
-  'examples/web-todomvc-sync-electric',
-  'examples/web-todomvc-sync-s2',
-] as const
 
 export const contribWorkspaceMemberPaths = [
   ...contribPackageNames.map((name) => `packages/@livestore/${name}`),
