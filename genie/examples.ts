@@ -11,6 +11,7 @@ export const contribExampleMembers = [
   'examples/web-todomvc-redwood',
   'examples/web-todomvc-solid',
   'examples/web-todomvc-svelte',
+  'examples/web-todomvc-sync-celld',
   'examples/web-todomvc-sync-electric',
   'examples/web-todomvc-sync-s2',
 ] as const
