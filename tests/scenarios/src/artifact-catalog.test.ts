@@ -8,7 +8,6 @@ describe('artifact catalog', () => {
     ['concurrent-hotel-booking', 'SF-01'],
     ['pending-tail-recovery', 'SF-02'],
     ['many-writer-convergence', 'SF-03'],
-    ['large-payload-recovery', 'SF-04'],
   ] as const)('labels the reported %s finding as %s', (scenarioId, findingId) => {
     const catalog = buildArtifactCatalog([
       { file: `${scenarioId}.json.gz`, artifact: makeArtifact(scenarioId), reference: false },
@@ -24,6 +23,14 @@ describe('artifact catalog', () => {
 
     expect(catalog.entries[0]?.findingId).toBeUndefined()
     expect(catalog.entries[0]?.label).toContain('reference')
+  })
+
+  it('treats supported-size payload recovery as an example', () => {
+    const catalog = buildArtifactCatalog([
+      { file: 'payload.json', artifact: makeArtifact('large-payload-recovery'), reference: false },
+    ])
+
+    expect(catalog.entries[0]?.findingId).toBeUndefined()
   })
 
   it('carries source provenance into the saved-run catalog', () => {

@@ -43,6 +43,7 @@ export default packageJson(
     ...localPackageDefaults,
     scripts: {
       'scenario:run': 'tsx src/launcher.ts',
+      benchmark: 'tsx src/benchmark.ts',
       test: 'vitest run',
       'test:watch': 'vitest',
       viewer: 'pnpm exec vite --config scenario-viewer.vite.config.ts',

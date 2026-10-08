@@ -21,7 +21,8 @@ const sessionB = clientB.session('session-b')
 const both = alias([sessionA, sessionB])
 
 export default Scenario.parameterized(
-  { payload_bytes: parameter.integer(899_643) },
+  // Leave room for event and transport metadata beneath sync-cf's encoded-message cap.
+  { payload_bytes: parameter.integer(512 * 1024) },
   ({ payload_bytes: payloadBytes }) =>
     Scenario.start({
       application: todo,

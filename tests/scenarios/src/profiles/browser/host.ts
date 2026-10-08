@@ -76,6 +76,7 @@ export const makeBrowserHost = (args: {
     }
 
     const server = yield* startFixtureServer({
+      applicationId: args.applicationId,
       backendUrl: args.backend.serializedConfig.url,
       storeIdSuffix: args.backend.serializedConfig.storeIdSuffix,
       backendPayload: args.backend.serializedConfig.payload,
@@ -685,6 +686,7 @@ const inspectPageState = (page: Page, input: Parameters<Window['__scenarioBrowse
   })
 
 const startFixtureServer = (args: {
+  applicationId: string
   backendUrl: string
   storeIdSuffix: string
   backendPayload?: Schema.Json
@@ -709,6 +711,7 @@ const startFixtureServer = (args: {
             },
           },
           define: {
+            __SCENARIO_APPLICATION_ID__: jsonStringify(args.applicationId),
             __SCENARIO_SYNC_URL__: jsonStringify(args.backendUrl),
             __SCENARIO_STORE_SUFFIX__: jsonStringify(args.storeIdSuffix),
             __SCENARIO_SYNC_PAYLOAD__:

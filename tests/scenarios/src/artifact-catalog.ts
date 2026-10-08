@@ -1,8 +1,12 @@
+import { createHash } from 'node:crypto'
+
+import type { BenchmarkMembership } from './benchmark-model.ts'
 import type { ParallelOperationStep, ScenarioInstruction, ScenarioRunArtifact } from './model.ts'
+import { deriveRunTimings, type RunTimings } from './performance.ts'
 
 type ParticipantProfile = 'in-process' | 'process' | 'browser'
 type SyncBackend = 'mock' | 'local-sync-cf' | 'cloud-sync-cf'
-type SyncFailureId = 'SF-01' | 'SF-02' | 'SF-03' | 'SF-04'
+type SyncFailureId = 'SF-01' | 'SF-02' | 'SF-03'
 
 export interface ArtifactCatalogSource {
   readonly file: string
@@ -11,6 +15,9 @@ export interface ArtifactCatalogSource {
 }
 
 export interface ArtifactCatalogEntry {
+  readonly timings?: RunTimings
+  readonly comparisonKey?: string
+  readonly benchmark?: BenchmarkMembership
   readonly findingId?: SyncFailureId
   readonly file: string
   readonly label: string
@@ -27,7 +34,6 @@ const syncFailureIds: Readonly<Partial<Record<string, SyncFailureId>>> = {
   'concurrent-hotel-booking': 'SF-01',
   'pending-tail-recovery': 'SF-02',
   'many-writer-convergence': 'SF-03',
-  'large-payload-recovery': 'SF-04',
 }
 
 export const buildArtifactCatalog = (
@@ -55,6 +61,18 @@ export const makeArtifactCatalogEntry = ({
   const profile = artifact.descriptor.execution.participantProfile
   const backend = artifact.descriptor.execution.syncBackend
   return {
+    timings: deriveRunTimings(artifact),
+    comparisonKey: createHash('sha256')
+      .update(
+        canonical({
+          scenario: artifact.scenario,
+          execution: artifact.descriptor.execution,
+          traceVersion: artifact.descriptor.traceVersion,
+          seed: artifact.descriptor.seed,
+          applicationId: artifact.descriptor.applicationId,
+        }),
+      )
+      .digest('hex'),
     findingId: syncFailureIds[artifact.descriptor.scenarioId],
     file,
     label: makeArtifactLabel({ artifact, profile, backend, reference }),
@@ -112,3 +130,10 @@ const largestStringLength = (value: unknown): number => {
   if (value !== null && typeof value === 'object') return Math.max(0, ...Object.values(value).map(largestStringLength))
   return 0
 }
+
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, item) =>
+    item !== null && typeof item === 'object' && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item,
+  )

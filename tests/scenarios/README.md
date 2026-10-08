@@ -161,3 +161,67 @@ and promotion workflow.
 
 `tests/scenarios` is private contributor tooling. It may depend on LiveStore
 product packages, but product packages never depend on the runner.
+
+
+## Compare correctness and performance
+
+Use the same dependency-compatible core selection as `scenario:run`:
+
+```sh
+pnpm --dir tests/scenarios benchmark \
+  --baseline <baseline-ref> --candidate <candidate-ref> \
+  --scenario pending-tail-recovery --profile browser \
+  --samples 10 --warmups 1 --set pending_count=400
+```
+
+Repeat `--scenario` and/or `--profile` to build a matrix. Without those flags the
+suite runs offline recovery, pending-tail recovery, and many-writer convergence
+in the browser. Parameters apply to every selected scenario; run separate
+campaigns when cases need different parameter names. Use supported combinations
+(multi-session recovery requires the browser). `--help` lists the options.
+
+The command resolves refs to immutable commits once, checks dependency
+compatibility, runs sequentially, and alternates baseline/candidate order on
+each repetition. Each run starts fresh clients. Warmups prime host/build caches;
+they do not preserve a warmed application instance and never enter statistics.
+All artifacts and a campaign manifest remain under `artifacts/benchmarks/`.
+The manifest records Node, OS, CPU, lockfile and harness hashes. Changing the
+harness or lockfile during a campaign invalidates its controlled status.
+Dependency-incompatible branches need separately installed matching environments;
+the benchmark does not bypass the source selector's checks.
+
+In the viewer, **Saved runs → Compare** selects a campaign, baseline, candidate,
+and timing metric. It matches the complete normalized scenario (including
+inputs/seed), execution configuration, and trace version. Different workloads
+remain unmatched. Each row shows pass counts, passing-run median and min–max
+range; failed samples never contribute a duration or a speedup. Any correctness
+failure, missing metric, or incomplete campaign withholds the percentage change.
+**Choose individual runs** narrows either side to one artifact, and **Runs**
+opens the underlying evidence. Existing saved artifacts can be compared in
+exploratory mode, where equal hardware/dependencies/run order are not guaranteed.
+Saved runs also has a sortable **Time to pass** column. Refresh the viewer
+after a campaign finishes to read its updated catalog.
+
+Timings are derived from existing controller monotonic trace readings, without
+changing the artifact schema, participant clocks, or execution semantics:
+
+| Metric | Interval |
+| --- | --- |
+| Time to pass | `run.started` → `run.completed` on a passing artifact |
+| Client startup | `run.started` → creation of all initial clients |
+| Writes → settled | first `action.requested` → terminal stabilization completion |
+| Slowest recovery | longest matched fault removal → recovery completion |
+
+Total time includes client initialization and correctness checks but excludes
+launcher/source setup, fixture/backend setup before `run.started`, artifact
+encoding/writing, and teardown after completion.
+Workload time includes scripted waits and observation overhead. Recovery covers
+connectivity/backend faults, not every lifecycle restart. Unsupported/missing
+intervals display `—`. The existing two-observation settlement criterion and
+100 ms polling cadence remain unchanged; observations add further latency.
+These are instrumented end-to-end measurements, not microbenchmarks. Compare
+substantial workloads, inspect the spread, and use enough repetitions before
+drawing conclusions. Results are informational; no timing threshold fails CI.
+Measured correctness failures remain in the report and make the command exit
+nonzero; setup/infrastructure failures abort
+the campaign with nonzero exit status and preserve completed evidence.

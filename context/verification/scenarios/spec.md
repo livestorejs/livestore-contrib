@@ -77,6 +77,12 @@ Both are trusted executable TypeScript; code review or explicit operator
 selection is the authoring trust boundary. Normalization still produces closed,
 validated data before the runner starts. See [decision 0012](./.decisions/0012-deterministic-scenario-language.md).
 
+The retained large-payload recovery example defaults to a 512 KiB ASCII string,
+leaving room for protocol metadata beneath the sync-cf encoded-message cap. It
+checks offline persistence and subsequent synchronization at a supported size.
+The `payload_bytes` override can reproduce oversized transport boundaries, but
+those runs are not evidence that supported-size recovery fails.
+
 An explicit `wait <duration>` is one ordered instruction requesting that the
 controller delay the next instruction by at least that positive duration.
 `repeat ... with <duration> between:` applies fixed-delay pacing after each
@@ -97,6 +103,10 @@ The same normalized Scenario and host contract are composed through:
 | `in-process` | Store and host in the runner process; SQLite                                            | controlled mock, local or cloud `sync-cf` | direct host boundary, sampled product state and Store shutdown failures |
 | `process`    | isolated Node child process; SQLite                                                     | local or cloud `sync-cf`                  | serialized process protocol                                             |
 | `browser`    | persistent Chromium context per Client, page per session; OPFS, SharedWorker, Web Locks | local or cloud `sync-cf`                  | serialized page protocol and browser observations                       |
+
+The browser fixture passes the selected Application ID to its leader worker.
+Pages and workers resolve that same registered Application schema, including
+non-todo Applications, so their State databases and materializers agree.
 
 The improved core `makeMockSyncBackend` broadcasts pushed and advanced Events
 to every ordinary backend connection and seeds/filters each connection's pulls
@@ -287,6 +297,22 @@ and trace remain authoritative. Session reconstruction, provenance across
 historical Application/materializer revisions, and opt-in captured SQLite
 snapshots remain follow-ups. See
 [decision 0009](./.decisions/0009-reconstruct-leader-state-from-recorded-events.md).
+
+Saved runs are browsed in a collapsible table with separate Scenario, core
+revision, participant profile, backend, Event count, trace count, and result
+columns. Column sorting and text/target/profile/result filters help compare
+runs before loading an artifact; the recorded result remains authoritative.
+
+Performance comparison derives controller-clock intervals from existing trace
+records; it does not change the Scenario AST, artifact version, participant
+clocks, observation cadence, or correctness oracles. Only passing artifacts
+contribute completion timings. A contrib-owned benchmark command pins two core
+revisions, alternates sequential runs, excludes cache warmups from statistics,
+and records campaign/environment provenance separately from immutable artifacts.
+The replay viewer compares identical normalized workloads and execution settings,
+showing pass counts and timing distributions. Missing evidence, failed samples,
+and incomplete campaigns cannot produce a speedup claim. Historical comparisons
+are explicitly exploratory; timing results are informational, not CI thresholds.
 
 Storybook exercises primitives and complete viewer states from the tracked
 references. Playwright verifies interaction semantics across desktop light,

@@ -312,91 +312,52 @@ and passing-boundary probes remain reduction results rather than viewer entries.
   Browser promotion likewise observes Store shutdown during the action sequence as a
   `host-transport-failure`, without the SQLite cause.
 
-## SF-04: a 899,643-byte payload crosses the local sync-cf transport boundary
+## SF-04: encoded transport-size boundary (reclassified)
 
-### Failure summary
+The historical 899,643-byte ASCII payload exceeds an intentional sync-cf
+transport limit. It is not evidence of a supported-size recovery regression.
 
-Client A commits one todo Event offline, with a string payload of exactly
-899,643 ASCII/UTF-8 bytes. Local SQLite accepts it and the mock backend syncs
-payloads of at least one MiB, but reconnecting through process/local `sync-cf`
-fails with an empty `UnknownError`. The Event either remains indefinitely
-pending for larger payloads or makes backend observation fail immediately at
-the exact edge.
+At core revisions `ba85edffd44170139e1072a770045e09a1572abe` and
+`ebf19cf50d9ea9121b701b5f6e7946ef58eaaac6`,
+`packages/@livestore/sync-cf/src/common/constants.ts` sets
+`MAX_TRANSPORT_PAYLOAD_BYTES` to **900,000 bytes**, with a safety margin below
+roughly 1 MB. The limit covers the encoded message, including metadata, rather
+than just the application string. `splitArrayBySize` splits batches between
+Events and rejects a single oversized item with `OversizeChunkItemError`.
 
-Classification: **LiveStore/sync-provider resource and diagnostic failure**.
-The underlying runtime may impose a legitimate message-size limit, but LiveStore
-does not preflight/chunk the payload or return a stable typed size rejection.
+Using the scenario's Event, a 21-character backend ID, and the provider's
+ISO timestamp metadata, the actual `SyncMessage.PullResponse` encoder produces:
 
-### Expected versus actual behavior
+| Application string | Encoded response | Size check |
+| --- | --- | --- |
+| 899,642 bytes | 900,000 bytes | Accepted |
+| 899,643 bytes | 900,001 bytes | Rejected |
+| 524,288 bytes (512 KiB) | 524,646 bytes | Accepted |
 
-- Expected: the Event is chunked/sent successfully, or commit/push reports a
-  typed permanent size-limit error with an application recovery path.
-- Actual: the local commit succeeds, but the provider route fails during
-  reconnect/settlement with `UnknownError` and an empty message. At larger sizes
-  the Event remains pending and retries without visible progress.
+This explains the historical one-byte boundary. The mock backend does not
+impose the sync-cf transport cap. Push and pull envelopes differ in size;
+acceptance of the local commit or push does not imply that a pull response fits.
+The provider persists pushed Events before preparing its broadcast response.
 
-### Stable failure signature and reproducibility
-
-The exact boundary reproduced in **3/3** runs:
-
-```text
-profile=process + local-sync-cf
-annotation=commit-large-payload-offline
-terminal=UnknownError
-message=<empty>
-payload-bytes=899643
-```
-
-The timing boundary varies: two runs report the failure from settlement and one
-from reconnect. The normalized signature deliberately excludes that step.
-
-### Exact reproduction
-
-Profile `process + local-sync-cf`, seed `3002`:
+The retained `large-payload-recovery` scenario is now an example with a default
+512 KiB string. It still commits offline, reconnects, and checks that pending
+Events resolve and both Clients converge. Its source is
+[`large-payload-recovery.scenario.ts`](./src/corpus/scenarios/retained/examples/large-payload-recovery.scenario.ts).
+The previous boundary remains reproducible explicitly:
 
 ```sh
-SCENARIO_PAYLOAD_BYTES=899643 \
-SCENARIO_SETTLEMENT_TIMEOUT_MS=30000 \
-GITHUB_SHA=816c2a1d563ecfe15c200ad39f2ea0101914ecee \
-  pnpm --dir tests/scenarios scenario:run \
+pnpm --dir tests/scenarios scenario:run \
   --profile process \
   --scenario large-payload-recovery \
-  --output artifacts/correctness-large-payload-899643b-process-r2.json
+  --set payload_bytes=899643 \
+  --output artifacts/large-payload-boundary.json
 ```
 
-LiveStore revision:
-`1ce3d5484c7822f06ed054ddafbc14398cabc325`.
-
-### Minimized scenario
-
-`tests/scenarios/src/corpus/scenarios/retained/findings/large-payload-recovery.ts`
-
-Current reduction evidence:
-
-- One Client must originate the Event and one observer demonstrates remote
-  materialization; there is one disconnect, one action, one reconnect, and one
-  settlement.
-- 899,642 payload bytes passes; 899,643 bytes fails in the same environment.
-- The payload is one repeated ASCII character, avoiding encoding ambiguity.
-- The mock profile passes a one-MiB payload, isolating the boundary to the real
-  provider/transport path rather than SQLite or materialization.
-
-### Current artifact
-
-No artifact is retained for SF-04. The current runner reaches an invalid-string
-length failure before it can encode the artifact, so retaining the superseded
-envelope would misrepresent the current evidence protocol. The Scenario source
-remains the canonical reproducer.
-
-### Remaining uncertainty
-
-- The exact encoded wire size includes Event envelope/protocol overhead; 899,643
-  is the application string length, not the final WebSocket frame length.
-- The empty error does not identify whether rejection occurs in the client,
-  proxy, workerd WebSocket layer, worker, or Durable Object.
-- Cloudflare production may have a different limit. The browser profile fails
-  at the same 899,643-byte boundary with the same empty `UnknownError` during
-  reconnect.
+The historical process/browser runs surfaced an empty `UnknownError` instead
+of a useful size diagnostic. That remains a separate error-reporting concern;
+reducing the recovery payload does not fix oversized-event rejection or its
+diagnostics. Historical artifacts should retain their original payload sizes
+and outcomes.
 
 ## Runner finding RF-001: local sync-cf observations were not globally ordered
 
@@ -453,7 +414,8 @@ the minimal viewer corpus.
   compare it with the live database.
 - **Precise resource telemetry:** artifacts retain full logical evidence but do
   not record heap, SQLite file, queue, frame, or encoded payload sizes. Payload
-  byte counts in SF-04 describe application data only.
+  dimensions describe application data; SF-04's encoded sizes were measured
+  separately with the provider schema.
 
 These are runner limitations, not negative LiveStore results.
 

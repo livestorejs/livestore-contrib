@@ -46,9 +46,8 @@
     margin-left: 0;
   }
 
-  .controls {
+  .run-picker {
     flex: none;
-    grid-template-columns: auto minmax(0, 1fr);
     width: 100%;
   }
 

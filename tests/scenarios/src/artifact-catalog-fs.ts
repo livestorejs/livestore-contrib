@@ -9,6 +9,7 @@ import {
   makeArtifactCatalogEntry,
   type ArtifactCatalogEntry,
 } from './artifact-catalog.ts'
+import type { BenchmarkManifest } from './benchmark-model.ts'
 import { ScenarioRunArtifact } from './model.ts'
 
 export const writeArtifactCatalog = async (artifactDirectory: string): Promise<void> => {
@@ -38,6 +39,58 @@ export const writeArtifactCatalog = async (artifactDirectory: string): Promise<v
     }
   }
 
-  const catalog = buildArtifactCatalogFromEntries(catalogEntries)
+  const campaigns: BenchmarkManifest[] = []
+  const campaignRoot = path.join(artifactDirectory, 'benchmarks')
+  const directories = await fs.readdir(campaignRoot, { withFileTypes: true }).catch(() => [])
+  for (const directory of directories) {
+    if (!directory.isDirectory()) continue
+    try {
+      const manifest = JSON.parse(
+        await fs.readFile(path.join(campaignRoot, directory.name, 'manifest.json'), 'utf8'),
+      ) as BenchmarkManifest
+      if (
+        manifest.version !== 1 ||
+        manifest.id !== directory.name ||
+        typeof manifest.startedAt !== 'string' ||
+        typeof manifest.baseline !== 'string' ||
+        typeof manifest.candidate !== 'string' ||
+        typeof manifest.environment !== 'object' ||
+        manifest.environment === null ||
+        !Array.isArray(manifest.samples) ||
+        !['running', 'complete', 'interrupted'].includes(manifest.status)
+      )
+        continue
+      const campaignEntries: ArtifactCatalogEntry[] = []
+      for (const sample of manifest.samples) {
+        if (sample.phase !== 'measured') continue
+        if (path.basename(sample.file) !== sample.file || !['baseline', 'candidate'].includes(sample.role))
+          throw new Error('Invalid sample')
+        const file = `benchmarks/${directory.name}/${sample.file}`
+        const artifact = Schema.decodeSync(Schema.fromJsonString(ScenarioRunArtifact))(
+          await fs.readFile(path.join(artifactDirectory, file), 'utf8'),
+        )
+        if (artifact.descriptor.sourceRevision !== manifest[sample.role]) throw new Error('Sample revision mismatch')
+        const entry = makeArtifactCatalogEntry({ file, artifact, reference: false })
+        campaignEntries.push({
+          ...entry,
+          label: `${sample.role.toUpperCase()} · ${entry.label} · sample ${sample.iteration}`,
+          benchmark: {
+            id: manifest.id,
+            role: sample.role,
+            iteration: sample.iteration,
+            complete: manifest.status === 'complete',
+          },
+        })
+      }
+      campaigns.push(manifest)
+      catalogEntries.push(...campaignEntries)
+    } catch {
+      // A malformed campaign cannot contribute misleading partial comparison statistics.
+    }
+  }
+  const catalog = {
+    ...buildArtifactCatalogFromEntries(catalogEntries),
+    campaigns: campaigns.toSorted((a, b) => b.startedAt.localeCompare(a.startedAt)),
+  }
   await fs.writeFile(path.join(artifactDirectory, 'catalog.json'), `${JSON.stringify(catalog, null, 2)}\n`, 'utf8')
 }

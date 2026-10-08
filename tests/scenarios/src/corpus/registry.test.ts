@@ -29,7 +29,7 @@ describe('scenario corpus', () => {
       ['finding', 'SF-01', 'concurrent-hotel-booking'],
       ['finding', 'SF-02', 'pending-tail-recovery'],
       ['finding', 'SF-03', 'many-writer-convergence'],
-      ['finding', 'SF-04', 'large-payload-recovery'],
+      ['example', undefined, 'large-payload-recovery'],
     ])
   })
 })
