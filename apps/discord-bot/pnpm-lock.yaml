@@ -8,6 +8,7 @@ overrides:
   effect: 4.0.0-beta.105
   '@effect/platform-node': 4.0.0-beta.105
   '@effect/platform-node-shared': 4.0.0-beta.105
+  '@effect/sql-d1': 4.0.0-beta.105
   '@effect/vitest': 4.0.0-beta.105
   discord-api-types: 0.38.40
 
@@ -218,9 +219,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@cloudflare/workers-types@5.20260823.1':
-    resolution: {integrity: sha512-HdBVDR/gecQ5QwB+DZ9kB5yjNZLS85fe8bMB2K/k0xmCvaoMlAFrQQGLaCBYR00j+i9aTkQzwfrPInVZwlMPwQ==}
-
   '@cloudflare/workers-types@5.20260825.1':
     resolution: {integrity: sha512-/XZntbK+BlJWC5jxkaDNhnDLr2Bf2627sZ6VMrxqKrnc84pc6gNu5NdAyaTkZn1LzQVFIa3SL7V/7veLF59P7w==}
 
@@ -272,8 +270,8 @@ packages:
       effect: 4.0.0-beta.105
       ioredis: '>=5.7.0 <6.0.0'
 
-  '@effect/sql-d1@4.0.0-rc.111':
-    resolution: {integrity: sha512-hjIoVS59gAvP1DjB+R5hwL9n/UbS1598/qcT1Hp3Tn3ksuJUOPTXfsCCiAQT3Ueecfkbiy32fxrCbzD0Z1YJLA==}
+  '@effect/sql-d1@4.0.0-beta.105':
+    resolution: {integrity: sha512-69ShnmTbpxYEqJGVms/JGIiUAjzLsZZxAAIZv9rs5SBHlL0P2gZ+ZCHxtjL9hgnSlt5xePGRdK+vUiNMuRynKQ==}
     peerDependencies:
       effect: 4.0.0-beta.105
 
@@ -2409,8 +2407,6 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260704.1':
     optional: true
 
-  '@cloudflare/workers-types@5.20260823.1': {}
-
   '@cloudflare/workers-types@5.20260825.1': {}
 
   '@distilled.cloud/aws@1.0.0-rc.4(effect@4.0.0-beta.105)':
@@ -2480,9 +2476,9 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/sql-d1@4.0.0-rc.111(effect@4.0.0-beta.105)':
+  '@effect/sql-d1@4.0.0-beta.105(effect@4.0.0-beta.105)':
     dependencies:
-      '@cloudflare/workers-types': 5.20260823.1
+      '@cloudflare/workers-types': 5.20260825.1
       effect: 4.0.0-beta.105
 
   '@effect/sql-sqlite-do@4.0.0-beta.105(effect@4.0.0-beta.105)':
@@ -3164,7 +3160,7 @@ snapshots:
       '@distilled.cloud/core': 1.0.0-rc.4(effect@4.0.0-beta.105)
       '@distilled.cloud/neon': 1.0.0-rc.4(effect@4.0.0-beta.105)
       '@distilled.cloud/planetscale': 1.0.0-rc.4(effect@4.0.0-beta.105)
-      '@effect/sql-d1': 4.0.0-rc.111(effect@4.0.0-beta.105)
+      '@effect/sql-d1': 4.0.0-beta.105(effect@4.0.0-beta.105)
       '@effect/sql-sqlite-do': 4.0.0-beta.105(effect@4.0.0-beta.105)
       '@effect/vitest': 4.0.0-beta.105(effect@4.0.0-beta.105)(vitest@4.1.11(@types/node@25.3.3)(vite@8.2.2(@types/node@25.3.3)(yaml@2.9.0)))
       '@libsql/client': 0.17.4

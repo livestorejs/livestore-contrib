@@ -47,7 +47,7 @@ import {
   Stream,
   SubscriptionRef,
 } from '@livestore/utils/effect'
-import { Sse } from 'effect/unstable/encoding'
+import { Sse } from 'effect/encoding'
 
 import * as ApiSchema from './api-schema.ts'
 import { decodeReadBatch } from './decode.ts'

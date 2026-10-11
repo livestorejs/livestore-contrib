@@ -1,4 +1,4 @@
-import { type Toolkit } from 'effect/unstable/ai'
+import { type Toolkit } from 'effect/ai'
 
 import { Effect, FetchHttpClient, Layer } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'

@@ -1,4 +1,4 @@
-import { Tool } from 'effect/unstable/ai'
+import { Tool } from 'effect/ai'
 
 import { Vitest } from '@livestore/utils-dev/node-vitest'
 

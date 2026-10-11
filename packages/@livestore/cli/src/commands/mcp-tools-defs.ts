@@ -1,4 +1,4 @@
-import { Tool, Toolkit } from 'effect/unstable/ai'
+import { Tool, Toolkit } from 'effect/ai'
 
 import { Schema } from '@livestore/utils/effect'
 

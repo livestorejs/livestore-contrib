@@ -3,10 +3,10 @@
   "members": {
     "livestore": {
       "url": "https://github.com/livestorejs/livestore",
-      "ref": "main",
-      "commit": "ba85edffd44170139e1072a770045e09a1572abe",
+      "ref": "2d7fe27d7de368852115d3a32a4230f47a80a905",
+      "commit": "2d7fe27d7de368852115d3a32a4230f47a80a905",
       "pinned": true,
-      "lockedAt": "2026-09-23T16:51:23.208Z"
+      "lockedAt": "2026-10-11T20:25:56.981Z"
     },
     "effect-utils": {
       "url": "https://github.com/overengineeringstudio/effect-utils",

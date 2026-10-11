@@ -1,4 +1,4 @@
-import { McpProtocol } from 'effect/unstable/ai'
+import { McpProtocol } from 'effect/ai'
 
 /**
  * MCP stdio selects an exact offered version when available and otherwise

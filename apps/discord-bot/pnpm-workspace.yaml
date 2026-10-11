@@ -7,6 +7,7 @@ overrides:
   effect: 4.0.0-beta.105
   '@effect/platform-node': 4.0.0-beta.105
   '@effect/platform-node-shared': 4.0.0-beta.105
+  '@effect/sql-d1': 4.0.0-beta.105
   '@effect/vitest': 4.0.0-beta.105
   discord-api-types: 0.38.40
 

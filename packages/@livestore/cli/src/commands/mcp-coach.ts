@@ -1,4 +1,4 @@
-import { AiError, LanguageModel, Prompt, Tool } from 'effect/unstable/ai'
+import { AiError, LanguageModel, Prompt, Tool } from 'effect/ai'
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai'
 
 import { Config, Effect, FetchHttpClient, Layer, Schema } from '@livestore/utils/effect'

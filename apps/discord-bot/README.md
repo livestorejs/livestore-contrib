@@ -17,6 +17,10 @@ The admitted runtime tuple is pinned exactly:
 - `@effect/platform-node` and `@effect/platform-node-shared` 4.0.0-beta.105
 - `discord-api-types` 0.38.40
 
+Alchemy's transitive `@effect/sql-d1` is also pinned to 4.0.0-beta.105 in the
+app-local overrides. This satisfies Alchemy's supported dependency range while
+keeping its SQL adapter in the app's independent Effect beta cohort.
+
 The current entrypoint composes runtime configuration, DFX Gateway/REST
 adapters, shared workflows, the control RPC, and the operator CLI. The default
 mode is a local fake runtime and does not contact Discord; live writes require
