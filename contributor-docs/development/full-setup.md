@@ -34,12 +34,6 @@ devenv tasks run setup:strict --mode before
 | Check generated projections | `devenv tasks run genie:check --mode before` |
 | Check composed source state | `devenv tasks run mr:check --mode before` |
 
-Example manifests are standalone, manually maintained files and are intentionally
-excluded from `genie:run` and `genie:check`. When updating core's Effect cohort,
-align each example's `pnpm.overrides` with `repos/livestore/genie/external.ts`
-(currently Effect 4.0.3), preserving the example's other dependency pins and
-metadata. There is no example-manifest regeneration command.
-
 Only refresh remote refs and rewrite `megarepo.lock` when intentionally moving
 the composed dependency graph:
 

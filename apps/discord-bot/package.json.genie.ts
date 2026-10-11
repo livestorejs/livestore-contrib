@@ -18,7 +18,6 @@ export default packageJson({
   packageManager: 'pnpm@11.8.0',
   overrides: {
     '@effect/platform-node-shared': '4.0.0-beta.105',
-    '@effect/sql-d1': '4.0.0-beta.105',
     '@effect/sql-sqlite-do': '4.0.0-beta.105',
     'discord-api-types': '0.38.40',
     effect: '4.0.0-beta.105',
