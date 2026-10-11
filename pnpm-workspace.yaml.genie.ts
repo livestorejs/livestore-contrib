@@ -249,26 +249,6 @@ export default pnpmWorkspaceYaml.root({
   overrides: {
     ...effectDedupeOverrides,
     ...workspacePackageOverrides,
-    // Keep ASN.1 parsing fixes when pnpm reuses older transitive resolutions.
-    'node-forge': '1.4.0',
-    // Preserve main's transitive resolutions when rebuilding the Effect cohort lock.
-    '@expo/config-plugins@9.0.12>semver': '7.8.2',
-    '@expo/image-utils@0.6.5>@expo/spawn-async': '1.8.0',
-    '@expo/osascript@2.1.4>@expo/spawn-async': '1.8.0',
-    '@expo/package-manager@1.9.10>@expo/spawn-async': '1.8.0',
-    '@expo/plugin-warn-if-update-available@2.5.1>semver': '7.8.2',
-    '@expo/plugin-warn-if-update-available@2.5.1>tslib': '2.8.1',
-    '@expo/rudder-sdk-node@1.1.1>node-fetch': '2.7.0',
-    '@expo/steps@1.0.231>@expo/spawn-async': '1.8.0',
-    '@expo/steps@1.0.231>fs-extra': '11.3.6',
-    '@expo/steps@1.0.231>yaml': '2.9.0',
-    '@oclif/core@1.26.2>semver': '7.8.2',
-    '@oclif/core@1.26.2>tslib': '2.8.1',
-    '@oclif/core@2.16.0>tslib': '2.8.1',
-    '@urql/exchange-retry@1.2.0>@urql/core': '5.2.0',
-    'globby@11.1.0>ignore': '5.3.2',
-    'graphql-tag@2.12.6>tslib': '2.8.1',
-    'jsonwebtoken@9.0.0>semver': '7.8.2',
     /**
      * Force one copy of the OpenTelemetry tracing packages, at the versions the catalog pins.
      * Two copies otherwise resolve side by side, and their `InMemorySpanExporter` types are
