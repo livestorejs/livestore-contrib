@@ -15,6 +15,7 @@ import {
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 
+import { publishCohort } from './publish-cohort.mjs'
 import { cleanupPackedRun } from './simulate-publish-cleanup.mjs'
 import { PendingRegistryVerification, verifyProvenance, waitForRegistryVerification } from './verify-provenance.mjs'
 
@@ -527,37 +528,42 @@ if (dryRun === true || publish === true || packOnly === true) {
       }
     }
 
-    if (packOnly === false) {
-      for (const { pkg, tarballPath } of packed) {
-        const existing = npmViewExists(pkg.name, pkg.version)
-        if (existing === true && publish === true) {
-          console.log(`${pkg.name}@${pkg.version} already exists; skipping publish and verifying the packed candidate`)
-          continue
-        }
+    const publishPackage = ({ pkg, tarballPath }) => {
+      const publishArgs = ['publish', tarballPath, `--tag=${npmTag}`, '--access=public', '--ignore-scripts']
+      if (publish === true) publishArgs.push('--provenance')
+      if (dryRun === true) publishArgs.push('--dry-run')
+      run('npm', publishArgs)
+      console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
+    }
 
-        const publishArgs = ['publish', tarballPath, `--tag=${npmTag}`, '--access=public', '--ignore-scripts']
-        if (publish === true) publishArgs.push('--provenance')
-        if (dryRun === true) publishArgs.push('--dry-run')
-        run('npm', publishArgs)
-        console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
-      }
+    if (dryRun === true) {
+      for (const candidate of packed) publishPackage(candidate)
     }
 
     if (publish === true) {
-      const verifiedRegistryMetadata = new Map()
-      for (const { pkg, digests } of packed) {
-        const metadata = await waitForRegistryVerification(async () => {
-          if (!npmViewExists(pkg.name, pkg.version)) {
-            throw new PendingRegistryVerification(`${pkg.name}@${pkg.version} is not visible on npm yet`)
+      const verifiedRegistryMetadata = await publishCohort({
+        packed,
+        isPublished: (pkg) => npmViewExists(pkg.name, pkg.version),
+        preflightExisting: ({ pkg, digests }) => {
+          assertRegistryArtifact({ pkg, digests })
+          console.log(`${pkg.name}@${pkg.version} existing artifact matches the packed candidate; skipping publish`)
+        },
+        publishPackage,
+        verifyPackage: ({ pkg, digests }, { newlyPublished }) => {
+          const verify = async () => {
+            if (!npmViewExists(pkg.name, pkg.version)) {
+              throw new PendingRegistryVerification(`${pkg.name}@${pkg.version} is not visible on npm yet`)
+            }
+            const metadata = assertRegistryArtifact({ pkg, digests })
+            verifyTag(pkg)
+            verifyPublishedDependencies({ pkg, metadata })
+            await verifyProvenance(pkg, metadata)
+            return metadata
           }
-          const candidateMetadata = assertRegistryArtifact({ pkg, digests })
-          verifyTag(pkg)
-          verifyPublishedDependencies({ pkg, metadata: candidateMetadata })
-          await verifyProvenance(pkg, candidateMetadata)
-          return candidateMetadata
-        })
-        verifiedRegistryMetadata.set(pkg.name, metadata)
-      }
+          // Only freshly published packages can have pending publication evidence.
+          return newlyPublished ? waitForRegistryVerification(verify) : verify()
+        },
+      })
 
       if (manifestOut !== undefined) {
         const absoluteManifestOut = isAbsolute(manifestOut) === true ? manifestOut : join(rootDir, manifestOut)
