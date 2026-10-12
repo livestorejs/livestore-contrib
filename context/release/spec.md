@@ -45,12 +45,38 @@ The trusted job publishes the exact `release/topology.json` contrib cohort
 under the npm `dev` tag with provenance. An existing package version is accepted
 only when its registry digest matches the newly packed artifact; the job
 verifies the mutable tag (and fails rather than attempting an out-of-band tag
-repair), verifies direct rewritten core dependencies, and
-records the source SHA and package digests in an uploaded manifest.
+repair), verifies direct rewritten core dependencies and the presence of the
+registry SLSA provenance bundle, and records source SHA, package digests and
+provenance metadata in an uploaded manifest. Any missing or mismatched evidence
+fails publication verification, including when re-running an existing version.
 
 This escape hatch does not implement core-triggered dispatch or automatic
 lockstep orchestration. A maintainer must dispatch contrib after verifying the
 matching core cohort; automatic mirrored publication remains future work.
+
+## Stable Publication Runbook
+
+After core is published, dispatch `.github/workflows/release.yml` on `main`
+with `mode=publish-stable`, `core_version=x.y.z`, and `contrib_version=x.y.z`.
+Both versions must be identical stable SemVer (no prerelease or build suffix).
+The live npm `latest` tag for `@livestore/livestore` must point to that version,
+and every required core dependency must already exist on npm. The job runs
+`release:stable`, publishing the complete topology cohort on `latest` through
+npm OIDC trusted publishing with provenance; token authentication is refused.
+The same digest, dist-tag, dependency and provenance checks as the dev path
+apply. Review the uploaded stable release manifest and job summary.
+
+For a hypothetical release that is not on npm yet, run:
+
+```sh
+LIVESTORE_RELEASE_VERSION=0.5.0 LIVESTORE_CORE_RELEASE_VERSION=0.5.0 \
+  devenv tasks run release:stable:dryrun
+```
+
+This reuses the snapshot runner's `--dry-run` packing/building/publish simulation
+and never publishes. It deliberately omits the live core registry preflight so
+unpublished hypothetical versions can be rehearsed; a successful dry run does
+not prove core publication or OIDC/provenance availability.
 
 ## Core Version Resolution
 

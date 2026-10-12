@@ -26,8 +26,13 @@ be the same `x.y.z-dev.N` prerelease (for example, `0.5.0-dev.0`), and the core
 version must already be available on npm. Dev publishing uses the same npm
 trusted-publishing workflow identity and rejects token-based authentication.
 
-Stable release publishing remains blocked until release-plan generation and
-approval are added.
+An explicit `mode=publish-stable` dispatch on `main` publishes identical stable
+`core_version` and `contrib_version` values on npm `latest`, after confirming
+`@livestore/livestore` already has that version on `latest`. Both dev and stable
+jobs verify each package's dist-tag, packed SHA-1/SHA-512 digests, dependencies
+and retrievable npm provenance attestation. A mismatch fails the job.
+See [`context/release/spec.md`](../../context/release/spec.md#stable-publication-runbook)
+for the dispatch and hypothetical stable dry-run runbook.
 
 ## Repository Settings
 

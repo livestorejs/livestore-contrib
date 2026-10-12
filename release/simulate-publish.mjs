@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 
 import { cleanupPackedRun } from './simulate-publish-cleanup.mjs'
+import { verifyProvenance } from './verify-provenance.mjs'
 
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
@@ -42,6 +43,21 @@ const outDir = readArg('--out-dir')
 const manifestOut = readArg('--manifest-out')
 const npmTag = readArg('--tag') ?? 'snapshot'
 const verifyCore = hasArg('--verify-core')
+
+if (npmTag === 'latest' || npmTag === 'dev') {
+  const pattern =
+    npmTag === 'latest'
+      ? /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/
+      : /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$/
+  if (!pattern.test(releaseVersion ?? '') || releaseVersion !== explicitCoreVersion) {
+    throw new Error(
+      `${npmTag} requires matching explicit contrib and core ${npmTag === 'latest' ? 'stable' : 'dev'} semver versions`,
+    )
+  }
+  if (publish === true && verifyCore === false) {
+    throw new Error(`${npmTag} publishing requires --verify-core`)
+  }
+}
 
 const exclusiveModes = [publish, dryRun, packOnly].filter((mode) => mode === true)
 if (exclusiveModes.length > 1) {
@@ -221,7 +237,11 @@ for (const { path, manifest } of publishablePackages) {
       if (isLocalProtocol(spec) === true) {
         addError(`${manifest.name} ${section}.${dependencyName} still uses local protocol ${spec}`)
       }
-      if (npmTag === 'dev' && dependencyName === '@livestore/devtools-vite' && spec !== coreReleaseVersion) {
+      if (
+        (npmTag === 'dev' || npmTag === 'latest') &&
+        dependencyName === '@livestore/devtools-vite' &&
+        spec !== coreReleaseVersion
+      ) {
         addError(
           `${manifest.name} ${section}.@livestore/devtools-vite must equal core release version ${coreReleaseVersion}`,
         )
@@ -341,7 +361,7 @@ const dependencyChecksForPackage = ({ pkg, metadata }) => {
     name: dependencyName,
     expected: to,
   }))
-  if (npmTag === 'dev') {
+  if (npmTag === 'dev' || npmTag === 'latest') {
     for (const section of dependencySections) {
       const expected = pkg.manifest?.[section]?.['@livestore/devtools-vite']
       if (expected !== undefined) expectedDependencies.push({ section, name: '@livestore/devtools-vite', expected })
@@ -436,7 +456,15 @@ const restoreGeneratedFiles = () => {
 const verifyRequiredCorePackages = () => {
   if (verifyCore === false) return
   const packagesToVerify = new Set(requiredCorePackages)
-  if (npmTag === 'dev') packagesToVerify.add('@livestore/devtools-vite')
+  if (npmTag === 'dev' || npmTag === 'latest') packagesToVerify.add('@livestore/devtools-vite')
+  if (npmTag === 'latest') {
+    packagesToVerify.add('@livestore/livestore')
+    if (registryTagVersion('@livestore/livestore', 'latest') !== plan.coreVersion) {
+      throw new Error(
+        `@livestore/livestore dist-tag latest must point to ${plan.coreVersion} before contrib publishing`,
+      )
+    }
+  }
   for (const packageName of [...packagesToVerify].sort()) {
     if (npmViewExists(packageName, plan.coreVersion) === false) {
       throw new Error(`Required core package is not visible on npm: ${packageName}@${plan.coreVersion}`)
@@ -482,7 +510,7 @@ if (outPath !== undefined) {
 
 const rewriteCount = plan.packages.reduce((count, pkg) => count + pkg.rewrites.length, 0)
 console.log(
-  `Simulated ${plan.packageCount} publishable packages at ${coreVersion}; rewrote ${rewriteCount} local dependency specs.`,
+  `Simulated ${plan.packageCount} publishable packages at ${releaseVersion ?? coreVersion}; rewrote ${rewriteCount} local dependency specs.`,
 )
 for (const pkg of plan.packages) {
   const packagePath = relative(rootDir, join(rootDir, pkg.path))
@@ -541,6 +569,7 @@ if (dryRun === true || publish === true || packOnly === true) {
         const metadata = assertRegistryArtifact({ pkg, digests })
         verifyTag(pkg)
         verifyPublishedDependencies({ pkg, metadata })
+        await verifyProvenance(pkg, metadata)
         verifiedRegistryMetadata.set(pkg.name, metadata)
       }
 
@@ -563,6 +592,7 @@ if (dryRun === true || publish === true || packOnly === true) {
                 version: pkg.version,
                 shasum: digests.shasum,
                 integrity: digests.integrity,
+                provenance: verifiedRegistryMetadata.get(pkg.name).dist.attestations,
                 dependencyChecks: dependencyChecksForPackage({
                   pkg,
                   metadata: verifiedRegistryMetadata.get(pkg.name),
