@@ -49,6 +49,12 @@ repair), verifies direct rewritten core dependencies and the presence of the
 registry SLSA provenance bundle, and records source SHA, package digests and
 provenance metadata in an uploaded manifest. Any missing or mismatched evidence
 fails publication verification, including when re-running an existing version.
+Verification tolerates registry propagation with at most 21 attempts, backoff
+from 5 to 15 seconds, and a five-minute deadline. Each attempt re-reads package
+metadata and tags. Missing versions/digests, stale tags, missing provenance
+metadata, attestation HTTP 404s and absent provenance bundles are pending states.
+Digest mismatches, unexpected endpoints and malformed responses fail immediately;
+pending evidence that does not converge within the bound also fails.
 
 This escape hatch does not implement core-triggered dispatch or automatic
 lockstep orchestration. A maintainer must dispatch contrib after verifying the

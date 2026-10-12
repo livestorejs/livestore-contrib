@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 
 import { cleanupPackedRun } from './simulate-publish-cleanup.mjs'
-import { verifyProvenance } from './verify-provenance.mjs'
+import { PendingRegistryVerification, verifyProvenance, waitForRegistryVerification } from './verify-provenance.mjs'
 
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
@@ -349,6 +349,9 @@ const registryTagVersion = (name, tag) => npmViewJson(name, 'dist-tags')?.[tag]
 
 const assertRegistryArtifact = ({ pkg, digests }) => {
   const metadata = registryMetadata(pkg.name, pkg.version)
+  if (metadata?.dist?.shasum === undefined || metadata?.dist?.integrity === undefined) {
+    throw new PendingRegistryVerification(`${pkg.name}@${pkg.version} registry digests are not available yet`)
+  }
   if (metadata?.dist?.shasum !== digests.shasum || metadata?.dist?.integrity !== digests.integrity) {
     throw new Error(`${pkg.name}@${pkg.version} exists with registry bytes that differ from the packed candidate`)
   }
@@ -385,28 +388,8 @@ const verifyPublishedDependencies = ({ pkg, metadata }) => {
 
 const verifyTag = (pkg) => {
   if (registryTagVersion(pkg.name, npmTag) !== pkg.version) {
-    throw new Error(
-      `${pkg.name} dist-tag ${npmTag} does not point to ${pkg.version}; this trusted-publishing lane cannot safely repair tags out of band`,
-    )
+    throw new PendingRegistryVerification(`${pkg.name} dist-tag ${npmTag} does not point to ${pkg.version}`)
   }
-}
-
-const sleep = (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
-
-const waitForNpmView = (name, version) => {
-  const attempts = 24
-  const delayMs = 5_000
-
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    if (npmViewExists(name, version) === true) return
-
-    if (attempt !== attempts) {
-      console.log(`${name}@${version} is not visible on npm yet; retrying in ${delayMs / 1_000}s`)
-      sleep(delayMs)
-    }
-  }
-
-  throw new Error(`${name}@${version} is not visible on npm after publish`)
 }
 
 const packPackage = (pkg) => {
@@ -545,12 +528,10 @@ if (dryRun === true || publish === true || packOnly === true) {
     }
 
     if (packOnly === false) {
-      for (const { pkg, tarballPath, digests } of packed) {
+      for (const { pkg, tarballPath } of packed) {
         const existing = npmViewExists(pkg.name, pkg.version)
         if (existing === true && publish === true) {
-          assertRegistryArtifact({ pkg, digests })
-          verifyTag(pkg)
-          console.log(`${pkg.name}@${pkg.version} already matches the packed candidate; skipping publish`)
+          console.log(`${pkg.name}@${pkg.version} already exists; skipping publish and verifying the packed candidate`)
           continue
         }
 
@@ -565,11 +546,16 @@ if (dryRun === true || publish === true || packOnly === true) {
     if (publish === true) {
       const verifiedRegistryMetadata = new Map()
       for (const { pkg, digests } of packed) {
-        waitForNpmView(pkg.name, pkg.version)
-        const metadata = assertRegistryArtifact({ pkg, digests })
-        verifyTag(pkg)
-        verifyPublishedDependencies({ pkg, metadata })
-        await verifyProvenance(pkg, metadata)
+        const metadata = await waitForRegistryVerification(async () => {
+          if (!npmViewExists(pkg.name, pkg.version)) {
+            throw new PendingRegistryVerification(`${pkg.name}@${pkg.version} is not visible on npm yet`)
+          }
+          const candidateMetadata = assertRegistryArtifact({ pkg, digests })
+          verifyTag(pkg)
+          verifyPublishedDependencies({ pkg, metadata: candidateMetadata })
+          await verifyProvenance(pkg, candidateMetadata)
+          return candidateMetadata
+        })
         verifiedRegistryMetadata.set(pkg.name, metadata)
       }
 
