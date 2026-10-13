@@ -50,12 +50,12 @@ export default githubWorkflow({
           type: 'string',
         },
         contrib_version: {
-          description: 'Contrib dev semver; publish-dev requires the same x.y.z-dev.N value as core_version',
+          description: 'Contrib semver; must match core_version (stable for publish-stable, dev for publish-dev)',
           required: false,
           type: 'string',
         },
         core_version: {
-          description: 'Published core dev semver; publish-dev requires the same x.y.z-dev.N value as contrib_version',
+          description: 'Published core semver; must match contrib_version',
           required: false,
           type: 'string',
         },
@@ -64,7 +64,13 @@ export default githubWorkflow({
           required: true,
           default: 'validate-release-surface',
           type: 'choice',
-          options: ['validate-release-surface', 'publish-dev', 'publish-snapshot', prSnapshot.dispatchModeOption],
+          options: [
+            'validate-release-surface',
+            'publish-dev',
+            'publish-stable',
+            'publish-snapshot',
+            prSnapshot.dispatchModeOption,
+          ],
         },
       },
     },
@@ -143,70 +149,74 @@ echo "LIVESTORE_RELEASE_VERSION=0.0.0-snapshot-$core_sha.$contrib_sha" >> "$GITH
       ]),
     },
 
-    'publish-dev-version': {
-      if: "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.mode == 'publish-dev'",
-      'runs-on': 'ubuntu-24.04',
-      concurrency: {
-        // Every dev version mutates the same package-wide `dev` tags, so all dev publications
-        // must share one lock rather than allowing different versions to interleave.
-        group: 'publish-dev',
-        'cancel-in-progress': false,
-      },
-      permissions: {
-        contents: 'read',
-        'id-token': 'write',
-      },
-      defaults: bashShellDefaults,
-      steps: withNixDiagnosticsOnFailure([
-        {
-          name: 'Checkout',
-          uses: 'actions/checkout@v4',
-          with: {
-            ref: '${{ github.sha }}',
-            'persist-credentials': false,
-          },
-        },
-        {
-          name: 'Validate matching dev version inputs',
-          env: {
-            CORE_VERSION: '${{ inputs.core_version }}',
-            CONTRIB_VERSION: '${{ inputs.contrib_version }}',
-          },
-          run: `set -euo pipefail
-dev_semver_pattern='^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-dev\\.(0|[1-9][0-9]*)$'
-[[ "$CONTRIB_VERSION" =~ $dev_semver_pattern ]]
+    ...Object.fromEntries(
+      (['dev', 'stable'] as const).map((channel) => {
+        const tag = channel === 'stable' ? 'latest' : 'dev'
+        return [
+          `publish-${channel}-version`,
+          {
+            if: `github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.mode == 'publish-${channel}'`,
+            'runs-on': 'ubuntu-24.04',
+            concurrency: {
+              // All versions of a channel mutate the same package-wide dist-tags.
+              group: `publish-${channel}`,
+              'cancel-in-progress': false,
+            },
+            permissions: {
+              contents: 'read',
+              'id-token': 'write',
+            },
+            defaults: bashShellDefaults,
+            steps: withNixDiagnosticsOnFailure([
+              {
+                name: 'Checkout',
+                uses: 'actions/checkout@v4',
+                with: {
+                  ref: '${{ github.sha }}',
+                  'persist-credentials': false,
+                },
+              },
+              {
+                name: `Validate matching ${channel} version inputs`,
+                env: {
+                  CORE_VERSION: '${{ inputs.core_version }}',
+                  CONTRIB_VERSION: '${{ inputs.contrib_version }}',
+                },
+                run: `set -euo pipefail
+semver_pattern='^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)${channel === 'dev' ? '-dev\\.(0|[1-9][0-9]*)' : ''}$'
+[[ "$CONTRIB_VERSION" =~ $semver_pattern ]]
 test "$CONTRIB_VERSION" = "$CORE_VERSION"`,
-        },
-        ...livestoreContribSetupSteps.slice(1),
-        {
-          name: 'Publish matching contrib dev version',
-          env: {
-            LIVESTORE_CORE_RELEASE_VERSION: '${{ inputs.core_version }}',
-            LIVESTORE_RELEASE_VERSION: '${{ inputs.contrib_version }}',
-            LIVESTORE_RELEASE_MANIFEST: '${{ runner.temp }}/dev-release-manifest.json',
-          },
-          run: runDevenvTasksBefore('release:dev'),
-        },
-        {
-          id: 'upload-dev-release-manifest',
-          name: 'Upload dev release manifest',
-          uses: 'actions/upload-artifact@v4',
-          with: {
-            name: 'dev-release-${{ inputs.contrib_version }}-${{ github.sha }}',
-            path: '${{ runner.temp }}/dev-release-manifest.json',
-            'if-no-files-found': 'error',
-          },
-        },
-        {
-          name: 'Record dev release',
-          env: {
-            ARTIFACT_DIGEST: '${{ steps.upload-dev-release-manifest.outputs.artifact-digest }}',
-            ARTIFACT_URL: '${{ steps.upload-dev-release-manifest.outputs.artifact-url }}',
-            MANIFEST: '${{ runner.temp }}/dev-release-manifest.json',
-          },
-          run: `set -euo pipefail
+              },
+              ...livestoreContribSetupSteps.slice(1),
+              {
+                name: `Publish matching contrib ${channel} version`,
+                env: {
+                  LIVESTORE_CORE_RELEASE_VERSION: '${{ inputs.core_version }}',
+                  LIVESTORE_RELEASE_VERSION: '${{ inputs.contrib_version }}',
+                  LIVESTORE_RELEASE_MANIFEST: '${{ runner.temp }}/' + channel + '-release-manifest.json',
+                },
+                run: runDevenvTasksBefore(`release:${channel}`),
+              },
+              {
+                id: 'upload-release-manifest',
+                name: `Upload ${channel} release manifest`,
+                uses: 'actions/upload-artifact@v4',
+                with: {
+                  name: channel + '-release-${{ inputs.contrib_version }}-${{ github.sha }}',
+                  path: '${{ runner.temp }}/' + channel + '-release-manifest.json',
+                  'if-no-files-found': 'error',
+                },
+              },
+              {
+                name: `Record ${channel} release`,
+                env: {
+                  ARTIFACT_DIGEST: '${{ steps.upload-release-manifest.outputs.artifact-digest }}',
+                  ARTIFACT_URL: '${{ steps.upload-release-manifest.outputs.artifact-url }}',
+                  MANIFEST: '${{ runner.temp }}/' + channel + '-release-manifest.json',
+                },
+                run: `set -euo pipefail
 {
-  echo '## Contrib dev release'
+  echo '## Contrib ${tag} release'
   echo
   echo "- Source: $(jq -r .sourceSha "$MANIFEST")"
   echo "- Version: $(jq -r .version "$MANIFEST")"
@@ -216,8 +226,11 @@ test "$CONTRIB_VERSION" = "$CORE_VERSION"`,
   echo "- Manifest artifact digest: $ARTIFACT_DIGEST"
   echo "- Manifest artifact: $ARTIFACT_URL"
 } >> "$GITHUB_STEP_SUMMARY"`,
-        },
-      ]),
-    },
+              },
+            ]),
+          },
+        ]
+      }),
+    ),
   },
 })

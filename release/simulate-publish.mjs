@@ -15,7 +15,9 @@ import {
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 
+import { publishCohort } from './publish-cohort.mjs'
 import { cleanupPackedRun } from './simulate-publish-cleanup.mjs'
+import { PendingRegistryVerification, verifyProvenance, waitForRegistryVerification } from './verify-provenance.mjs'
 
 const rootDir = process.cwd()
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
@@ -42,6 +44,21 @@ const outDir = readArg('--out-dir')
 const manifestOut = readArg('--manifest-out')
 const npmTag = readArg('--tag') ?? 'snapshot'
 const verifyCore = hasArg('--verify-core')
+
+if (npmTag === 'latest' || npmTag === 'dev') {
+  const pattern =
+    npmTag === 'latest'
+      ? /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/
+      : /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-dev\.(0|[1-9][0-9]*)$/
+  if (!pattern.test(releaseVersion ?? '') || releaseVersion !== explicitCoreVersion) {
+    throw new Error(
+      `${npmTag} requires matching explicit contrib and core ${npmTag === 'latest' ? 'stable' : 'dev'} semver versions`,
+    )
+  }
+  if (publish === true && verifyCore === false) {
+    throw new Error(`${npmTag} publishing requires --verify-core`)
+  }
+}
 
 const exclusiveModes = [publish, dryRun, packOnly].filter((mode) => mode === true)
 if (exclusiveModes.length > 1) {
@@ -221,7 +238,11 @@ for (const { path, manifest } of publishablePackages) {
       if (isLocalProtocol(spec) === true) {
         addError(`${manifest.name} ${section}.${dependencyName} still uses local protocol ${spec}`)
       }
-      if (npmTag === 'dev' && dependencyName === '@livestore/devtools-vite' && spec !== coreReleaseVersion) {
+      if (
+        (npmTag === 'dev' || npmTag === 'latest') &&
+        dependencyName === '@livestore/devtools-vite' &&
+        spec !== coreReleaseVersion
+      ) {
         addError(
           `${manifest.name} ${section}.@livestore/devtools-vite must equal core release version ${coreReleaseVersion}`,
         )
@@ -329,6 +350,9 @@ const registryTagVersion = (name, tag) => npmViewJson(name, 'dist-tags')?.[tag]
 
 const assertRegistryArtifact = ({ pkg, digests }) => {
   const metadata = registryMetadata(pkg.name, pkg.version)
+  if (metadata?.dist?.shasum === undefined || metadata?.dist?.integrity === undefined) {
+    throw new PendingRegistryVerification(`${pkg.name}@${pkg.version} registry digests are not available yet`)
+  }
   if (metadata?.dist?.shasum !== digests.shasum || metadata?.dist?.integrity !== digests.integrity) {
     throw new Error(`${pkg.name}@${pkg.version} exists with registry bytes that differ from the packed candidate`)
   }
@@ -341,7 +365,7 @@ const dependencyChecksForPackage = ({ pkg, metadata }) => {
     name: dependencyName,
     expected: to,
   }))
-  if (npmTag === 'dev') {
+  if (npmTag === 'dev' || npmTag === 'latest') {
     for (const section of dependencySections) {
       const expected = pkg.manifest?.[section]?.['@livestore/devtools-vite']
       if (expected !== undefined) expectedDependencies.push({ section, name: '@livestore/devtools-vite', expected })
@@ -365,28 +389,8 @@ const verifyPublishedDependencies = ({ pkg, metadata }) => {
 
 const verifyTag = (pkg) => {
   if (registryTagVersion(pkg.name, npmTag) !== pkg.version) {
-    throw new Error(
-      `${pkg.name} dist-tag ${npmTag} does not point to ${pkg.version}; this trusted-publishing lane cannot safely repair tags out of band`,
-    )
+    throw new PendingRegistryVerification(`${pkg.name} dist-tag ${npmTag} does not point to ${pkg.version}`)
   }
-}
-
-const sleep = (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
-
-const waitForNpmView = (name, version) => {
-  const attempts = 24
-  const delayMs = 5_000
-
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    if (npmViewExists(name, version) === true) return
-
-    if (attempt !== attempts) {
-      console.log(`${name}@${version} is not visible on npm yet; retrying in ${delayMs / 1_000}s`)
-      sleep(delayMs)
-    }
-  }
-
-  throw new Error(`${name}@${version} is not visible on npm after publish`)
 }
 
 const packPackage = (pkg) => {
@@ -436,7 +440,15 @@ const restoreGeneratedFiles = () => {
 const verifyRequiredCorePackages = () => {
   if (verifyCore === false) return
   const packagesToVerify = new Set(requiredCorePackages)
-  if (npmTag === 'dev') packagesToVerify.add('@livestore/devtools-vite')
+  if (npmTag === 'dev' || npmTag === 'latest') packagesToVerify.add('@livestore/devtools-vite')
+  if (npmTag === 'latest') {
+    packagesToVerify.add('@livestore/livestore')
+    if (registryTagVersion('@livestore/livestore', 'latest') !== plan.coreVersion) {
+      throw new Error(
+        `@livestore/livestore dist-tag latest must point to ${plan.coreVersion} before contrib publishing`,
+      )
+    }
+  }
   for (const packageName of [...packagesToVerify].sort()) {
     if (npmViewExists(packageName, plan.coreVersion) === false) {
       throw new Error(`Required core package is not visible on npm: ${packageName}@${plan.coreVersion}`)
@@ -482,7 +494,7 @@ if (outPath !== undefined) {
 
 const rewriteCount = plan.packages.reduce((count, pkg) => count + pkg.rewrites.length, 0)
 console.log(
-  `Simulated ${plan.packageCount} publishable packages at ${coreVersion}; rewrote ${rewriteCount} local dependency specs.`,
+  `Simulated ${plan.packageCount} publishable packages at ${releaseVersion ?? coreVersion}; rewrote ${rewriteCount} local dependency specs.`,
 )
 for (const pkg of plan.packages) {
   const packagePath = relative(rootDir, join(rootDir, pkg.path))
@@ -516,33 +528,42 @@ if (dryRun === true || publish === true || packOnly === true) {
       }
     }
 
-    if (packOnly === false) {
-      for (const { pkg, tarballPath, digests } of packed) {
-        const existing = npmViewExists(pkg.name, pkg.version)
-        if (existing === true && publish === true) {
-          assertRegistryArtifact({ pkg, digests })
-          verifyTag(pkg)
-          console.log(`${pkg.name}@${pkg.version} already matches the packed candidate; skipping publish`)
-          continue
-        }
+    const publishPackage = ({ pkg, tarballPath }) => {
+      const publishArgs = ['publish', tarballPath, `--tag=${npmTag}`, '--access=public', '--ignore-scripts']
+      if (publish === true) publishArgs.push('--provenance')
+      if (dryRun === true) publishArgs.push('--dry-run')
+      run('npm', publishArgs)
+      console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
+    }
 
-        const publishArgs = ['publish', tarballPath, `--tag=${npmTag}`, '--access=public', '--ignore-scripts']
-        if (publish === true) publishArgs.push('--provenance')
-        if (dryRun === true) publishArgs.push('--dry-run')
-        run('npm', publishArgs)
-        console.log(`${dryRun === true ? 'Dry-ran' : 'Published'} ${pkg.name}@${pkg.version}`)
-      }
+    if (dryRun === true) {
+      for (const candidate of packed) publishPackage(candidate)
     }
 
     if (publish === true) {
-      const verifiedRegistryMetadata = new Map()
-      for (const { pkg, digests } of packed) {
-        waitForNpmView(pkg.name, pkg.version)
-        const metadata = assertRegistryArtifact({ pkg, digests })
-        verifyTag(pkg)
-        verifyPublishedDependencies({ pkg, metadata })
-        verifiedRegistryMetadata.set(pkg.name, metadata)
-      }
+      const verifiedRegistryMetadata = await publishCohort({
+        packed,
+        isPublished: (pkg) => npmViewExists(pkg.name, pkg.version),
+        preflightExisting: ({ pkg, digests }) => {
+          assertRegistryArtifact({ pkg, digests })
+          console.log(`${pkg.name}@${pkg.version} existing artifact matches the packed candidate; skipping publish`)
+        },
+        publishPackage,
+        verifyPackage: ({ pkg, digests }, { newlyPublished }) => {
+          const verify = async () => {
+            if (!npmViewExists(pkg.name, pkg.version)) {
+              throw new PendingRegistryVerification(`${pkg.name}@${pkg.version} is not visible on npm yet`)
+            }
+            const metadata = assertRegistryArtifact({ pkg, digests })
+            verifyTag(pkg)
+            verifyPublishedDependencies({ pkg, metadata })
+            await verifyProvenance(pkg, metadata)
+            return metadata
+          }
+          // Only freshly published packages can have pending publication evidence.
+          return newlyPublished ? waitForRegistryVerification(verify) : verify()
+        },
+      })
 
       if (manifestOut !== undefined) {
         const absoluteManifestOut = isAbsolute(manifestOut) === true ? manifestOut : join(rootDir, manifestOut)
@@ -563,6 +584,7 @@ if (dryRun === true || publish === true || packOnly === true) {
                 version: pkg.version,
                 shasum: digests.shasum,
                 integrity: digests.integrity,
+                provenance: verifiedRegistryMetadata.get(pkg.name).dist.attestations,
                 dependencyChecks: dependencyChecksForPackage({
                   pkg,
                   metadata: verifiedRegistryMetadata.get(pkg.name),

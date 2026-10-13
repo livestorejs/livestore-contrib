@@ -154,23 +154,38 @@ in
 
   # Keep TypeScript tasks local until contrib adopts Buck TypeScript authority (effect-utils #1343).
   tasks."ts:check" = {
-    after = [ "genie:run" "pnpm:install" ];
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
     exec = "${effectTsgo}/bin/tsgo --build tsconfig.check.json";
   };
   tasks."ts:check:strict" = {
-    after = [ "genie:run" "pnpm:install" ];
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
     exec = "${effectTsgo}/bin/tsgo --build --force tsconfig.check.json";
   };
   tasks."ts:build" = {
-    after = [ "genie:run" "pnpm:install" ];
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
     exec = "${effectTsgo}/bin/tsgo --build tsconfig.check.json";
   };
   tasks."ts:watch" = {
-    after = [ "genie:run" "pnpm:install" ];
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
     exec = "${effectTsgo}/bin/tsgo --build --watch tsconfig.check.json";
   };
   tasks."ts:emit" = {
-    after = [ "genie:run" "pnpm:install" ];
+    after = [
+      "genie:run"
+      "pnpm:install"
+    ];
     exec = "${effectTsgo}/bin/tsgo --build tsconfig.emit.json --noCheck";
   };
   tasks."ci:quality" = {
@@ -232,7 +247,9 @@ in
   tasks."discord-bot:lint" = {
     description = "Lint the Discord bot with warnings denied and type-aware rules enabled";
     after = [ "discord-bot:install" ];
-    exec = "PATH=${lib.makeBinPath [ pkgs.tsgolint ]}:$PATH DEVENV_TASK_PASSTHROUGH=1 oxlint --import-plugin --deny-warnings --type-aware --tsconfig apps/discord-bot/tsconfig.json apps/discord-bot/src apps/discord-bot/e2e/src apps/discord-bot/cf";
+    exec = "PATH=${
+      lib.makeBinPath [ pkgs.tsgolint ]
+    }:$PATH DEVENV_TASK_PASSTHROUGH=1 oxlint --import-plugin --deny-warnings --type-aware --tsconfig apps/discord-bot/tsconfig.json apps/discord-bot/src apps/discord-bot/e2e/src apps/discord-bot/cf";
   };
   tasks."discord-bot:test" = {
     description = "Run the Discord bot unit, integration, and credential-free E2E suites";
@@ -264,6 +281,7 @@ in
         exit 1
       fi
 
+      node --test release/*.unit.test.mjs
       node release/simulate-publish.mjs
 
       echo "Core version authority available: $core_version"
@@ -396,7 +414,7 @@ in
         LIVESTORE_RELEASE_VERSION="$LIVESTORE_RELEASE_VERSION" \
         LIVESTORE_CORE_RELEASE_VERSION="$LIVESTORE_CORE_RELEASE_VERSION" \
         genie --writeable --defer-validation
-      pnpm install --no-frozen-lockfile
+      DEVENV_TASK_PASSTHROUGH=1 pnpm install --no-frozen-lockfile
       DEVENV_TASK_PASSTHROUGH=1 \
         LIVESTORE_RELEASE_VERSION="$LIVESTORE_RELEASE_VERSION" \
         LIVESTORE_CORE_RELEASE_VERSION="$LIVESTORE_CORE_RELEASE_VERSION" \
@@ -408,6 +426,53 @@ in
         --verify-core \
         --publish \
         --manifest-out "$LIVESTORE_RELEASE_MANIFEST"
+    '';
+  };
+  tasks."release:stable" = {
+    description = "Publish matching contrib and core stable versions";
+    after = [
+      "mr:check"
+      "pnpm:install"
+    ];
+    exec = ''
+      set -euo pipefail
+      cd "$DEVENV_ROOT"
+      : "''${LIVESTORE_RELEASE_VERSION:?LIVESTORE_RELEASE_VERSION is required}"
+      : "''${LIVESTORE_CORE_RELEASE_VERSION:?LIVESTORE_CORE_RELEASE_VERSION is required}"
+      : "''${LIVESTORE_RELEASE_MANIFEST:?LIVESTORE_RELEASE_MANIFEST is required}"
+      if [ -n "''${NODE_AUTH_TOKEN:-}" ] || [ -n "''${NPM_TOKEN:-}" ]; then
+        echo "npm stable publishing must use trusted publishing; token auth is not allowed." >&2
+        exit 1
+      fi
+      stable_semver_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+      [[ "$LIVESTORE_RELEASE_VERSION" =~ $stable_semver_pattern ]]
+      test "$LIVESTORE_RELEASE_VERSION" = "$LIVESTORE_CORE_RELEASE_VERSION"
+      DEVENV_TASK_PASSTHROUGH=1 genie --writeable --defer-validation
+      DEVENV_TASK_PASSTHROUGH=1 pnpm install --no-frozen-lockfile
+      DEVENV_TASK_PASSTHROUGH=1 genie --check
+      node release/simulate-publish.mjs \
+        --version "$LIVESTORE_RELEASE_VERSION" \
+        --core-version "$LIVESTORE_CORE_RELEASE_VERSION" \
+        --tag latest --verify-core --publish \
+        --manifest-out "$LIVESTORE_RELEASE_MANIFEST"
+    '';
+  };
+  tasks."release:stable:dryrun" = {
+    description = "Pack and dry-run a hypothetical stable contrib release without publishing";
+    after = [
+      "mr:check"
+      "pnpm:install"
+    ];
+    exec = ''
+      set -euo pipefail
+      cd "$DEVENV_ROOT"
+      : "''${LIVESTORE_RELEASE_VERSION:?LIVESTORE_RELEASE_VERSION is required}"
+      : "''${LIVESTORE_CORE_RELEASE_VERSION:?LIVESTORE_CORE_RELEASE_VERSION is required}"
+      DEVENV_TASK_PASSTHROUGH=1 genie --writeable --defer-validation
+      node release/simulate-publish.mjs \
+        --version "$LIVESTORE_RELEASE_VERSION" \
+        --core-version "$LIVESTORE_CORE_RELEASE_VERSION" \
+        --tag latest --dry-run
     '';
   };
   tasks."test:integration:node" = {

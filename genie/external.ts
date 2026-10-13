@@ -61,20 +61,20 @@ export const livestoreContribWorkspaceCatalog = Object.fromEntries(
  * tarballs then fail to install with ERR_PNPM_NO_MATCHING_VERSION.
  *
  * Pinning the plain version keeps the dependency resolvable regardless of what contrib is
- * publishing. Release generation selects the explicit core release version so future mirrored dev
+ * publishing. Release generation selects the explicit core release version so mirrored stable/dev
  * cohorts do not retain this checkout's fallback; ordinary generation deliberately falls back to a
  * reviewed, published version.
  */
 const requestedContribReleaseVersion = process.env.LIVESTORE_RELEASE_VERSION
 const requestedCoreReleaseVersion = process.env.LIVESTORE_CORE_RELEASE_VERSION
-const mirroredDevVersionPattern = /^\d+\.\d+\.\d+-dev\.\d+$/
+const mirroredVersionPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-dev\.(0|[1-9][0-9]*))?$/
 
-export const isMirroredDevRelease =
+const isMirroredRelease =
   requestedContribReleaseVersion === requestedCoreReleaseVersion &&
   requestedCoreReleaseVersion !== undefined &&
-  mirroredDevVersionPattern.test(requestedCoreReleaseVersion)
+  mirroredVersionPattern.test(requestedCoreReleaseVersion)
 
-export const contribCoreReleaseVersion = isMirroredDevRelease === true ? requestedCoreReleaseVersion : '0.5.0-dev.0'
+export const contribCoreReleaseVersion = isMirroredRelease === true ? requestedCoreReleaseVersion : '0.5.0-dev.0'
 
 export const contribConsumedCoreArtifacts = {
   '@livestore/devtools-vite': contribCoreReleaseVersion,
