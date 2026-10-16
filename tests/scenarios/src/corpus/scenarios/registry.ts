@@ -6,9 +6,12 @@ import offlineWriterRecoverySource from './retained/examples/offline-writer-reco
 import concurrentHotelBookingSource from './retained/findings/concurrent-hotel-booking.scenario.ts'
 import manyWriterConvergenceSource from './retained/findings/many-writer-convergence.scenario.ts'
 import pendingTailRecoverySource from './retained/findings/pending-tail-recovery.scenario.ts'
+import uiCatchUpResponsivenessSource from './retained/stress/ui-catch-up-responsiveness.scenario.ts'
+import uiRebaseResponsivenessSource from './retained/stress/ui-rebase-responsiveness.scenario.ts'
 
 export interface RetainedScenarioEntry {
-  readonly kind: 'example' | 'finding'
+  /** `stress` Scenarios drive load for performance measurement rather than demonstrating a behavior. */
+  readonly kind: 'example' | 'finding' | 'stress'
   readonly findingId?: 'SF-01' | 'SF-02' | 'SF-03'
   readonly scenario: ScenarioAst
 }
@@ -52,8 +55,18 @@ const sources = [
     file: new URL('./retained/examples/large-payload-recovery.scenario.ts', import.meta.url),
     source: largePayloadRecoverySource,
   },
+  {
+    kind: 'stress',
+    file: new URL('./retained/stress/ui-catch-up-responsiveness.scenario.ts', import.meta.url),
+    source: uiCatchUpResponsivenessSource,
+  },
+  {
+    kind: 'stress',
+    file: new URL('./retained/stress/ui-rebase-responsiveness.scenario.ts', import.meta.url),
+    source: uiRebaseResponsivenessSource,
+  },
 ] as const satisfies ReadonlyArray<{
-  readonly kind: 'example' | 'finding'
+  readonly kind: RetainedScenarioEntry['kind']
   readonly findingId?: RetainedScenarioEntry['findingId']
   readonly file: URL
   readonly source: ScenarioSource

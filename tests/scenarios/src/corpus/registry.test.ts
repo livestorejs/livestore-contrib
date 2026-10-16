@@ -30,6 +30,8 @@ describe('scenario corpus', () => {
       ['finding', 'SF-02', 'pending-tail-recovery'],
       ['finding', 'SF-03', 'many-writer-convergence'],
       ['example', undefined, 'large-payload-recovery'],
+      ['stress', undefined, 'ui-catch-up-responsiveness'],
+      ['stress', undefined, 'ui-rebase-responsiveness'],
     ])
   })
 })
