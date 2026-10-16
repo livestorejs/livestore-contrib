@@ -152,58 +152,69 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
               const file = `${manifest.samples.length.toString().padStart(4, '0')}-${role}.json`
               const output = path.join(directory, file)
               console.log(`${phase} ${iteration}: ${role} · ${scenario} · ${profile}`)
-              const exitCode = await withCoreSource({
-                workspaceRoot,
-                selection: { _tag: 'ref', ref: role === 'baseline' ? baseline : candidate },
-                run: async (core) =>
-                  new Promise<number>((resolve, reject) => {
-                    child = spawn(
-                      process.execPath,
-                      [
-                        '--import',
-                        import.meta.resolve('tsx'),
-                        path.join(import.meta.dirname, 'cli.ts'),
-                        '--scenario',
-                        scenario,
-                        '--profile',
-                        profile,
-                        ...options.parameters.flatMap((value) => ['--set', value]),
-                        ...(options.stabilizationTimeout === undefined
-                          ? []
-                          : ['--stabilization-timeout', options.stabilizationTimeout]),
-                        '--output',
-                        output,
-                      ],
-                      {
-                        cwd: path.join(workspaceRoot, 'tests/scenarios'),
-                        env: {
-                          ...process.env,
-                          LIVESTORE_SCENARIO_CORE_PATH: core.path,
-                          LIVESTORE_SCENARIO_SOURCE_REVISION: core.sourceRevision,
+              const runSample = () =>
+                withCoreSource({
+                  workspaceRoot,
+                  selection: { _tag: 'ref', ref: role === 'baseline' ? baseline : candidate },
+                  run: async (core) =>
+                    new Promise<number>((resolve, reject) => {
+                      child = spawn(
+                        process.execPath,
+                        [
+                          '--import',
+                          import.meta.resolve('tsx'),
+                          path.join(import.meta.dirname, 'cli.ts'),
+                          '--scenario',
+                          scenario,
+                          '--profile',
+                          profile,
+                          ...options.parameters.flatMap((value) => ['--set', value]),
+                          ...(options.stabilizationTimeout === undefined
+                            ? []
+                            : ['--stabilization-timeout', options.stabilizationTimeout]),
+                          '--output',
+                          output,
+                        ],
+                        {
+                          cwd: path.join(workspaceRoot, 'tests/scenarios'),
+                          env: {
+                            ...process.env,
+                            LIVESTORE_SCENARIO_CORE_PATH: core.path,
+                            LIVESTORE_SCENARIO_SOURCE_REVISION: core.sourceRevision,
+                          },
+                          stdio: 'inherit',
                         },
-                        stdio: 'inherit',
-                      },
-                    )
-                    // A sample that never finishes would stall the campaign silently. Stop it and fail the campaign
-                    // instead; a stopped sample has no artifact to compare.
-                    const sampleTimer = setTimeout(() => {
-                      timedOut = true
-                      child?.kill('SIGINT')
-                      setTimeout(() => child?.kill('SIGKILL'), 20_000).unref()
-                    }, options.sampleTimeoutMs)
-                    child.once('error', reject)
-                    child.once('exit', (code) => {
-                      clearTimeout(sampleTimer)
-                      child = undefined
-                      resolve(code ?? 1)
-                    })
-                  }),
-              })
-              if (interrupted) throw new Error('Benchmark interrupted')
-              if (timedOut)
-                throw new Error(
-                  `Sample ${file} did not finish within ${options.sampleTimeoutMs / 1000} s and was stopped`,
-                )
+                      )
+                      // A sample that never finishes would stall the campaign silently. Stop it; the loop below
+                      // retries it once and fails the campaign if it stalls again.
+                      const sampleTimer = setTimeout(() => {
+                        timedOut = true
+                        child?.kill('SIGINT')
+                        setTimeout(() => child?.kill('SIGKILL'), 20_000).unref()
+                      }, options.sampleTimeoutMs)
+                      child.once('error', reject)
+                      child.once('exit', (code) => {
+                        clearTimeout(sampleTimer)
+                        child = undefined
+                        resolve(code ?? 1)
+                      })
+                    }),
+                })
+              let attempts = 0
+              let exitCode = 1
+              while (true) {
+                attempts += 1
+                timedOut = false
+                exitCode = await runSample()
+                if (interrupted) throw new Error('Benchmark interrupted')
+                if (timedOut === false) break
+                const message = `Sample ${file} did not finish within ${options.sampleTimeoutMs / 1000} s and was stopped`
+                // Rare stalls happened before a run printed anything; one retry keeps them from ending a campaign,
+                // while a run that stalls twice points at a real problem.
+                if (attempts >= 2) throw new Error(`${message} twice`)
+                console.log(`${message}; retrying once`)
+                await fs.rm(output, { force: true })
+              }
               const artifact = JSON.parse(await fs.readFile(output, 'utf8'))
               if (
                 !['passed', 'failed'].includes(artifact.status) ||
@@ -211,7 +222,16 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
                 (exitCode !== 0 && artifact.status !== 'failed')
               )
                 throw new Error(`Invalid run artifact: ${file}`)
-              manifest.samples.push({ role, phase, iteration, scenario, profile, file, exitCode })
+              manifest.samples.push({
+                role,
+                phase,
+                iteration,
+                scenario,
+                profile,
+                file,
+                exitCode,
+                ...(attempts > 1 ? { attempts } : {}),
+              })
               await save()
             }
           }

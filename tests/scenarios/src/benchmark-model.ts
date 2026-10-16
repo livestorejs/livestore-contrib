@@ -26,6 +26,8 @@ export interface BenchmarkSample {
   readonly profile: string
   readonly file: string
   readonly exitCode: number
+  /** Present when the sample had to be retried after it stalled past `--sample-timeout`. */
+  readonly attempts?: number
 }
 export interface BenchmarkMembership {
   readonly id: string
