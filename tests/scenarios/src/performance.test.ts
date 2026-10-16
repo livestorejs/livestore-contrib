@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { makeArtifactCatalogEntry, type ArtifactCatalogEntry } from './artifact-catalog.ts'
 import type { ScenarioRunArtifact } from './model.ts'
-import { deriveRunTimings, summarizeDurations } from './performance.ts'
+import { deriveFrameMetrics, deriveRunTimings, summarizeDurations } from './performance.ts'
 import { compareRuns } from './run-comparison.ts'
 
 const artifact = (status = 'passed') =>
@@ -121,5 +121,70 @@ describe('performance summaries', () => {
     expect(
       compareRuns([entry('a', 'base', 1), entry('b', 'new', 2)], 'base', 'new', 'recoveryMs')[0]?.delta,
     ).toBeUndefined()
+  })
+})
+
+describe('frame metrics', () => {
+  const record = (
+    tag: string,
+    time: number,
+    payload: object = {},
+    extra: { origin?: string; correlationId?: string; clientId?: string } = {},
+  ) => ({
+    payload: { _tag: tag, ...payload },
+    origin: extra.origin ?? 'observation',
+    correlationId: extra.correlationId ?? null,
+    clientId: extra.clientId ?? null,
+    sessionId: extra.clientId === undefined ? null : 'session',
+    coordinatorReceiptMonotonicMs: time,
+    calibratedTime: { earliestMs: time, latestMs: time, calibrationId: 'test' },
+  })
+  const frameArtifact = () =>
+    ({
+      status: 'passed',
+      trace: [
+        record('action.requested', 10, {}, { origin: 'instruction', correlationId: 'a' }),
+        record('connectivity.reconnect.requested', 100, {}, { origin: 'instruction', correlationId: 'r' }),
+        record('wait.requested', 120, { durationMs: 880 }, { origin: 'instruction', correlationId: 'w' }),
+        record('wait.completed', 1000, {}, { origin: 'acknowledgement', correlationId: 'w' }),
+        record(
+          'frame.timing.observed',
+          1000,
+          {
+            reason: 'wait',
+            timing: {
+              windowMs: 990,
+              frameCount: 50,
+              // Starts at 500 (harness observing), 700 (application), and 50 (before the window).
+              slowFrames: [
+                [-500, 100],
+                [-300, 30],
+                [-950, 60],
+              ],
+              longAnimationFrames: [[-500, 100, 50, 'observe']],
+              harnessIntervals: [
+                [-520, 40, 'observe'],
+                [-310, 50, 'set-connectivity'],
+              ],
+              longAnimationFramesSupported: true,
+            },
+          },
+          { clientId: 'ui' },
+        ),
+      ],
+    }) as unknown as ScenarioRunArtifact
+
+  it('measures the instruction before a wait through the wait and separates harness work', () => {
+    const metrics = deriveFrameMetrics(frameArtifact())!
+    expect(metrics.all).toMatchObject({ windowMs: 900, maxFrameMs: 100, longFrames: 1, droppedFrames: 6 })
+    expect(metrics.all.longAnimationFrameBlockingMs).toBe(50)
+    // The 100 ms frame overlapped an observation; set-connectivity only polls, so the 30 ms frame stays.
+    expect(metrics.excludingHarness).toMatchObject({ maxFrameMs: 30, longFrames: 0, droppedFrames: 1 })
+    expect(metrics.excludingHarness.longAnimationFrameBlockingMs).toBe(0)
+    expect(metrics.harnessAffectedFrames).toBe(1)
+  })
+
+  it('reports nothing for artifacts without frame timing', () => {
+    expect(deriveFrameMetrics(artifact())).toBeUndefined()
   })
 })

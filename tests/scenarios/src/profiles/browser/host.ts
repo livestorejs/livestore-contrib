@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import { chromium, type BrowserContext, type Page } from '@playwright/test'
-import { createServer, searchForWorkspaceRoot, type ViteDevServer } from 'vite'
+import { build, createServer, preview, searchForWorkspaceRoot } from 'vite'
 
 import { EventSequenceNumber } from '@livestore/common/schema'
 import { Effect, Schema, Semaphore, type Scope } from '@livestore/utils/effect'
@@ -19,6 +19,8 @@ import { getScenarioApplication } from '../../corpus/applications/registry.ts'
 import {
   type ClientSystemObservation,
   ClientSystemObservation as ClientSystemObservationSchema,
+  FrameTiming as FrameTimingSchema,
+  type FrameTimingObservation,
   type HostAcknowledgement,
   type HostCapabilities,
   type HostObservationOccurrence,
@@ -266,6 +268,11 @@ export const makeBrowserHost = (args: {
       [...clients.values()].flatMap((client) => client.drainRuntimeFailures()),
     )
 
+    // Suspended so each drain reads the Clients running now, not those present when the host was built.
+    const drainFrameTimings: NonNullable<ParticipantHost['drainFrameTimings']> = Effect.suspend(() =>
+      Effect.forEach([...clients.values()], (client) => client.drainFrameTimings, { concurrency: 'unbounded' }),
+    ).pipe(Effect.map((timings) => timings.flat()))
+
     const inspectState: ParticipantHost['inspectState'] = (command) =>
       Effect.gen(function* () {
         const client = yield* getClient(clients, command.target.clientId)
@@ -284,6 +291,7 @@ export const makeBrowserHost = (args: {
         '@livestore/livestore': 'workspace',
         ...args.backend.componentVersions,
         chromium: chromium.name(),
+        'browser-fixture-build': fixtureBuildMode(),
       },
       createClient,
       addSession,
@@ -295,6 +303,7 @@ export const makeBrowserHost = (args: {
       restartClient,
       observeSystem,
       drainRuntimeFailures,
+      drainFrameTimings,
       observeSync,
       inspectState,
       profileDirectories: () => [...clients.values()].map((client) => client.userDataDir),
@@ -313,6 +322,7 @@ interface BrowserClientController {
   readonly restart: Effect.Effect<void, ScenarioOperationError>
   readonly observe: Effect.Effect<BrowserClientObservation, ScenarioOperationError>
   readonly drainRuntimeFailures: () => ReadonlyArray<RuntimeFailureObservation>
+  readonly drainFrameTimings: Effect.Effect<ReadonlyArray<FrameTimingObservation>, ScenarioOperationError>
   readonly shutdown: Effect.Effect<void, ScenarioOperationError>
 }
 
@@ -507,6 +517,20 @@ const makeBrowserClient = (args: {
         restart,
         observe,
         drainRuntimeFailures: () => state.runtimeFailures.splice(0),
+        drainFrameTimings: Effect.suspend(() =>
+          Effect.forEach(
+            [...state.pages.entries()],
+            ([sessionId, page]) =>
+              drainPageFrameTiming(page).pipe(
+                Effect.map(({ timing, occurrence }) => ({
+                  participant: { clientId: args.clientId, sessionId },
+                  occurrence,
+                  timing,
+                })),
+              ),
+            { concurrency: 'unbounded' },
+          ),
+        ),
         shutdown,
       }
     }),
@@ -669,6 +693,35 @@ const observePageWithTiming = (
   )
 }
 
+const drainPageFrameTiming = (
+  page: Page,
+): Effect.Effect<
+  { readonly timing: Schema.Schema.Type<typeof FrameTimingSchema>; readonly occurrence: HostObservationOccurrence },
+  ScenarioOperationError
+> => {
+  const controllerBeforeMonotonicMs = performance.now()
+  return Effect.tryPromise({
+    try: () => page.evaluate(() => window.__scenarioBrowser.drainFrameTiming()),
+    catch: (cause) =>
+      browserTransportFailure(`Browser frame timing drain failed: ${String(cause)}`, 'definite-failure'),
+  }).pipe(
+    Effect.flatMap((drained) =>
+      Schema.decodeUnknownEffect(FrameTimingSchema)(drained.timing).pipe(
+        Effect.mapError((cause) => browserResponseInvalid(`Invalid browser frame timing: ${String(cause)}`)),
+        Effect.map((timing) => ({
+          timing,
+          occurrence: calibrateParticipantReading({
+            reading: drained.clock,
+            controllerBeforeMonotonicMs,
+            controllerAfterMonotonicMs: performance.now(),
+            calibrationId: `${drained.clock.emitterId}:${drained.clock.localSequence}`,
+          }),
+        })),
+      ),
+    ),
+  )
+}
+
 const dispatchPageAction = (
   page: Page,
   input: Parameters<Window['__scenarioBrowser']['dispatchAction']>[0],
@@ -685,18 +738,66 @@ const inspectPageState = (page: Page, input: Parameters<Window['__scenarioBrowse
     catch: (cause) => browserTransportFailure(`Browser state inspection failed: ${String(cause)}`, 'definite-failure'),
   })
 
+/**
+ * `development` (default) serves the fixture through Vite's dev server. `production` builds it first and serves the
+ * bundle, so React and LiveStore run their production code paths (no development-only checks) as a deployed app
+ * would. Frame measurements should use `production`.
+ */
+const fixtureBuildMode = (): 'development' | 'production' =>
+  process.env.SCENARIO_BROWSER_BUILD === 'production' ? 'production' : 'development'
+
 const startFixtureServer = (args: {
   applicationId: string
   backendUrl: string
   storeIdSuffix: string
   backendPayload?: Schema.Json
-}): Effect.Effect<{ baseUrl: string; server: ViteDevServer }, ScenarioOperationError, Scope.Scope> =>
+}): Effect.Effect<{ baseUrl: string; close: () => Promise<void> }, ScenarioOperationError, Scope.Scope> =>
   Effect.acquireRelease(
     Effect.tryPromise({
       try: async () => {
+        const root = path.join(import.meta.dirname, 'fixture')
+        const define = {
+          __SCENARIO_APPLICATION_ID__: jsonStringify(args.applicationId),
+          __SCENARIO_SYNC_URL__: jsonStringify(args.backendUrl),
+          __SCENARIO_STORE_SUFFIX__: jsonStringify(args.storeIdSuffix),
+          __SCENARIO_SYNC_PAYLOAD__:
+            args.backendPayload === undefined ? 'undefined' : jsonStringify(args.backendPayload),
+        }
+        if (fixtureBuildMode() === 'production') {
+          const outDir = await fs.mkdtemp(path.join(os.tmpdir(), 'livestore-scenario-fixture-'))
+          await build({
+            root,
+            mode: 'production',
+            logLevel: 'error',
+            configFile: false,
+            define,
+            // LiveStore's workers import modules, so they must be ES module workers.
+            worker: { format: 'es' },
+            build: { outDir, emptyOutDir: true, target: 'esnext', sourcemap: false },
+          })
+          const server = await preview({
+            root,
+            logLevel: 'error',
+            configFile: false,
+            build: { outDir },
+            preview: { host: '127.0.0.1', port: 0 },
+          })
+          const address = server.httpServer.address()
+          if (address === null || typeof address === 'string') {
+            await server.close()
+            throw new Error('Vite preview did not expose a TCP port')
+          }
+          return {
+            baseUrl: `http://127.0.0.1:${address.port}`,
+            close: async () => {
+              await server.close()
+              await fs.rm(outDir, { recursive: true, force: true })
+            },
+          }
+        }
         const server = await createServer({
           cacheDir: path.join(import.meta.dirname, '../../../node_modules/.vite/browser-fixture'),
-          root: path.join(import.meta.dirname, 'fixture'),
+          root,
           logLevel: 'error',
           server: {
             host: '127.0.0.1',
@@ -710,13 +811,7 @@ const startFixtureServer = (args: {
               ],
             },
           },
-          define: {
-            __SCENARIO_APPLICATION_ID__: jsonStringify(args.applicationId),
-            __SCENARIO_SYNC_URL__: jsonStringify(args.backendUrl),
-            __SCENARIO_STORE_SUFFIX__: jsonStringify(args.storeIdSuffix),
-            __SCENARIO_SYNC_PAYLOAD__:
-              args.backendPayload === undefined ? 'undefined' : jsonStringify(args.backendPayload),
-          },
+          define,
         })
         await server.listen()
         const address = server.httpServer?.address()
@@ -724,13 +819,13 @@ const startFixtureServer = (args: {
           await server.close()
           throw new Error('Vite did not expose a TCP port')
         }
-        return { baseUrl: `http://127.0.0.1:${address.port}`, server }
+        return { baseUrl: `http://127.0.0.1:${address.port}`, close: () => server.close() }
       },
       catch: (cause) => browserInfrastructureFailure(`Failed to start browser fixture: ${String(cause)}`),
     }),
-    ({ server }) =>
+    ({ close }) =>
       Effect.tryPromise({
-        try: () => server.close(),
+        try: close,
         catch: (cause) => browserInfrastructureFailure(`Failed to close browser fixture: ${String(cause)}`),
       }).pipe(Effect.ignore),
   )

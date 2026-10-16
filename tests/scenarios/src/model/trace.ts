@@ -4,6 +4,7 @@ import { HostCapabilities } from './host-protocol.ts'
 import {
   BackendObservation,
   ComponentSyncObservation,
+  FrameTiming,
   SyncObservation,
   SyncObservationPayload,
 } from './observations.ts'
@@ -125,6 +126,7 @@ export const ScenarioTracePayload = Schema.Union([
     code: Schema.String,
     message: Schema.String,
   }),
+  Schema.TaggedStruct('frame.timing.observed', { reason: Schema.String, timing: FrameTiming }),
   Schema.TaggedStruct('settlement.completed', { observations: Schema.Array(SyncObservationPayload) }),
   Schema.TaggedStruct('terminal-stabilization.requested', {
     participants: Schema.Array(Schema.String),

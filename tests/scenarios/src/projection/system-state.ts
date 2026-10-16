@@ -312,6 +312,13 @@ export const summarizeTraceRecord = (record: ScenarioTraceRecord): string => {
       return `Terminal stabilization failed: ${summarizeFailureMessage(record.payload.message)}`
     case 'runtime.failure.observed':
       return scoped(`runtime failure: ${summarizeFailureMessage(record.payload.message)}`)
+    case 'frame.timing.observed': {
+      const { timing } = record.payload
+      const slowest = Math.max(0, ...timing.slowFrames.map(([, gap]) => gap))
+      return scoped(
+        `${timing.frameCount} frames in ${Math.round(timing.windowMs)} ms · ${timing.slowFrames.length} slow · slowest ${Math.round(slowest)} ms`,
+      )
+    }
     case 'sync.snapshot':
       return `${record.payload.participant}: local ${record.payload.localHead} · upstream ${record.payload.upstreamHead} · ${record.payload.pendingCount} pending`
     case 'state.snapshot':
