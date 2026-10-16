@@ -39,6 +39,13 @@ export interface BrowserFrameTimingDrain {
   readonly clock: ParticipantClockReading
 }
 
+/** Pending counts and the leader's backend head, without the event log that `observe` streams. */
+export interface BrowserSyncProbe {
+  readonly sessionPending: number
+  readonly leaderPending: number
+  readonly leaderUpstreamGlobal: number
+}
+
 export interface BrowserDatabaseDiagnostics {
   readonly sessionStateBase64: string
   readonly leaderStateBase64: string
@@ -54,6 +61,7 @@ export interface ScenarioBrowserControl {
   readonly observe: () => Promise<BrowserPageObservation>
   readonly inspectState: (args: { participant: ParticipantRef; inspector: string }) => Promise<Schema.Json>
   readonly drainFrameTiming: () => Promise<BrowserFrameTimingDrain>
+  readonly probeSync: () => Promise<BrowserSyncProbe>
   readonly shutdown: () => Promise<void>
 }
 

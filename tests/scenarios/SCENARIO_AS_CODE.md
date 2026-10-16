@@ -82,6 +82,10 @@ Available final expectations are
 `wait('2s')` requests a positive minimum controller delay. `between: '250ms'`
 adds that delay after each completed sequence action except the last. Neither is
 a Settlement or performance assertion.
+`wait('45s', { untilSettled: true })` ends as soon as the host reports every
+Client connected with nothing pending and level with the backend, using a cheap
+probe instead of full observations; the duration is the upper bound. Hosts
+without the probe wait the full duration.
 
 ## Parameters and ordinary TypeScript
 

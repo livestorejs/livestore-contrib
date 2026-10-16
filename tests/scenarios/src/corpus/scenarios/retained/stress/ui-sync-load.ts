@@ -70,9 +70,12 @@ export const uiSyncLoadScenario = (defaults: {
           ...(pending_count > 0 ? [repeat(createBatches('pending', pending_count, ui))] : []),
           repeat(createBatches('remote', remote_count, writer)),
           settle(writer),
-          note('The UI Client reconnects. The harness stays idle while it applies the pull and re-renders.'),
+          note(
+            'The UI Client reconnects. The harness only probes sync status while it applies the pull and re-renders.',
+          ),
           reconnect(uiClient),
-          wait(quiet_ms),
+          // Ends as soon as everything settled; quiet_ms is the upper bound for a revision that never does.
+          wait(quiet_ms, { untilSettled: true }),
         )
         .expect(
           pendingResolved(both),

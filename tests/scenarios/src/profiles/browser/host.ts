@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -31,7 +32,7 @@ import {
 } from '../../model.ts'
 import { makeEventRefRegistry } from '../../observations.ts'
 import type { ParticipantHost } from '../contract.ts'
-import type { BrowserPageObservation, BrowserStartOptions } from './protocol.ts'
+import type { BrowserPageObservation, BrowserStartOptions, BrowserSyncProbe } from './protocol.ts'
 
 export const browserHostCapabilities: HostCapabilities = {
   profile: 'browser',
@@ -268,6 +269,21 @@ export const makeBrowserHost = (args: {
       [...clients.values()].flatMap((client) => client.drainRuntimeFailures()),
     )
 
+    const probeSettled: NonNullable<ParticipantHost['probeSettled']> = Effect.gen(function* () {
+      if (observedStoreId === undefined) return false
+      const backend = yield* args.backend.observe(observedStoreId)
+      const backendHead = backend.events.at(-1)?.seqNum ?? 0
+      const running = [...clients.values()]
+      if (running.some((client) => client.connected() === false) === true) return false
+      const probes = yield* Effect.forEach(running, (client) => client.probeSync, { concurrency: 'unbounded' })
+      return probes
+        .flat()
+        .every(
+          (probe) =>
+            probe.sessionPending === 0 && probe.leaderPending === 0 && probe.leaderUpstreamGlobal === backendHead,
+        )
+    })
+
     // Suspended so each drain reads the Clients running now, not those present when the host was built.
     const drainFrameTimings: NonNullable<ParticipantHost['drainFrameTimings']> = Effect.suspend(() =>
       Effect.forEach([...clients.values()], (client) => client.drainFrameTimings, { concurrency: 'unbounded' }),
@@ -304,6 +320,7 @@ export const makeBrowserHost = (args: {
       observeSystem,
       drainRuntimeFailures,
       drainFrameTimings,
+      probeSettled,
       observeSync,
       inspectState,
       profileDirectories: () => [...clients.values()].map((client) => client.userDataDir),
@@ -323,6 +340,7 @@ interface BrowserClientController {
   readonly observe: Effect.Effect<BrowserClientObservation, ScenarioOperationError>
   readonly drainRuntimeFailures: () => ReadonlyArray<RuntimeFailureObservation>
   readonly drainFrameTimings: Effect.Effect<ReadonlyArray<FrameTimingObservation>, ScenarioOperationError>
+  readonly probeSync: Effect.Effect<ReadonlyArray<BrowserSyncProbe>, ScenarioOperationError>
   readonly shutdown: Effect.Effect<void, ScenarioOperationError>
 }
 
@@ -517,6 +535,22 @@ const makeBrowserClient = (args: {
         restart,
         observe,
         drainRuntimeFailures: () => state.runtimeFailures.splice(0),
+        probeSync: Effect.suspend(() =>
+          Effect.forEach(
+            [...state.pages.values()],
+            (page) =>
+              Effect.tryPromise({
+                try: () =>
+                  withPageTimeout(
+                    'probe-sync',
+                    page.evaluate(() => window.__scenarioBrowser.probeSync()),
+                  ),
+                catch: (cause) =>
+                  browserTransportFailure(`Browser sync probe failed: ${String(cause)}`, 'definite-failure'),
+              }),
+            { concurrency: 'unbounded' },
+          ),
+        ),
         drainFrameTimings: Effect.suspend(() =>
           Effect.forEach(
             [...state.pages.entries()],
@@ -589,7 +623,11 @@ const startSessionPage = (args: {
       sessionId: args.sessionId,
     }
     yield* Effect.tryPromise({
-      try: () => page.evaluate((input) => window.__scenarioBrowser.start(input), options),
+      try: () =>
+        withPageTimeout(
+          'start',
+          page.evaluate((input) => window.__scenarioBrowser.start(input), options),
+        ),
       catch: (cause) =>
         browserTransportFailure(
           `Browser start completion was not observed for ${args.clientId}/${args.sessionId}: ${String(cause)}`,
@@ -614,7 +652,11 @@ const setClientSyncConnectivity = (pages: ReadonlyMap<string, Page>, connected: 
     if (page === undefined)
       return yield* Effect.fail(browserRequestRejected('Client has no running session to control its sync latch'))
     yield* Effect.tryPromise({
-      try: () => page.evaluate((value) => window.__scenarioBrowser.setConnectivity(value), connected),
+      try: () =>
+        withPageTimeout(
+          'set-connectivity',
+          page.evaluate((value) => window.__scenarioBrowser.setConnectivity(value), connected),
+        ),
       catch: (cause) =>
         browserTransportFailure(`Failed to confirm browser connected=${connected}: ${String(cause)}`, 'indefinite'),
     })
@@ -626,7 +668,11 @@ const persistPageDiagnostics = (args: { pages: ReadonlyMap<string, Page>; client
     if (sessionId === undefined || page === undefined)
       return yield* Effect.fail(browserRequestRejected('Client has no running session to inspect'))
     const diagnostics = yield* Effect.tryPromise({
-      try: () => page.evaluate(() => window.__scenarioBrowser.captureDatabaseDiagnostics()),
+      try: () =>
+        withPageTimeout(
+          'capture-diagnostics',
+          page.evaluate(() => window.__scenarioBrowser.captureDatabaseDiagnostics()),
+        ),
       catch: (cause) =>
         browserTransportFailure(`Failed to capture browser database diagnostics: ${String(cause)}`, 'definite-failure'),
     })
@@ -650,7 +696,10 @@ const shutdownPage = (page: Page) =>
   Effect.tryPromise({
     try: async () => {
       if (page.isClosed() === true) return
-      await page.evaluate(() => window.__scenarioBrowser.shutdown()).catch(() => undefined)
+      await withPageTimeout(
+        'shutdown',
+        page.evaluate(() => window.__scenarioBrowser.shutdown()),
+      ).catch(() => undefined)
       await page.close()
     },
     catch: (cause) => browserInfrastructureFailure(`Failed to close browser session: ${String(cause)}`, 'indefinite'),
@@ -678,7 +727,11 @@ const observePageWithTiming = (
 > => {
   const controllerBeforeMonotonicMs = performance.now()
   return Effect.tryPromise({
-    try: () => page.evaluate(() => window.__scenarioBrowser.observe()),
+    try: () =>
+      withPageTimeout(
+        'observe',
+        page.evaluate(() => window.__scenarioBrowser.observe()),
+      ),
     catch: (cause) => browserTransportFailure(`Browser observation failed: ${String(cause)}`, 'definite-failure'),
   }).pipe(
     Effect.map((observation) => ({
@@ -701,7 +754,11 @@ const drainPageFrameTiming = (
 > => {
   const controllerBeforeMonotonicMs = performance.now()
   return Effect.tryPromise({
-    try: () => page.evaluate(() => window.__scenarioBrowser.drainFrameTiming()),
+    try: () =>
+      withPageTimeout(
+        'drain-frame-timing',
+        page.evaluate(() => window.__scenarioBrowser.drainFrameTiming()),
+      ),
     catch: (cause) =>
       browserTransportFailure(`Browser frame timing drain failed: ${String(cause)}`, 'definite-failure'),
   }).pipe(
@@ -727,14 +784,22 @@ const dispatchPageAction = (
   input: Parameters<Window['__scenarioBrowser']['dispatchAction']>[0],
 ): Effect.Effect<void, ScenarioOperationError> =>
   Effect.tryPromise({
-    try: () => page.evaluate((args) => window.__scenarioBrowser.dispatchAction(args), input),
+    try: () =>
+      withPageTimeout(
+        'dispatch-action',
+        page.evaluate((args) => window.__scenarioBrowser.dispatchAction(args), input),
+      ),
     catch: (cause) =>
       browserTransportFailure(`Browser action completion was not observed: ${String(cause)}`, 'indefinite'),
   })
 
 const inspectPageState = (page: Page, input: Parameters<Window['__scenarioBrowser']['inspectState']>[0]) =>
   Effect.tryPromise({
-    try: () => page.evaluate((args) => window.__scenarioBrowser.inspectState(args), input),
+    try: () =>
+      withPageTimeout(
+        'inspect-state',
+        page.evaluate((args) => window.__scenarioBrowser.inspectState(args), input),
+      ),
     catch: (cause) => browserTransportFailure(`Browser state inspection failed: ${String(cause)}`, 'definite-failure'),
   })
 
@@ -745,6 +810,80 @@ const inspectPageState = (page: Page, input: Parameters<Window['__scenarioBrowse
  */
 const fixtureBuildMode = (): 'development' | 'production' =>
   process.env.SCENARIO_BROWSER_BUILD === 'production' ? 'production' : 'development'
+
+/**
+ * Tokens compiled into the production fixture in place of per-run values, so one build serves every run of a core
+ * revision. They only appear in string and template literals, which minification leaves intact.
+ */
+const PLACEHOLDERS = {
+  applicationId: '@@SCENARIO_APPLICATION_ID@@',
+  syncUrl: '@@SCENARIO_SYNC_URL@@',
+  storeSuffix: '@@SCENARIO_STORE_SUFFIX@@',
+  /** See `encodeSyncPayload`. */
+  syncPayload: '@@SCENARIO_SYNC_PAYLOAD@@',
+} as const
+
+/** The worker decodes this; wrapping in `{ value }` keeps an absent payload a valid JSON document. */
+const encodeSyncPayload = (payload: Schema.Json | undefined): string =>
+  encodeURIComponent(jsonStringify({ value: payload }))
+
+/**
+ * Returns a production build of the fixture, building it once per core revision, harness source and lockfile. A
+ * production build takes about five seconds, a large share of a short Scenario run.
+ */
+const cachedProductionFixture = async (root: string): Promise<string> => {
+  const workspaceRoot = searchForWorkspaceRoot(import.meta.dirname)
+  const scenariosRoot = path.join(import.meta.dirname, '../../..')
+  const hash = crypto.createHash('sha256')
+  hash.update(process.env.LIVESTORE_SCENARIO_SOURCE_REVISION ?? `uncached-${process.pid}-${Date.now()}`)
+  hash.update(await fs.readFile(path.join(workspaceRoot, 'pnpm-lock.yaml')).catch(() => ''))
+  for (const file of (await fs.readdir(path.join(scenariosRoot, 'src'), { recursive: true })).toSorted()) {
+    // Hidden directories hold runtime state (for example wrangler's .wrangler), not fixture source.
+    if (file.split(path.sep).some((segment) => segment.startsWith('.')) === true) continue
+    const filePath = path.join(scenariosRoot, 'src', file)
+    if ((await fs.stat(filePath)).isFile() === true) hash.update(file).update(await fs.readFile(filePath))
+  }
+  const cacheRoot = path.join(scenariosRoot, 'node_modules/.vite/browser-fixture-builds')
+  const cached = path.join(cacheRoot, hash.digest('hex').slice(0, 24))
+  const cacheHit = await fs.stat(cached).then(
+    () => true,
+    () => false,
+  )
+  if (cacheHit === true) return cached
+
+  const staging = `${cached}.${process.pid}.tmp`
+  await build({
+    root,
+    mode: 'production',
+    logLevel: 'error',
+    configFile: false,
+    define: {
+      __SCENARIO_APPLICATION_ID__: jsonStringify(PLACEHOLDERS.applicationId),
+      __SCENARIO_SYNC_URL__: jsonStringify(PLACEHOLDERS.syncUrl),
+      __SCENARIO_STORE_SUFFIX__: jsonStringify(PLACEHOLDERS.storeSuffix),
+      __SCENARIO_SYNC_PAYLOAD__: jsonStringify(PLACEHOLDERS.syncPayload),
+    },
+    // LiveStore's workers import modules, so they must be ES module workers.
+    worker: { format: 'es' },
+    build: { outDir: staging, emptyOutDir: true, target: 'esnext', sourcemap: false },
+  })
+  await fs.rename(staging, cached).catch(async () => {
+    // Another run finished the same build first; its output is equivalent.
+    await fs.rm(staging, { recursive: true, force: true })
+  })
+  return cached
+}
+
+const substituteFixturePlaceholders = async (directory: string, values: Readonly<Record<string, string>>) => {
+  for (const file of await fs.readdir(directory, { recursive: true })) {
+    if (file.endsWith('.js') === false) continue
+    const filePath = path.join(directory, file)
+    const source = await fs.readFile(filePath, 'utf8')
+    let replaced = source
+    for (const [token, value] of Object.entries(values)) replaced = replaced.replaceAll(token, value)
+    if (replaced !== source) await fs.writeFile(filePath, replaced)
+  }
+}
 
 const startFixtureServer = (args: {
   applicationId: string
@@ -760,20 +899,16 @@ const startFixtureServer = (args: {
           __SCENARIO_APPLICATION_ID__: jsonStringify(args.applicationId),
           __SCENARIO_SYNC_URL__: jsonStringify(args.backendUrl),
           __SCENARIO_STORE_SUFFIX__: jsonStringify(args.storeIdSuffix),
-          __SCENARIO_SYNC_PAYLOAD__:
-            args.backendPayload === undefined ? 'undefined' : jsonStringify(args.backendPayload),
+          __SCENARIO_SYNC_PAYLOAD__: jsonStringify(encodeSyncPayload(args.backendPayload)),
         }
         if (fixtureBuildMode() === 'production') {
           const outDir = await fs.mkdtemp(path.join(os.tmpdir(), 'livestore-scenario-fixture-'))
-          await build({
-            root,
-            mode: 'production',
-            logLevel: 'error',
-            configFile: false,
-            define,
-            // LiveStore's workers import modules, so they must be ES module workers.
-            worker: { format: 'es' },
-            build: { outDir, emptyOutDir: true, target: 'esnext', sourcemap: false },
+          await fs.cp(await cachedProductionFixture(root), outDir, { recursive: true })
+          await substituteFixturePlaceholders(outDir, {
+            [PLACEHOLDERS.applicationId]: args.applicationId,
+            [PLACEHOLDERS.syncUrl]: args.backendUrl,
+            [PLACEHOLDERS.storeSuffix]: args.storeIdSuffix,
+            [PLACEHOLDERS.syncPayload]: encodeSyncPayload(args.backendPayload),
           })
           const server = await preview({
             root,
@@ -829,6 +964,25 @@ const startFixtureServer = (args: {
         catch: (cause) => browserInfrastructureFailure(`Failed to close browser fixture: ${String(cause)}`),
       }).pipe(Effect.ignore),
   )
+
+/**
+ * Upper bound for one call into a participant page. Without it a page that never answers (for example a store stuck
+ * waiting on its worker) blocks the run, and with it a whole benchmark campaign, indefinitely; with it the run fails
+ * with a transport error that names the call.
+ */
+const pageCallTimeoutMs = (): number => Number(process.env.SCENARIO_BROWSER_CALL_TIMEOUT_MS ?? 120_000)
+
+const withPageTimeout = <A>(label: string, call: Promise<A>): Promise<A> => {
+  const timeoutMs = pageCallTimeoutMs()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Browser page call '${label}' did not finish within ${timeoutMs} ms`)),
+      timeoutMs,
+    )
+  })
+  return Promise.race([call, timeout]).finally(() => clearTimeout(timer))
+}
 
 const getClient = (
   clients: ReadonlyMap<string, BrowserClientController>,

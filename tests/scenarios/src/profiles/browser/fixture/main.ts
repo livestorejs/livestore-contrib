@@ -106,6 +106,15 @@ const control: ScenarioBrowserControl = {
   dispatchAction: (args) => frameMonitor.harness('dispatch-action', () => dispatchAction(args)),
   observe: () => frameMonitor.harness('observe', observe),
   inspectState: (args) => frameMonitor.harness('inspect-state', () => inspectState(args)),
+  probeSync: () =>
+    frameMonitor.harness('probe-sync', async () => {
+      const states = await requireRuntime().store._dev.syncStates()
+      return {
+        sessionPending: states.session.pending.length,
+        leaderPending: states.leader.pending.length,
+        leaderUpstreamGlobal: states.leader.upstreamHead.global,
+      }
+    }),
   drainFrameTiming: async () => {
     const clock = participantClock
     if (clock === undefined) throw new Error('Browser participant clock has not started')

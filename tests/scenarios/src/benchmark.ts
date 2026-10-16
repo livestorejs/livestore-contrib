@@ -9,11 +9,22 @@ import { fileURLToPath } from 'node:url'
 import { writeArtifactCatalog } from './artifact-catalog-fs.ts'
 import type { BenchmarkManifest } from './benchmark-model.ts'
 import { withCoreSource } from './core-source.ts'
+import { parseScenarioDurationMs } from './duration.ts'
 
 const workspaceRoot = path.resolve(import.meta.dirname, '../../..')
 export const parseBenchmarkOptions = (args: ReadonlyArray<string>) => {
   const values = new Map<string, string[]>()
-  const allowed = ['--baseline', '--candidate', '--scenario', '--profile', '--samples', '--warmups', '--set']
+  const allowed = [
+    '--baseline',
+    '--candidate',
+    '--scenario',
+    '--profile',
+    '--samples',
+    '--warmups',
+    '--set',
+    '--stabilization-timeout',
+    '--sample-timeout',
+  ]
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i]!
     const value = args[i + 1]
@@ -53,6 +64,8 @@ export const parseBenchmarkOptions = (args: ReadonlyArray<string>) => {
     parameters,
     samples: count('--samples', 10, 1),
     warmups: count('--warmups', 1, 0),
+    stabilizationTimeout: values.get('--stabilization-timeout')?.[0],
+    sampleTimeoutMs: parseScenarioDurationMs(values.get('--sample-timeout')?.[0] ?? '15m'),
   }
 }
 
@@ -117,6 +130,7 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
     await fs.rename(destination + '.tmp', destination)
   }
   let interrupted = false
+  let timedOut = false
   let child: ReturnType<typeof spawn> | undefined
   const stop = () => {
     interrupted = true
@@ -154,6 +168,9 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
                         '--profile',
                         profile,
                         ...options.parameters.flatMap((value) => ['--set', value]),
+                        ...(options.stabilizationTimeout === undefined
+                          ? []
+                          : ['--stabilization-timeout', options.stabilizationTimeout]),
                         '--output',
                         output,
                       ],
@@ -167,14 +184,26 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
                         stdio: 'inherit',
                       },
                     )
+                    // A sample that never finishes would stall the campaign silently. Stop it and fail the campaign
+                    // instead; a stopped sample has no artifact to compare.
+                    const sampleTimer = setTimeout(() => {
+                      timedOut = true
+                      child?.kill('SIGINT')
+                      setTimeout(() => child?.kill('SIGKILL'), 20_000).unref()
+                    }, options.sampleTimeoutMs)
                     child.once('error', reject)
                     child.once('exit', (code) => {
+                      clearTimeout(sampleTimer)
                       child = undefined
                       resolve(code ?? 1)
                     })
                   }),
               })
               if (interrupted) throw new Error('Benchmark interrupted')
+              if (timedOut)
+                throw new Error(
+                  `Sample ${file} did not finish within ${options.sampleTimeoutMs / 1000} s and was stopped`,
+                )
               const artifact = JSON.parse(await fs.readFile(output, 'utf8'))
               if (
                 !['passed', 'failed'].includes(artifact.status) ||
@@ -215,6 +244,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   --samples <n>       Measured runs per target/case (default: 10)
   --warmups <n>       Cache warmup runs per target/case (default: 1)
   --set <name=value>  Scenario parameter; applies to all selected cases
+  --stabilization-timeout <duration>  Passed to every run (default: the CLI's 60s)
+  --sample-timeout <duration>  Stops a run that takes longer and fails the campaign (default: 15m)
 Results: artifacts/benchmarks/<campaign>/manifest.json and immutable run artifacts.
 Warmups use fresh clients, prime host caches, and are excluded from statistics.
 Correctness failures are retained and exit nonzero; no performance regression threshold is enforced.`)

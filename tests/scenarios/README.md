@@ -162,7 +162,6 @@ and promotion workflow.
 `tests/scenarios` is private contributor tooling. It may depend on LiveStore
 product packages, but product packages never depend on the runner.
 
-
 ## Compare correctness and performance
 
 Use the same dependency-compatible core selection as `scenario:run`:
@@ -189,6 +188,10 @@ The manifest records Node, OS, CPU, lockfile and harness hashes. Changing the
 harness or lockfile during a campaign invalidates its controlled status.
 Dependency-incompatible branches need separately installed matching environments;
 the benchmark does not bypass the source selector's checks.
+`--stabilization-timeout <duration>` is passed to every run, so a revision that
+never settles fails sooner than the CLI's 60s default. `--sample-timeout
+<duration>` (default 15m) stops a run that takes longer and fails the campaign
+instead of letting it stall.
 
 In the viewer, **Saved runs → Compare** selects a campaign, baseline, candidate,
 and timing metric. It matches the complete normalized scenario (including
@@ -205,12 +208,12 @@ after a campaign finishes to read its updated catalog.
 Timings are derived from existing controller monotonic trace readings, without
 changing the artifact schema, participant clocks, or execution semantics:
 
-| Metric | Interval |
-| --- | --- |
-| Time to pass | `run.started` → `run.completed` on a passing artifact |
-| Client startup | `run.started` → creation of all initial clients |
+| Metric           | Interval                                                     |
+| ---------------- | ------------------------------------------------------------ |
+| Time to pass     | `run.started` → `run.completed` on a passing artifact        |
+| Client startup   | `run.started` → creation of all initial clients              |
 | Writes → settled | first `action.requested` → terminal stabilization completion |
-| Slowest recovery | longest matched fault removal → recovery completion |
+| Slowest recovery | longest matched fault removal → recovery completion          |
 
 Total time includes client initialization and correctness checks but excludes
 launcher/source setup, fixture/backend setup before `run.started`, artifact

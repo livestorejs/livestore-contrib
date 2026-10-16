@@ -75,6 +75,8 @@ export type AnnotationInstruction = typeof AnnotationInstruction.Type
 export const WaitStep = Schema.TaggedStruct('wait', {
   id: Schema.String,
   durationMs: Schema.Int,
+  /** End early once the host reports the system settled; `durationMs` is then the upper bound. */
+  untilSettled: Schema.optionalKey(Schema.Boolean),
 })
 export type WaitStep = typeof WaitStep.Type
 
