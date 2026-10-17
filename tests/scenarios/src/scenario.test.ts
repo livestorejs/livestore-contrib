@@ -56,6 +56,7 @@ describe('Scenario as code', () => {
       note('Write locally.'),
       todo.createTodo({ id: 'todo-1', text: 'First' }).as(sessionA),
       wait('25ms'),
+      wait('2s', { untilSettled: true }),
     )
 
     expect(start.instructions).toHaveLength(0)
@@ -73,6 +74,7 @@ describe('Scenario as code', () => {
         { _tag: 'annotation', id: 'note-0001', text: 'Write locally.' },
         { _tag: 'action', id: 'action-0001', target: { clientId: 'client-a', sessionId: 'session-a' } },
         { _tag: 'wait', id: 'wait-0001', durationMs: 25 },
+        { _tag: 'wait', id: 'wait-0002', durationMs: 2000, untilSettled: true },
       ],
       oracles: [
         { _tag: 'pending-resolution', id: 'oracle-0001' },

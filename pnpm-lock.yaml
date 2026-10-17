@@ -2489,6 +2489,9 @@ importers:
       '@livestore/livestore':
         specifier: link:../../repos/livestore/packages/@livestore/livestore
         version: link:../../repos/livestore/packages/@livestore/livestore
+      '@livestore/react':
+        specifier: link:../../repos/livestore/packages/@livestore/react
+        version: link:../../repos/livestore/packages/@livestore/react
       '@livestore/sync-cf':
         specifier: link:../../repos/livestore/packages/@livestore/sync-cf
         version: link:../../repos/livestore/packages/@livestore/sync-cf

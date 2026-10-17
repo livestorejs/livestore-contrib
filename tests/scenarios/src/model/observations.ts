@@ -97,6 +97,29 @@ export const RuntimeFailureObservation = Schema.Struct({
 })
 export type RuntimeFailureObservation = typeof RuntimeFailureObservation.Type
 
+/**
+ * Main-thread frame timing reported by a participant since its previous report. Times are milliseconds relative to the
+ * report's own participant clock reading, which the occurrence calibrates onto the controller clock.
+ */
+export const FrameTiming = Schema.Struct({
+  windowMs: Schema.Finite,
+  frameCount: Schema.Finite,
+  /** Frames slower than 20 ms as `[start, gap]`. */
+  slowFrames: Schema.Array(Schema.Tuple([Schema.Finite, Schema.Finite])),
+  /** Long animation frames as `[start, duration, blockingDuration, longest scripts]`. */
+  longAnimationFrames: Schema.Array(Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite, Schema.String])),
+  /** Intervals in which the harness drove the participant, as `[start, duration, label]`. */
+  harnessIntervals: Schema.Array(Schema.Tuple([Schema.Finite, Schema.Finite, Schema.String])),
+  longAnimationFramesSupported: Schema.Boolean,
+})
+export type FrameTiming = typeof FrameTiming.Type
+
+export interface FrameTimingObservation {
+  readonly participant: ParticipantRef
+  readonly occurrence: HostObservationOccurrence
+  readonly timing: FrameTiming
+}
+
 export const SyncObservationPayload = Schema.Struct({
   participant: Schema.String,
   localHead: Schema.String,

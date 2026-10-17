@@ -13,15 +13,125 @@ const lifecycleArtifact = path.join(packageRoot, 'artifacts/reference-multi-sess
 const denseArtifact = path.join(packageRoot, 'artifacts/reference-seeded-todo-actions-browser.json.gz')
 const viewerUrl = 'http://127.0.0.1:4173'
 
+test('saved runs support numeric sorting, combined filters, loading, and collapse', async ({ page }) => {
+  const entries = [
+    {
+      file: path.basename(offlineArtifact),
+      scenarioId: 'offline-writer-recovery',
+      label: 'BRANCH · offline-writer-recovery',
+      sourceRevision: 'livestore@' + 'a'.repeat(40),
+      profile: 'browser',
+      backend: 'local-sync-cf',
+      applicationEventCount: 2,
+      traceRecordCount: 100,
+      status: 'passed',
+    },
+    {
+      file: path.basename(manyWriterArtifact),
+      scenarioId: 'many-writer-convergence',
+      label: 'BASELINE · many-writer-convergence',
+      sourceRevision: 'livestore@' + 'b'.repeat(40),
+      profile: 'in-process',
+      backend: 'mock',
+      applicationEventCount: 100,
+      traceRecordCount: 20,
+      status: 'failed',
+    },
+    {
+      file: path.basename(lifecycleArtifact),
+      scenarioId: 'multi-session-recovery',
+      label: 'BRANCH · multi-session-recovery',
+      sourceRevision: 'livestore@' + 'a'.repeat(40),
+      profile: 'browser',
+      backend: 'local-sync-cf',
+      applicationEventCount: 10,
+      traceRecordCount: 3,
+      status: 'passed',
+    },
+  ]
+  await page.route('**/catalog.json', (route) => route.fulfill({ json: { version: 4, entries } }))
+  await page.goto(viewerUrl)
+  const table = page.getByRole('table', { name: 'Saved scenario runs' })
+  await page.getByRole('button', { name: 'Events', exact: true }).click()
+  await expect(table.locator('tbody tr td:nth-child(5)')).toHaveText(['2', '10', '100'])
+  await page.getByRole('button', { name: 'Events', exact: true }).click()
+  await expect(table.locator('tbody tr td:nth-child(5)')).toHaveText(['100', '10', '2'])
+  await expect(page.getByRole('columnheader', { name: 'Events' })).toHaveAttribute('aria-sort', 'descending')
+  await page.getByLabel('Filter target').selectOption(entries[0]!.sourceRevision)
+  await page.getByLabel('Filter profile').selectOption('browser')
+  await page.getByLabel('Filter result').selectOption('failed')
+  await expect(page.getByText('No runs match these filters.')).toBeVisible()
+  await page.getByLabel('Filter result').selectOption('passed')
+  await page.getByRole('searchbox', { name: 'Search runs' }).fill('offline')
+  await expect(table.locator('tbody tr')).toHaveCount(1)
+  await table.getByRole('button', { name: 'offline-writer-recovery', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('offline-writer-recovery')
+  await expect(table.getByRole('button', { name: 'offline-writer-recovery', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await page.getByRole('button', { name: /Saved runs/ }).click()
+  await expect(table).toBeHidden()
+  await page.getByRole('button', { name: /Saved runs/ }).click()
+  await expect(table.locator('tbody tr')).toHaveCount(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('compares timing and correctness without treating failures as speedups', async ({ page }) => {
+  const base = 'livestore@' + 'a'.repeat(40),
+    candidate = 'livestore@' + 'b'.repeat(40)
+  const common = {
+    scenarioId: 'offline-writer-recovery',
+    label: 'offline-writer-recovery',
+    profile: 'browser',
+    backend: 'local-sync-cf',
+    comparisonKey: 'same-workload',
+    applicationEventCount: 2,
+    traceRecordCount: 100,
+  }
+  const entries = [
+    {
+      ...common,
+      file: path.basename(offlineArtifact),
+      sourceRevision: base,
+      status: 'passed',
+      timings: { runMs: 1000, workloadMs: 500 },
+    },
+    {
+      ...common,
+      file: 'candidate-pass.json',
+      sourceRevision: candidate,
+      status: 'passed',
+      timings: { runMs: 800, workloadMs: 400 },
+    },
+    { ...common, file: 'candidate-fail.json', sourceRevision: candidate, status: 'failed', timings: {} },
+  ]
+  await page.route('**/catalog.json', (route) => route.fulfill({ json: { version: 4, entries } }))
+  await page.goto(viewerUrl)
+  await page.getByRole('button', { name: 'Time to pass', exact: true }).click()
+  const runs = page.getByRole('table', { name: 'Saved scenario runs' })
+  await expect(runs.locator('tbody tr td:last-child')).toHaveText(['800 ms', '1.00 s', '—'])
+  await page.getByRole('button', { name: 'Compare', exact: true }).click()
+  const comparison = page.getByRole('table', { name: 'Baseline and candidate comparison' })
+  await expect(comparison).toContainText('Correctness failed')
+  await expect(comparison).toContainText('1 / 2')
+  await page.getByText('Choose individual runs', { exact: true }).click()
+  await page.getByLabel('Candidate sample', { exact: true }).selectOption('candidate-pass.json')
+  await expect(comparison).toContainText('-20.0%')
+  await page.getByLabel('Candidate revision', { exact: true }).selectOption(base)
+  await expect(page.getByText('Choose two different revisions to compare.')).toBeVisible()
+  await page.getByLabel('Candidate revision', { exact: true }).selectOption(candidate)
+  await page.getByLabel('Candidate sample', { exact: true }).selectOption('candidate-pass.json')
+  await comparison.getByText('Runs', { exact: true }).click()
+  await comparison.getByRole('button', { name: '1 · passed · 500 ms', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('offline-writer-recovery')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
 test('loads failure artifacts and preserves comparison interactions', async ({ page }) => {
   await openArtifact(page, viewerUrl, failureArtifact, 'many-writer-convergence')
-  await expect(
-    page
-      .getByLabel('Saved scenario run')
-      .locator('option')
-      .filter({ hasText: /core [0-9a-f]{8}/ })
-      .first(),
-  ).toBeAttached()
+  await expect(page.getByRole('table', { name: 'Saved scenario runs' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Target' })).toBeVisible()
   await openArtifact(page, viewerUrl, offlineArtifact, 'offline-writer-recovery')
   await applyComparisonState(page)
   await expect(page.getByText('Logical time')).toBeVisible()

@@ -4,6 +4,7 @@ import { HostCapabilities } from './host-protocol.ts'
 import {
   BackendObservation,
   ComponentSyncObservation,
+  FrameTiming,
   SyncObservation,
   SyncObservationPayload,
 } from './observations.ts'
@@ -39,10 +40,12 @@ export const ScenarioTracePayload = Schema.Union([
   }),
   Schema.TaggedStruct('client.created', { status: Schema.Literal('acknowledged') }),
   Schema.TaggedStruct('annotation.reached', { text: Schema.String }),
-  Schema.TaggedStruct('wait.requested', { durationMs: Schema.Int }),
+  Schema.TaggedStruct('wait.requested', { durationMs: Schema.Int, untilSettled: Schema.optionalKey(Schema.Boolean) }),
   Schema.TaggedStruct('wait.completed', {
     requestedDurationMs: Schema.Int,
     actualDurationMs: Schema.Finite,
+    /** Present for `untilSettled` waits: whether the system settled before the upper bound. */
+    settled: Schema.optionalKey(Schema.Boolean),
   }),
   Schema.TaggedStruct('action.requested', { action: Schema.String, input: Schema.Json }),
   Schema.TaggedStruct('action.completed', {
@@ -125,6 +128,7 @@ export const ScenarioTracePayload = Schema.Union([
     code: Schema.String,
     message: Schema.String,
   }),
+  Schema.TaggedStruct('frame.timing.observed', { reason: Schema.String, timing: FrameTiming }),
   Schema.TaggedStruct('settlement.completed', { observations: Schema.Array(SyncObservationPayload) }),
   Schema.TaggedStruct('terminal-stabilization.requested', {
     participants: Schema.Array(Schema.String),

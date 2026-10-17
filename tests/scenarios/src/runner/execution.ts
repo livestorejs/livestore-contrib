@@ -11,7 +11,7 @@ import {
   type ScenarioTraceRecord,
 } from '../model.ts'
 import type { HostError, ParticipantHost } from '../profiles/contract.ts'
-import { waitAtLeast } from './clock.ts'
+import { waitAtLeast, waitUntilSettled } from './clock.ts'
 import { syncObservationPayload } from './eventlog.ts'
 import { type ScenarioFaultState, recordOperationFailure } from './faults.ts'
 import { awaitStabilization } from './observations.ts'
@@ -83,9 +83,24 @@ export const executeInstruction = (args: {
         const requested = args.record({
           origin: 'instruction',
           correlationId: instruction.id,
-          payload: { _tag: 'wait.requested', durationMs: instruction.durationMs },
+          payload: {
+            _tag: 'wait.requested',
+            durationMs: instruction.durationMs,
+            ...(instruction.untilSettled === true ? { untilSettled: true } : {}),
+          },
         })
-        const actualDurationMs = yield* waitAtLeast(instruction.durationMs)
+        const probe = instruction.untilSettled === true ? args.host.probeSettled : undefined
+        if (probe === undefined) {
+          const actualDurationMs = yield* waitAtLeast(instruction.durationMs)
+          args.record({
+            origin: 'acknowledgement',
+            correlationId: instruction.id,
+            causedBy: [requested.index],
+            payload: { _tag: 'wait.completed', requestedDurationMs: instruction.durationMs, actualDurationMs },
+          })
+          return
+        }
+        const { elapsedMs, settled } = yield* waitUntilSettled(probe, instruction.durationMs)
         args.record({
           origin: 'acknowledgement',
           correlationId: instruction.id,
@@ -93,7 +108,8 @@ export const executeInstruction = (args: {
           payload: {
             _tag: 'wait.completed',
             requestedDurationMs: instruction.durationMs,
-            actualDurationMs,
+            actualDurationMs: elapsedMs,
+            settled,
           },
         })
       })

@@ -111,6 +111,20 @@ export const recordSystemObservation = (args: {
       }
     }
 
+    const frameTimings = args.host.drainFrameTimings === undefined ? [] : yield* args.host.drainFrameTimings
+    for (const frameTiming of frameTimings) {
+      args.record({
+        origin: 'observation',
+        correlationId: args.correlationId,
+        clientId: frameTiming.participant.clientId,
+        sessionId: frameTiming.participant.sessionId,
+        captureId,
+        evidence: 'first-observed',
+        occurrence: frameTiming.occurrence,
+        payload: { _tag: 'frame.timing.observed', reason: args.reason, timing: frameTiming.timing },
+      })
+    }
+
     const runtimeFailures = yield* args.host.drainRuntimeFailures
     for (const failure of runtimeFailures) {
       args.record({

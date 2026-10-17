@@ -8,6 +8,7 @@ import type {
   ClientLifecycleCommand,
   CreateClientCommand,
   DispatchActionCommand,
+  FrameTimingObservation,
   HostAcknowledgement,
   HostCapabilities,
   HostSystemObservation,
@@ -51,6 +52,17 @@ export interface ParticipantHost {
   ) => Effect.Effect<HostAcknowledgement, HostError, HostServices>
   readonly observeSystem: Effect.Effect<HostSystemObservation, HostError, Scope.Scope>
   readonly drainRuntimeFailures: Effect.Effect<ReadonlyArray<RuntimeFailureObservation>, HostError, Scope.Scope>
+  /**
+   * Frame timing each participant recorded since the previous drain. Optional: only hosts that render a UI on a real
+   * main thread (the browser profile) can measure frames.
+   */
+  readonly drainFrameTimings?: Effect.Effect<ReadonlyArray<FrameTimingObservation>, HostError, Scope.Scope>
+  /**
+   * Cheap settlement check for `untilSettled` waits: every Client connected, nothing pending in sessions or leaders,
+   * and every leader level with the backend. Optional; unlike observeSystem it must not stream event logs, so polling
+   * it does not load the participants being measured.
+   */
+  readonly probeSettled?: Effect.Effect<boolean, HostError, Scope.Scope>
   readonly observeSync: (participant: ParticipantRef) => Effect.Effect<SyncObservation, HostError, Scope.Scope>
   readonly inspectState: (command: InspectStateCommand) => Effect.Effect<Schema.Json, HostError>
 }

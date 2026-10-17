@@ -77,7 +77,7 @@ export const ScenarioViewerApp = ({ initialArtifact, initialState, hidePicker = 
             selectedFile={selectedFile}
             onSelectedFileChange={setSelectedFile}
             onFile={(file) => loadText(readArtifactFile(file))}
-            onLoad={() => loadText(fetchArtifactJson(selectedFile))}
+            onLoad={(file) => loadText(fetchArtifactJson(file))}
           />
         )}
       </ViewerHeader>

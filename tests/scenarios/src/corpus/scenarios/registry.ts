@@ -1,15 +1,18 @@
 import type { ScenarioAst } from '../../model.ts'
 import { normalizeScenario, scenarioIdFromFileName, type ScenarioSource } from '../../scenario.ts'
+import largePayloadRecoverySource from './retained/examples/large-payload-recovery.scenario.ts'
 import multiSessionRecoverySource from './retained/examples/multi-session-recovery.scenario.ts'
 import offlineWriterRecoverySource from './retained/examples/offline-writer-recovery.scenario.ts'
 import concurrentHotelBookingSource from './retained/findings/concurrent-hotel-booking.scenario.ts'
-import largePayloadRecoverySource from './retained/findings/large-payload-recovery.scenario.ts'
 import manyWriterConvergenceSource from './retained/findings/many-writer-convergence.scenario.ts'
 import pendingTailRecoverySource from './retained/findings/pending-tail-recovery.scenario.ts'
+import uiCatchUpResponsivenessSource from './retained/stress/ui-catch-up-responsiveness.scenario.ts'
+import uiRebaseResponsivenessSource from './retained/stress/ui-rebase-responsiveness.scenario.ts'
 
 export interface RetainedScenarioEntry {
-  readonly kind: 'example' | 'finding'
-  readonly findingId?: 'SF-01' | 'SF-02' | 'SF-03' | 'SF-04'
+  /** `stress` Scenarios drive load for performance measurement rather than demonstrating a behavior. */
+  readonly kind: 'example' | 'finding' | 'stress'
+  readonly findingId?: 'SF-01' | 'SF-02' | 'SF-03'
   readonly scenario: ScenarioAst
 }
 
@@ -48,13 +51,22 @@ const sources = [
     source: manyWriterConvergenceSource,
   },
   {
-    kind: 'finding',
-    findingId: 'SF-04',
-    file: new URL('./retained/findings/large-payload-recovery.scenario.ts', import.meta.url),
+    kind: 'example',
+    file: new URL('./retained/examples/large-payload-recovery.scenario.ts', import.meta.url),
     source: largePayloadRecoverySource,
   },
+  {
+    kind: 'stress',
+    file: new URL('./retained/stress/ui-catch-up-responsiveness.scenario.ts', import.meta.url),
+    source: uiCatchUpResponsivenessSource,
+  },
+  {
+    kind: 'stress',
+    file: new URL('./retained/stress/ui-rebase-responsiveness.scenario.ts', import.meta.url),
+    source: uiRebaseResponsivenessSource,
+  },
 ] as const satisfies ReadonlyArray<{
-  readonly kind: 'example' | 'finding'
+  readonly kind: RetainedScenarioEntry['kind']
   readonly findingId?: RetainedScenarioEntry['findingId']
   readonly file: URL
   readonly source: ScenarioSource

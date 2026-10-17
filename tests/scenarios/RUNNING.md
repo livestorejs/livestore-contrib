@@ -111,6 +111,21 @@ Useful environment variables:
 - `SCENARIO_BROWSER_DB_SNAPSHOT_DIR=<directory>` exports the first session,
   leader, and eventlog databases immediately before each browser Client
   reconnects.
+- `SCENARIO_BROWSER_BUILD=production` serves a production build of the browser
+  fixture, so React and LiveStore skip their development-only checks. Use it
+  for frame measurements. The build is cached per core revision, harness source
+  and lockfile under `node_modules/.vite/browser-fixture-builds`.
+- `SCENARIO_BROWSER_CALL_TIMEOUT_MS=<ms>` bounds each call into a browser page
+  (default 120000). A page that stops answering fails the run instead of
+  stalling it.
+- `SCENARIO_BROWSER_DIAGNOSTICS=1` forwards browser console output.
+
+Browser participants render a small React app over the Scenario state and
+record main-thread frame timing (animation-frame gaps and Chromium long
+animation frames) into `frame.timing.observed` trace records.
+`deriveFrameMetrics` in `src/performance.ts` summarizes them over each wait and
+the instruction that started it, with and without frames that overlap harness
+work in the page.
 
 The artifact retains the normalized Scenario, execution identity, trace,
 observations, operation outcomes, snapshots, and verdicts. Failed runs preserve

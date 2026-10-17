@@ -1,18 +1,13 @@
 import { Schema } from '@livestore/utils/effect'
 
+import type { ArtifactCatalogEntry } from '../artifact-catalog.ts'
+import type { BenchmarkManifest } from '../benchmark-model.ts'
 import { ScenarioRunArtifact } from '../model.ts'
 
 export interface ArtifactCatalog {
+  readonly campaigns?: ReadonlyArray<BenchmarkManifest>
   readonly version: 4
-  readonly entries: ReadonlyArray<{
-    readonly findingId?: string
-    readonly file: string
-    readonly label: string
-    readonly sourceRevision: string
-    readonly applicationEventCount: number
-    readonly traceRecordCount: number
-    readonly status?: 'passed' | 'failed'
-  }>
+  readonly entries: ReadonlyArray<ArtifactCatalogEntry>
 }
 
 export const decodeArtifactJson = (input: string): ScenarioRunArtifact =>
@@ -22,7 +17,7 @@ export const readArtifactFile = async (file: File): Promise<string> =>
   file.name.endsWith('.gz') === true ? decompressGzip(await file.arrayBuffer()) : file.text()
 
 export const fetchArtifactJson = async (file: string): Promise<string> => {
-  const response = await fetch(`/${encodeURIComponent(file)}`)
+  const response = await fetch(`/${file.split('/').map(encodeURIComponent).join('/')}`)
   if (response.ok === false) throw new Error(`Could not load saved artifact ${file}.`)
   if (file.endsWith('.gz') === false) return response.text()
 

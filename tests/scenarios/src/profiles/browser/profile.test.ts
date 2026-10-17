@@ -2,8 +2,17 @@ import { FetchHttpClient, Layer } from '@livestore/utils/effect'
 import { PlatformNode } from '@livestore/utils/node'
 
 import { makeLocalSyncCfScenarioBackend } from '../../backends.ts'
+import { hotelBooking, hotelBookingApplication } from '../../corpus/applications/hotel-booking.ts'
 import { todo } from '../../corpus/applications/todo.ts'
-import { Scenario, client, normalizeScenario, stopSession } from '../../scenario.ts'
+import {
+  Scenario,
+  alias,
+  client,
+  eventlogsConverge,
+  normalizeScenario,
+  pendingResolved,
+  stopSession,
+} from '../../scenario.ts'
 import { expectOfflineEventCorrelationLifecycle } from '../../test-support/runner-assertions.ts'
 import {
   Effect,
@@ -22,6 +31,35 @@ const makeLocalBackend = makeLocalSyncCfScenarioBackend.pipe(
 )
 
 Vitest.describe('browser profile', () => {
+  Vitest.live(
+    'uses the selected application schema in the browser leader',
+    (test) =>
+      Effect.gen(function* () {
+        const clientA = client('client-a').withSessions('session-a')
+        const sessionA = clientA.session('session-a')
+        const participants = alias([sessionA])
+        const scenario = normalizeScenario(
+          Scenario.start({ application: hotelBooking, clients: [clientA] })
+            .steps(
+              hotelBooking.initializeHotelRoomInventory({ roomType: 'standard', available: 2 }).as(sessionA),
+              hotelBooking.bookHotelRoom({ roomType: 'standard' }).as(sessionA),
+            )
+            .expect(pendingResolved(participants), eventlogsConverge(participants)),
+          { id: 'browser-selected-application' },
+        )
+        const artifact = yield* runBrowserLocalSyncCfScenario({
+          scenario,
+          applicationId: hotelBookingApplication.id,
+          options: { runId: 'browser-selected-application-test', sourceRevision: 'test' },
+        })
+
+        expect(artifact.status).toBe('passed')
+        expect(artifact.verdicts).toHaveLength(2)
+        expect(artifact.verdicts.every((verdict) => verdict.status === 'passed')).toBe(true)
+      }).pipe(Vitest.withTestCtx(test)),
+    120_000,
+  )
+
   Vitest.live(
     'keeps a restarted session offline until its Client reconnects',
     (test) =>

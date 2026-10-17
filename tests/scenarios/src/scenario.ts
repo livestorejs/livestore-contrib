@@ -79,7 +79,7 @@ type SequenceActions = ReadonlyArray<ScenarioAction> | ((context: SequenceContex
 type InstructionSpec =
   | ActionSpec
   | { readonly _tag: 'annotation'; readonly text: string }
-  | { readonly _tag: 'wait'; readonly durationMs: number }
+  | { readonly _tag: 'wait'; readonly durationMs: number; readonly untilSettled?: boolean }
   | Exclude<ParallelSpec, ActionSpec>
   | { readonly _tag: 'create-client'; readonly client: ScenarioClient }
   | { readonly _tag: 'add-session'; readonly target: ScenarioSession }
@@ -291,8 +291,16 @@ const makeOperation = <TSpec extends InstructionSpec>(spec: TSpec): ScenarioOper
 
 export const note = (text: string): ScenarioOperation => makeOperation({ _tag: 'annotation', text })
 
-export const wait = (duration: string | number): ScenarioOperation =>
-  makeOperation({ _tag: 'wait', durationMs: compileDuration(duration) })
+/**
+ * Waits without driving any participant. With `untilSettled`, the wait ends as soon as the host reports every Client
+ * connected with nothing pending and level with the backend, and `duration` becomes the upper bound.
+ */
+export const wait = (duration: string | number, options: { readonly untilSettled?: boolean } = {}): ScenarioOperation =>
+  makeOperation({
+    _tag: 'wait',
+    durationMs: compileDuration(duration),
+    ...(options.untilSettled === true ? { untilSettled: true } : {}),
+  })
 
 export const disconnect = (target: ScenarioClient): ScenarioOperation =>
   makeOperation({ _tag: 'disconnect', client: target })
@@ -651,7 +659,12 @@ const normalizePlan = (plan: ScenarioPlan, options: NormalizeScenarioOptions): S
         instructions.push({ _tag: 'annotation', id: nextId('note'), text: spec.text })
         break
       case 'wait':
-        instructions.push({ _tag: 'wait', id: nextId('wait'), durationMs: spec.durationMs })
+        instructions.push({
+          _tag: 'wait',
+          id: nextId('wait'),
+          durationMs: spec.durationMs,
+          ...(spec.untilSettled === true ? { untilSettled: true } : {}),
+        })
         break
       case 'action':
         instructions.push(compileAction(spec, nextId('action')))
