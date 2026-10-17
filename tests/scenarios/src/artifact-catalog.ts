@@ -133,7 +133,7 @@ const largestStringLength = (value: unknown): number => {
 
 const canonical = (value: unknown): string =>
   JSON.stringify(value, (_key, item) =>
-    item !== null && typeof item === 'object' && !Array.isArray(item)
+    item !== null && typeof item === 'object' && Array.isArray(item) === false
       ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
       : item,
   )

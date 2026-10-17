@@ -59,13 +59,13 @@ The earlier correctness campaign was not an alternating paired benchmark.
 Numbers below measure first action through terminal settlement, including
 scripted waits and observation overhead. Negative changes mean shorter duration.
 
-| Scenario / profile | Samples per revision | Baseline median | Candidate median | Change |
-| --- | --- | --- | --- | --- |
-| Many writers / in-process | 3 | 1.581 s | 2.675 s | +69.1% |
-| Many writers / process | 3 | 17.570 s | 15.026 s | -14.5% |
-| Pending tail / browser | 1 | 3.567 s | 2.122 s | -40.5% |
-| Pending tail / in-process | 1 | 1.089 s | 1.662 s | +52.6% |
-| Pending tail / process | 1 | 1.538 s | 2.710 s | +76.2% |
+| Scenario / profile        | Samples per revision | Baseline median | Candidate median | Change |
+| ------------------------- | -------------------- | --------------- | ---------------- | ------ |
+| Many writers / in-process | 3                    | 1.581 s         | 2.675 s          | +69.1% |
+| Many writers / process    | 3                    | 17.570 s        | 15.026 s         | -14.5% |
+| Pending tail / browser    | 1                    | 3.567 s         | 2.122 s          | -40.5% |
+| Pending tail / in-process | 1                    | 1.089 s         | 1.662 s          | +52.6% |
+| Pending tail / process    | 1                    | 1.538 s         | 2.710 s          | +76.2% |
 
 All three in-process many-writer candidate samples were slower than all three
 baseline samples. Prioritize reproducing this, then the pending-tail differences.

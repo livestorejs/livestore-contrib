@@ -1,11 +1,13 @@
 import { Schema } from '@livestore/utils/effect'
 
+import type { ArtifactCatalogEntry } from '../artifact-catalog.ts'
+import type { BenchmarkManifest } from '../benchmark-model.ts'
 import { ScenarioRunArtifact } from '../model.ts'
 
 export interface ArtifactCatalog {
-  readonly campaigns?: ReadonlyArray<import('../benchmark-model.ts').BenchmarkManifest>
+  readonly campaigns?: ReadonlyArray<BenchmarkManifest>
   readonly version: 4
-  readonly entries: ReadonlyArray<import('../artifact-catalog.ts').ArtifactCatalogEntry>
+  readonly entries: ReadonlyArray<ArtifactCatalogEntry>
 }
 
 export const decodeArtifactJson = (input: string): ScenarioRunArtifact =>

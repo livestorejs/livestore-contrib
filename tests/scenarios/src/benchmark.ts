@@ -14,7 +14,7 @@ import { parseScenarioDurationMs } from './duration.ts'
 const workspaceRoot = path.resolve(import.meta.dirname, '../../..')
 export const parseBenchmarkOptions = (args: ReadonlyArray<string>) => {
   const values = new Map<string, string[]>()
-  const allowed = [
+  const allowed = new Set([
     '--baseline',
     '--candidate',
     '--scenario',
@@ -24,30 +24,30 @@ export const parseBenchmarkOptions = (args: ReadonlyArray<string>) => {
     '--set',
     '--stabilization-timeout',
     '--sample-timeout',
-  ]
+  ])
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i]!
     const value = args[i + 1]
-    if (!allowed.includes(flag) || value === undefined || value.startsWith('--'))
+    if (allowed.has(flag) === false || value === undefined || value.startsWith('--') === true)
       throw new Error(`Invalid option: ${flag}. Use --help.`)
     const existing = values.get(flag) ?? []
-    if (!['--scenario', '--profile', '--set'].includes(flag) && existing.length > 0)
+    if (['--scenario', '--profile', '--set'].includes(flag) === false && existing.length > 0)
       throw new Error(`Duplicate ${flag}`)
     values.set(flag, [...existing, value])
   }
   const required = (key: string) => {
     const value = values.get(key)?.[0]
-    if (!value) throw new Error(`Required: ${key}`)
+    if (value === undefined || value === '') throw new Error(`Required: ${key}`)
     return value
   }
   const count = (key: string, fallback: number, min: number) => {
     const value = Number(values.get(key)?.[0] ?? fallback)
-    if (!Number.isSafeInteger(value) || value < min || value > 1000)
+    if (Number.isSafeInteger(value) === false || value < min || value > 1000)
       throw new Error(`${key} must be an integer between ${min} and 1000`)
     return value
   }
   const profiles = [...new Set(values.get('--profile') ?? ['browser'])]
-  if (profiles.some((p) => !['browser', 'process', 'in-process'].includes(p)))
+  if (profiles.some((p) => !['browser', 'process', 'in-process'].includes(p)) === true)
     throw new Error('Profiles: browser, process, in-process')
   const scenarios = [
     ...new Set(
@@ -55,7 +55,7 @@ export const parseBenchmarkOptions = (args: ReadonlyArray<string>) => {
     ),
   ]
   const parameters = values.get('--set') ?? []
-  if (parameters.some((p) => !/^\w+=.+$/.test(p))) throw new Error('--set requires name=value')
+  if (parameters.some((p) => !/^\w+=.+$/.test(p)) === true) throw new Error('--set requires name=value')
   return {
     baseline: required('--baseline'),
     candidate: required('--candidate'),
@@ -129,6 +129,7 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
     await fs.writeFile(destination + '.tmp', JSON.stringify(manifest, null, 2) + '\n')
     await fs.rename(destination + '.tmp', destination)
   }
+  /** Set by the signal handler; read as `!== false` because TS narrows this closure-mutated flag to its initializer. */
   let interrupted = false
   let timedOut = false
   let child: ReturnType<typeof spawn> | undefined
@@ -148,7 +149,7 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
             const roles =
               iteration % 2 === 1 ? (['baseline', 'candidate'] as const) : (['candidate', 'baseline'] as const)
             for (const role of roles) {
-              if (interrupted) throw new Error('Benchmark interrupted')
+              if (interrupted !== false) throw new Error('Benchmark interrupted')
               const file = `${manifest.samples.length.toString().padStart(4, '0')}-${role}.json`
               const output = path.join(directory, file)
               console.log(`${phase} ${iteration}: ${role} · ${scenario} · ${profile}`)
@@ -206,7 +207,7 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
                 attempts += 1
                 timedOut = false
                 exitCode = await runSample()
-                if (interrupted) throw new Error('Benchmark interrupted')
+                if (interrupted !== false) throw new Error('Benchmark interrupted')
                 if (timedOut === false) break
                 const message = `Sample ${file} did not finish within ${options.sampleTimeoutMs / 1000} s and was stopped`
                 // Rare stalls happened before a run printed anything; one retry keeps them from ending a campaign,
@@ -217,7 +218,7 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
               }
               const artifact = JSON.parse(await fs.readFile(output, 'utf8'))
               if (
-                !['passed', 'failed'].includes(artifact.status) ||
+                ['passed', 'failed'].includes(artifact.status) === false ||
                 artifact.descriptor?.sourceRevision !== manifest[role] ||
                 (exitCode !== 0 && artifact.status !== 'failed')
               )
@@ -256,8 +257,12 @@ export const runBenchmark = async (args: ReadonlyArray<string>): Promise<boolean
   return manifest.samples.filter((sample) => sample.phase === 'measured').every((sample) => sample.exitCode === 0)
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes('--help'))
+if (
+  process.argv[1] !== undefined &&
+  process.argv[1] !== '' &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  if (process.argv.includes('--help') === true)
     console.log(`Usage: pnpm benchmark --baseline <ref> --candidate <ref>
   --scenario <id>     Repeat to select scenarios (default: offline, pending-tail, many-writer)
   --profile <profile> Repeat to select profiles (default: browser)
@@ -272,7 +277,7 @@ Correctness failures are retained and exit nonzero; no performance regression th
   else
     await runBenchmark(process.argv.slice(2))
       .then((passed) => {
-        if (!passed) process.exitCode = 1
+        if (passed === false) process.exitCode = 1
       })
       .catch((cause) => {
         console.error(cause)

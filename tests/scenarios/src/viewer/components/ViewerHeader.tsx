@@ -59,7 +59,7 @@ export const ArtifactPicker = ({
       const comparison =
         typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv))
       return (
-        (sort.descending ? -comparison : comparison) ||
+        (sort.descending === true ? -comparison : comparison) ||
         a.scenarioId.localeCompare(b.scenarioId) ||
         a.file.localeCompare(b.file)
       )
@@ -77,7 +77,7 @@ export const ArtifactPicker = ({
           aria-controls="saved-runs"
           onClick={() => setExpanded(!expanded)}
         >
-          {expanded ? '▾' : '▸'} Saved runs <span className="run-muted">({entries.length})</span>
+          {expanded === true ? '▾' : '▸'} Saved runs <span className="run-muted">({entries.length})</span>
         </button>
         <button
           type="button"
@@ -161,7 +161,7 @@ export const ArtifactPicker = ({
               {visible.length} of {entries.length} runs
             </span>
           </div>
-          {catalogError ? (
+          {catalogError !== undefined && catalogError !== '' ? (
             <p role="alert">{catalogError}</p>
           ) : catalog === undefined ? (
             <p role="status">Loading saved runs…</p>
@@ -175,7 +175,9 @@ export const ArtifactPicker = ({
                         <th
                           key={key}
                           scope="col"
-                          aria-sort={sort.key === key ? (sort.descending ? 'descending' : 'ascending') : 'none'}
+                          aria-sort={
+                            sort.key === key ? (sort.descending === true ? 'descending' : 'ascending') : 'none'
+                          }
                           className={
                             key === 'applicationEventCount' || key === 'traceRecordCount' || key === 'runMs'
                               ? 'run-number'
@@ -187,7 +189,9 @@ export const ArtifactPicker = ({
                             onClick={() => setSort({ key, descending: sort.key === key && !sort.descending })}
                           >
                             {title}{' '}
-                            <span aria-hidden="true">{sort.key === key ? (sort.descending ? '↓' : '↑') : '↕'}</span>
+                            <span aria-hidden="true">
+                              {sort.key === key ? (sort.descending === true ? '↓' : '↑') : '↕'}
+                            </span>
                           </button>
                         </th>
                       ))}
@@ -201,7 +205,6 @@ export const ArtifactPicker = ({
                             type="button"
                             className="run-open"
                             aria-pressed={entry.file === selectedFile}
-                            title={entry.file}
                             onClick={() => {
                               onSelectedFileChange(entry.file)
                               onLoad(entry.file)
@@ -209,7 +212,7 @@ export const ArtifactPicker = ({
                           >
                             {entry.scenarioId}
                           </button>
-                          <span className="run-detail" title={entry.label}>
+                          <span className="run-detail">
                             {entry.label
                               .split(' · ')
                               .filter(
@@ -228,9 +231,7 @@ export const ArtifactPicker = ({
                         </td>
                         <td>
                           <span className="run-target">{targetName(entry)}</span>
-                          <code className="run-detail" title={entry.sourceRevision}>
-                            {displaySourceRevision(entry.sourceRevision).compact}
-                          </code>
+                          <code className="run-detail">{displaySourceRevision(entry.sourceRevision).compact}</code>
                         </td>
                         <td>{entry.profile}</td>
                         <td className="run-muted">{entry.backend}</td>
@@ -241,12 +242,7 @@ export const ArtifactPicker = ({
                             {entry.status === 'passed' ? '✓ Passed' : '× Failed'}
                           </span>
                         </td>
-                        <td
-                          className="run-number"
-                          title="Controller run start to correctness completion. Failed runs have no time to pass."
-                        >
-                          {formatDuration(entry.timings?.runMs)}
-                        </td>
+                        <td className="run-number">{formatDuration(entry.timings?.runMs)}</td>
                       </tr>
                     ))}
                   </tbody>

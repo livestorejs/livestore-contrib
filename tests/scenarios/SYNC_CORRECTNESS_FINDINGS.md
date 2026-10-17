@@ -328,11 +328,11 @@ Events and rejects a single oversized item with `OversizeChunkItemError`.
 Using the scenario's Event, a 21-character backend ID, and the provider's
 ISO timestamp metadata, the actual `SyncMessage.PullResponse` encoder produces:
 
-| Application string | Encoded response | Size check |
-| --- | --- | --- |
-| 899,642 bytes | 900,000 bytes | Accepted |
-| 899,643 bytes | 900,001 bytes | Rejected |
-| 524,288 bytes (512 KiB) | 524,646 bytes | Accepted |
+| Application string      | Encoded response | Size check |
+| ----------------------- | ---------------- | ---------- |
+| 899,642 bytes           | 900,000 bytes    | Accepted   |
+| 899,643 bytes           | 900,001 bytes    | Rejected   |
+| 524,288 bytes (512 KiB) | 524,646 bytes    | Accepted   |
 
 This explains the historical one-byte boundary. The mock backend does not
 impose the sync-cf transport cap. Push and pull envelopes differ in size;

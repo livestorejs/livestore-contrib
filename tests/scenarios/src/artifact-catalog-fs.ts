@@ -43,7 +43,7 @@ export const writeArtifactCatalog = async (artifactDirectory: string): Promise<v
   const campaignRoot = path.join(artifactDirectory, 'benchmarks')
   const directories = await fs.readdir(campaignRoot, { withFileTypes: true }).catch(() => [])
   for (const directory of directories) {
-    if (!directory.isDirectory()) continue
+    if (directory.isDirectory() === false) continue
     try {
       const manifest = JSON.parse(
         await fs.readFile(path.join(campaignRoot, directory.name, 'manifest.json'), 'utf8'),
@@ -56,14 +56,14 @@ export const writeArtifactCatalog = async (artifactDirectory: string): Promise<v
         typeof manifest.candidate !== 'string' ||
         typeof manifest.environment !== 'object' ||
         manifest.environment === null ||
-        !Array.isArray(manifest.samples) ||
-        !['running', 'complete', 'interrupted'].includes(manifest.status)
+        Array.isArray(manifest.samples) === false ||
+        ['running', 'complete', 'interrupted'].includes(manifest.status) === false
       )
         continue
       const campaignEntries: ArtifactCatalogEntry[] = []
       for (const sample of manifest.samples) {
         if (sample.phase !== 'measured') continue
-        if (path.basename(sample.file) !== sample.file || !['baseline', 'candidate'].includes(sample.role))
+        if (path.basename(sample.file) !== sample.file || ['baseline', 'candidate'].includes(sample.role) === false)
           throw new Error('Invalid sample')
         const file = `benchmarks/${directory.name}/${sample.file}`
         const artifact = Schema.decodeSync(Schema.fromJsonString(ScenarioRunArtifact))(

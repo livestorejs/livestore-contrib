@@ -21,7 +21,11 @@ export const deriveRunTimings = (artifact: ScenarioRunArtifact): RunTimings => {
   const trace = artifact.trace
   const time = (tag: string) => trace.find((r) => r.payload._tag === tag)?.coordinatorReceiptMonotonicMs
   const span = (start: number | undefined, end: number | undefined) =>
-    start !== undefined && end !== undefined && Number.isFinite(start) && Number.isFinite(end) && end >= start
+    start !== undefined &&
+    end !== undefined &&
+    Number.isFinite(start) === true &&
+    Number.isFinite(end) === true &&
+    end >= start
       ? end - start
       : undefined
   const start = time('run.started')
@@ -199,7 +203,7 @@ export const summarizeDurations = (values: ReadonlyArray<number>) => {
   const middle = Math.floor(sorted.length / 2)
   return {
     count: sorted.length,
-    median: sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2,
+    median: sorted.length % 2 !== 0 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2,
     min: sorted[0]!,
     max: sorted.at(-1)!,
   }

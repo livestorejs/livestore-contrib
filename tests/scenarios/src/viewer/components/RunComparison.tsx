@@ -35,12 +35,15 @@ export const RunComparison = ({
   const campaigns = catalog?.campaigns ?? []
   const activeScope = scope ?? campaigns[0]?.id ?? ''
   const campaign = campaigns.find((c) => c.id === activeScope)
-  const entries = (catalog?.entries ?? []).filter((e) => (activeScope ? e.benchmark?.id === activeScope : !e.benchmark))
+  const entries = (catalog?.entries ?? []).filter((e) =>
+    activeScope !== '' ? e.benchmark?.id === activeScope : !e.benchmark,
+  )
   const revisions = [...new Set(entries.map((e) => e.sourceRevision))]
-  const left = revisions.includes(baseline) ? baseline : (campaign?.baseline ?? revisions[0] ?? '')
-  const right = revisions.includes(candidate)
-    ? candidate
-    : (campaign?.candidate ?? revisions.find((r) => r !== left) ?? '')
+  const left = revisions.includes(baseline) === true ? baseline : (campaign?.baseline ?? revisions[0] ?? '')
+  const right =
+    revisions.includes(candidate) === true
+      ? candidate
+      : (campaign?.candidate ?? revisions.find((r) => r !== left) ?? '')
   const rows = compareRuns(
     entries.filter((e) =>
       e.sourceRevision === left ? !baselineFile || e.file === baselineFile : !candidateFile || e.file === candidateFile,
@@ -142,7 +145,8 @@ export const RunComparison = ({
               .filter((e) => e.sourceRevision === left)
               .map((e) => (
                 <option key={e.file} value={e.file}>
-                  {e.scenarioId} · {e.profile} · {e.benchmark ? `sample ${e.benchmark.iteration}` : e.file} · {e.status}
+                  {e.scenarioId} · {e.profile} ·{' '}
+                  {e.benchmark !== undefined ? `sample ${e.benchmark.iteration}` : e.file} · {e.status}
                 </option>
               ))}
           </select>
@@ -156,14 +160,15 @@ export const RunComparison = ({
               .filter((e) => e.sourceRevision === right)
               .map((e) => (
                 <option key={e.file} value={e.file}>
-                  {e.scenarioId} · {e.profile} · {e.benchmark ? `sample ${e.benchmark.iteration}` : e.file} · {e.status}
+                  {e.scenarioId} · {e.profile} ·{' '}
+                  {e.benchmark !== undefined ? `sample ${e.benchmark.iteration}` : e.file} · {e.status}
                 </option>
               ))}
           </select>
         </div>
       </details>
       <p className="comparison-note">
-        {campaign
+        {campaign !== undefined
           ? 'Paired campaign · warmups excluded. '
           : 'Exploratory comparison · machine, dependencies, and run order may differ. '}
         Medians and min–max ranges use passing runs only. A timing change is shown only when both sides pass every
@@ -190,7 +195,7 @@ export const RunComparison = ({
           Campaign {campaign.status}. Timing comparisons are withheld. {campaign.error}
         </p>
       )}
-      {!left || !right || left === right ? (
+      {left === '' || right === '' || left === right ? (
         <p className="run-empty">Choose two different revisions to compare.</p>
       ) : (
         <div className="run-table-scroll">
@@ -242,7 +247,7 @@ export const RunComparison = ({
                   <td>
                     {row.delta === undefined ? (
                       <span className="run-muted">
-                        {!row.baseline.runs.length || !row.candidate.runs.length
+                        {row.baseline.runs.length === 0 || row.candidate.runs.length === 0
                           ? 'Unmatched workload'
                           : row.baseline.passed !== row.baseline.runs.length ||
                               row.candidate.passed !== row.candidate.runs.length

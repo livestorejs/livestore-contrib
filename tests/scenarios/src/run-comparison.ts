@@ -39,7 +39,7 @@ export const compareRuns = (
         group.every((e) => e.benchmark?.complete !== false) &&
         new Set(group.map((e) => e.benchmark?.id ?? 'exploratory')).size === 1
       const delta =
-        comparable && left.stats && right.stats && left.stats.median > 0
+        comparable === true && left.stats !== undefined && right.stats !== undefined && left.stats.median > 0
           ? (right.stats.median / left.stats.median - 1) * 100
           : undefined
       return { key, entry: group[0]!, baseline: left, candidate: right, delta }

@@ -763,7 +763,7 @@ const drainPageFrameTiming = (
       browserTransportFailure(`Browser frame timing drain failed: ${String(cause)}`, 'definite-failure'),
   }).pipe(
     Effect.flatMap((drained) =>
-      Schema.decodeUnknownEffect(FrameTimingSchema)(drained.timing).pipe(
+      Schema.decodeEffect(FrameTimingSchema)(drained.timing).pipe(
         Effect.mapError((cause) => browserResponseInvalid(`Invalid browser frame timing: ${String(cause)}`)),
         Effect.map((timing) => ({
           timing,
