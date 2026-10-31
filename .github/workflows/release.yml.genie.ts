@@ -18,6 +18,8 @@ const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
 ]
 
 const prSnapshot = prSnapshotReleaseJobs({
+  // Q415: hosted under the Q423 exception until 2026-12-31; moves to a fleet profile on admission.
+  runsOn: 'ubuntu-24.04',
   topologyPath: releaseTopologyPath,
   attestationPredicateType: prSnapshotAttestationPredicateType,
 })
