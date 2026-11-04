@@ -72,7 +72,7 @@ export const makeGatewayAlarmRetry = (
   now: () => number = Date.now,
 ) => {
   let failures = 0
-  return <A, E, R>(alarm: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  return <A, E, R>(alarm: Effect.Effect<A, E, R>, expiresAt = Infinity): Effect.Effect<A, E, R> =>
     alarm.pipe(
       Effect.onExit((exit) => {
         if (exit._tag === 'Success') {
@@ -80,7 +80,7 @@ export const makeGatewayAlarmRetry = (
           return Effect.void
         }
         const delay = Math.min(60_000, 5_000 * 2 ** Math.min(failures++, 4))
-        return Effect.promise(() => storage.setAlarm(now() + delay)).pipe(
+        return Effect.promise(() => storage.setAlarm(Math.min(now() + delay, expiresAt))).pipe(
           Effect.tap(() => Effect.sync(() => console.warn(`[bot-state] alarm failed; retryScheduledInMs=${delay}`))),
         )
       }),

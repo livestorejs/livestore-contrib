@@ -111,6 +111,16 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
   bash cf/scripts/remote.sh deploy --stage production --yes
 '`,
     },
+    ...(stage === 'staging'
+      ? [
+          {
+            name: 'Activate staging gateway for this deploy',
+            id: 'staging_gateway',
+            env: { ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}' },
+            run: 'node --experimental-strip-types apps/discord-bot/cf/scripts/staging-gateway.ts activate',
+          },
+        ]
+      : []),
     {
       name: 'Verify gateway readiness and release',
       run: `node --input-type=module <<'NODE'
@@ -153,6 +163,16 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
   node --experimental-strip-types cf/scripts/commands-sync.ts "$STAGE"
 '`,
     },
+    ...(stage === 'staging'
+      ? [
+          {
+            name: 'Park staging gateway',
+            if: "${{ always() && steps.staging_gateway.outcome != 'skipped' && steps.staging_gateway.outcome != '' }}",
+            env: { ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}' },
+            run: 'node --experimental-strip-types apps/discord-bot/cf/scripts/staging-gateway.ts park',
+          },
+        ]
+      : []),
     nixDiagnosticsArtifactStep(),
   ],
 })

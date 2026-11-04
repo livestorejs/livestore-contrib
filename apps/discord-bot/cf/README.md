@@ -182,6 +182,38 @@ must show `changes=false` with registered commands (`unchanged>0`). The
 application/guild fingerprint comes from validated default runtime config;
 production supplies `DISCORD_APPLICATION_ID` from its GitHub environment.
 
+### Staging gateway leases
+
+Staging parks the gateway between approved work windows. After deploying,
+CI claims a 30-minute lease under `github-<run-id>-<run-attempt>`, checks the
+exact deployed release, converges application commands, and parks the gateway
+even if verification fails. If the runner disappears, the lease expires.
+Production promotion waits for successful staging verification and cleanup.
+A lease conflict blocks the release check. Coordinate manual staging activity
+with the staging deploy job so that a deploy cannot interrupt a manual run.
+
+For an approved manual staging E2E run, command sync, or soak, use a unique
+owner and a lease long enough to cover the complete run. From `apps/discord-bot`,
+with the staging `CF_WORKER_URL` and `ADMIN_TOKEN` already supplied:
+
+```sh
+export STAGE=staging
+export STAGING_GATEWAY_OWNER="operator-$(uuidgen)"
+export STAGING_GATEWAY_TTL_SECONDS=9000 # 2-hour soak plus setup
+node --experimental-strip-types cf/scripts/staging-gateway.ts activate
+```
+
+Wait for `/readyz` to return HTTP 200 at the expected release before running the
+proof. After the run, including after a failed proof, use the same owner to
+park the gateway:
+
+```sh
+node --experimental-strip-types cf/scripts/staging-gateway.ts park
+```
+
+Retrying activation with the same owner does not extend the lease. A parked
+staging gateway reports HTTP 503 at `/readyz`.
+
 Runtime config reloads that change `docsAudience` can change the desired
 commands without a deploy. After such a reload reaches `/readyz` 200, manually
 POST `/admin/commands-sync` with `Authorization: Bearer $ADMIN_TOKEN`,
@@ -424,10 +456,14 @@ means the readback is unavailable or does not yet show that selection.
 and `/readyz` first. Before POST, failures report `outcome=not-applied`
 (exit 1) with a sanitized step, HTTP status when known, or named guard.
 
-Staging rollback proof (operator-owned; never perform an unapproved live
-selection): record N−1 as known-good via `pnpm cf:rollback list` and `/readyz`;
-deploy N through `pnpm cf:plan --stage staging` then
-`AGENT_ACTION_APPROVAL=deploy pnpm cf:deploy --stage staging --yes`; require
+For an approved staging rollback proof, activate a staging lease before
+verifying readiness on a lease-aware release. A rollback to a release predating
+gateway leases restores that release's continuous staging gateway. Finish that
+proof by restoring a lease-aware release and parking it.
+
+Record N−1 as known-good via `pnpm cf:rollback list` and `/readyz`. Deploy N
+through `pnpm cf:plan --stage staging` then
+`AGENT_ACTION_APPROVAL=deploy pnpm cf:deploy --stage staging --yes`. Require
 `/readyz` 200 with `releaseId=N` and gateway `workerVersionId=N`.
 After checking schema/API compatibility, select N−1 with the command above
 and require `/readyz` 200 with all checks true, `releaseId=N−1` and

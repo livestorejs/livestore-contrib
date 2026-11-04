@@ -79,6 +79,7 @@ import { makeCrypto } from './crypto.ts'
 import { correlateWithWebCryptoKey, makeDocsServices } from './docs-services.ts'
 import { makeKeyValueDocsStateStore } from './docs-state.ts'
 import { readOptionalBinding, readSecret } from './env.ts'
+import { makeGatewayLease } from './gateway-lease.ts'
 import { makeSharedShardLayer } from './gateway-shard.ts'
 import { makeDurableObjectGatewayTelemetrySink } from './gateway-telemetry-do.ts'
 import {
@@ -778,12 +779,32 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         (candidate) => candidate.telemetry.activated,
       )
 
+      const stopGateway = Effect.asVoid(
+        runtimeInstall.reset(() =>
+          Effect.gen(function* () {
+            awaitingAlarmBuild = true
+            awaitingAlarmBuildSinceMs = Date.now()
+            if (supervisorFiber !== undefined) {
+              yield* Fiber.interrupt(supervisorFiber)
+              supervisorFiber = undefined
+            }
+            yield* gate.end
+            ownerDeadline.reset()
+            startupMaintenanceDone = false
+          }),
+        ),
+      )
+      const gatewayLease = yield* makeGatewayLease(stage, doState.raw.storage, stopGateway)
       const ensureAlarm = scheduleGatewayAlarmIfMissing(doState.raw.storage)
       const retryAlarm = makeGatewayAlarmRetry(doState.raw.storage)
-      const ensureRuntime: Effect.Effect<BotRuntime> = Effect.suspend(() =>
-        awaitingAlarmBuild === true
-          ? ensureAlarm.pipe(Effect.andThen(Effect.die(new Error('Gateway runtime awaiting alarm activation'))))
-          : runtimeInstall.get,
+      const ensureRuntime: Effect.Effect<BotRuntime> = gatewayLease.whileActive(
+        () =>
+          Effect.suspend(() =>
+            awaitingAlarmBuild === true
+              ? ensureAlarm.pipe(Effect.andThen(Effect.die(new Error('Gateway runtime awaiting alarm activation'))))
+              : runtimeInstall.get,
+          ),
+        Effect.die(new Error('Staging gateway is parked')),
       )
       const withRuntime = <A>(f: (rt: BotRuntime) => Effect.Effect<A>): Effect.Effect<A> =>
         Effect.flatMap(ensureRuntime, f)
@@ -824,11 +845,15 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             )
             .pipe(
               Effect.andThen(
-                Effect.gen(function* () {
-                  const deadline = Date.now()
-                  yield* Effect.promise(() => doState.raw.storage.setAlarm(deadline))
-                  console.info(`[bot-state] reload alarmDeadlineMs=${deadline}`)
-                }),
+                gatewayLease.whileActive(
+                  () =>
+                    Effect.gen(function* () {
+                      const deadline = Date.now()
+                      yield* Effect.promise(() => doState.raw.storage.setAlarm(deadline))
+                      console.info(`[bot-state] reload alarmDeadlineMs=${deadline}`)
+                    }),
+                  Effect.void,
+                ),
               ),
               Effect.tap(() =>
                 Effect.sync(() => {
@@ -839,7 +864,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             ),
       })
 
-      const tick = (origin: 'alarm' | 'cron'): Effect.Effect<number | undefined> =>
+      const tick = (origin: 'alarm' | 'cron', expiresAt: number | undefined) =>
         Effect.gen(function* () {
           if (origin === 'cron') {
             // Cron can repair a missing alarm but cannot build or start the
@@ -848,7 +873,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             console.info(
               `[bot-state] tick origin=cron alarmRepaired=${alarm.repaired} alarmDeadlineMs=${alarm.scheduledAt} nowMs=${Date.now()}`,
             )
-            return 0
+            return { delay: 0 }
           }
           if (awaitingAlarmBuild === true) lastError = undefined
           yield* runtimeInstall.get.pipe(
@@ -876,6 +901,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
           // claim, and fiber publication; if it ran first, this tick starts B.
           const installed = yield* runtimeInstall.withCurrent((rt) =>
             Effect.gen(function* () {
+              if (expiresAt !== undefined && Date.now() >= expiresAt) return null
               if (scheduledAlarm !== null) {
                 yield* rt.telemetry.alarmObserved(Math.max(0, Date.now() - scheduledAlarm))
               }
@@ -926,7 +952,10 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
               return { rt, startedFiber }
             }),
           )
-          if (installed === null) return undefined
+          if (installed === null) {
+            if (expiresAt !== undefined) yield* Effect.promise(() => doState.raw.storage.setAlarm(expiresAt))
+            return { delay: undefined }
+          }
           const { rt, startedFiber } = installed
           if ('stalled' in installed) {
             const dropped = yield* runtimeInstall.reset(
@@ -948,7 +977,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
               console.warn('[bot-state] alarm restarting overdue gateway owner from stored config')
               yield* Effect.promise(() => doState.raw.storage.setAlarm(Date.now()))
             }
-            return 0
+            return { delay: 0 }
           }
 
           if ((yield* rt.supervisor.state) === 'ready') yield* rt.pulseGateway
@@ -965,11 +994,11 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             supervisorDelay === undefined || heartbeatInterval === null
               ? supervisorDelay
               : Math.min(supervisorDelay, Math.max(1_000, Math.floor(heartbeatInterval / 2)))
-          if (delay === undefined) {
+          if (delay === undefined && expiresAt === undefined) {
             yield* Effect.promise(() => doState.raw.storage.deleteAlarm())
             console.info(`[bot-state] tick origin=${origin} alarmDeleted=true`)
           } else {
-            const deadline = Date.now() + delay
+            const deadline = Math.min(Date.now() + (delay ?? Infinity), expiresAt ?? Infinity)
             yield* Effect.promise(() => doState.raw.storage.setAlarm(new Date(deadline)))
             console.info(`[bot-state] tick origin=${origin} alarmDeadlineMs=${deadline}`)
           }
@@ -979,12 +1008,25 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
           // leave its OPEN event and timers stalled despite subsequent alarms.
           // Keep this wait outside the lifecycle mutex and after scheduling the
           // next alarm; reload interrupts the owner and releases the wait.
-          if (origin === 'alarm' && startedFiber !== undefined) {
-            yield* Effect.raceFirst(rt.supervisor.awaitEstablished, Fiber.await(startedFiber)).pipe(
-              Effect.timeoutOption(defaultHandshakeTimeout),
-            )
-          }
-          return delay
+          const handshake =
+            startedFiber === undefined
+              ? Effect.void
+              : Effect.raceFirst(rt.supervisor.awaitEstablished, Fiber.await(startedFiber)).pipe(
+                  Effect.timeoutOption(defaultHandshakeTimeout),
+                )
+          return { delay, handshake }
+        })
+
+      const runTick = (origin: 'alarm' | 'cron') =>
+        Effect.gen(function* () {
+          const result = yield* gatewayLease.whileActive((expiresAt) => {
+            const run = tick(origin, expiresAt)
+            return origin === 'alarm' ? retryAlarm(run, expiresAt) : run
+          }, Effect.undefined)
+          // Keep the invocation alive during handshake while allowing an expiry
+          // alarm or the owner to park and interrupt that handshake.
+          if (result?.handshake !== undefined) yield* result.handshake
+          return result?.delay
         })
 
       // A runtime that cannot build (corrupt stored config, dead journal) must
@@ -1000,6 +1042,19 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         automaticDiagnostics: automaticDiagnostics.snapshot(),
       })
       const status: Effect.Effect<BotStatus> = Effect.gen(function* () {
+        const parked = yield* gatewayLease.whileActive(() => Effect.succeed(false), Effect.succeed(true))
+        if (parked) {
+          return degradedStatus(
+            makeGatewayHealthSummary({
+              supervisor: 'stopped',
+              sessionPresent: false,
+              telemetry: null,
+              lastError: 'Staging gateway is parked',
+              releaseId,
+              workerVersionId: readWorkerVersionId(env),
+            }),
+          )
+        }
         const rt = yield* ensureRuntime
         const session = yield* loadShardState(doState.raw.storage, shardLayout)
         // An unmigrated/unreadable journal reports schemaVersion 0, which the
@@ -1061,7 +1116,12 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       )
 
       return {
-        tick: () => tick('cron').pipe(Effect.provide(discordSafeLoggerLayer)),
+        tick: () => runTick('cron').pipe(Effect.provide(discordSafeLoggerLayer)),
+
+        gatewayActivate: (payload: unknown) =>
+          gatewayLease.activate(payload).pipe(Effect.provide(discordSafeLoggerLayer)),
+
+        gatewayPark: (payload: unknown) => gatewayLease.park(payload).pipe(Effect.provide(discordSafeLoggerLayer)),
 
         status: () => status.pipe(Effect.provide(discordSafeLoggerLayer)),
 
@@ -1090,7 +1150,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
           ),
 
         /** Cloudflare DO alarm entry point — the same heartbeat as `tick`. */
-        alarm: () => retryAlarm(tick('alarm')).pipe(Effect.provide(discordSafeLoggerLayer)),
+        alarm: () => runTick('alarm').pipe(Effect.provide(discordSafeLoggerLayer)),
       }
     })
   }),

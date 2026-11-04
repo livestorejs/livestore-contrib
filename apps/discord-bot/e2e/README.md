@@ -114,8 +114,11 @@ does not grant routing authority.
 
 Only the runtime's `StagingE2ERun` control operation is intentionally gated; the
 runtime does not self-authorize E2E writes. Peer authentication and source
-validation are current runtime checks. The executable boundary for the live
-write is the standalone package script:
+validation are current runtime checks. Before running the live matrix,
+[activate a staging gateway lease](../cf/README.md#staging-gateway-leases) for
+the full proof window and verify readiness at the intended release. Park the
+gateway when the run ends. The executable boundary for the live write is the
+standalone package script:
 
 ```text
 pnpm e2e:live -- \

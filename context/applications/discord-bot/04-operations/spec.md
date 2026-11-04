@@ -155,6 +155,14 @@ second bot actor and is not a bot canary. Production and staging have disjoint
 Workers, Durable Objects, storage, configuration, and secret projections; no
 state or credential crosses the environment boundary.
 
+The production Gateway runs continuously. Staging persists at most one
+expiring Gateway lease for its singleton. The authenticated staging control
+plane activates and parks the lease by owner. A different owner cannot replace
+or park an active lease. With no active lease, health checks report the
+Gateway as parked and cron, alarm, and administrative activity cannot start
+a session. Expiry and explicit park stop the session and release its
+heartbeat/reconnect work while preserving the existing journal and config.
+
 The Worker exposes the typed Bot control RPC below `/admin/rpc/` over HTTPS.
 Every request requires the environment-specific bearer credential from an
 Alchemy-declared Cloudflare secret binding. The runtime derives authorization
@@ -337,8 +345,9 @@ the staging job succeeds, including gateway-aware `/readyz` for the exact
 release and command registration verification. A manual dispatch selects one
 stage; production dispatch requires a `main` ref, while initial Worker
 creation remains operator-owned. Each stage serializes its deployments
-without cancelling a running one. Following each stage's readiness check,
-CI calls authenticated `POST /admin/commands-sync` with the stage and running
+without cancelling a running one. The staging job activates a bounded lease
+after deploying the candidate and parks it during cleanup. The lease expires
+if cleanup is interrupted. Following each stage's readiness check, CI calls authenticated `POST /admin/commands-sync` with the stage and running
 application/guild fingerprint: read-only plan, apply after durable/running
 config convergence, and a second plan requiring `changes=false` and at least
 one unchanged registered command. An API error, mismatched fingerprint, or

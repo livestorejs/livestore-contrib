@@ -373,6 +373,8 @@ it('persists a config through the admin route before the alarm installs its runt
           threadCreate: () => withinRequest(Effect.die('unexpected thread create')),
           configGet: () => withinRequest(operations.configGet),
           configPut: (payload) => withinRequest(operations.configPut(payload)),
+          gatewayActivate: () => withinRequest(Effect.die('unexpected activation')),
+          gatewayPark: () => withinRequest(Effect.die('unexpected park')),
           commandsSync: () => withinRequest(Effect.die('unexpected command sync')),
           threadReconcile: () => withinRequest(Effect.die('unexpected reconciliation')),
         }

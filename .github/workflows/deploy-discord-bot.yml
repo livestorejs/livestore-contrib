@@ -212,6 +212,11 @@ jobs:
             cd apps/discord-bot
             bash cf/scripts/remote.sh deploy --stage production --yes
           '
+      - name: Activate staging gateway for this deploy
+        id: staging_gateway
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: node --experimental-strip-types apps/discord-bot/cf/scripts/staging-gateway.ts activate
       - name: Verify gateway readiness and release
         run: |
           node --input-type=module <<'NODE'
@@ -251,6 +256,11 @@ jobs:
             cd apps/discord-bot
             node --experimental-strip-types cf/scripts/commands-sync.ts "$STAGE"
           '
+      - name: Park staging gateway
+        if: ${{ always() && steps.staging_gateway.outcome != 'skipped' && steps.staging_gateway.outcome != '' }}
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: node --experimental-strip-types apps/discord-bot/cf/scripts/staging-gateway.ts park
       - name: Upload Nix diagnostics artifact
         if: failure() && env.NIX_STORE_DIAGNOSTICS_DIR != ''
         uses: actions/upload-artifact@v4
