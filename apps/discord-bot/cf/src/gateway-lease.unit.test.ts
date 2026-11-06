@@ -1,5 +1,8 @@
 import { expect, it } from '@effect/vitest'
+import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
+import * as TestClock from 'effect/testing/TestClock'
 
 import { makeGatewayLease } from './gateway-lease.ts'
 
@@ -26,7 +29,7 @@ const makeLeaseFixture = (stage: 'staging' | 'production' = 'staging') =>
       stage,
       storage,
       Effect.sync(() => {
-        if (state.stopFailure) throw new Error('Failed to close the gateway')
+        if (state.stopFailure === true) throw new Error('Failed to close the gateway')
         state.stops++
       }),
       () => state.now,
@@ -79,7 +82,7 @@ it.effect('serializes competing activations and fences stale cleanup', () =>
       owners.map((owner) => lease.activate({ owner, ttlSeconds: 90 })),
       { concurrency: 'unbounded' },
     )
-    expect(results.map((result) => result.status).sort()).toEqual([200, 409])
+    expect(results.map((result) => result.status).sort((a, b) => a - b)).toEqual([200, 409])
     const winner = owners[results.findIndex((result) => result.ok)]!
     const loser = owners.find((owner) => owner !== winner)!
     expect((yield* lease.park({ owner: loser })).status).toBe(409)
@@ -89,6 +92,37 @@ it.effect('serializes competing activations and fences stale cleanup', () =>
     expect(state).toMatchObject({ alarm: null, stops: 1 })
     expect((yield* lease.activate({ owner: loser, ttlSeconds: 90 })).status).toBe(200)
     expect((yield* lease.park({ owner: winner })).status).toBe(409)
+  }),
+)
+
+it.effect('cancels stalled active work at expiry before stopping the gateway', () =>
+  Effect.gen(function* () {
+    const { lease, state } = yield* makeLeaseFixture()
+    yield* lease.activate({ owner: 'ci-123-1', ttlSeconds: 1 })
+    const started = yield* Deferred.make<void>()
+    let interrupted = false
+    const tick = yield* Effect.forkChild(
+      lease.whileActive(
+        () =>
+          Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(Effect.never),
+            Effect.ensuring(
+              Effect.sync(() => {
+                interrupted = true
+              }),
+            ),
+          ),
+        parked,
+      ),
+    )
+    yield* Deferred.await(started)
+    expect(state.stops).toBe(0)
+    state.now = 2_000
+    yield* TestClock.adjust('1 second')
+    expect(yield* Fiber.join(tick)).toBe('parked')
+    expect(interrupted).toBe(true)
+    expect(state).toMatchObject({ alarm: null, stops: 1 })
+    expect((yield* lease.activate({ owner: 'next', ttlSeconds: 1 })).status).toBe(200)
   }),
 )
 

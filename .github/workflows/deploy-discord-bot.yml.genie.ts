@@ -8,16 +8,15 @@ import {
   runDevenvTasksBefore,
 } from '../../genie/repo.ts'
 
-// A push to main deploys staging first, then production only after staging's
-// release and command-sync checks pass. Manual dispatch keeps single-stage runs.
+// Pushes to main deploy staging only. Production requires an explicit dispatch
+// from main; staging success never authorizes a production rollout.
 // Initial Worker creation remains operator-only; github.sha identifies the release.
 const deployJob = (stage: 'staging' | 'production') => ({
   'runs-on': 'ubuntu-24.04',
   'timeout-minutes': 45,
   ...(stage === 'production'
     ? {
-        needs: ['staging'],
-        if: "${{ always() && ((github.event_name == 'push' && needs.staging.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'production' && github.ref == 'refs/heads/main')) }}",
+        if: "${{ github.event_name == 'workflow_dispatch' && inputs.stage == 'production' && github.ref == 'refs/heads/main' }}",
       }
     : { if: "${{ github.event_name == 'push' || inputs.stage == 'staging' }}" }),
   environment: stage,

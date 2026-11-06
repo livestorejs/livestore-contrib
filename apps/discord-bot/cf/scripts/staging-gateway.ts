@@ -12,18 +12,30 @@ export const controlStagingGateway = async (
 ): Promise<void> => {
   const { STAGE, CF_WORKER_URL, ADMIN_TOKEN, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT } = env
   if (STAGE !== 'staging') throw new Error('Gateway lifecycle is staging-only')
-  if (!CF_WORKER_URL || !ADMIN_TOKEN) throw new Error('Staging Worker URL and admin token are required')
+  if (CF_WORKER_URL === undefined || CF_WORKER_URL === '' || ADMIN_TOKEN === undefined || ADMIN_TOKEN === '')
+    throw new Error('Staging Worker URL and admin token are required')
   const owner =
     env['STAGING_GATEWAY_OWNER'] ??
-    (GITHUB_RUN_ID && GITHUB_RUN_ATTEMPT ? `github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}` : undefined)
-  if (!owner) throw new Error('STAGING_GATEWAY_OWNER or GitHub run identity is required')
+    (GITHUB_RUN_ID !== undefined &&
+    GITHUB_RUN_ID !== '' &&
+    GITHUB_RUN_ATTEMPT !== undefined &&
+    GITHUB_RUN_ATTEMPT !== ''
+      ? `github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`
+      : undefined)
+  if (owner === undefined || owner === '') throw new Error('STAGING_GATEWAY_OWNER or GitHub run identity is required')
   const worker = new URL(CF_WORKER_URL)
-  if (worker.protocol !== 'https:' || worker.username || worker.password || worker.search || worker.hash) {
+  if (
+    worker.protocol !== 'https:' ||
+    worker.username !== '' ||
+    worker.password !== '' ||
+    worker.search !== '' ||
+    worker.hash !== ''
+  ) {
     throw new Error('CF_WORKER_URL must be an HTTPS Worker URL without credentials or query parameters')
   }
   const url = new URL(`/admin/gateway/${action}`, worker)
   const ttlSeconds = Number(env['STAGING_GATEWAY_TTL_SECONDS'] ?? '1800')
-  if (action === 'activate' && (!Number.isInteger(ttlSeconds) || ttlSeconds < 1)) {
+  if (action === 'activate' && (Number.isInteger(ttlSeconds) === false || ttlSeconds < 1)) {
     throw new Error('STAGING_GATEWAY_TTL_SECONDS must be a positive integer')
   }
   const body = JSON.stringify(action === 'activate' ? { owner, ttlSeconds } : { owner })
@@ -50,7 +62,7 @@ export const controlStagingGateway = async (
             result.owner === owner &&
             'expiresAt' in result &&
             typeof result.expiresAt === 'number' &&
-            result.expiresAt > Date.now())
+            result.expiresAt > Date.now()) === true
       ) {
         console.log(`Staging gateway ${action === 'activate' ? 'activated' : 'parked'}`)
         return

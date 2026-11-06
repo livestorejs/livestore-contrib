@@ -340,11 +340,10 @@ digest, sanitized application identity, and previous known-good Rollback Target
 (R12).
 
 The CI deployment workflow runs on pushes to `main` that change the bot or
-its deploy workflow. It deploys staging first and starts production only when
-the staging job succeeds, including gateway-aware `/readyz` for the exact
-release and command registration verification. A manual dispatch selects one
-stage; production dispatch requires a `main` ref, while initial Worker
-creation remains operator-owned. Each stage serializes its deployments
+its deploy workflow. Push events deploy staging only; no staging outcome can
+start production. A manual dispatch selects one stage; production requires
+an explicit operator decision and a `main` ref, while initial Worker creation
+remains operator-owned. Each stage serializes its deployments
 without cancelling a running one. The staging job activates a bounded lease
 after deploying the candidate and parks it during cleanup. The lease expires
 if cleanup is interrupted. Following each stage's readiness check, CI calls authenticated `POST /admin/commands-sync` with the stage and running
@@ -363,9 +362,9 @@ deployment and backward-compatible known-good code redeploy proof, a CI-owned
 deploy path, and long-duration reconnect observation. Production remains
 disabled until both verdicts pass (R19; decisions 0008 and 0010).
 
-After initial admission, CI promotes an eligible `main` release through staging
-to production without rebuilding. This is one binary change for the production
-Worker and its singleton Durable Object, not a percentage traffic ramp.
+After initial admission, an operator explicitly dispatches production for an
+eligible `main` release. This is one binary change for the production Worker
+and its singleton Durable Object, not a percentage traffic ramp.
 Production has its own Discord application, Worker, Durable
 Object storage, configuration, and secret projection. A percentage split would
 only divide requests to the singleton bot deployment; it neither creates an

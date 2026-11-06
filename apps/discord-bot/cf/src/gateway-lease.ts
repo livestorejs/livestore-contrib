@@ -51,10 +51,10 @@ export const makeGatewayLease = (
     })
     const current = Effect.gen(function* () {
       const lease = yield* read
-      if (Option.isSome(lease) && lease.value.expiresAt > now()) return lease.value
+      if (Option.isSome(lease) === true && lease.value.expiresAt > now()) return lease.value
       // This also clears an inherited alarm when the first lease-aware release
       // replaces a staging deployment that used to keep itself running.
-      if (Option.isSome(lease) || (yield* Effect.promise(() => storage.getAlarm())) !== null) yield* park
+      if (Option.isSome(lease) === true || (yield* Effect.promise(() => storage.getAlarm())) !== null) yield* park
       return undefined
     })
 
@@ -69,7 +69,14 @@ export const makeGatewayLease = (
               Effect.gen(function* () {
                 const lease = yield* current
                 if (lease === undefined) return yield* onParked
-                return yield* onActive(lease.expiresAt)
+                // Maintenance may await external services while holding this
+                // lock. Cancel it at expiry so it cannot prevent gateway stop.
+                const result = yield* onActive(lease.expiresAt).pipe(
+                  Effect.timeoutOption(Math.max(0, lease.expiresAt - now())),
+                )
+                if (Option.isSome(result) === true) return result.value
+                yield* park
+                return yield* onParked
               }),
             ),
 
@@ -79,7 +86,7 @@ export const makeGatewayLease = (
           : serialized(
               Effect.gen(function* () {
                 const input = Schema.decodeUnknownOption(activatePayload)(payload)
-                if (Option.isNone(input))
+                if (Option.isNone(input) === true)
                   return outcome(422, { error: 'Expected a valid owner and ttlSeconds (1–10800)' })
                 const existing = yield* current
                 if (existing !== undefined) {
@@ -105,7 +112,7 @@ export const makeGatewayLease = (
           : serialized(
               Effect.gen(function* () {
                 const input = Schema.decodeUnknownOption(parkPayload)(payload)
-                if (Option.isNone(input)) return outcome(422, { error: 'Expected a valid owner' })
+                if (Option.isNone(input) === true) return outcome(422, { error: 'Expected a valid owner' })
                 const existing = yield* current
                 if (existing === undefined) return parked
                 if (existing.owner !== input.value.owner) return conflictingOwner

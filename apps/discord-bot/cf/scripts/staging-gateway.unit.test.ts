@@ -14,12 +14,13 @@ describe('staging gateway deployment lease', () => {
   it('retries ambiguous activation using the same owner and parks only that attempt', async () => {
     const requests: Array<{ path: string; body: unknown }> = []
     const fetcher: typeof fetch = async (input, init) => {
-      const path = new URL(String(input)).pathname
-      requests.push({ path, body: JSON.parse(String(init?.body)) })
+      const path = new URL(input instanceof Request ? input.url : input).pathname
+      if (typeof init?.body !== 'string') throw new Error('Expected a JSON string body')
+      requests.push({ path, body: JSON.parse(init.body) })
       expect(init?.redirect).toBe('error')
       if (requests.length === 1) throw new Error('lost response')
       return Response.json(
-        path.endsWith('/activate')
+        path.endsWith('/activate') === true
           ? { state: 'active', owner: 'github-123-2', expiresAt: Date.now() + 1000 }
           : { state: 'parked' },
       )

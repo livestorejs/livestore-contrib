@@ -58,11 +58,10 @@ fallback. `alchemy.local.ts` is the only stack allowed to use
 `Alchemy.localState()`.
 
 The existing `cf:plan`/`cf:deploy` scripts remain the staging path. Production
-uses the explicit stage-aware `cf/scripts/remote.sh` runner. After the
-operator-owned initial production creation below, a merge to `main` that
-changes `apps/discord-bot/**` or the deploy workflow automatically deploys
-staging, then production only after staging's exact-release readiness and
-command-sync verification succeed.
+uses the explicit stage-aware `cf/scripts/remote.sh` runner. A merge to `main`
+that changes `apps/discord-bot/**` or the deploy workflow automatically deploys
+**staging only**. Production requires a separately approved manual dispatch
+from `main`; staging verification never triggers a production rollout.
 
 ### First production deploy (operator-owned; passive verification only)
 
@@ -154,9 +153,9 @@ Set these non-secret GitHub **environment variables**:
 | `production` | `CF_WORKER_URL`             | `https://discordbot-discordbot-production.livestore.workers.dev`               |
 | `production` | `DISCORD_APPLICATION_ID`    | `1553674978757451776`                                                          |
 
-The CI setup installs both the root workspace (`pnpm:install`) and the
-Discord bot's separate pnpm workspace (`discord-bot:install`) before running
-any stage's preflight, deploy, readiness, or command-sync steps.
+Staging CI installs only the Discord bot's standalone pnpm workspace with
+Node.js 24. Production CI uses the full devenv setup and installs both the root
+workspace (`pnpm:install`) and the bot workspace (`discord-bot:install`).
 
 The job derives `RELEASE_ID` from `github.sha`, sets `CF_DEPLOY_STAGE=production`
 on production plan and deploy steps and `AGENT_ACTION_APPROVAL=deploy` on the
@@ -168,10 +167,10 @@ on a fresh runner. The state store must already be bootstrapped and each
 stage's remote state must pass `--verify-remote-authoritative`; CI cannot
 migrate missing state or create the initial production Worker. Deployments are
 serialized per stage and never cancel a running deploy. An eligible push to
-`main` deploys staging first and production only if staging succeeds, including
-its `/readyz` and application-command checks. The production stage uses the
-GitHub `production` environment and protected `main` branch; it cannot run
-from a failed staging job. Manual single-stage dispatch remains available:
+`main` deploys staging only, including its `/readyz` and application-command
+checks. The production job is ineligible for every push event and uses the
+GitHub `production` environment only on explicit dispatch from `main`.
+Manual single-stage dispatch is available:
 `gh workflow run deploy-discord-bot.yml --ref <approved-ref> -f stage=staging`
 or `gh workflow run deploy-discord-bot.yml --ref main -f stage=production`.
 Manual production dispatch is restricted to `main` and does not rerun staging.
@@ -188,7 +187,11 @@ Staging parks the gateway between approved work windows. After deploying,
 CI claims a 30-minute lease under `github-<run-id>-<run-attempt>`, checks the
 exact deployed release, converges application commands, and parks the gateway
 even if verification fails. If the runner disappears, the lease expires.
-Production promotion waits for successful staging verification and cleanup.
+Active staging work is cancelled at the lease deadline before the gateway is
+stopped, including stalled journal maintenance. Explicit park waits for the
+current serialized tick; if it is stalled, the lease deadline remains the cap
+even if the park client's confirmation timeout elapses.
+Production promotion is a separate operator decision, not a staging dependency.
 A lease conflict blocks the release check. Coordinate manual staging activity
 with the staging deploy job so that a deploy cannot interrupt a manual run.
 

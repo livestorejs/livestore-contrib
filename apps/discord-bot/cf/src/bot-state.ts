@@ -1043,7 +1043,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       })
       const status: Effect.Effect<BotStatus> = Effect.gen(function* () {
         const parked = yield* gatewayLease.whileActive(() => Effect.succeed(false), Effect.succeed(true))
-        if (parked) {
+        if (parked === true) {
           return degradedStatus(
             makeGatewayHealthSummary({
               supervisor: 'stopped',

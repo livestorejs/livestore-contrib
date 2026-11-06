@@ -161,8 +161,7 @@ jobs:
   production:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    needs: [staging]
-    if: ${{ always() && ((github.event_name == 'push' && needs.staging.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'production' && github.ref == 'refs/heads/main')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.stage == 'production' && github.ref == 'refs/heads/main' }}
     environment: production
     concurrency:
       group: discord-bot-deploy-production
