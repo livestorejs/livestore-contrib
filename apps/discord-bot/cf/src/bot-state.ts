@@ -1139,15 +1139,24 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             1,
           )(configAdmin.configPut(payload)).pipe(Effect.provide(discordSafeLoggerLayer)),
 
-        // Hold both control mutation and runtime lifecycle ownership through
-        // the final stored/running recheck and REST mutation/verification.
+        // Config mutation stays excluded through REST verification. In staging,
+        // lease-owned I/O is cancellable and never holds the lifecycle mutex;
+        // park/expiry cancels it before resetting the runtime. Production keeps
+        // its existing lifecycle fencing and does not participate in leases.
         commandsSync: (payload: unknown) =>
           Semaphore.withPermits(
             controlMutationLock,
             1,
-          )(Effect.flatMap(ensureRuntime, () => runtimeInstall.withCurrent((rt) => rt.commandsSync(payload)))).pipe(
-            Effect.provide(discordSafeLoggerLayer),
-          ),
+          )(
+            stage === 'production'
+              ? Effect.flatMap(ensureRuntime, () => runtimeInstall.withCurrent((rt) => rt.commandsSync(payload)))
+              : Effect.flatMap(ensureRuntime, (rt) =>
+                  gatewayLease.withActiveOperation(
+                    rt.commandsSync(payload),
+                    Effect.die(new Error('Staging gateway is parked')),
+                  ),
+                ),
+          ).pipe(Effect.provide(discordSafeLoggerLayer)),
 
         /** Cloudflare DO alarm entry point — the same heartbeat as `tick`. */
         alarm: () => runTick('alarm').pipe(Effect.provide(discordSafeLoggerLayer)),

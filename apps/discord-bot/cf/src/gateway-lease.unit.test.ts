@@ -5,8 +5,12 @@ import * as Fiber from 'effect/Fiber'
 import * as TestClock from 'effect/testing/TestClock'
 
 import { makeGatewayLease } from './gateway-lease.ts'
+import { makeSerializedRuntime } from './runtime-install.ts'
 
-const makeLeaseFixture = (stage: 'staging' | 'production' = 'staging') =>
+const makeLeaseFixture = (
+  stage: 'staging' | 'production' = 'staging',
+  stopGateway: Effect.Effect<void> = Effect.void,
+) =>
   Effect.gen(function* () {
     const state = { now: 1000, alarm: null as number | null, stops: 0, stopFailure: false }
     const values = new Map<string, unknown>()
@@ -31,7 +35,7 @@ const makeLeaseFixture = (stage: 'staging' | 'production' = 'staging') =>
       Effect.sync(() => {
         if (state.stopFailure === true) throw new Error('Failed to close the gateway')
         state.stops++
-      }),
+      }).pipe(Effect.andThen(stopGateway)),
       () => state.now,
     )
     const lease = yield* reload
@@ -126,6 +130,56 @@ it.effect('cancels stalled active work at expiry before stopping the gateway', (
   }),
 )
 
+for (const action of ['park', 'expire', 'deadline'] as const) {
+  it.effect(`${action} stops the gateway despite stalled command synchronization`, () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>()
+      let interrupted = false
+      let supervisorRunning = true
+      const commandsSync = Deferred.succeed(started, undefined).pipe(
+        Effect.andThen(Effect.never),
+        Effect.ensuring(
+          Effect.sync(() => {
+            interrupted = true
+          }),
+        ),
+      )
+      const runtime = yield* makeSerializedRuntime(Effect.succeed({ commandsSync }), () => Effect.void)
+      const stopGateway = runtime
+        .reset(() =>
+          Effect.sync(() => {
+            expect(interrupted).toBe(true)
+            supervisorRunning = false
+          }),
+        )
+        .pipe(Effect.asVoid)
+      const { lease, state } = yield* makeLeaseFixture('staging', stopGateway)
+      yield* lease.activate({ owner: 'ci', ttlSeconds: 1 })
+      const rt = yield* runtime.get
+      // Match staging's command path: select under the lifecycle mutex, then
+      // run lease-owned upstream I/O outside that mutex.
+      const sync = yield* Effect.forkChild(lease.withActiveOperation(rt.commandsSync, parked))
+      yield* Deferred.await(started)
+      if (action === 'park') {
+        expect((yield* lease.park({ owner: 'ci' })).status).toBe(200)
+        expect((yield* Fiber.await(sync))._tag).toBe('Failure')
+      } else if (action === 'expire') {
+        state.now = 2_000
+        expect(yield* lease.whileActive(observe, parked)).toBe('parked')
+        expect((yield* Fiber.await(sync))._tag).toBe('Failure')
+      } else {
+        state.now = 2_000
+        yield* TestClock.adjust('1 second')
+        expect(yield* Fiber.join(sync)).toBe('parked')
+      }
+      expect(supervisorRunning).toBe(false)
+      expect(runtime.peek()).toBeUndefined()
+      expect(state).toMatchObject({ stops: 1, alarm: null })
+      expect(yield* lease.whileActive(observe, parked)).toBe('parked')
+    }),
+  )
+}
+
 it.effect('retries closing a gateway if the expiry alarm could not stop it', () =>
   Effect.gen(function* () {
     const { lease, state } = yield* makeLeaseFixture()
@@ -154,6 +208,7 @@ it.effect('bounds activation payloads and leaves production continuously enabled
     expect((yield* production.lease.activate({ owner: 'test', ttlSeconds: 100 })).status).toBe(403)
     expect((yield* production.lease.park({ owner: 'test' })).status).toBe(403)
     expect(yield* production.lease.whileActive(observe, parked)).toBeUndefined()
+    expect(yield* production.lease.withActiveOperation(Effect.succeed('synced'), parked)).toBe('synced')
     expect(production.state).toMatchObject({ alarm: null, stops: 0 })
   }),
 )

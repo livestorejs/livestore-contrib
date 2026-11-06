@@ -1,4 +1,5 @@
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import * as Semaphore from 'effect/Semaphore'
@@ -41,10 +42,14 @@ export const makeGatewayLease = (
   Effect.gen(function* () {
     const lock = yield* Semaphore.make(1)
     const serialized = Semaphore.withPermits(lock, 1)
+    const operations = new Set<Effect.Effect<void>>()
     const read = Effect.promise(() => storage.get<unknown>(leaseKey)).pipe(
       Effect.map(Schema.decodeUnknownOption(leaseSchema)),
     )
     const park = Effect.gen(function* () {
+      // Operations never hold the lease or runtime lifecycle mutex during I/O.
+      // Cancel them before reset so upstream retries cannot delay shutdown.
+      for (const interrupt of operations) yield* interrupt
       yield* stopGateway
       yield* Effect.promise(() => storage.delete(leaseKey))
       yield* Effect.promise(() => storage.deleteAlarm())
@@ -79,6 +84,39 @@ export const makeGatewayLease = (
                 return yield* onParked
               }),
             ),
+
+      withActiveOperation: <A, B, E, R>(
+        onActive: Effect.Effect<A, E, R>,
+        onParked: Effect.Effect<B>,
+      ): Effect.Effect<A | B, E, R> =>
+        stage === 'production'
+          ? onActive
+          : Effect.gen(function* () {
+              const result = yield* Effect.acquireUseRelease(
+                serialized(
+                  Effect.gen(function* () {
+                    const lease = yield* current
+                    if (lease === undefined) return undefined
+                    const fiber = yield* Effect.forkChild(
+                      onActive.pipe(Effect.timeoutOption(Math.max(0, lease.expiresAt - now())), Effect.interruptible),
+                    )
+                    const interrupt = Fiber.interrupt(fiber).pipe(Effect.asVoid)
+                    operations.add(interrupt)
+                    return { fiber, interrupt }
+                  }),
+                ),
+                (running) => (running === undefined ? Effect.succeed(Option.none<A>()) : Fiber.join(running.fiber)),
+                (running) =>
+                  running === undefined
+                    ? Effect.void
+                    : running.interrupt.pipe(Effect.ensuring(Effect.sync(() => operations.delete(running.interrupt)))),
+              )
+              if (Option.isSome(result) === true) return result.value
+              // Re-read under the lock: a newer owner may already have replaced
+              // the expired lease while this operation was being cancelled.
+              yield* serialized(current)
+              return yield* onParked
+            }),
 
       activate: (payload: unknown): Effect.Effect<AdminOperationOutcome> =>
         stage === 'production'

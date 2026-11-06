@@ -191,6 +191,11 @@ Active staging work is cancelled at the lease deadline before the gateway is
 stopped, including stalled journal maintenance. Explicit park waits for the
 current serialized tick; if it is stalled, the lease deadline remains the cap
 even if the park client's confirmation timeout elapses.
+Staging command synchronization runs outside the runtime lifecycle mutex with
+a server-side deadline at lease expiry. Park and expiry cancel that upstream
+work before resetting the runtime, so stalled Discord requests or rate-limit
+retries cannot retain the gateway. Config mutation remains serialized against
+command synchronization. Production retains its existing command-sync path.
 Production promotion is a separate operator decision, not a staging dependency.
 A lease conflict blocks the release check. Coordinate manual staging activity
 with the staging deploy job so that a deploy cannot interrupt a manual run.
