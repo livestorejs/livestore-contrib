@@ -2,9 +2,11 @@ import type { AutomaticDiagnosticsSnapshot } from './automatic-diagnostics.ts'
 import type { GatewayTelemetrySnapshot } from './gateway-telemetry.ts'
 import { schemaVersion } from './journal.ts'
 import type { SupervisorState } from './supervisor.ts'
+import type { WorkerGatewayReport } from './worker-gateway-state.ts'
 
 export interface GatewayHealthSummary {
   readonly supervisor: SupervisorState
+  readonly workerGateway?: WorkerGatewayReport
   readonly sessionPresent: boolean
   /** Bounded, content-free lifetime soak totals and current-activation health. */
   readonly gateway: GatewayTelemetrySnapshot | null
@@ -34,6 +36,7 @@ export const awaitingAlarmBuildHealth = (input: {
 
 export interface ReadinessStatus {
   readonly health: GatewayHealthSummary
+  readonly workerGatewayHealthy?: boolean
   readonly journalSchemaVersion: number
   readonly automaticDiagnostics?: AutomaticDiagnosticsSnapshot | undefined
 }
@@ -74,14 +77,15 @@ export const evaluateReadiness = (status: ReadinessStatus, now = Date.now()): Re
     supervisorReady: health.supervisor === 'ready',
     sessionPresent: health.sessionPresent,
     gatewayHealthy:
-      health.gateway !== null &&
-      health.gateway.current.state === 'ready' &&
-      health.gateway.current.connectedAt !== null &&
-      (health.gateway.current.lastReadyAt !== null || health.gateway.current.lastResumedAt !== null) &&
-      health.gateway.current.terminalCloseCode === null &&
-      health.gateway.current.lastError === null &&
-      health.lastError === null &&
-      heartbeatHealthy,
+      status.workerGatewayHealthy ??
+      (health.gateway !== null &&
+        health.gateway.current.state === 'ready' &&
+        health.gateway.current.connectedAt !== null &&
+        (health.gateway.current.lastReadyAt !== null || health.gateway.current.lastResumedAt !== null) &&
+        health.gateway.current.terminalCloseCode === null &&
+        health.gateway.current.lastError === null &&
+        health.lastError === null &&
+        heartbeatHealthy),
     errorFree: health.lastError === null,
   }
 

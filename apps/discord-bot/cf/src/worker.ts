@@ -13,7 +13,8 @@ import { BotState } from './bot-state.ts'
 import { readOptionalBinding, readSecret } from './env.ts'
 import { receiveDiscordInteraction } from './interaction-http.ts'
 import { evaluateReadiness } from './readiness.ts'
-import { releaseIdConfig } from './release.ts'
+import { readReleaseId, readWorkerVersionId, releaseIdConfig } from './release.ts'
+import { runWorkerGateway } from './worker-gateway.ts'
 
 const configuredWorkerName = process.env['CF_WORKER_NAME']?.trim()
 
@@ -68,6 +69,7 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
             DEPLOY_STAGE: 'production',
           }
         : {}),
+      ...(process.env['CF_GATEWAY_TRANSPORT'] === 'worker' ? { GATEWAY_TRANSPORT: 'worker' } : {}),
       RELEASE_ID: releaseIdConfig(process.env['ALCHEMY_LOCAL'] === '1'),
       // The gateway DO reports the version it is actually assigned during a
       // Cloudflare versions deployment; singleton rollout is therefore
@@ -105,9 +107,35 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
       return adminHandler
     }
 
-    yield* Cloudflare.Workers.cron('* * * * *', () => Effect.asVoid(botState.getByName('gateway').tick())).pipe(
-      Effect.provide(Cloudflare.Workers.CronEventSourceLive),
-    )
+    yield* Cloudflare.Workers.cron('* * * * *', () =>
+      Effect.gen(function* () {
+        const target = () => botState.getByName('gateway')
+        if (readOptionalBinding(env, 'GATEWAY_TRANSPORT') !== 'worker') {
+          yield* target().tick()
+          return
+        }
+        const owner = crypto.randomUUID()
+        yield* Effect.acquireUseRelease(
+          target().workerGatewayClaim(owner, readWorkerVersionId(env) ?? readReleaseId(env)),
+          (claim) =>
+            claim === undefined
+              ? target().workerGatewayDrain()
+              : runWorkerGateway({
+                  ...claim,
+                  token: readSecret(env, 'DISCORD_BOT_TOKEN'),
+                  owner: {
+                    isOwner: () => target().workerGatewayIsOwner(owner),
+                    renew: (ready, ackAt, event) => target().workerGatewayRenew(owner, ready, ackAt, event),
+                    checkpoint: (session) => target().workerGatewayCheckpoint(owner, session),
+                    allowIdentify: () => target().workerGatewayIdentify(owner),
+                    capture: (source) => target().workerGatewayCapture(owner, source),
+                    drain: () => target().workerGatewayDrain(),
+                  },
+                }),
+          (claim) => (claim === undefined ? Effect.void : target().workerGatewayRelease(owner)),
+        )
+      }).pipe(Effect.provide(discordSafeLoggerLayer)),
+    ).pipe(Effect.provide(Cloudflare.Workers.CronEventSourceLive))
 
     return {
       fetch: Effect.gen(function* () {

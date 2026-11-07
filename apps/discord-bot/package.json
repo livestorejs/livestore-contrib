@@ -18,7 +18,7 @@
     "cf:deploy": "bash cf/scripts/deploy.sh",
     "cf:rollback": "bun cf/scripts/rollback.ts",
     "cf:dev": "ALCHEMY_LOCAL=1 alchemy dev cf/alchemy.local.ts",
-    "cf:plan": "node --experimental-strip-types cf/src/deploy-preflight.ts && (cd cf && node --experimental-strip-types scripts/state-migrate.ts --verify-remote-authoritative) && alchemy plan cf/alchemy.run.ts",
+    "cf:plan": "node --experimental-strip-types cf/src/deploy-preflight.ts --embedded-only && (cd cf && node --experimental-strip-types scripts/state-migrate.ts --verify-remote-authoritative) && alchemy plan cf/alchemy.run.ts",
     "cf:preflight": "node --experimental-strip-types cf/src/deploy-preflight.ts",
     "cf:state:migrate:dry-run": "node --experimental-strip-types cf/src/deploy-preflight.ts && (cd cf && node --experimental-strip-types scripts/state-migrate.ts --dry-run)",
     "cf:state:migrate:execute": "node --experimental-strip-types cf/src/deploy-preflight.ts && (cd cf && node --experimental-strip-types scripts/state-migrate.ts --execute)",
