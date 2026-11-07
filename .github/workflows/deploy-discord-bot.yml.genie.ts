@@ -123,7 +123,8 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
         CF_DEPLOY_STAGE: stage,
       },
       'working-directory': 'apps/discord-bot',
-      run: `node --experimental-strip-types cf/scripts/rollback.ts current | node --input-type=module -e '
+      run: `receipt=$(node --experimental-strip-types cf/scripts/rollback.ts current)
+node --input-type=module -e '
         import { appendFileSync, readFileSync } from "node:fs"
         const receipt = JSON.parse(readFileSync(0, "utf8"))
         if (receipt.releaseId !== process.env.RELEASE_ID || !receipt.currentVersionId) {
@@ -131,7 +132,7 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
         }
         appendFileSync(process.env.GITHUB_OUTPUT, "version=" + receipt.currentVersionId + String.fromCharCode(10))
         console.log("Verified Cloudflare deployment", receipt.currentVersionId)
-      '`,
+      ' <<< "$receipt"`,
     },
     ...(stage === 'staging'
       ? [

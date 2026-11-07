@@ -122,7 +122,8 @@ jobs:
           CF_DEPLOY_STAGE: staging
         working-directory: apps/discord-bot
         run: |
-          node --experimental-strip-types cf/scripts/rollback.ts current | node --input-type=module -e '
+          receipt=$(node --experimental-strip-types cf/scripts/rollback.ts current)
+          node --input-type=module -e '
                   import { appendFileSync, readFileSync } from "node:fs"
                   const receipt = JSON.parse(readFileSync(0, "utf8"))
                   if (receipt.releaseId !== process.env.RELEASE_ID || !receipt.currentVersionId) {
@@ -130,7 +131,7 @@ jobs:
                   }
                   appendFileSync(process.env.GITHUB_OUTPUT, "version=" + receipt.currentVersionId + String.fromCharCode(10))
                   console.log("Verified Cloudflare deployment", receipt.currentVersionId)
-                '
+                ' <<< "$receipt"
       - name: Activate staging gateway for this deploy
         id: staging_gateway
         env:
@@ -341,7 +342,8 @@ jobs:
           CF_DEPLOY_STAGE: production
         working-directory: apps/discord-bot
         run: |
-          node --experimental-strip-types cf/scripts/rollback.ts current | node --input-type=module -e '
+          receipt=$(node --experimental-strip-types cf/scripts/rollback.ts current)
+          node --input-type=module -e '
                   import { appendFileSync, readFileSync } from "node:fs"
                   const receipt = JSON.parse(readFileSync(0, "utf8"))
                   if (receipt.releaseId !== process.env.RELEASE_ID || !receipt.currentVersionId) {
@@ -349,7 +351,7 @@ jobs:
                   }
                   appendFileSync(process.env.GITHUB_OUTPUT, "version=" + receipt.currentVersionId + String.fromCharCode(10))
                   console.log("Verified Cloudflare deployment", receipt.currentVersionId)
-                '
+                ' <<< "$receipt"
       - name: Verify gateway adoption and readiness
         env:
           EXPECTED_WORKER_VERSION: ${{ steps.deployment.outputs.version }}

@@ -98,11 +98,13 @@ export interface RollbackConfig {
 type RollbackStep = 'versions' | 'deployments' | 'details' | 'post' | 'decode' | `guard:${string}`
 
 export class RollbackFailure extends Error {
-  constructor(
-    readonly step: RollbackStep,
-    readonly status?: number,
-  ) {
+  readonly step: RollbackStep
+  readonly status: number | undefined
+
+  constructor(step: RollbackStep, status?: number) {
     super(`outcome=not-applied step=${step}${status === undefined ? '' : ` HTTP ${status}`}`)
+    this.step = step
+    this.status = status
   }
 }
 
