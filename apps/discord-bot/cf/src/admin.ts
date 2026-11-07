@@ -303,6 +303,9 @@ export interface AdminRouterOptions {
   readonly configGet?: Effect.Effect<AdminOperationOutcome> | undefined
   /** Revision-guarded validated persistence and optional atomic runtime reload. Absent ⇒ 503. */
   readonly configPut?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
+  /** Staging-only Gateway activation and parking. Absent ⇒ 503. */
+  readonly gatewayActivate?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
+  readonly gatewayPark?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
   /** Guarded plan/apply command reconciliation against the running config. Absent ⇒ 503. */
   readonly commandsSync?: ((payload: unknown) => Effect.Effect<AdminOperationOutcome>) | undefined
   /** Journal reconciliation (Plan or Apply). Absent ⇒ 503. */
@@ -315,6 +318,8 @@ export interface AdminGateway {
   readonly threadCreate: NonNullable<AdminRouterOptions['threadCreate']>
   readonly configGet: () => NonNullable<AdminRouterOptions['configGet']>
   readonly configPut: NonNullable<AdminRouterOptions['configPut']>
+  readonly gatewayActivate: NonNullable<AdminRouterOptions['gatewayActivate']>
+  readonly gatewayPark: NonNullable<AdminRouterOptions['gatewayPark']>
   readonly commandsSync: NonNullable<AdminRouterOptions['commandsSync']>
   readonly threadReconcile: NonNullable<AdminRouterOptions['threadReconcile']>
 }
@@ -324,6 +329,8 @@ export const makeAdminGatewayOptions = (getGateway: () => AdminGateway): AdminRo
   threadCreate: (payload) => getGateway().threadCreate(payload),
   configGet: Effect.suspend(() => getGateway().configGet()),
   configPut: (payload) => getGateway().configPut(payload),
+  gatewayActivate: (payload) => getGateway().gatewayActivate(payload),
+  gatewayPark: (payload) => getGateway().gatewayPark(payload),
   commandsSync: (payload) => getGateway().commandsSync(payload),
   threadReconcile: (payload) => getGateway().threadReconcile(payload),
 })
@@ -386,6 +393,19 @@ export const makeAdminRouter = (options: AdminRouterOptions = {}): AdminRouterEf
         ),
       ),
     )
+
+    for (const [path, operation] of [
+      ['/admin/gateway/activate', options.gatewayActivate],
+      ['/admin/gateway/park', options.gatewayPark],
+    ] as const) {
+      yield* router.add('POST', path, (request) =>
+        Effect.flatMap(readJsonBody(request), (body) =>
+          operation === undefined
+            ? Effect.succeed(errorJson({ error: 'Gateway lease operations are unavailable' }, 503))
+            : Effect.map(operation(body), outcomeResponse),
+        ),
+      )
+    }
 
     // Policy/config plane over the SAME durable config document the handlers
     // consume: GET returns the validated summary plus the stored payload,

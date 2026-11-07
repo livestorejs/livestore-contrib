@@ -121,6 +121,22 @@ it.effect('a failed cold build keeps the alarm chain alive with bounded retries'
   }),
 )
 
+it.effect('a retry cannot postpone the staging lease expiry alarm', () =>
+  Effect.gen(function* () {
+    let scheduled: number | undefined
+    const retry = makeGatewayAlarmRetry(
+      {
+        setAlarm: async (when) => {
+          scheduled = when
+        },
+      },
+      () => 1000,
+    )
+    expect((yield* Effect.exit(retry(Effect.die('cold build failed'), 2000)))._tag).toBe('Failure')
+    expect(scheduled).toBe(2000)
+  }),
+)
+
 it.effect('a hung cold build times out, releases its install slot, and retries on the next alarm', () =>
   Effect.gen(function* () {
     let attempts = 0

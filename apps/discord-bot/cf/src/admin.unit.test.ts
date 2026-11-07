@@ -88,6 +88,26 @@ it('answers 401 (not 404) to unauthenticated unknown routes', async () => {
   expect(response.status).toBe(401)
 })
 
+it('authenticates gateway lease routes before invoking either operation', async () => {
+  const calls: unknown[] = []
+  const operation = (payload: unknown) =>
+    Effect.sync(() => {
+      calls.push(payload)
+      return { ok: true, status: 200, body: { state: 'parked' } }
+    })
+  const route = makeAdminHandler(token, { gatewayActivate: operation, gatewayPark: operation })
+  for (const path of ['/admin/gateway/activate', '/admin/gateway/park']) {
+    for (const authorization of [undefined, 'Basic c2VjcmV0', 'Bearer wrong']) {
+      expect((await route(post(path, { owner: 'test' }, authorization))).status).toBe(401)
+    }
+    expect(calls).toHaveLength(0)
+    const response = await route(post(path, { owner: 'test' }, `Bearer ${token}`))
+    expect(response.status).toBe(200)
+    expect(await jsonBody(response)).toEqual({ state: 'parked' })
+    expect(calls.splice(0)).toEqual([{ owner: 'test' }])
+  }
+})
+
 it('validates payloads server-side into a decodable 422', async () => {
   const response = await handler(
     post(
@@ -373,6 +393,8 @@ it('persists a config through the admin route before the alarm installs its runt
           threadCreate: () => withinRequest(Effect.die('unexpected thread create')),
           configGet: () => withinRequest(operations.configGet),
           configPut: (payload) => withinRequest(operations.configPut(payload)),
+          gatewayActivate: () => withinRequest(Effect.die('unexpected activation')),
+          gatewayPark: () => withinRequest(Effect.die('unexpected park')),
           commandsSync: () => withinRequest(Effect.die('unexpected command sync')),
           threadReconcile: () => withinRequest(Effect.die('unexpected reconciliation')),
         }

@@ -8,16 +8,15 @@ import {
   runDevenvTasksBefore,
 } from '../../genie/repo.ts'
 
-// A push to main deploys staging first, then production only after staging's
-// release and command-sync checks pass. Manual dispatch keeps single-stage runs.
+// Pushes to main deploy staging only. Production requires an explicit dispatch
+// from main; staging success never authorizes a production rollout.
 // Initial Worker creation remains operator-only; github.sha identifies the release.
 const deployJob = (stage: 'staging' | 'production') => ({
   'runs-on': 'ubuntu-24.04',
   'timeout-minutes': 45,
   ...(stage === 'production'
     ? {
-        needs: ['staging'],
-        if: "${{ always() && ((github.event_name == 'push' && needs.staging.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.stage == 'production' && github.ref == 'refs/heads/main')) }}",
+        if: "${{ github.event_name == 'workflow_dispatch' && inputs.stage == 'production' && github.ref == 'refs/heads/main' }}",
       }
     : { if: "${{ github.event_name == 'push' || inputs.stage == 'staging' }}" }),
   environment: stage,
@@ -32,8 +31,19 @@ const deployJob = (stage: 'staging' | 'production') => ({
   },
   steps: [
     checkoutStep({ ref: '${{ github.sha }}' }),
-    ...livestoreContribSetupStepsAfterCheckout,
-    { name: 'Install workspace dependencies', run: runDevenvTasksBefore('pnpm:install', 'discord-bot:install') },
+    ...(stage === 'staging'
+      ? [
+          { uses: 'actions/setup-node@v6', with: { 'node-version': '24', 'package-manager-cache': false } },
+          {
+            name: 'Install standalone Discord bot dependencies',
+            'working-directory': 'apps/discord-bot',
+            run: 'corepack pnpm install --frozen-lockfile',
+          },
+        ]
+      : [
+          ...livestoreContribSetupStepsAfterCheckout,
+          { name: 'Install workspace dependencies', run: runDevenvTasksBefore('pnpm:install', 'discord-bot:install') },
+        ]),
     {
       name: 'Plan and enforce staging adoption gate',
       if: "${{ env.STAGE == 'staging' }}",
@@ -46,12 +56,8 @@ const deployJob = (stage: 'staging' | 'production') => ({
         E2E_ACTOR_TOKEN: '${{ secrets.E2E_ACTOR_TOKEN }}',
         OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
       },
-      run: `set -euo pipefail
-DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
-  cd apps/discord-bot
-  pnpm cf:plan --stage "$STAGE" 2>&1 | tee "$RUNNER_TEMP/discord-bot-plan.log"
-  node --experimental-strip-types cf/scripts/check-deploy-plan.ts "$RUNNER_TEMP/discord-bot-plan.log"
-'`,
+      'working-directory': 'apps/discord-bot',
+      run: 'bash cf/scripts/remote.sh plan --stage staging',
     },
     {
       name: 'Plan and enforce production adoption gate',
@@ -85,11 +91,8 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
         OPENAI_API_KEY: '${{ secrets.OPENAI_API_KEY }}',
         AGENT_ACTION_APPROVAL: 'deploy',
       },
-      run: `set -euo pipefail
-DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
-  cd apps/discord-bot
-  pnpm cf:deploy --stage "$STAGE" --yes
-'`,
+      'working-directory': 'apps/discord-bot',
+      run: 'bash cf/scripts/remote.sh deploy --stage staging --yes',
     },
     {
       name: 'Deploy approved production plan',
@@ -111,6 +114,16 @@ DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" 
   bash cf/scripts/remote.sh deploy --stage production --yes
 '`,
     },
+    ...(stage === 'staging'
+      ? [
+          {
+            name: 'Activate staging gateway for this deploy',
+            id: 'staging_gateway',
+            env: { ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}' },
+            run: 'node --experimental-strip-types apps/discord-bot/cf/scripts/staging-gateway.ts activate',
+          },
+        ]
+      : []),
     {
       name: 'Verify gateway readiness and release',
       run: `node --input-type=module <<'NODE'
@@ -146,14 +159,31 @@ NODE`,
         ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}',
         DISCORD_APPLICATION_ID: '${{ vars.DISCORD_APPLICATION_ID }}',
       },
-      run: `set -euo pipefail
+      ...(stage === 'staging'
+        ? {
+            'working-directory': 'apps/discord-bot',
+            run: 'node --experimental-strip-types cf/scripts/commands-sync.ts staging',
+          }
+        : {
+            run: `set -euo pipefail
 echo "::add-mask::$ADMIN_TOKEN"
 DEVENV_TASK_PASSTHROUGH=1 DEVENV_TUI=false "\${DEVENV_BIN:?DEVENV_BIN not set}" shell --no-reload -- bash -euo pipefail -c '
   cd apps/discord-bot
   node --experimental-strip-types cf/scripts/commands-sync.ts "$STAGE"
 '`,
+          }),
     },
-    nixDiagnosticsArtifactStep(),
+    ...(stage === 'staging'
+      ? [
+          {
+            name: 'Park staging gateway',
+            if: "${{ always() && steps.staging_gateway.outcome != 'skipped' && steps.staging_gateway.outcome != '' }}",
+            env: { ADMIN_TOKEN: '${{ secrets.ADMIN_TOKEN }}' },
+            run: 'node --experimental-strip-types apps/discord-bot/cf/scripts/staging-gateway.ts park',
+          },
+        ]
+      : []),
+    ...(stage === 'production' ? [nixDiagnosticsArtifactStep()] : []),
   ],
 })
 
