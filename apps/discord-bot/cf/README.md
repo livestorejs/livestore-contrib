@@ -57,8 +57,9 @@ before running preflight or Alchemy; it never adds `--yes` automatically.
 fallback. `alchemy.local.ts` is the only stack allowed to use
 `Alchemy.localState()`.
 
-The existing `cf:plan`/`cf:deploy` scripts remain the staging path. Production
-uses the explicit stage-aware `cf/scripts/remote.sh` runner. A merge to `main`
+The `cf:plan` and `cf:deploy` scripts support embedded staging. Worker transport
+and production use the stage-aware `cf/scripts/remote.sh` runner, which verifies
+the canonical Discord endpoint for Worker transport. A merge to `main`
 that changes `apps/discord-bot/**` or the deploy workflow automatically deploys
 **staging only**. Production requires a separately approved manual dispatch
 from `main`; staging verification never triggers a production rollout.

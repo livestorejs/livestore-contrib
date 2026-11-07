@@ -307,6 +307,10 @@ export interface RuntimeConfigAdminOperations<TCandidate> {
  */
 export const makeRuntimeConfigAdminOperations = <TCandidate>(deps: {
   readonly store: RuntimeConfigStore
+  readonly validateChange?: (
+    previous: RuntimeConfigDocument['config'],
+    next: RuntimeConfigDocument['config'],
+  ) => string | undefined
   readonly getRunning: () => RuntimeConfigDocument | undefined
   readonly buildCandidate: (document: RuntimeConfigDocument) => Effect.Effect<TCandidate, unknown>
   readonly activateCandidate: (candidate: TCandidate) => Effect.Effect<void>
@@ -358,6 +362,11 @@ export const makeRuntimeConfigAdminOperations = <TCandidate>(deps: {
           revision: current.revision + 1,
           // releaseId is deploy-owned, never writable through the admin plane.
           config: { ...payload.config, releaseId: current.config.releaseId },
+        }
+
+        const invalidChange = deps.validateChange?.(current.config, candidateDocument.config)
+        if (invalidChange !== undefined) {
+          return failureOutcome({ _tag: 'InvalidControlInput', message: invalidChange }, 409)
         }
 
         if (payload.reload === false) {

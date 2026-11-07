@@ -14,6 +14,6 @@ if [[ "$approved" != true && ( "${ALCHEMY_TUI:-}" != 1 || "${ALCHEMY_PLAIN:-}" =
   exit 2
 fi
 
-node --experimental-strip-types cf/src/deploy-preflight.ts
+node --experimental-strip-types cf/src/deploy-preflight.ts --embedded-only
 (cd cf && node --experimental-strip-types scripts/state-migrate.ts --verify-remote-authoritative)
 alchemy deploy cf/alchemy.run.ts "$@"
