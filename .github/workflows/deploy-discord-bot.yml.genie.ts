@@ -24,6 +24,10 @@ const deployJob = (stage: 'staging' | 'production') => ({
   defaults: bashShellDefaults,
   env: {
     STAGE: stage,
+    CF_GATEWAY_TRANSPORT:
+      "${{ (inputs.transport != '' && inputs.transport != 'default' && inputs.transport) || vars.CF_GATEWAY_TRANSPORT || 'embedded' }}",
+    CF_ALLOW_WORKER_GATEWAY_ROLLBACK: "${{ inputs.transport == 'embedded' && '1' || '0' }}",
+    DISCORD_INTERACTIONS_PUBLIC_KEY: '${{ vars.DISCORD_INTERACTIONS_PUBLIC_KEY }}',
     RELEASE_ID: '${{ github.sha }}',
     CF_WORKER_NAME: '${{ vars.CF_WORKER_NAME }}',
     CF_BOT_STATE_NAMESPACE_ID: '${{ vars.CF_BOT_STATE_NAMESPACE_ID }}',
@@ -198,6 +202,13 @@ export default githubWorkflow({
           required: true,
           type: 'choice',
           options: ['staging', 'production'],
+        },
+        transport: {
+          description: 'Override the stage Gateway transport for cutover or rollback',
+          required: false,
+          type: 'choice',
+          default: 'default',
+          options: ['default', 'embedded', 'worker'],
         },
       },
     },
