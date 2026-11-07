@@ -10,6 +10,7 @@ import { ShardStateStore } from 'dfx/DiscordGateway/Shard/StateStore'
 import { MemoryRateLimitStoreLive, RateLimitStore, type RateLimitStoreService } from 'dfx/RateLimit'
 import type * as Discord from 'dfx/types'
 import * as Context from 'effect/Context'
+import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import * as Layer from 'effect/Layer'
@@ -27,7 +28,7 @@ import { makeDfxApplicationCommandsPort } from '../../src/application-commands/d
 import { makeApplicationCommandsReconciler } from '../../src/application-commands/reconcile.ts'
 import { type DiscordMessageRef } from '../../src/control/schema.ts'
 import { DiscordActionsDfxLive } from '../../src/discord/actions-dfx.ts'
-import { DiscordActions } from '../../src/discord/actions.ts'
+import { DiscordActions, type DiscordActionsService } from '../../src/discord/actions.ts'
 import { DiscordEventHandlers, gatewayIntents } from '../../src/discord/events.ts'
 import {
   describeDiscordRestFailure,
@@ -88,6 +89,7 @@ import {
   type GatewayTelemetrySink,
   type GatewayTelemetrySnapshot,
 } from './gateway-telemetry.ts'
+import { observeDiscordCallback } from './interaction-http.ts'
 import { makeSqliteDoThreadActionJournal, migrateJournal } from './journal.ts'
 import {
   makeGatewayOwnerDeadline,
@@ -172,6 +174,7 @@ const makeGatewayHealthSummary = (input: {
 }
 
 interface BotRuntime {
+  readonly handleHttpInteraction: (payload: unknown, onAcknowledged: Effect.Effect<void>) => Effect.Effect<void>
   readonly supervisor: Supervisor
   readonly telemetry: GatewayTelemetryRecorder
   readonly automaticDiagnostics: AutomaticDiagnostics
@@ -471,17 +474,37 @@ const buildRuntime = (
         Effect.mapError((cause) => new DocsChannelResolutionError({ message: 'Discord channel request failed' })),
       )
 
-    const eventHandlers = yield* DiscordEventHandlers.pipe(
-      Effect.provide(
-        makeDiscordEventHandlersLayer(config, {
-          thread: threadWorkflow,
-          docsReady: true,
-          resolveDocsChannelParent,
-          automaticDiagnostic: recordAutomatic,
-          correlateSourceId,
-        }).pipe(Layer.provide(Layer.merge(Layer.succeed(DiscordActions, actions), Layer.succeed(DocsWorkflow, docs)))),
-      ),
-    )
+    const makeEventHandlers = (interactionActions: DiscordActionsService) =>
+      DiscordEventHandlers.pipe(
+        Effect.provide(
+          makeDiscordEventHandlersLayer(config, {
+            thread: threadWorkflow,
+            docsReady: true,
+            resolveDocsChannelParent,
+            automaticDiagnostic: recordAutomatic,
+            correlateSourceId,
+          }).pipe(
+            Layer.provide(
+              Layer.merge(Layer.succeed(DiscordActions, interactionActions), Layer.succeed(DocsWorkflow, docs)),
+            ),
+          ),
+        ),
+      )
+
+    const eventHandlers = yield* makeEventHandlers(actions)
+
+    const handleHttpInteraction = (payload: unknown, onAcknowledged: Effect.Effect<void>) =>
+      Effect.gen(function* () {
+        const interaction = payload as Discord.GatewayInteractionCreateDispatchData
+        if (interaction.application_id !== config.applicationId || interaction.guild_id !== config.guildId) return
+        const httpHandlers = yield* makeEventHandlers({
+          ...actions,
+          deferInteraction: (route, visibility) =>
+            observeDiscordCallback(actions.deferInteraction(route, visibility), onAcknowledged),
+          respondInteraction: (message) => observeDiscordCallback(actions.respondInteraction(message), onAcknowledged),
+        })
+        yield* routeInteraction(interaction, httpHandlers, docsEnabled)
+      }).pipe(Effect.catchCause(() => Effect.logWarning('Discord HTTP interaction failed')))
 
     // Gateway payloads → typed routes → handlers. Unknown dispatch types are
     // ignored; MESSAGE_CREATE/INTERACTION_CREATE mirror the Node routes. The
@@ -651,6 +674,7 @@ const buildRuntime = (
     })
 
     return {
+      handleHttpInteraction,
       supervisor: yield* makeSupervisorLoop(
         {
           acquire: makeShardAcquire({
@@ -1116,6 +1140,32 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       )
 
       return {
+        httpInteraction: (payload: unknown) =>
+          Effect.gen(function* () {
+            if (readOptionalBinding(env, 'DISCORD_INTERACTIONS_PUBLIC_KEY') === undefined) return false
+            const acknowledged = yield* Deferred.make<boolean>()
+            const cancelled = yield* Deferred.make<void>()
+            const run = withRuntime((rt) =>
+              gatewayLease.withActiveOperation(
+                rt.handleHttpInteraction(payload, Effect.asVoid(Deferred.succeed(acknowledged, true))),
+                Effect.void,
+              ),
+            ).pipe(
+              Effect.ensuring(Deferred.succeed(acknowledged, false)),
+              Effect.catchCause(() => Effect.logWarning('Discord HTTP interaction failed')),
+              Effect.provide(discordSafeLoggerLayer),
+            )
+            // The DO owns the post-acknowledgment work. A slow docs query or
+            // thread mutation must not delay the Worker's initial HTTP reply.
+            yield* doState.waitUntil(Effect.raceFirst(run, Deferred.await(cancelled)))
+            const result = yield* Deferred.await(acknowledged).pipe(Effect.timeoutOption('2500 millis'))
+            if (Option.isNone(result) === true) {
+              yield* Deferred.succeed(cancelled, undefined)
+              return false
+            }
+            return result.value
+          }),
+
         tick: () => runTick('cron').pipe(Effect.provide(discordSafeLoggerLayer)),
 
         gatewayActivate: (payload: unknown) =>
