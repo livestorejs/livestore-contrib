@@ -135,6 +135,14 @@ This injection seam does not validate Discord itself. A separate, explicitly
 write-enabled staging harness must prove Gateway-to-REST behavior against a
 dedicated Discord target before production acceptance.
 
+## Cloudflare HTTP Interactions
+
+The Cloudflare Worker can receive signed Discord commands through an optional
+HTTP endpoint. Discord selects either the HTTP endpoint or Gateway delivery
+for application interactions. Both transports run the same typed routes,
+permission checks, and DFX REST callbacks in the Durable Object. Automatic
+threading continues to use Gateway message events.
+
 ## Dependency Admission
 
 The bot may adopt DFX only with one lock-coherent Effect line. Admission checks
