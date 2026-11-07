@@ -130,26 +130,30 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
               onFailure: () => Effect.succeed(new Response(null, { status: 400 })),
               onSuccess: (web) =>
                 Effect.promise(() => {
+                  const owner = web.headers.get('x-relay-owner')
+                  if (owner === null || /^[0-9a-f-]{36}$/.test(owner) === false) {
+                    return Promise.resolve(new Response(null, { status: 400 }))
+                  }
                   const target = botState.getByName('gateway')
                   if (pathname === '/gateway/messages') {
                     return receiveRelayMessage({
                       request: web,
                       token,
-                      deliver: (source) => Effect.runPromise(target.relayMessage(source)),
+                      deliver: (source) => Effect.runPromise(target.relayMessage(owner, source)),
                     })
                   }
                   if (pathname === '/gateway/interactions') {
                     return receiveRelayInteraction({
                       request: web,
                       token,
-                      deliver: (payload) => Effect.runPromise(target.relayInteraction(payload)),
+                      deliver: (payload) => Effect.runPromise(target.relayInteraction(owner, payload)),
                     })
                   }
                   if (pathname === '/gateway/heartbeat') {
                     return receiveRelayHeartbeat({
                       request: web,
                       token,
-                      deliver: (ready) => Effect.runPromise(target.relayHeartbeat(ready)),
+                      deliver: (ready) => Effect.runPromise(target.relayHeartbeat(owner, ready)),
                     })
                   }
                   return Promise.resolve(new Response(null, { status: 404 }))

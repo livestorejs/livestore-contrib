@@ -14,22 +14,26 @@ it('retries an ambiguous delivery and acknowledges only the terminal response', 
   const outbox = openRelayOutbox(':memory:', 2)
   try {
     outbox.enqueue(source)
+    const later = Schema.decodeSync(DiscordMessageRef)({ ...source, messageId: '100000000000000004' })
+    outbox.enqueue(later)
     const statuses = [503, 204]
     const input = {
       endpoint: new URL('https://relay.test/gateway/messages'),
       token: 'test-credential',
+      owner: 'test-owner',
       outbox,
       signal: AbortSignal.timeout(1_000),
       fetcher: (async (_url, options) => {
-        expect(options?.body).toBe(JSON.stringify(source))
+        expect(options?.body).toBe(JSON.stringify(statuses.length === 2 ? source : later))
         expect(options?.redirect).toBe('error')
         return new Response(null, { status: statuses.shift() ?? 500 })
       }) as typeof fetch,
     }
     expect(await forwardRelayMessage(input)).toBe('retry')
-    expect(outbox.next()).toMatchObject(source)
+    expect(outbox.next()).toMatchObject(later)
     expect(await forwardRelayMessage(input)).toBe('acknowledged')
     expect(await forwardRelayMessage(input)).toBe('empty')
+    expect(outbox.next(Date.now() + 30_000)).toMatchObject(source)
   } finally {
     outbox.close()
   }

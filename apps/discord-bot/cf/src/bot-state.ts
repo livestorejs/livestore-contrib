@@ -97,6 +97,7 @@ import {
   scheduleGatewayAlarmIfMissing,
 } from './loop-gate.ts'
 import { awaitingAlarmBuildHealth, type GatewayHealthSummary } from './readiness.ts'
+import { sameRelayScope, type RelayHeartbeat } from './relay-ingress.ts'
 import { readReleaseId, readWorkerVersionId } from './release.ts'
 import {
   encodeConfigSummary,
@@ -771,7 +772,15 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       const instanceFibers = yield* makeInstanceFiberRunner
       const releaseId = readReleaseId(env)
       const relayMode = readOptionalBinding(env, 'GATEWAY_TRANSPORT') === 'relay'
-      const relayHeartbeatKey = 'livestore-discord/relay-heartbeat-at'
+      const relayLeaseKey = 'livestore-discord/relay-owner-lease'
+      type RelayLease = { readonly owner: string; readonly expiresAt: number; readonly ready: boolean }
+      const readRelayLease = () => doState.raw.storage.get<RelayLease>(relayLeaseKey)
+      const relayOwnsLease = (owner: string) =>
+        Effect.promise(async () => {
+          if (relayMode === false) return false
+          const lease = await readRelayLease()
+          return lease?.owner === owner && lease.expiresAt > Date.now()
+        })
       const relayMaintenanceKey = 'livestore-discord/relay-maintenance-hour'
       const stage = readOptionalBinding(env, 'DEPLOY_STAGE') === 'production' ? 'production' : 'staging'
       const applicationId = readOptionalBinding(env, 'DISCORD_APPLICATION_ID')
@@ -851,6 +860,12 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         Effect.flatMap(ensureRuntime, f)
       const configAdmin = makeRuntimeConfigAdminOperations({
         store: configStore,
+        acceptsConfigChange: (current, candidate) =>
+          relayMode === false ||
+          sameRelayScope(current.config, {
+            guildId: candidate.config.guildId,
+            channels: candidate.config.actionChannelIds,
+          }),
         getRunning: () => runtimeInstall.peek()?.configDocument,
         buildCandidate: (document) =>
           buildRuntime(
@@ -1133,8 +1148,8 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                 ),
               )
         if (relayMode === true) {
-          const seen = yield* Effect.promise(() => doState.raw.storage.get<number>(relayHeartbeatKey))
-          const relayHealthy = seen !== undefined && Date.now() - seen <= 90_000
+          const lease = yield* Effect.promise(readRelayLease)
+          const relayHealthy = lease?.ready === true && lease.expiresAt > Date.now()
           return {
             health: {
               ...makeGatewayHealthSummary({
@@ -1203,23 +1218,36 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
 
         gatewayPark: (payload: unknown) => gatewayLease.park(payload).pipe(Effect.provide(discordSafeLoggerLayer)),
 
-        relayMessage: (source: DiscordMessageRef) =>
-          (relayMode === true ? withRuntime((rt) => rt.relayMessage(source)) : Effect.succeed(false)).pipe(
+        relayMessage: (owner: string, source: DiscordMessageRef) =>
+          relayOwnsLease(owner).pipe(
+            Effect.flatMap((owns) =>
+              owns === true ? withRuntime((rt) => rt.relayMessage(source)) : Effect.succeed(false),
+            ),
             Effect.provide(discordSafeLoggerLayer),
           ),
 
-        relayInteraction: (payload: unknown) =>
-          (relayMode === true ? withRuntime((rt) => rt.relayInteraction(payload)) : Effect.succeed(false)).pipe(
+        relayInteraction: (owner: string, payload: unknown) =>
+          relayOwnsLease(owner).pipe(
+            Effect.flatMap((owns) =>
+              owns === true ? withRuntime((rt) => rt.relayInteraction(payload)) : Effect.succeed(false),
+            ),
             Effect.provide(discordSafeLoggerLayer),
           ),
 
-        relayHeartbeat: (ready: boolean) =>
+        relayHeartbeat: (owner: string, heartbeat: RelayHeartbeat) =>
           relayMode === false
             ? Effect.succeed(false)
-            : Effect.promise(async () => {
-                if (ready === true) await doState.raw.storage.put(relayHeartbeatKey, Date.now())
-                else await doState.raw.storage.delete(relayHeartbeatKey)
-                return true
+            : Effect.flatMap(Effect.orDie(configStore.read), ({ config }) => {
+                if (sameRelayScope(config, heartbeat) === false) return Effect.succeed(false)
+                return Effect.promise(() =>
+                  doState.raw.storage.transaction(async (storage) => {
+                    const lease = await storage.get<RelayLease>(relayLeaseKey)
+                    const now = Date.now()
+                    if (lease !== undefined && lease.expiresAt > now && lease.owner !== owner) return false
+                    await storage.put(relayLeaseKey, { owner, ready: heartbeat.ready, expiresAt: now + 45_000 })
+                    return true
+                  }),
+                )
               }),
 
         status: () => status.pipe(Effect.provide(discordSafeLoggerLayer)),

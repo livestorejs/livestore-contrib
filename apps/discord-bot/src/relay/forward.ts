@@ -4,15 +4,20 @@ import type { RelayOutbox } from './outbox.ts'
 export const forwardRelayMessage = async (input: {
   readonly endpoint: URL
   readonly token: string
-  readonly outbox: Pick<RelayOutbox, 'next' | 'acknowledge'>
+  readonly owner: string
+  readonly outbox: Pick<RelayOutbox, 'next' | 'acknowledge' | 'retry'>
   readonly signal: AbortSignal
   readonly fetcher?: typeof fetch
 }): Promise<'empty' | 'acknowledged' | 'retry'> => {
-  const entry = input.outbox.next()
+  const now = Date.now()
+  const entry = input.outbox.next(now)
   if (entry === undefined) return 'empty'
 
   const { guildId, channelId, messageId } = entry
-  if ((await sendRelayJson({ ...input, payload: { guildId, channelId, messageId } })) === false) return 'retry'
+  if ((await sendRelayJson({ ...input, payload: { guildId, channelId, messageId } })) === false) {
+    input.outbox.retry(entry.ordinal, Date.now())
+    return 'retry'
+  }
   input.outbox.acknowledge(entry)
   return 'acknowledged'
 }
@@ -20,6 +25,7 @@ export const forwardRelayMessage = async (input: {
 export const sendRelayJson = async (input: {
   readonly endpoint: URL
   readonly token: string
+  readonly owner: string
   readonly payload: unknown
   readonly signal: AbortSignal
   readonly fetcher?: typeof fetch
@@ -40,7 +46,11 @@ export const sendRelayJson = async (input: {
     response = await (input.fetcher ?? fetch)(input.endpoint, {
       method: 'POST',
       redirect: 'error',
-      headers: { authorization: `Bearer ${input.token}`, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${input.token}`,
+        'content-type': 'application/json',
+        'x-relay-owner': input.owner,
+      },
       body: JSON.stringify(input.payload),
       signal: input.signal,
     })

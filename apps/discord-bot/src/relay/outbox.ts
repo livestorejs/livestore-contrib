@@ -27,6 +27,13 @@ export const openRelayOutbox = (path: string, capacity: number) => {
       ) STRICT;
     `)
 
+    const columns = db.prepare('PRAGMA table_info(relay_outbox)').all()
+    if (columns.some((column) => column.name === 'retry_at') === false) {
+      db.exec('ALTER TABLE relay_outbox ADD COLUMN retry_at INTEGER NOT NULL DEFAULT 0')
+    }
+    const size = db.prepare('SELECT count(*) AS count FROM relay_outbox')
+    const reschedule = db.prepare('UPDATE relay_outbox SET retry_at = ? WHERE ordinal = ?')
+
     const enqueue = db.prepare(`
       INSERT INTO relay_outbox (guild_id, channel_id, message_id)
       SELECT ?, ?, ?
@@ -36,7 +43,7 @@ export const openRelayOutbox = (path: string, capacity: number) => {
     const contains = db.prepare('SELECT 1 FROM relay_outbox WHERE message_id = ?')
     const oldest = db.prepare(`
       SELECT ordinal, guild_id AS guildId, channel_id AS channelId, message_id AS messageId
-      FROM relay_outbox ORDER BY ordinal LIMIT 1
+      FROM relay_outbox WHERE retry_at <= ? ORDER BY ordinal LIMIT 1
     `)
     const remove = db.prepare('DELETE FROM relay_outbox WHERE ordinal = ? AND message_id = ?')
 
@@ -58,7 +65,11 @@ export const openRelayOutbox = (path: string, capacity: number) => {
           throw new Error('Relay outbox is full')
         }
       },
-      next: () => oldest.get() as (DiscordMessageRef & { readonly ordinal: number }) | undefined,
+      hasCapacity: () => Number(size.get()?.count) < capacity,
+      retry: (ordinal: number, now: number) => {
+        reschedule.run(now + 30_000, ordinal)
+      },
+      next: (now = Date.now()) => oldest.get(now) as (DiscordMessageRef & { readonly ordinal: number }) | undefined,
       acknowledge: (entry: DiscordMessageRef & { readonly ordinal: number }) => {
         remove.run(entry.ordinal, entry.messageId)
       },

@@ -15,28 +15,21 @@ export const runGatewayRelay = (input: {
   readonly outbox: RelayOutbox
 }) =>
   Effect.gen(function* () {
-    const drain = (untilEmpty: boolean) =>
+    const owner = crypto.randomUUID()
+    const drain = (untilCapacity: boolean) =>
       Effect.gen(function* () {
-        let retryDelayMs = 1_000
-        for (;;) {
+        while (untilCapacity === false || input.outbox.hasCapacity() === false) {
           const outcome = yield* Effect.promise((signal) =>
             forwardRelayMessage({
               endpoint: endpoint('/gateway/messages'),
               token: input.token,
+              owner,
               outbox: input.outbox,
               signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
             }),
           )
-          if (outcome === 'retry') {
-            yield* Effect.sleep(retryDelayMs)
-            retryDelayMs = Math.min(retryDelayMs * 2, 30_000)
-          } else {
-            retryDelayMs = 1_000
-            if (outcome === 'empty') {
-              if (untilEmpty === true) return
-              yield* Effect.sleep(250)
-            }
-          }
+          if (outcome === 'empty') yield* Effect.sleep(250)
+          if (outcome === 'retry') yield* Effect.logWarning('Discord message delivery will retry')
         }
       })
     const endpoint = (path: string) => new URL(path, input.endpoint)
@@ -45,11 +38,13 @@ export const runGatewayRelay = (input: {
         sendRelayJson({
           endpoint: endpoint(path),
           token: input.token,
+          owner,
           payload,
           signal: AbortSignal.any([signal, AbortSignal.timeout(timeout)]),
         }),
       )
-    const heartbeat = (ready: boolean) => post('/gateway/heartbeat', ready, 5_000)
+    const heartbeat = (ready: boolean) =>
+      post('/gateway/heartbeat', { ready, guildId: input.guildId, channels: [...input.channels] }, 5_000)
     if ((yield* heartbeat(false)) === false) {
       return yield* Effect.die(new Error('Worker has not admitted the Discord relay'))
     }
@@ -83,23 +78,28 @@ export const runGatewayRelay = (input: {
     )
     // A full outbox may have stopped the previous Gateway reader. Make
     // capacity before reconnecting so replay cannot trap it in a restart loop.
-    yield* drain(true)
-    const gateway = yield* openRelayGateway({ ...input, onInteraction })
-    let established = false
-    const monitor = Stream.runForEach(gateway.lifecycle, (event) =>
-      Effect.sync(() => {
-        established = event._tag === 'Ready' || event._tag === 'Resumed'
-      }),
-    )
+    let isReady = () => false
+    const run = Effect.gen(function* () {
+      yield* drain(true)
+      const gateway = yield* openRelayGateway({ ...input, onInteraction })
+      let established = false
+      const monitor = Stream.runForEach(gateway.lifecycle, (event) =>
+        Effect.sync(() => {
+          established = event._tag === 'Ready' || event._tag === 'Resumed'
+        }),
+      )
+      isReady = () => established && gateway.heartbeatHealthy()
+      return yield* Effect.raceFirst(
+        gateway.failure,
+        Effect.all([drain(false), dispatch, monitor], { concurrency: 'unbounded', discard: true }),
+      )
+    })
     const report = Effect.gen(function* () {
-      const ready = established && gateway.heartbeatHealthy()
+      const ready = isReady()
       if ((yield* heartbeat(ready)) === false) {
         return yield* Effect.die(new Error('Worker stopped admitting the Discord relay'))
       }
-      yield* Effect.sleep('20 seconds')
+      yield* Effect.sleep('15 seconds')
     }).pipe(Effect.forever)
-    return yield* Effect.raceFirst(
-      gateway.failure,
-      Effect.all([drain(false), dispatch, monitor, report], { concurrency: 'unbounded', discard: true }),
-    ).pipe(Effect.ensuring(Effect.asVoid(heartbeat(false))))
+    return yield* Effect.raceFirst(run, report)
   }).pipe(Effect.scoped)

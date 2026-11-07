@@ -69,8 +69,23 @@ export const receiveRelayInteraction = (input: {
   readonly deliver: (payload: unknown) => Promise<boolean>
 }) => receive({ ...input, maxBytes: 65_536, decode: (payload) => payload })
 
+const RelayHeartbeat = Schema.Struct({
+  ready: Schema.Boolean,
+  guildId: Schema.String,
+  channels: Schema.Array(Schema.String),
+})
+export type RelayHeartbeat = typeof RelayHeartbeat.Type
+
+export const sameRelayScope = (
+  config: { readonly guildId: string; readonly actionChannelIds: readonly string[] },
+  relay: { readonly guildId: string; readonly channels: readonly string[] },
+): boolean =>
+  config.guildId === relay.guildId &&
+  config.actionChannelIds.length === relay.channels.length &&
+  config.actionChannelIds.every((id) => relay.channels.includes(id))
+
 export const receiveRelayHeartbeat = (input: {
   readonly request: Request
   readonly token: string
-  readonly deliver: (ready: boolean) => Promise<boolean>
-}) => receive({ ...input, maxBytes: 16, decode: Schema.decodeUnknownSync(Schema.Boolean) })
+  readonly deliver: (heartbeat: RelayHeartbeat) => Promise<boolean>
+}) => receive({ ...input, maxBytes: 8192, decode: Schema.decodeUnknownSync(RelayHeartbeat) })

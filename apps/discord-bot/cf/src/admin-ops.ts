@@ -308,6 +308,7 @@ export interface RuntimeConfigAdminOperations<TCandidate> {
 export const makeRuntimeConfigAdminOperations = <TCandidate>(deps: {
   readonly store: RuntimeConfigStore
   readonly getRunning: () => RuntimeConfigDocument | undefined
+  readonly acceptsConfigChange?: (current: RuntimeConfigDocument, candidate: RuntimeConfigDocument) => boolean
   readonly buildCandidate: (document: RuntimeConfigDocument) => Effect.Effect<TCandidate, unknown>
   readonly activateCandidate: (candidate: TCandidate) => Effect.Effect<void>
 }): RuntimeConfigAdminOperations<TCandidate> => {
@@ -358,6 +359,16 @@ export const makeRuntimeConfigAdminOperations = <TCandidate>(deps: {
           revision: current.revision + 1,
           // releaseId is deploy-owned, never writable through the admin plane.
           config: { ...payload.config, releaseId: current.config.releaseId },
+        }
+
+        if (deps.acceptsConfigChange?.(current, candidateDocument) === false) {
+          return failureOutcome(
+            {
+              _tag: 'InvalidControlInput',
+              message: 'Change the relay capture scope with the gateway transport rolled back to embedded',
+            },
+            409,
+          )
         }
 
         if (payload.reload === false) {
