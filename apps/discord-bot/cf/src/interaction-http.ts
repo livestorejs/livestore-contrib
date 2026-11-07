@@ -1,5 +1,8 @@
 import * as Effect from 'effect/Effect'
 
+import type { DiscordActionError } from '../../src/discord/actions.ts'
+import { redactDiscordRestError } from '../../src/discord/rest-error-redaction.ts'
+
 const maxBodyBytes = 256 * 1024
 const maxTimestampSkewMs = 5 * 60_000
 const encoder = new TextEncoder()
@@ -80,8 +83,33 @@ const verifyDiscordInteraction = async (
   if (payload.type === 1) return Response.json({ type: 1 })
   if (payload.type !== 2) return new Response(null, { status: 400 })
 
-  return { command: payload }
+  // Discord HTTP interactions may omit the deprecated channel_id field.
+  const legacyId = 'channel_id' in payload ? (payload.channel_id ?? undefined) : undefined
+  const channel = 'channel' in payload ? payload.channel : undefined
+  const nestedId = typeof channel === 'object' && channel !== null && 'id' in channel ? channel.id : undefined
+  const channelId = legacyId ?? nestedId
+  if (
+    typeof channelId !== 'string' ||
+    /^\d{17,20}$/u.test(channelId) === false ||
+    (legacyId !== undefined && nestedId !== undefined && legacyId !== nestedId)
+  ) {
+    return new Response(null, { status: 400 })
+  }
+  return { command: { ...payload, channel_id: channelId } }
 }
+
+/** Treat a duplicate as already acknowledged without letting the command run again. */
+export const observeDiscordCallback = (
+  callback: Effect.Effect<void, DiscordActionError>,
+  onAcknowledged: Effect.Effect<void>,
+): Effect.Effect<void, DiscordActionError> =>
+  callback.pipe(
+    Effect.tap(onAcknowledged),
+    Effect.tapError((error) => {
+      const rest = redactDiscordRestError(error.cause)
+      return rest.status === 400 && rest.discordCode === 40060 ? onAcknowledged : Effect.void
+    }),
+  )
 
 export const receiveDiscordInteraction = <R>(
   request: Request,

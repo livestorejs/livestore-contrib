@@ -89,6 +89,7 @@ import {
   type GatewayTelemetrySink,
   type GatewayTelemetrySnapshot,
 } from './gateway-telemetry.ts'
+import { observeDiscordCallback } from './interaction-http.ts'
 import { makeSqliteDoThreadActionJournal, migrateJournal } from './journal.ts'
 import {
   makeGatewayOwnerDeadline,
@@ -499,8 +500,8 @@ const buildRuntime = (
         const httpHandlers = yield* makeEventHandlers({
           ...actions,
           deferInteraction: (route, visibility) =>
-            actions.deferInteraction(route, visibility).pipe(Effect.tap(onAcknowledged)),
-          respondInteraction: (message) => actions.respondInteraction(message).pipe(Effect.tap(onAcknowledged)),
+            observeDiscordCallback(actions.deferInteraction(route, visibility), onAcknowledged),
+          respondInteraction: (message) => observeDiscordCallback(actions.respondInteraction(message), onAcknowledged),
         })
         yield* routeInteraction(interaction, httpHandlers, docsEnabled)
       }).pipe(Effect.catchCause(() => Effect.logWarning('Discord HTTP interaction failed')))

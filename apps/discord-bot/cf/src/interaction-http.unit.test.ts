@@ -1,7 +1,8 @@
 import * as Effect from 'effect/Effect'
 import { describe, expect, it, vi } from 'vitest'
 
-import { receiveDiscordInteraction } from './interaction-http.ts'
+import { DiscordActionError } from '../../src/discord/actions.ts'
+import { observeDiscordCallback, receiveDiscordInteraction } from './interaction-http.ts'
 
 const receive = (...args: Parameters<typeof receiveDiscordInteraction<never>>) =>
   Effect.runPromise(receiveDiscordInteraction(...args))
@@ -51,13 +52,50 @@ describe('signed Discord interaction ingress', () => {
   })
 
   it('returns an empty 202 only after the callback reports acknowledgment', async () => {
-    const { request, publicKey } = await signRequest('{"type":2}')
+    const command = { type: 2, channel_id: '100000000000000001' }
+    const { request, publicKey } = await signRequest(JSON.stringify(command))
     const acknowledge = vi.fn(() => Effect.succeed(true))
     const accepted = await receive(request(), publicKey, acknowledge)
     expect(accepted.status).toBe(202)
     expect(await accepted.text()).toBe('')
-    expect(acknowledge).toHaveBeenCalledWith({ type: 2 })
+    expect(acknowledge).toHaveBeenCalledWith(command)
     const unavailable = await receive(request(), publicKey, () => Effect.succeed(false))
     expect(unavailable.status).toBe(503)
   })
+})
+
+it('normalizes a signed channel object and rejects disagreeing or missing channel IDs', async () => {
+  const command = { type: 2, channel: { id: '100000000000000001' } }
+  const nested = await signRequest(JSON.stringify(command))
+  const conflicting = await signRequest(JSON.stringify({ ...command, channel_id: '100000000000000002' }))
+  const missing = await signRequest('{"type":2}')
+  const acknowledge = vi.fn(() => Effect.succeed(true))
+  expect((await receive(nested.request(), nested.publicKey, acknowledge)).status).toBe(202)
+  expect((await receive(conflicting.request(), conflicting.publicKey, acknowledge)).status).toBe(400)
+  expect((await receive(missing.request(), missing.publicKey, acknowledge)).status).toBe(400)
+  expect(acknowledge).toHaveBeenCalledExactlyOnceWith({ ...command, channel_id: command.channel.id })
+})
+
+it('acknowledges a Discord 40060 retry without running the command continuation', async () => {
+  const observe = vi.fn()
+  const runCommand = vi.fn()
+  const callbackError = new DiscordActionError({
+    operation: 'defer-interaction',
+    message: 'Duplicate callback',
+    cause: Object.assign(new Error('Already acknowledged'), {
+      name: 'DiscordRestError',
+      _tag: 'ErrorResponse',
+      response: { status: 400 },
+      data: { code: 40060 },
+    }),
+  })
+  const result = await Effect.runPromise(
+    observeDiscordCallback(Effect.fail(callbackError), Effect.sync(observe)).pipe(
+      Effect.andThen(Effect.sync(runCommand)),
+      Effect.flip,
+    ),
+  )
+  expect(result).toBe(callbackError)
+  expect(observe).toHaveBeenCalledOnce()
+  expect(runCommand).not.toHaveBeenCalled()
 })
