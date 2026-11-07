@@ -73,3 +73,10 @@ it('admits precisely the first production Worker with its declared bindings only
 it('accepts a cron trigger binding row on a Worker update', () => {
   expect(checkDeployPlan(allowed + '[DiscordBot/Cron(* * * * *)] noop\n')).toBe(true)
 })
+
+it('permits only relay binding deletions during an explicit rollback', () => {
+  const rollback = allowed + '[DiscordBot/GATEWAY_RELAY_TOKEN] delete\n[DiscordBot/GATEWAY_TRANSPORT] delete\n'
+  expect(checkDeployPlan(rollback, 'staging', false, true)).toBe(true)
+  expect(() => checkDeployPlan(rollback)).toThrow()
+  expect(() => checkDeployPlan(rollback + '[DiscordBot/BotState] delete\n', 'staging', false, true)).toThrow()
+})

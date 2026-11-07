@@ -31,8 +31,11 @@ export const openRelayOutbox = (path: string, capacity: number) => {
     if (columns.some((column) => column.name === 'retry_at') === false) {
       db.exec('ALTER TABLE relay_outbox ADD COLUMN retry_at INTEGER NOT NULL DEFAULT 0')
     }
+    if (columns.some((column) => column.name === 'attempts') === false) {
+      db.exec('ALTER TABLE relay_outbox ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0')
+    }
     const size = db.prepare('SELECT count(*) AS count FROM relay_outbox')
-    const reschedule = db.prepare('UPDATE relay_outbox SET retry_at = ? WHERE ordinal = ?')
+    const reschedule = db.prepare('UPDATE relay_outbox SET retry_at = ?, attempts = attempts + 1 WHERE ordinal = ?')
 
     const enqueue = db.prepare(`
       INSERT INTO relay_outbox (guild_id, channel_id, message_id)
@@ -42,7 +45,7 @@ export const openRelayOutbox = (path: string, capacity: number) => {
     `)
     const contains = db.prepare('SELECT 1 FROM relay_outbox WHERE message_id = ?')
     const oldest = db.prepare(`
-      SELECT ordinal, guild_id AS guildId, channel_id AS channelId, message_id AS messageId
+      SELECT ordinal, guild_id AS guildId, channel_id AS channelId, message_id AS messageId, attempts
       FROM relay_outbox WHERE retry_at <= ? ORDER BY ordinal LIMIT 1
     `)
     const remove = db.prepare('DELETE FROM relay_outbox WHERE ordinal = ? AND message_id = ?')
@@ -66,10 +69,12 @@ export const openRelayOutbox = (path: string, capacity: number) => {
         }
       },
       hasCapacity: () => Number(size.get()?.count) < capacity,
-      retry: (ordinal: number, now: number) => {
-        reschedule.run(now + 30_000, ordinal)
+      retry: (entry: { readonly ordinal: number; readonly attempts: number }, now: number) => {
+        const delay = Math.min(30_000 * 2 ** Math.min(entry.attempts, 6), 30 * 60_000)
+        reschedule.run(now + delay, entry.ordinal)
       },
-      next: (now = Date.now()) => oldest.get(now) as (DiscordMessageRef & { readonly ordinal: number }) | undefined,
+      next: (now = Date.now()) =>
+        oldest.get(now) as (DiscordMessageRef & { readonly ordinal: number; readonly attempts: number }) | undefined,
       acknowledge: (entry: DiscordMessageRef & { readonly ordinal: number }) => {
         remove.run(entry.ordinal, entry.messageId)
       },

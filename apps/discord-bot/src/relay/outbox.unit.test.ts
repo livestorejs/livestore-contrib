@@ -43,3 +43,29 @@ it('retains the unacknowledged reference across reopen and rejects new work at c
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+it('persists growing retry delays across reopen and caps them at thirty minutes', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'livestore-discord-relay-'))
+  const path = join(dir, 'relay.sqlite')
+  let now = 1_000
+  try {
+    for (const [attempts, delay] of [
+      30_000, 60_000, 120_000, 240_000, 480_000, 960_000, 1_800_000, 1_800_000,
+    ].entries()) {
+      const outbox = openRelayOutbox(path, 1)
+      try {
+        if (attempts === 0) outbox.enqueue(source('100000000000000003'))
+        const entry = outbox.next(now)
+        expect(entry?.attempts).toBe(attempts)
+        if (entry === undefined) throw new Error('Expected the retry to be due')
+        outbox.retry(entry, now)
+        expect(outbox.next(now + delay - 1)).toBeUndefined()
+        now += delay
+      } finally {
+        outbox.close()
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

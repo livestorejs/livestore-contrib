@@ -14,6 +14,8 @@
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
+      nixosModules.gatewayRelay = import ./nix/relay-service.nix;
+
       packages = forAllSystems (
         system:
         let
