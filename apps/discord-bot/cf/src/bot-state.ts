@@ -534,11 +534,11 @@ const buildRuntime = (
             : Effect.succeed(false),
         ),
         Effect.catch((error) => {
-          const status = redactDiscordRestError(error).status
-          if (status === 403) {
+          const { status, discordCode } = redactDiscordRestError(error)
+          if (status === 403 && (discordCode === 50001 || discordCode === 50013)) {
             return Effect.logWarning('Discord relay source is no longer accessible').pipe(Effect.as(true))
           }
-          return Effect.succeed(status === 404)
+          return Effect.succeed(status === 404 && (discordCode === 10003 || discordCode === 10008))
         }),
         Effect.catchCause(() => Effect.succeed(false)),
       )
