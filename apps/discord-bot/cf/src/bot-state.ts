@@ -494,7 +494,7 @@ const buildRuntime = (
         // DFX models gateway event names as a separate enum from dispatch payload types.
         // oxlint-disable-next-line typescript-eslint/no-unsafe-enum-comparison
         payload.t === 'MESSAGE_CREATE'
-          ? diagnostics.frameReceived.pipe(Effect.andThen(routeMessage(payload.d, eventHandlers)))
+          ? diagnostics.frameReceived.pipe(Effect.andThen(routeMessage(payload.d, eventHandlers)), Effect.asVoid)
           : // oxlint-disable-next-line typescript-eslint/no-unsafe-enum-comparison
             payload.t === 'INTERACTION_CREATE'
             ? routeInteraction(payload.d, eventHandlers, docsEnabled)
