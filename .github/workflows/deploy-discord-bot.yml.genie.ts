@@ -26,6 +26,7 @@ const deployJob = (stage: 'staging' | 'production') => ({
     STAGE: stage,
     CF_GATEWAY_TRANSPORT:
       "${{ (inputs.transport != '' && inputs.transport != 'default' && inputs.transport) || vars.CF_GATEWAY_TRANSPORT || 'embedded' }}",
+    CF_ALLOW_RELAY_ROLLBACK: "${{ inputs.transport == 'embedded' && '1' || '0' }}",
     RELEASE_ID: '${{ github.sha }}',
     CF_WORKER_NAME: '${{ vars.CF_WORKER_NAME }}',
     CF_BOT_STATE_NAMESPACE_ID: '${{ vars.CF_BOT_STATE_NAMESPACE_ID }}',
