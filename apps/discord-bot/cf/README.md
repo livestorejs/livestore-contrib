@@ -506,7 +506,9 @@ The deploy workflow defaults to the stage's `CF_GATEWAY_TRANSPORT` variable,
 or `embedded` if unset. An explicit dispatch can select `relay` or
 `embedded` for a cutover. Relay mode requires a stage-specific
 `GATEWAY_RELAY_TOKEN`. The gateway only connects after the Worker and its
-Durable Object admit that token in relay mode.
+Durable Object admit that token in relay mode. The Durable Object admits one
+process owner at a time and expires the lease 45 seconds after the last
+renewal. A crashed process may appear ready until that lease expires.
 
 1. For staging, park the embedded gateway before the relay deploy. Deploy
    via the Alchemy workflow with `transport=relay`. Confirm adoption and
@@ -516,11 +518,18 @@ Durable Object admit that token in relay mode.
    `LIVESTORE_DISCORD_RELAY_ORIGIN`, `LIVESTORE_DISCORD_RELAY_GUILD`,
    `LIVESTORE_DISCORD_RELAY_APPLICATION`, and the comma-separated
    `LIVESTORE_DISCORD_RELAY_CHANNELS`. Supply the `discord-bot-token` and
-   `gateway-relay-token` files in `CREDENTIALS_DIRECTORY`.
+   `gateway-relay-token` files in `CREDENTIALS_DIRECTORY`. The relay guild and
+   channels must match the Worker runtime config. To change the capture scope,
+   first switch to embedded transport, update the runtime config and service
+   together, then cut back to the relay.
 3. To roll back, stop the relay and verify its process exited before
    dispatching `transport=embedded`. Confirm the embedded gateway is ready
    and converges commands. The staging workflow then parks it. Keep the relay
    SQLite files so any unacknowledged references remain available on retry.
+   Check the Alchemy plan before stopping the relay. If rollback fails before
+   the Worker switches to embedded, restart the relay and wait for its lease.
+   The transports use separate Discord sessions. Record the last successful
+   event on the old path and first on the new path, then reconcile the gap.
 4. After a production relay cutover passes its smoke tests, set the production
    stage variable to `relay` so later dispatches retain the transport. For a
    production rollback, restore that variable to `embedded` after verification.

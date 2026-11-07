@@ -18,7 +18,8 @@ export const runGatewayRelay = (input: {
     const owner = crypto.randomUUID()
     const drain = (untilCapacity: boolean) =>
       Effect.gen(function* () {
-        while (untilCapacity === false || input.outbox.hasCapacity() === false) {
+        for (;;) {
+          if (untilCapacity === true && input.outbox.hasCapacity() === true) return
           const outcome = yield* Effect.promise((signal) =>
             forwardRelayMessage({
               endpoint: endpoint('/gateway/messages'),

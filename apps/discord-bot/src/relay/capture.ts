@@ -22,18 +22,17 @@ export const captureRelayMessages = (input: {
     Effect.map(input.socket.connect(options), (connection) => ({
       ...connection,
       take: Effect.tap(connection.take, (frame) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           if (frame.op !== Discord.GatewayOpcodes.Dispatch || frame.t !== Discord.GatewayDispatchEvents.MessageCreate)
             return
           const message = frame.d
           if (message.guild_id !== input.guildId || input.channels.has(message.channel_id) === false) return
-          input.outbox.enqueue(
-            Schema.decodeSync(DiscordMessageRef)({
-              guildId: message.guild_id,
-              channelId: message.channel_id,
-              messageId: message.id,
-            }),
-          )
+          const source = yield* Schema.decodeEffect(DiscordMessageRef)({
+            guildId: message.guild_id,
+            channelId: message.channel_id,
+            messageId: message.id,
+          }).pipe(Effect.orDie)
+          yield* Effect.sync(() => input.outbox.enqueue(source))
         }).pipe(
           Effect.onError(() => input.onCaptureFailure),
           Effect.andThen(input.observeFrame?.(frame) ?? Effect.void),

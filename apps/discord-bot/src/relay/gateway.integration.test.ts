@@ -1,4 +1,4 @@
-import { Effect, Layer, Stream } from 'effect'
+import { Effect, Stream } from 'effect'
 import { WebSocketConstructor } from 'effect/unstable/socket/Socket'
 import { expect, it } from 'vitest'
 
@@ -26,7 +26,7 @@ it('queues a message before DFX checkpoints it and stops at a storage failure', 
         return { exit, session: outbox.session('0-1'), queued: outbox.next() }
       }).pipe(
         Effect.scoped,
-        Effect.provide(Layer.succeed(WebSocketConstructor, () => new RelayTestSocket())),
+        Effect.provideService(WebSocketConstructor, () => new RelayTestSocket()),
         Effect.timeout('5 seconds'),
       ),
     )
