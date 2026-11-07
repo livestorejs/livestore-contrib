@@ -12,7 +12,8 @@ const discord = (initial: string | null, id: string = canonicalStagingApplicatio
   const writes: Array<string | null> = []
   const fetcher: typeof fetch = async (_input, init) => {
     if (init?.method === 'PATCH') {
-      const body = JSON.parse(String(init.body)) as { interactions_endpoint_url: string | null }
+      if (typeof init.body !== 'string') throw new Error('Expected a JSON request body')
+      const body = JSON.parse(init.body) as { interactions_endpoint_url: string | null }
       url = body.interactions_endpoint_url
       writes.push(url)
     }
