@@ -10,9 +10,11 @@ import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse'
 import { discordSafeLoggerLayer } from '../../src/discord/rest-error-redaction.ts'
 import { AdminToken, makeAdminGatewayOptions, makeAdminRouter, runAdminRouter, toFetchHandler } from './admin.ts'
 import { BotState } from './bot-state.ts'
-import { readSecret } from './env.ts'
+import { readOptionalBinding, readSecret } from './env.ts'
+import { receiveDiscordInteraction } from './interaction-http.ts'
 import { evaluateReadiness } from './readiness.ts'
-import { releaseIdConfig } from './release.ts'
+import { readReleaseId, readWorkerVersionId, releaseIdConfig } from './release.ts'
+import { runWorkerGateway } from './worker-gateway.ts'
 
 const configuredWorkerName = process.env['CF_WORKER_NAME']?.trim()
 
@@ -67,11 +69,20 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
             DEPLOY_STAGE: 'production',
           }
         : {}),
+      ...(process.env['CF_GATEWAY_TRANSPORT'] === 'worker' ? { GATEWAY_TRANSPORT: 'worker' } : {}),
       RELEASE_ID: releaseIdConfig(process.env['ALCHEMY_LOCAL'] === '1'),
       // The gateway DO reports the version it is actually assigned during a
       // Cloudflare versions deployment; singleton rollout is therefore
       // observable even though percentages are not a meaningful bot canary.
       CF_VERSION_METADATA: Cloudflare.Workers.VersionMetadata(),
+      ...(isWorkerdRuntime === false && (process.env['DISCORD_INTERACTIONS_PUBLIC_KEY']?.trim().length ?? 0) > 0
+        ? {
+            DISCORD_INTERACTIONS_PUBLIC_KEY: Config.schema(
+              Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/iu)),
+              'DISCORD_INTERACTIONS_PUBLIC_KEY',
+            ),
+          }
+        : {}),
     },
   },
   Effect.gen(function* () {
@@ -96,9 +107,35 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
       return adminHandler
     }
 
-    yield* Cloudflare.Workers.cron('* * * * *', () => Effect.asVoid(botState.getByName('gateway').tick())).pipe(
-      Effect.provide(Cloudflare.Workers.CronEventSourceLive),
-    )
+    yield* Cloudflare.Workers.cron('* * * * *', () =>
+      Effect.gen(function* () {
+        const target = () => botState.getByName('gateway')
+        if (readOptionalBinding(env, 'GATEWAY_TRANSPORT') !== 'worker') {
+          yield* target().tick()
+          return
+        }
+        const owner = crypto.randomUUID()
+        yield* Effect.acquireUseRelease(
+          target().workerGatewayClaim(owner, readWorkerVersionId(env) ?? readReleaseId(env)),
+          (claim) =>
+            claim === undefined
+              ? target().workerGatewayDrain()
+              : runWorkerGateway({
+                  ...claim,
+                  token: readSecret(env, 'DISCORD_BOT_TOKEN'),
+                  owner: {
+                    isOwner: () => target().workerGatewayIsOwner(owner),
+                    renew: (ready, ackAt, event) => target().workerGatewayRenew(owner, ready, ackAt, event),
+                    checkpoint: (session) => target().workerGatewayCheckpoint(owner, session),
+                    allowIdentify: () => target().workerGatewayIdentify(owner),
+                    capture: (source) => target().workerGatewayCapture(owner, source),
+                    drain: () => target().workerGatewayDrain(),
+                  },
+                }),
+          (claim) => (claim === undefined ? Effect.void : target().workerGatewayRelease(owner)),
+        )
+      }).pipe(Effect.provide(discordSafeLoggerLayer)),
+    ).pipe(Effect.provide(Cloudflare.Workers.CronEventSourceLive))
 
     return {
       fetch: Effect.gen(function* () {
@@ -107,6 +144,17 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
         // URL parsing and the web-Request bridge always see an absolute form.
         const requestUrl = new URL(request.url, 'http://localhost').toString()
         const pathname = new URL(requestUrl).pathname
+
+        if (pathname === '/discord/interactions') {
+          const publicKey = readOptionalBinding(env, 'DISCORD_INTERACTIONS_PUBLIC_KEY')
+          if (publicKey === undefined) return HttpServerResponse.text('not found', { status: 404 })
+          const acknowledge = (payload: unknown) => botState.getByName('gateway').httpInteraction(payload)
+          const response = yield* Effect.matchEffect(HttpServerRequest.toWeb({ ...request, url: requestUrl }), {
+            onFailure: () => Effect.succeed(new Response(null, { status: 400 })),
+            onSuccess: (web) => receiveDiscordInteraction(web, publicKey, acknowledge),
+          })
+          return HttpServerResponse.fromWeb(response)
+        }
 
         if (pathname === '/readyz') {
           // Public-minimal projection: release/version identity and boolean

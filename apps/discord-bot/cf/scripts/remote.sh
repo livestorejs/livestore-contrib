@@ -38,7 +38,12 @@ fi
 export PATH="$PWD/node_modules/.bin:$PATH"
 export CF_DEPLOY_STAGE=$stage
 if [[ "$bootstrap" == true ]]; then export CF_ALLOW_INITIAL_CREATE=1; else unset CF_ALLOW_INITIAL_CREATE; fi
+verify_worker_interactions() {
+  [[ "${CF_GATEWAY_TRANSPORT:-embedded}" == worker ]] || return 0
+  node --experimental-strip-types cf/scripts/interactions-endpoint.ts "$stage" verify >/dev/null
+}
 node --experimental-strip-types cf/src/deploy-preflight.ts
+verify_worker_interactions
 if [[ "$bootstrap" == true ]]; then
   (cd cf && node --experimental-strip-types scripts/state-migrate.ts --assert-empty-production)
 else
@@ -53,6 +58,7 @@ node --experimental-strip-types cf/scripts/check-deploy-plan.ts "$plan_log" "${p
 if [[ "$mode" == deploy ]]; then
   # Recheck absence/identity after plan, before the only mutating operation.
   node --experimental-strip-types cf/src/deploy-preflight.ts
+  verify_worker_interactions
   if [[ "$bootstrap" == true ]]; then
     (cd cf && node --experimental-strip-types scripts/state-migrate.ts --assert-empty-production)
   else

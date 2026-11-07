@@ -34,11 +34,11 @@ export const runDiscordRoutes = (docsEnabled = true) =>
   })
 
 export const routeMessage = Effect.fn('discord.routeMessage')(function* (
-  message: Discord.GatewayMessageCreateDispatchData,
+  message: DiscordMessageLike,
   handlers: DiscordEventHandlersService,
 ) {
   const decoded = yield* decodeAutomaticMessage(normalizeMessage(message))
-  if (Option.isSome(decoded) === true) yield* handlers.onAutomaticMessage(decoded.value)
+  return Option.isSome(decoded) === true ? yield* handlers.onAutomaticMessage(decoded.value) : undefined
 })
 
 export const routeInteraction = Effect.fn('discord.routeInteraction')(function* (
