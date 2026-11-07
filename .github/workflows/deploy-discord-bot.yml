@@ -114,39 +114,33 @@ jobs:
             cd apps/discord-bot
             bash cf/scripts/remote.sh deploy --stage production --yes
           '
+      - name: Record deployed Cloudflare version
+        id: deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_DEPLOY_STAGE: staging
+        working-directory: apps/discord-bot
+        run: |
+          receipt=$(node --experimental-strip-types cf/scripts/rollback.ts current)
+          node --input-type=module -e '
+                  import { appendFileSync, readFileSync } from "node:fs"
+                  const receipt = JSON.parse(readFileSync(0, "utf8"))
+                  if (receipt.releaseId !== process.env.RELEASE_ID || !receipt.currentVersionId) {
+                    throw new Error("Cloudflare deployment receipt does not match the requested release")
+                  }
+                  appendFileSync(process.env.GITHUB_OUTPUT, "version=" + receipt.currentVersionId + String.fromCharCode(10))
+                  console.log("Verified Cloudflare deployment", receipt.currentVersionId)
+                ' <<< "$receipt"
       - name: Activate staging gateway for this deploy
         id: staging_gateway
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: node --experimental-strip-types apps/discord-bot/cf/scripts/staging-gateway.ts activate
-      - name: Verify gateway readiness and release
-        run: |
-          node --input-type=module <<'NODE'
-          import { setTimeout } from 'node:timers/promises'
-          const url = new URL('/readyz', process.env.CF_WORKER_URL)
-          if (url.protocol !== 'https:' || !process.env.CF_WORKER_URL || !process.env.RELEASE_ID) {
-            throw new Error('CF_WORKER_URL must be an HTTPS URL and RELEASE_ID must be set')
-          }
-          const checks = ['journalCurrent', 'supervisorReady', 'sessionPresent', 'gatewayHealthy', 'errorFree']
-          const deadline = Date.now() + 120_000
-          while (Date.now() < deadline) {
-            try {
-              const response = await fetch(url, { signal: AbortSignal.timeout(5000) })
-              if (response.status === 200) {
-                const report = await response.json()
-                if (report.ready === true && report.releaseId === process.env.RELEASE_ID &&
-                    checks.every((key) => report.checks?.[key] === true)) {
-                  console.log('Discord bot ready at expected release', report.releaseId)
-                  process.exit(0)
-                }
-              }
-            } catch (error) {
-              console.log('Readiness request failed:', error instanceof Error ? error.message : String(error))
-            }
-            await setTimeout(5000)
-          }
-          throw new Error('Discord bot readiness did not reach expected release within 120 seconds')
-          NODE
+      - name: Verify gateway adoption and readiness
+        env:
+          EXPECTED_WORKER_VERSION: ${{ steps.deployment.outputs.version }}
+        run: node apps/discord-bot/cf/scripts/verify-deployed-gateway.mjs
       - name: Converge application commands
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
@@ -180,6 +174,10 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
         env:
@@ -336,34 +334,28 @@ jobs:
             cd apps/discord-bot
             bash cf/scripts/remote.sh deploy --stage production --yes
           '
-      - name: Verify gateway readiness and release
+      - name: Record deployed Cloudflare version
+        id: deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_DEPLOY_STAGE: production
+        working-directory: apps/discord-bot
         run: |
-          node --input-type=module <<'NODE'
-          import { setTimeout } from 'node:timers/promises'
-          const url = new URL('/readyz', process.env.CF_WORKER_URL)
-          if (url.protocol !== 'https:' || !process.env.CF_WORKER_URL || !process.env.RELEASE_ID) {
-            throw new Error('CF_WORKER_URL must be an HTTPS URL and RELEASE_ID must be set')
-          }
-          const checks = ['journalCurrent', 'supervisorReady', 'sessionPresent', 'gatewayHealthy', 'errorFree']
-          const deadline = Date.now() + 120_000
-          while (Date.now() < deadline) {
-            try {
-              const response = await fetch(url, { signal: AbortSignal.timeout(5000) })
-              if (response.status === 200) {
-                const report = await response.json()
-                if (report.ready === true && report.releaseId === process.env.RELEASE_ID &&
-                    checks.every((key) => report.checks?.[key] === true)) {
-                  console.log('Discord bot ready at expected release', report.releaseId)
-                  process.exit(0)
-                }
-              }
-            } catch (error) {
-              console.log('Readiness request failed:', error instanceof Error ? error.message : String(error))
-            }
-            await setTimeout(5000)
-          }
-          throw new Error('Discord bot readiness did not reach expected release within 120 seconds')
-          NODE
+          receipt=$(node --experimental-strip-types cf/scripts/rollback.ts current)
+          node --input-type=module -e '
+                  import { appendFileSync, readFileSync } from "node:fs"
+                  const receipt = JSON.parse(readFileSync(0, "utf8"))
+                  if (receipt.releaseId !== process.env.RELEASE_ID || !receipt.currentVersionId) {
+                    throw new Error("Cloudflare deployment receipt does not match the requested release")
+                  }
+                  appendFileSync(process.env.GITHUB_OUTPUT, "version=" + receipt.currentVersionId + String.fromCharCode(10))
+                  console.log("Verified Cloudflare deployment", receipt.currentVersionId)
+                ' <<< "$receipt"
+      - name: Verify gateway adoption and readiness
+        env:
+          EXPECTED_WORKER_VERSION: ${{ steps.deployment.outputs.version }}
+        run: node apps/discord-bot/cf/scripts/verify-deployed-gateway.mjs
       - name: Converge application commands
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}

@@ -99,6 +99,13 @@ describe('cf:rollback argument parsing and approval', () => {
 })
 
 describe('cf:rollback API selection', () => {
+  it('reports the fully deployed release without exposing bindings or issuing writes', async () => {
+    const { client, calls } = mockClient()
+    const result = await Effect.runPromise(rollback({ action: 'current' }, productionConfig, client))
+    expect(result).toEqual({ currentVersionId: current, releaseId: 'release-N' })
+    expect(calls.every(({ init }) => init.method === undefined)).toBe(true)
+  })
+
   it('lists deployable versions with release identities but does not expose secret bindings or issue writes', async () => {
     const { client, calls } = mockClient()
     const result = await Effect.runPromise(rollback({ action: 'list' }, config, client))
