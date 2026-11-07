@@ -11,7 +11,6 @@ import { selectControlTransport } from './cli/transport-option.ts'
 import { makeHttpsBotControlClient } from './control/http-client.ts'
 import { defaultControlSocket } from './control/transport.ts'
 import { discordSafeLoggerLayer, redactDiscordRestCause } from './discord/rest-error-redaction.ts'
-import { runConfiguredRelay } from './relay/main.ts'
 import { gatewayIntents, loadRuntimeConfig, makeUnixBotControlClient, runRuntime } from './runtime/index.ts'
 
 export { gatewayIntents }
@@ -19,39 +18,37 @@ export { gatewayIntents }
 const args = process.argv.slice(2)
 
 export const program =
-  args.length === 1 && args[0] === 'relay'
-    ? runConfiguredRelay()
-    : args[0] === 'serve'
-      ? Effect.gen(function* () {
-          const configPath = yield* readConfigPath(args)
-          const config = yield* loadRuntimeConfig(configPath).pipe(Effect.orDie)
-          return yield* runRuntime(config, configPath).pipe(Effect.orDie)
-        }).pipe(Effect.scoped)
-      : Effect.gen(function* () {
-          const environment = args.includes('production') === true ? 'production' : 'staging'
-          const transport = selectControlTransport({
-            args,
-            environmentEndpoint: process.env.LIVESTORE_DISCORD_ADMIN_ENDPOINT,
-            environmentToken: process.env.LIVESTORE_DISCORD_ADMIN_TOKEN,
-            socketEnvironmentPath: process.env.LIVESTORE_DISCORD_CONTROL_SOCKET,
-            defaultSocketPath: defaultControlSocket(environment).path,
-          })
-          if (transport._tag === 'UsageError') {
-            process.stderr.write(`CRITICAL usage: ${transport.message}\n`)
-            process.exitCode = 2
-            return
-          }
-          const client =
-            transport._tag === 'UnixSocket'
-              ? yield* makeUnixBotControlClient(transport.path)
-              : yield* makeHttpsBotControlClient(transport.url, transport.token)
-          const code = yield* runCli(args, client, {
-            stdout: (line) => process.stdout.write(`${line}\n`),
-            stderr: (line) => process.stderr.write(`${line}\n`),
-            isTTY: process.stdout.isTTY,
-          })
-          if (code !== 0) process.exitCode = code
-        }).pipe(Effect.scoped)
+  args[0] === 'serve'
+    ? Effect.gen(function* () {
+        const configPath = yield* readConfigPath(args)
+        const config = yield* loadRuntimeConfig(configPath).pipe(Effect.orDie)
+        return yield* runRuntime(config, configPath).pipe(Effect.orDie)
+      }).pipe(Effect.scoped)
+    : Effect.gen(function* () {
+        const environment = args.includes('production') === true ? 'production' : 'staging'
+        const transport = selectControlTransport({
+          args,
+          environmentEndpoint: process.env.LIVESTORE_DISCORD_ADMIN_ENDPOINT,
+          environmentToken: process.env.LIVESTORE_DISCORD_ADMIN_TOKEN,
+          socketEnvironmentPath: process.env.LIVESTORE_DISCORD_CONTROL_SOCKET,
+          defaultSocketPath: defaultControlSocket(environment).path,
+        })
+        if (transport._tag === 'UsageError') {
+          process.stderr.write(`CRITICAL usage: ${transport.message}\n`)
+          process.exitCode = 2
+          return
+        }
+        const client =
+          transport._tag === 'UnixSocket'
+            ? yield* makeUnixBotControlClient(transport.path)
+            : yield* makeHttpsBotControlClient(transport.url, transport.token)
+        const code = yield* runCli(args, client, {
+          stdout: (line) => process.stdout.write(`${line}\n`),
+          stderr: (line) => process.stderr.write(`${line}\n`),
+          isTTY: process.stdout.isTTY,
+        })
+        if (code !== 0) process.exitCode = code
+      }).pipe(Effect.scoped)
 
 const readConfigPath = (values: ReadonlyArray<string>) => {
   const index = values.indexOf('--config')
