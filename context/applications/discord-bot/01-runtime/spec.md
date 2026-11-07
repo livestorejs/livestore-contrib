@@ -62,6 +62,23 @@ Feature nodes own message eligibility, thread naming, command authorization,
 and response content. This node owns only their Discord transport, lifecycle,
 and side-effect boundary.
 
+## Scheduled Worker transport
+
+When the deployment selects the Worker transport, the scheduled Worker runs
+the DFX socket for a bounded slot. The BotState singleton grants and fences
+that slot, holds the DFX cursor under the same storage key used by embedded
+transport, and remains the sole mutation authority. Gateway intake stores
+only the source reference before allowing DFX to checkpoint its sequence.
+BotState resolves the reference from Discord and runs the shared automatic
+thread workflow. It retries transient failures from the durable queue and
+uses the existing journal to deduplicate repeated work.
+
+Staging slots are 90 seconds to make handoff gaps observable. Production
+slots are ten minutes. A staging lease caps both intake and pending mutations.
+When switching back to embedded transport, the embedded owner waits for any
+remaining Worker lease to expire before starting. The same release can drain
+pending Worker references after the embedded runtime becomes ready.
+
 ## Gateway Configuration
 
 The initial identify intent bitset is exactly:
@@ -101,19 +118,18 @@ failure suitable for diagnosis, and causes the supervised runtime to fail.
 The terminal set initially follows Discord's documented non-reconnectable
 configuration/authentication failures:
 
-| Code | Meaning | Runtime action |
-| --- | --- | --- |
-| `4004` | Authentication failed | Stop and fail |
-| `4010` | Invalid shard | Stop and fail |
-| `4011` | Sharding required | Stop and fail |
-| `4012` | Invalid API version | Stop and fail |
-| `4013` | Invalid intent(s) | Stop and fail |
-| `4014` | Disallowed intent(s) | Stop and fail |
+| Code   | Meaning               | Runtime action |
+| ------ | --------------------- | -------------- |
+| `4004` | Authentication failed | Stop and fail  |
+| `4010` | Invalid shard         | Stop and fail  |
+| `4011` | Sharding required     | Stop and fail  |
+| `4012` | Invalid API version   | Stop and fail  |
+| `4013` | Invalid intent(s)     | Stop and fail  |
+| `4014` | Disallowed intent(s)  | Stop and fail  |
 
 Other Discord close codes follow DFX's resume/reconnect behavior unless the
 protocol classification is revised with evidence. The selected application
-artifact carries the narrowly fenced DFX 1.0.15 patch accepted by decision
-0002. Its terminal/transient differential and runtime failure propagation are
+artifact carries the narrowly fenced DFX 1.0.15 patch accepted by decision 0002. Its terminal/transient differential and runtime failure propagation are
 recorded in
 [experiment 0010](../.experiments/0010-implemented-tracer-bullet.md). An
 upstream release remains preferable, but is no longer an unproven application
@@ -134,6 +150,14 @@ repeated actions. Handler tests must not need a bot token.
 This injection seam does not validate Discord itself. A separate, explicitly
 write-enabled staging harness must prove Gateway-to-REST behavior against a
 dedicated Discord target before production acceptance.
+
+## Cloudflare HTTP Interactions
+
+The Cloudflare Worker can receive signed Discord commands through an optional
+HTTP endpoint. Discord selects either the HTTP endpoint or Gateway delivery
+for application interactions. Both transports run the same typed routes,
+permission checks, and DFX REST callbacks in the Durable Object. Automatic
+threading continues to use Gateway message events.
 
 ## Dependency Admission
 

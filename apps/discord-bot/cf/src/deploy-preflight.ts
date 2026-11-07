@@ -87,6 +87,9 @@ export const preflightRemoteIdentity = async (input: {
 }
 
 const run = async (): Promise<void> => {
+  if (process.argv.includes('--embedded-only') === true && process.env['CF_GATEWAY_TRANSPORT'] === 'worker') {
+    throw new Error('Worker Gateway transport requires cf/scripts/remote.sh plan|deploy --stage staging|production')
+  }
   const stage = process.env['CF_DEPLOY_STAGE'] ?? 'staging'
   if (stage === 'production') {
     const applicationId = requireEnvironment('DISCORD_APPLICATION_ID')

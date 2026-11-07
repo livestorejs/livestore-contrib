@@ -6,10 +6,12 @@ import { DiscordConfig, layer as discordConfigLayer, type DiscordConfigService }
 import { DiscordWSCodec, DiscordWSLive, JsonDiscordWSCodecLive } from 'dfx/DiscordGateway/DiscordWS'
 import { Messaging, MesssagingLive } from 'dfx/DiscordGateway/Messaging'
 import { Shard, type RunningShard } from 'dfx/DiscordGateway/Shard'
-import { ShardStateStore } from 'dfx/DiscordGateway/Shard/StateStore'
+import { ShardStateStore, type ShardState } from 'dfx/DiscordGateway/Shard/StateStore'
 import { MemoryRateLimitStoreLive, RateLimitStore, type RateLimitStoreService } from 'dfx/RateLimit'
 import type * as Discord from 'dfx/types'
 import * as Context from 'effect/Context'
+import { MessageType } from 'dfx/DiscordREST/Generated'
+import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import * as Layer from 'effect/Layer'
@@ -25,14 +27,15 @@ import { layerWebSocketConstructorGlobal } from 'effect/unstable/socket/Socket'
 
 import { makeDfxApplicationCommandsPort } from '../../src/application-commands/dfx.ts'
 import { makeApplicationCommandsReconciler } from '../../src/application-commands/reconcile.ts'
-import { type DiscordMessageRef } from '../../src/control/schema.ts'
+import { DiscordMessageRef } from '../../src/control/schema.ts'
 import { DiscordActionsDfxLive } from '../../src/discord/actions-dfx.ts'
-import { DiscordActions } from '../../src/discord/actions.ts'
+import { DiscordActions, type DiscordActionsService } from '../../src/discord/actions.ts'
 import { DiscordEventHandlers, gatewayIntents } from '../../src/discord/events.ts'
 import {
   describeDiscordRestFailure,
   discordSafeLoggerLayer,
   DiscordRestFailure,
+  redactDiscordRestError,
   safeDiscordFailureMessage,
 } from '../../src/discord/rest-error-redaction.ts'
 import { routeInteraction, routeMessage } from '../../src/discord/routes.ts'
@@ -88,6 +91,7 @@ import {
   type GatewayTelemetrySink,
   type GatewayTelemetrySnapshot,
 } from './gateway-telemetry.ts'
+import { observeDiscordCallback } from './interaction-http.ts'
 import { makeSqliteDoThreadActionJournal, migrateJournal } from './journal.ts'
 import {
   makeGatewayOwnerDeadline,
@@ -113,6 +117,7 @@ import { makeInstanceFiberRunner, makeSerializedRuntime } from './runtime-instal
 import { clearShardState, keyValueStoreFromDurableStorage, loadShardState, saveShardState } from './storage.ts'
 import { defaultHandshakeTimeout, make as makeSupervisorLoop, makeShardAcquire } from './supervisor.ts'
 import type { Supervisor, SupervisorState } from './supervisor.ts'
+import { makeWorkerGatewayState } from './worker-gateway-state.ts'
 
 /** The alchemy DurableObjectState service instance yielded inside DO handlers. */
 type DoInstanceState = InstanceType<typeof Cloudflare.DurableObjectState>
@@ -135,6 +140,7 @@ const alarmDelayByState: Record<SupervisorState, number | undefined> = {
 
 export interface BotStatus {
   readonly health: GatewayHealthSummary
+  readonly workerGatewayHealthy?: boolean
   readonly journalSchemaVersion: number
   readonly docsMonthlySpentUsdMicros: number
   readonly configSummary: RuntimeConfigSummary
@@ -172,10 +178,12 @@ const makeGatewayHealthSummary = (input: {
 }
 
 interface BotRuntime {
+  readonly handleHttpInteraction: (payload: unknown, onAcknowledged: Effect.Effect<void>) => Effect.Effect<void>
   readonly supervisor: Supervisor
   readonly telemetry: GatewayTelemetryRecorder
   readonly automaticDiagnostics: AutomaticDiagnostics
   readonly pulseGateway: Effect.Effect<void>
+  readonly processGatewayMessage: (source: DiscordMessageRef) => Effect.Effect<boolean>
   readonly journal: ThreadActionJournalService
   readonly docsStore: DocsStateStore
   /** The validated runtime config driving policy boundaries and routing. */
@@ -471,17 +479,37 @@ const buildRuntime = (
         Effect.mapError((cause) => new DocsChannelResolutionError({ message: 'Discord channel request failed' })),
       )
 
-    const eventHandlers = yield* DiscordEventHandlers.pipe(
-      Effect.provide(
-        makeDiscordEventHandlersLayer(config, {
-          thread: threadWorkflow,
-          docsReady: true,
-          resolveDocsChannelParent,
-          automaticDiagnostic: recordAutomatic,
-          correlateSourceId,
-        }).pipe(Layer.provide(Layer.merge(Layer.succeed(DiscordActions, actions), Layer.succeed(DocsWorkflow, docs)))),
-      ),
-    )
+    const makeEventHandlers = (interactionActions: DiscordActionsService) =>
+      DiscordEventHandlers.pipe(
+        Effect.provide(
+          makeDiscordEventHandlersLayer(config, {
+            thread: threadWorkflow,
+            docsReady: true,
+            resolveDocsChannelParent,
+            automaticDiagnostic: recordAutomatic,
+            correlateSourceId,
+          }).pipe(
+            Layer.provide(
+              Layer.merge(Layer.succeed(DiscordActions, interactionActions), Layer.succeed(DocsWorkflow, docs)),
+            ),
+          ),
+        ),
+      )
+
+    const eventHandlers = yield* makeEventHandlers(actions)
+
+    const handleHttpInteraction = (payload: unknown, onAcknowledged: Effect.Effect<void>) =>
+      Effect.gen(function* () {
+        const interaction = payload as Discord.GatewayInteractionCreateDispatchData
+        if (interaction.application_id !== config.applicationId || interaction.guild_id !== config.guildId) return
+        const httpHandlers = yield* makeEventHandlers({
+          ...actions,
+          deferInteraction: (route, visibility) =>
+            observeDiscordCallback(actions.deferInteraction(route, visibility), onAcknowledged),
+          respondInteraction: (message) => observeDiscordCallback(actions.respondInteraction(message), onAcknowledged),
+        })
+        yield* routeInteraction(interaction, httpHandlers, docsEnabled)
+      }).pipe(Effect.catchCause(() => Effect.logWarning('Discord HTTP interaction failed')))
 
     // Gateway payloads → typed routes → handlers. Unknown dispatch types are
     // ignored; MESSAGE_CREATE/INTERACTION_CREATE mirror the Node routes. The
@@ -494,7 +522,7 @@ const buildRuntime = (
         // DFX models gateway event names as a separate enum from dispatch payload types.
         // oxlint-disable-next-line typescript-eslint/no-unsafe-enum-comparison
         payload.t === 'MESSAGE_CREATE'
-          ? diagnostics.frameReceived.pipe(Effect.andThen(routeMessage(payload.d, eventHandlers)))
+          ? diagnostics.frameReceived.pipe(Effect.andThen(routeMessage(payload.d, eventHandlers)), Effect.asVoid)
           : // oxlint-disable-next-line typescript-eslint/no-unsafe-enum-comparison
             payload.t === 'INTERACTION_CREATE'
             ? routeInteraction(payload.d, eventHandlers, docsEnabled)
@@ -516,6 +544,29 @@ const buildRuntime = (
         ),
       )
     }
+
+    const processGatewayMessage = (source: DiscordMessageRef) =>
+      source.guildId !== config.guildId || config.actionChannelIds.includes(source.channelId) === false
+        ? Effect.succeed(true)
+        : rest.getMessage(source.channelId, source.messageId).pipe(
+            Effect.flatMap((message) => {
+              if (message.id !== source.messageId || message.channel_id !== source.channelId) {
+                return Effect.succeed(false)
+              }
+              if (message.type !== MessageType.DEFAULT) return Effect.succeed(true)
+              return routeMessage({ ...message, guild_id: config.guildId }, eventHandlers).pipe(
+                Effect.map((outcome) => outcome !== undefined && outcome._tag !== 'TransientFailure'),
+              )
+            }),
+            Effect.catch((error) => {
+              const { status, discordCode } = redactDiscordRestError(error)
+              if (status === 403 && (discordCode === 50001 || discordCode === 50013)) {
+                return Effect.logWarning('Discord Gateway source is no longer accessible').pipe(Effect.as(true))
+              }
+              return Effect.succeed(status === 404 && (discordCode === 10003 || discordCode === 10008))
+            }),
+            Effect.catchCause(() => Effect.succeed(false)),
+          )
 
     const operatorThreadCreate = makeOperatorThreadCreate({
       config,
@@ -651,6 +702,7 @@ const buildRuntime = (
     })
 
     return {
+      handleHttpInteraction,
       supervisor: yield* makeSupervisorLoop(
         {
           acquire: makeShardAcquire({
@@ -694,6 +746,7 @@ const buildRuntime = (
       ),
       automaticDiagnostics: diagnostics,
       pulseGateway,
+      processGatewayMessage,
       telemetry,
       journal,
       docsStore,
@@ -737,6 +790,10 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       // constructor's context so the gateway and its timers outlive that call.
       const instanceFibers = yield* makeInstanceFiberRunner
       const releaseId = readReleaseId(env)
+      const workerMode = readOptionalBinding(env, 'GATEWAY_TRANSPORT') === 'worker'
+      const workerGatewayVersion = readWorkerVersionId(env) ?? releaseId
+      const workerGateway = makeWorkerGatewayState(doState.raw.storage, workerGatewayVersion)
+      const drainLock = yield* Semaphore.make(1)
       const stage = readOptionalBinding(env, 'DEPLOY_STAGE') === 'production' ? 'production' : 'staging'
       const applicationId = readOptionalBinding(env, 'DISCORD_APPLICATION_ID')
       const configStore = makeRuntimeConfigStore(
@@ -791,6 +848,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             yield* gate.end
             ownerDeadline.reset()
             startupMaintenanceDone = false
+            if (workerMode === true) workerGateway.revoke()
           }),
         ),
       )
@@ -800,16 +858,58 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       const ensureRuntime: Effect.Effect<BotRuntime> = gatewayLease.whileActive(
         () =>
           Effect.suspend(() =>
-            awaitingAlarmBuild === true
+            workerMode === false && awaitingAlarmBuild === true
               ? ensureAlarm.pipe(Effect.andThen(Effect.die(new Error('Gateway runtime awaiting alarm activation'))))
-              : runtimeInstall.get,
+              : runtimeInstall.get.pipe(
+                  Effect.tap(() =>
+                    Effect.sync(() => {
+                      if (workerMode === true) awaitingAlarmBuild = false
+                    }),
+                  ),
+                ),
           ),
         Effect.die(new Error('Staging gateway is parked')),
       )
       const withRuntime = <A>(f: (rt: BotRuntime) => Effect.Effect<A>): Effect.Effect<A> =>
         Effect.flatMap(ensureRuntime, f)
+      const drainGatewayOutbox = Effect.gen(function* () {
+        workerGateway.initOutbox()
+        if (workerMode === true && workerGateway.needsMaintenance() === true) {
+          yield* withRuntime((rt) => rt.runJournalMaintenance('stale-only'))
+          workerGateway.maintained()
+        }
+        for (let count = 0; count < 20; count += 1) {
+          const entry = workerGateway.next()
+          if (entry === undefined) return
+          const source = yield* Schema.decodeEffect(DiscordMessageRef)({
+            guildId: entry.guildId,
+            channelId: entry.channelId,
+            messageId: entry.messageId,
+          }).pipe(Effect.orDie)
+          const handled = yield* withRuntime((rt) => rt.processGatewayMessage(source)).pipe(
+            Effect.timeoutOption('12 seconds'),
+            Effect.map(Option.getOrElse(() => false)),
+          )
+          workerGateway.finish(entry, handled)
+        }
+      })
+      const runDrainGatewayOutbox = Semaphore.withPermitsIfAvailable(
+        drainLock,
+        1,
+      )(gatewayLease.withActiveOperation(drainGatewayOutbox, Effect.void)).pipe(Effect.asVoid)
       const configAdmin = makeRuntimeConfigAdminOperations({
         store: configStore,
+        validateChange: (previous, next) => {
+          if (workerMode === false) return undefined
+          const nextChannels = new Set(next.actionChannelIds)
+          const previousChannels = new Set(previous.actionChannelIds)
+          return previous.applicationId !== next.applicationId ||
+            previous.guildId !== next.guildId ||
+            previousChannels.size !== nextChannels.size ||
+            previous.actionChannelIds.some((channelId) => nextChannels.has(channelId) === false) === true
+            ? 'Gateway scope changes require embedded transport. Update the scope before switching back to the Worker.'
+            : undefined
+        },
         getRunning: () => runtimeInstall.peek()?.configDocument,
         buildCandidate: (document) =>
           buildRuntime(
@@ -840,6 +940,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                 }
                 yield* gate.end
                 ownerDeadline.reset()
+                if (workerMode === true) workerGateway.revoke()
                 console.info('[bot-state] reload gate released')
               }),
             )
@@ -1019,6 +1120,16 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
 
       const runTick = (origin: 'alarm' | 'cron') =>
         Effect.gen(function* () {
+          if (workerMode === true) {
+            // Expire a staging lease on its inherited alarm, but leave socket
+            // ownership and retry work to the scheduled Worker.
+            yield* gatewayLease.whileActive(() => Effect.void, Effect.void)
+            return undefined
+          }
+          // A prior Worker invocation can outlive its version. Its stale RPCs
+          // are denied above; allow its socket renewal deadline to expire
+          // before the embedded supervisor can open a competing session.
+          if (workerGateway.reserved() !== undefined) return undefined
           const result = yield* gatewayLease.whileActive((expiresAt) => {
             const run = tick(origin, expiresAt)
             return origin === 'alarm' ? retryAlarm(run, expiresAt) : run
@@ -1026,6 +1137,9 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
           // Keep the invocation alive during handshake while allowing an expiry
           // alarm or the owner to park and interrupt that handshake.
           if (result?.handshake !== undefined) yield* result.handshake
+          if (origin === 'cron' && awaitingAlarmBuild === false && workerGateway.hasOutbox() === true) {
+            yield* runDrainGatewayOutbox
+          }
           return result?.delay
         })
 
@@ -1033,7 +1147,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       // degrade /readyz to 503-with-cause instead of answering 500: report
       // schemaVersion 0 (readyz maps that to 503) plus the pretty cause.
       const degradedStatus = (health: GatewayHealthSummary): BotStatus => ({
-        health,
+        health: workerMode === true ? { ...health, workerGateway: workerGateway.report() } : health,
         journalSchemaVersion: 0,
         docsMonthlySpentUsdMicros: 0,
         configSummary: encodeConfigSummary(
@@ -1073,19 +1187,26 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                   (error) => Effect.succeed({ schemaVersion: 0, error: error.message }),
                 ),
               )
-        const supervisor = yield* rt.supervisor.state
-        const sessionPresent = session !== undefined && session.sessionId !== ''
+        const workerLease = workerMode === true ? workerGateway.current() : undefined
+        const supervisor =
+          workerMode === true ? (workerLease?.ready === true ? 'ready' : 'disconnected') : yield* rt.supervisor.state
+        const sessionPresent =
+          (workerMode === false || workerLease !== undefined) && session !== undefined && session.sessionId !== ''
         const diagnostics = automaticDiagnostics.snapshot()
         return {
-          health: makeGatewayHealthSummary({
-            supervisor,
-            sessionPresent,
-            telemetry: yield* rt.telemetry.aggregate,
-            lastError: journalStatus.error ?? lastError,
-            releaseId,
-            workerVersionId: readWorkerVersionId(env),
-            frames: diagnostics.gatewayFrames,
-          }),
+          health: {
+            ...makeGatewayHealthSummary({
+              supervisor,
+              sessionPresent,
+              telemetry: yield* rt.telemetry.aggregate,
+              lastError: journalStatus.error ?? lastError,
+              releaseId,
+              workerVersionId: readWorkerVersionId(env),
+              frames: diagnostics.gatewayFrames,
+            }),
+            ...(workerMode === true ? { workerGateway: workerGateway.report() } : {}),
+          },
+          ...(workerMode === true ? { workerGatewayHealthy: workerLease?.ready === true } : {}),
           journalSchemaVersion: journalStatus.schemaVersion,
           docsMonthlySpentUsdMicros: yield* rt.docsStore.monthlySpent(Date.now()),
           configSummary: rt.configSummary,
@@ -1116,6 +1237,81 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       )
 
       return {
+        httpInteraction: (payload: unknown) =>
+          Effect.gen(function* () {
+            if (readOptionalBinding(env, 'DISCORD_INTERACTIONS_PUBLIC_KEY') === undefined) return false
+            const acknowledged = yield* Deferred.make<boolean>()
+            const cancelled = yield* Deferred.make<void>()
+            const run = gatewayLease
+              .withActiveOperation(
+                Effect.flatMap(runtimeInstall.get, (rt) =>
+                  rt.handleHttpInteraction(payload, Effect.asVoid(Deferred.succeed(acknowledged, true))),
+                ),
+                Effect.void,
+              )
+              .pipe(
+                Effect.ensuring(Deferred.succeed(acknowledged, false)),
+                Effect.catchCause(() => Effect.logWarning('Discord HTTP interaction failed')),
+                Effect.provide(discordSafeLoggerLayer),
+              )
+            // The DO owns the post-acknowledgment work. A slow docs query or
+            // thread mutation must not delay the Worker's initial HTTP reply.
+            yield* doState.waitUntil(Effect.raceFirst(run, Deferred.await(cancelled)))
+            const result = yield* Deferred.await(acknowledged).pipe(Effect.timeoutOption('2500 millis'))
+            if (Option.isNone(result) === true) {
+              yield* Deferred.succeed(cancelled, undefined)
+              return false
+            }
+            return result.value
+          }),
+
+        workerGatewayClaim: (owner: string, version: string) =>
+          workerMode === false || version !== workerGatewayVersion
+            ? Effect.succeed(undefined)
+            : gatewayLease
+                .whileActive(
+                  (expiresAt) =>
+                    Effect.gen(function* () {
+                      const { config } = yield* Effect.orDie(configStore.read)
+                      workerGateway.initOutbox()
+                      const slotMs = stage === 'staging' ? 90_000 : 10 * 60_000
+                      const claim = workerGateway.claim(owner, Math.min(expiresAt ?? Infinity, Date.now() + slotMs))
+                      return claim === undefined
+                        ? undefined
+                        : {
+                            ...claim,
+                            applicationId: config.applicationId,
+                            guildId: config.guildId,
+                            channels: config.actionChannelIds,
+                          }
+                    }),
+                  Effect.succeed(undefined),
+                )
+                .pipe(Effect.provide(discordSafeLoggerLayer)),
+
+        workerGatewayIsOwner: (owner: string) =>
+          Effect.sync(() => workerMode === true && workerGateway.current()?.owner === owner),
+
+        workerGatewayRenew: (owner: string, ready: boolean, ackAt: number, event?: 'Ready' | 'Resumed') =>
+          Effect.sync(() => (workerMode === true ? workerGateway.renew(owner, ready, ackAt, event) : undefined)),
+
+        workerGatewayCheckpoint: (owner: string, session: ShardState | undefined) =>
+          Effect.sync(() => workerMode === true && workerGateway.checkpoint(owner, session)),
+
+        workerGatewayIdentify: (owner: string) =>
+          Effect.sync(() => workerMode === true && workerGateway.allowIdentify(owner)),
+
+        workerGatewayCapture: (owner: string, source: DiscordMessageRef) =>
+          Effect.sync(() => workerMode === true && workerGateway.capture(owner, source)),
+
+        workerGatewayRelease: (owner: string) =>
+          Effect.sync(() => {
+            if (workerMode === true) workerGateway.release(owner)
+          }),
+
+        workerGatewayDrain: () =>
+          workerMode === true ? runDrainGatewayOutbox.pipe(Effect.provide(discordSafeLoggerLayer)) : Effect.void,
+
         tick: () => runTick('cron').pipe(Effect.provide(discordSafeLoggerLayer)),
 
         gatewayActivate: (payload: unknown) =>
