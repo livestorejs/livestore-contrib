@@ -42,12 +42,13 @@ const DeploymentResponse = Schema.Struct({ success: Schema.Literal(true), result
 
 export type RollbackCommand =
   | { readonly action: 'list' }
+  | { readonly action: 'current' }
   | { readonly action: 'select'; readonly version: typeof VersionId.Type; readonly assertDoCompatible: boolean }
 
 export const parseRollbackArgs = (args: readonly string[], approval: string | undefined): RollbackCommand => {
-  if (args.length === 1 && args[0] === 'list') return { action: 'list' }
+  if (args.length === 1 && (args[0] === 'list' || args[0] === 'current')) return { action: args[0] }
   if (args[0] !== 'select')
-    throw new Error('usage: cf:rollback list | select --version <UUID> --yes --assert-do-compatible')
+    throw new Error('usage: cf:rollback list | current | select --version <UUID> --yes --assert-do-compatible')
   const flags = args.slice(1)
   if (flags.length !== 4 || flags[0] !== '--version' || flags[2] !== '--yes' || flags[3] !== '--assert-do-compatible') {
     throw new Error('select requires --version <UUID> --yes --assert-do-compatible (in that order)')
@@ -142,9 +143,6 @@ export const rollback = (command: RollbackCommand, config: RollbackConfig, clien
       Schema.decodeUnknownEffect(schema)(payload).pipe(
         Effect.mapError(() => new RollbackFailure(step === 'post' ? 'post' : 'decode')),
       )
-    const versions = yield* request('/versions?deployable=true', 'versions').pipe(
-      Effect.flatMap((payload) => decode(VersionsResponse, payload, 'versions')),
-    )
     const readDeployments = request('/deployments?per_page=1', 'deployments').pipe(
       Effect.flatMap((payload) => decode(DeploymentsResponse, payload, 'deployments')),
     )
@@ -154,13 +152,23 @@ export const rollback = (command: RollbackCommand, config: RollbackConfig, clien
       request(`/versions/${encodeURIComponent(id)}`, 'details').pipe(
         Effect.flatMap((payload) => decode(VersionResponse, payload, 'details')),
       )
+    const currentId =
+      current?.versions.length === 1 && current.versions[0]?.percentage === 100
+        ? current.versions[0].version_id
+        : undefined
+    if (command.action === 'current') {
+      if (currentId === undefined) return yield* Effect.fail(new RollbackFailure('guard:binary-deployment'))
+      const detail = yield* details(currentId)
+      if (detail.result.id !== currentId) return yield* Effect.fail(new RollbackFailure('decode'))
+      return { currentVersionId: currentId, releaseId: releaseIdFromBindings(detail.result.resources.bindings) }
+    }
+    const versions = yield* request('/versions?deployable=true', 'versions').pipe(
+      Effect.flatMap((payload) => decode(VersionsResponse, payload, 'versions')),
+    )
     if (command.action === 'list') {
       return {
         environment: stage,
-        currentVersionId:
-          current?.versions.length === 1 && current.versions[0]?.percentage === 100
-            ? current.versions[0].version_id
-            : undefined,
+        currentVersionId: currentId,
         versions: yield* Effect.forEach(versions.result.items, (version) =>
           Effect.map(details(version.id), (detail) => ({
             versionId: version.id,
@@ -173,10 +181,7 @@ export const rollback = (command: RollbackCommand, config: RollbackConfig, clien
         ),
       }
     }
-    if (current === undefined || current.versions.length !== 1 || current.versions[0]?.percentage !== 100) {
-      return yield* Effect.fail(new RollbackFailure('guard:binary-deployment'))
-    }
-    const currentId = current.versions[0].version_id
+    if (currentId === undefined) return yield* Effect.fail(new RollbackFailure('guard:binary-deployment'))
     if (command.assertDoCompatible !== true) return yield* Effect.fail(new RollbackFailure('guard:do-compatibility'))
     if (command.version === currentId) return yield* Effect.fail(new RollbackFailure('guard:already-deployed'))
     if (versions.result.items.some((version) => version.id === command.version) === false) {
@@ -259,7 +264,7 @@ const main = Effect.gen(function* () {
     command = parseRollbackArgs(process.argv.slice(2), process.env['AGENT_ACTION_APPROVAL'])
   } catch {
     console.error(
-      'Rollback arguments or approval invalid; usage: cf:rollback list | select --version <UUID> --yes --assert-do-compatible (AGENT_ACTION_APPROVAL=deploy)',
+      'Rollback arguments or approval invalid; usage: cf:rollback list | current | select --version <UUID> --yes --assert-do-compatible (AGENT_ACTION_APPROVAL=deploy)',
     )
     process.exitCode = 2
     return
