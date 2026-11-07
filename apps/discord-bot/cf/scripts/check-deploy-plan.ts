@@ -22,6 +22,7 @@ export const checkDeployPlan = (
   text: string,
   stage: 'staging' | 'production' = 'staging',
   allowInitialCreate = false,
+  allowWorkerGatewayRollback = false,
 ): true => {
   // oxlint-disable-next-line no-control-regex -- ANSI escape stripping is intentional for Alchemy CLI output.
   const plain = text.replace(/\x1b\[[0-9;]*m/g, '')
@@ -77,6 +78,13 @@ export const checkDeployPlan = (
       bindingIdPattern.test(id.slice('DiscordBot/'.length)) === true
     ) {
       if (
+        allowInitialCreate === false &&
+        allowWorkerGatewayRollback === true &&
+        id === 'DiscordBot/GATEWAY_TRANSPORT' &&
+        action === 'delete'
+      )
+        continue
+      if (
         (allowInitialCreate === true
           ? action !== 'create'
           : action !== 'create' && action !== 'update' && action !== 'noop') === true
@@ -104,6 +112,11 @@ if (import.meta.main) {
   ) {
     throw new Error('usage: check-deploy-plan.ts <plan-log> [--stage staging|production [--allow-initial-create]]')
   }
-  checkDeployPlan(await readFile(path, 'utf8'), stage ?? 'staging', bootstrapFlag === '--allow-initial-create')
+  checkDeployPlan(
+    await readFile(path, 'utf8'),
+    stage ?? 'staging',
+    bootstrapFlag === '--allow-initial-create',
+    process.env.CF_GATEWAY_TRANSPORT === 'embedded' && process.env.CF_ALLOW_WORKER_GATEWAY_ROLLBACK === '1',
+  )
   console.log('Discord bot plan gate passed')
 }
