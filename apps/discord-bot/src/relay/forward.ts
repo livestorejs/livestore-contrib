@@ -15,7 +15,7 @@ export const forwardRelayMessage = async (input: {
 
   const { guildId, channelId, messageId } = entry
   if ((await sendRelayJson({ ...input, payload: { guildId, channelId, messageId } })) === false) {
-    input.outbox.retry(entry.ordinal, Date.now())
+    input.outbox.retry(entry, Date.now())
     return 'retry'
   }
   input.outbox.acknowledge(entry)
