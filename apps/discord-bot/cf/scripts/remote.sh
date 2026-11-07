@@ -40,17 +40,7 @@ export CF_DEPLOY_STAGE=$stage
 if [[ "$bootstrap" == true ]]; then export CF_ALLOW_INITIAL_CREATE=1; else unset CF_ALLOW_INITIAL_CREATE; fi
 verify_worker_interactions() {
   [[ "${CF_GATEWAY_TRANSPORT:-embedded}" == worker ]] || return 0
-  local application
-  application=$(node --experimental-strip-types cf/scripts/interactions-endpoint.ts "$stage" current)
-  node --input-type=module -e '
-    import { readFileSync } from "node:fs"
-    const app = JSON.parse(readFileSync(0, "utf8"))
-    const endpoint = new URL("/discord/interactions", process.env.CF_WORKER_URL).href
-    const expectedKey = process.env.DISCORD_INTERACTIONS_PUBLIC_KEY?.toLowerCase()
-    if (app.endpoint !== endpoint || app.publicKey.toLowerCase() !== expectedKey) {
-      throw new Error("Worker Gateway mode requires the canonical signed HTTP endpoint and matching verification key")
-    }
-  ' <<< "$application"
+  node --experimental-strip-types cf/scripts/interactions-endpoint.ts "$stage" verify >/dev/null
 }
 node --experimental-strip-types cf/src/deploy-preflight.ts
 verify_worker_interactions

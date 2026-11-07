@@ -30,6 +30,20 @@ describe('interaction delivery operator', () => {
     expect(api.writes).toEqual([endpoint, null])
   })
 
+  it('requires the canonical endpoint and matching key before Worker mode', async () => {
+    const api = discord(endpoint)
+    const configured = { ...env, DISCORD_INTERACTIONS_PUBLIC_KEY: 'a'.repeat(64) }
+    await expect(reconcileInteractionsEndpoint('staging', 'verify', configured, api.fetcher)).resolves.toMatchObject({
+      endpoint,
+    })
+    await expect(reconcileInteractionsEndpoint('staging', 'verify', env, api.fetcher)).rejects.toThrow('matching')
+    const other = discord('https://different.example/discord/interactions')
+    await expect(reconcileInteractionsEndpoint('staging', 'verify', configured, other.fetcher)).rejects.toThrow(
+      'canonical signed endpoint',
+    )
+    expect([...api.writes, ...other.writes]).toEqual([])
+  })
+
   it('refuses a different application, external endpoint, or wrong stage origin before mutation', async () => {
     const wrongApp = discord(null, '100000000000000001')
     await expect(reconcileInteractionsEndpoint('staging', 'set', env, wrongApp.fetcher)).rejects.toThrow('identity')

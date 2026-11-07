@@ -4,7 +4,7 @@ import { canonicalIdentityForStage, canonicalStagingApplicationId, type RemoteSt
 
 const canonicalProductionApplicationId = '1553674978757451776'
 const applicationEndpoint = 'https://discord.com/api/v10/applications/@me'
-type Operation = 'current' | 'set' | 'clear'
+type Operation = 'current' | 'verify' | 'set' | 'clear'
 
 /** Reconcile one app's interaction delivery without touching its registered commands. */
 export const reconcileInteractionsEndpoint = async (
@@ -24,7 +24,11 @@ export const reconcileInteractionsEndpoint = async (
   ) {
     throw new Error('Expected a stage-specific Discord bot token, application ID, and canonical Worker URL')
   }
-  if (stage === 'production' && operation !== 'current' && env['AGENT_ACTION_APPROVAL'] !== 'deploy') {
+  if (
+    stage === 'production' &&
+    (operation === 'set' || operation === 'clear') &&
+    env['AGENT_ACTION_APPROVAL'] !== 'deploy'
+  ) {
     throw new Error('Production interaction delivery changes require AGENT_ACTION_APPROVAL=deploy')
   }
 
@@ -61,6 +65,15 @@ export const reconcileInteractionsEndpoint = async (
   const current = await request('GET')
   if (operation === 'current') return current
   const canonical = `${workerOrigin}/discord/interactions`
+  if (operation === 'verify') {
+    if (
+      current.endpoint !== canonical ||
+      current.publicKey.toLowerCase() !== env['DISCORD_INTERACTIONS_PUBLIC_KEY']?.toLowerCase()
+    ) {
+      throw new Error('Worker Gateway mode requires the canonical signed endpoint and matching verification key')
+    }
+    return current
+  }
   if (current.endpoint !== null && current.endpoint !== canonical) {
     throw new Error('Discord already uses a different interaction endpoint')
   }
@@ -76,9 +89,9 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
   const [stage, operation] = process.argv.slice(2)
   if (
     (stage !== 'staging' && stage !== 'production') ||
-    (operation !== 'current' && operation !== 'set' && operation !== 'clear')
+    (operation !== 'current' && operation !== 'verify' && operation !== 'set' && operation !== 'clear')
   ) {
-    throw new Error('Usage: interactions-endpoint.ts staging|production current|set|clear')
+    throw new Error('Usage: interactions-endpoint.ts staging|production current|verify|set|clear')
   }
   console.log(JSON.stringify(await reconcileInteractionsEndpoint(stage, operation)))
 }
