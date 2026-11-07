@@ -494,3 +494,33 @@ gateway check is a failed redeploy proof, not a PASS.
 - `nodejs_compat` stays OFF (declared explicitly in `worker.ts`); the bundle
   must remain node-builtin-free. The bundle check always recrawls the source and
   scans emitted `dist/` JavaScript whenever a build exists.
+
+### Gateway relay cutover
+
+The relay host owns the outbound Discord socket. BotState retains the thread
+journal, docs state, and all Discord mutations. The relay persists automatic
+message references before the Discord resume cursor advances. Command
+interactions travel in memory and use the same application handlers.
+
+The deploy workflow defaults to the stage's `CF_GATEWAY_TRANSPORT` variable,
+or `embedded` if unset. An explicit dispatch can select `relay` or
+`embedded` for a cutover. Relay mode requires a stage-specific
+`GATEWAY_RELAY_TOKEN`. The gateway only connects after the Worker and its
+Durable Object admit that token in relay mode.
+
+1. For staging, park the embedded gateway before the relay deploy. Deploy
+   via the Alchemy workflow with `transport=relay`. Confirm adoption and
+   gateway readiness, then exercise the Discord actions using the staging app.
+2. Run `livestore-discord relay` under a single supervised service with its own
+   private state directory. Set `LIVESTORE_DISCORD_RELAY_STATE`,
+   `LIVESTORE_DISCORD_RELAY_ORIGIN`, `LIVESTORE_DISCORD_RELAY_GUILD`,
+   `LIVESTORE_DISCORD_RELAY_APPLICATION`, and the comma-separated
+   `LIVESTORE_DISCORD_RELAY_CHANNELS`. Supply the `discord-bot-token` and
+   `gateway-relay-token` files in `CREDENTIALS_DIRECTORY`.
+3. To roll back, stop the relay and verify its process exited before
+   dispatching `transport=embedded`. Confirm the embedded gateway is ready
+   and converges commands. The staging workflow then parks it. Keep the relay
+   SQLite files so any unacknowledged references remain available on retry.
+4. After a production relay cutover passes its smoke tests, set the production
+   stage variable to `relay` so later dispatches retain the transport. For a
+   production rollback, restore that variable to `embedded` after verification.

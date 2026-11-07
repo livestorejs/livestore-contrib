@@ -10,8 +10,9 @@ import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse'
 import { discordSafeLoggerLayer } from '../../src/discord/rest-error-redaction.ts'
 import { AdminToken, makeAdminGatewayOptions, makeAdminRouter, runAdminRouter, toFetchHandler } from './admin.ts'
 import { BotState } from './bot-state.ts'
-import { readSecret } from './env.ts'
+import { readOptionalBinding, readSecret } from './env.ts'
 import { evaluateReadiness } from './readiness.ts'
+import { receiveRelayHeartbeat, receiveRelayInteraction, receiveRelayMessage } from './relay-ingress.ts'
 import { releaseIdConfig } from './release.ts'
 
 const configuredWorkerName = process.env['CF_WORKER_NAME']?.trim()
@@ -58,6 +59,9 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
       ...(deployStage === 'staging' ? { E2E_ACTOR_TOKEN: Config.redacted('E2E_ACTOR_TOKEN') } : {}),
       DOCS_CORRELATION_KEY: Config.redacted('DOCS_CORRELATION_KEY'),
       ADMIN_TOKEN: Config.redacted('ADMIN_TOKEN'),
+      ...(process.env['CF_GATEWAY_TRANSPORT'] === 'relay'
+        ? { GATEWAY_TRANSPORT: 'relay', GATEWAY_RELAY_TOKEN: Config.redacted('GATEWAY_RELAY_TOKEN') }
+        : {}),
       ...(deployStage === 'production'
         ? {
             DISCORD_APPLICATION_ID: Config.schema(
@@ -117,6 +121,42 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
             status: report.ready === true ? 200 : 503,
             contentType: 'application/json',
           })
+        }
+
+        if (pathname.startsWith('/gateway/') === true) {
+          const token = readOptionalBinding(env, 'GATEWAY_RELAY_TOKEN')
+          if (token !== undefined) {
+            const response = yield* Effect.matchEffect(HttpServerRequest.toWeb({ ...request, url: requestUrl }), {
+              onFailure: () => Effect.succeed(new Response(null, { status: 400 })),
+              onSuccess: (web) =>
+                Effect.promise(() => {
+                  const target = botState.getByName('gateway')
+                  if (pathname === '/gateway/messages') {
+                    return receiveRelayMessage({
+                      request: web,
+                      token,
+                      deliver: (source) => Effect.runPromise(target.relayMessage(source)),
+                    })
+                  }
+                  if (pathname === '/gateway/interactions') {
+                    return receiveRelayInteraction({
+                      request: web,
+                      token,
+                      deliver: (payload) => Effect.runPromise(target.relayInteraction(payload)),
+                    })
+                  }
+                  if (pathname === '/gateway/heartbeat') {
+                    return receiveRelayHeartbeat({
+                      request: web,
+                      token,
+                      deliver: (ready) => Effect.runPromise(target.relayHeartbeat(ready)),
+                    })
+                  }
+                  return Promise.resolve(new Response(null, { status: 404 }))
+                }),
+            })
+            return HttpServerResponse.fromWeb(response)
+          }
         }
 
         // The whole /admin plane (rpc operations, config GET/PUT, command

@@ -8,6 +8,22 @@ export const forwardRelayMessage = async (input: {
   readonly signal: AbortSignal
   readonly fetcher?: typeof fetch
 }): Promise<'empty' | 'acknowledged' | 'retry'> => {
+  const entry = input.outbox.next()
+  if (entry === undefined) return 'empty'
+
+  const { guildId, channelId, messageId } = entry
+  if ((await sendRelayJson({ ...input, payload: { guildId, channelId, messageId } })) === false) return 'retry'
+  input.outbox.acknowledge(entry)
+  return 'acknowledged'
+}
+
+export const sendRelayJson = async (input: {
+  readonly endpoint: URL
+  readonly token: string
+  readonly payload: unknown
+  readonly signal: AbortSignal
+  readonly fetcher?: typeof fetch
+}): Promise<boolean> => {
   if (
     input.endpoint.protocol !== 'https:' ||
     input.endpoint.username !== '' ||
@@ -19,27 +35,22 @@ export const forwardRelayMessage = async (input: {
     throw new Error('Relay delivery requires an HTTPS endpoint and a separate credential')
   }
 
-  const entry = input.outbox.next()
-  if (entry === undefined) return 'empty'
-
-  const { guildId, channelId, messageId } = entry
   let response: Response
   try {
     response = await (input.fetcher ?? fetch)(input.endpoint, {
       method: 'POST',
       redirect: 'error',
       headers: { authorization: `Bearer ${input.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ guildId, channelId, messageId }),
+      body: JSON.stringify(input.payload),
       signal: input.signal,
     })
   } catch {
-    return 'retry'
+    return false
   }
   if (response.status !== 204) {
     await response.body?.cancel().catch(() => undefined)
-    return 'retry'
+    return false
   }
 
-  input.outbox.acknowledge(entry)
-  return 'acknowledged'
+  return true
 }

@@ -6,6 +6,7 @@ import type { SupervisorState } from './supervisor.ts'
 export interface GatewayHealthSummary {
   readonly supervisor: SupervisorState
   readonly sessionPresent: boolean
+  readonly relayHealthy?: boolean
   /** Bounded, content-free lifetime soak totals and current-activation health. */
   readonly gateway: GatewayTelemetrySnapshot | null
   /** Journal or supervision-loop failure outside the gateway state machine. */
@@ -74,14 +75,15 @@ export const evaluateReadiness = (status: ReadinessStatus, now = Date.now()): Re
     supervisorReady: health.supervisor === 'ready',
     sessionPresent: health.sessionPresent,
     gatewayHealthy:
-      health.gateway !== null &&
-      health.gateway.current.state === 'ready' &&
-      health.gateway.current.connectedAt !== null &&
-      (health.gateway.current.lastReadyAt !== null || health.gateway.current.lastResumedAt !== null) &&
-      health.gateway.current.terminalCloseCode === null &&
-      health.gateway.current.lastError === null &&
-      health.lastError === null &&
-      heartbeatHealthy,
+      health.relayHealthy ??
+      (health.gateway !== null &&
+        health.gateway.current.state === 'ready' &&
+        health.gateway.current.connectedAt !== null &&
+        (health.gateway.current.lastReadyAt !== null || health.gateway.current.lastResumedAt !== null) &&
+        health.gateway.current.terminalCloseCode === null &&
+        health.gateway.current.lastError === null &&
+        health.lastError === null &&
+        heartbeatHealthy),
     errorFree: health.lastError === null,
   }
 

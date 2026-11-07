@@ -104,6 +104,7 @@ export const makeDiscordEventHandlersLayer = (config: RuntimeConfigPayload, work
         ).pipe(
           Effect.annotateLogs({ ...(correlation === undefined ? {} : { correlation }), outcome: outcome._tag, reason }),
         )
+        return outcome
       })
 
       const onCreateThreadInteraction = Effect.fn('runtime.handlers.createThreadInteraction')(function* (
@@ -239,7 +240,7 @@ const renderThreadOutcome = (outcome: ThreadOutcome): string => {
 }
 
 /** The Gateway callback cannot fail; report a content-free failure and keep serving. */
-const safelyHandle = (effect: Effect.Effect<void, never>) =>
+const safelyHandle = <A>(effect: Effect.Effect<A, never>) =>
   effect.pipe(
     Effect.catchCause(() => Effect.logError('Discord event handler failed')),
     Effect.orDie,

@@ -16,6 +16,7 @@ export const captureRelayMessages = (input: {
   readonly channels: ReadonlySet<string>
   readonly outbox: Pick<RelayOutbox, 'enqueue'>
   readonly onCaptureFailure: Effect.Effect<void>
+  readonly observeFrame?: (frame: Discord.GatewayReceivePayload) => Effect.Effect<void>
 }): typeof DiscordWS.Service => ({
   connect: (options) =>
     Effect.map(input.socket.connect(options), (connection) => ({
@@ -33,7 +34,10 @@ export const captureRelayMessages = (input: {
               messageId: message.id,
             }),
           )
-        }).pipe(Effect.onError(() => input.onCaptureFailure)),
+        }).pipe(
+          Effect.onError(() => input.onCaptureFailure),
+          Effect.andThen(input.observeFrame?.(frame) ?? Effect.void),
+        ),
       ),
     })),
 })

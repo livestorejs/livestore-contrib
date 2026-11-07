@@ -1,4 +1,4 @@
-import { DiscordConfig, MemoryRateLimitStoreLive } from 'dfx'
+import { Discord, DiscordConfig, MemoryRateLimitStoreLive } from 'dfx'
 import { DiscordWS, DiscordWSLive, JsonDiscordWSCodecLive } from 'dfx/DiscordGateway/DiscordWS'
 import { MesssagingLive } from 'dfx/DiscordGateway/Messaging'
 import { Shard, make as makeShard } from 'dfx/DiscordGateway/Shard'
@@ -16,14 +16,36 @@ export const openRelayGateway = (input: {
   readonly guildId: string
   readonly channels: ReadonlySet<string>
   readonly outbox: RelayOutbox
+  readonly onInteraction?: (payload: Discord.GatewayInteractionCreateDispatchData) => Effect.Effect<void>
 }) =>
   Effect.gen(function* () {
     const failed = yield* Deferred.make<void>()
+    let lastHelloAt = 0
+    let lastAckAt = 0
+    let heartbeatInterval = 0
+    const observeFrame = (frame: Discord.GatewayReceivePayload) => {
+      if (frame.op === Discord.GatewayOpcodes.Hello) {
+        return Effect.sync(() => {
+          lastHelloAt = Date.now()
+          lastAckAt = 0
+          heartbeatInterval = frame.d.heartbeat_interval
+        })
+      }
+      if (frame.op === Discord.GatewayOpcodes.HeartbeatAck) {
+        return Effect.sync(() => {
+          lastAckAt = Date.now()
+        })
+      }
+      if (frame.op === Discord.GatewayOpcodes.Dispatch && frame.t === Discord.GatewayDispatchEvents.InteractionCreate) {
+        return input.onInteraction?.(frame.d) ?? Effect.void
+      }
+      return Effect.void
+    }
     const onCaptureFailure = Effect.asVoid(Deferred.succeed(failed, undefined))
     const socket = Layer.effect(
       DiscordWS,
       Effect.gen(function* () {
-        return captureRelayMessages({ ...input, socket: yield* DiscordWS, onCaptureFailure })
+        return captureRelayMessages({ ...input, socket: yield* DiscordWS, onCaptureFailure, observeFrame })
       }),
     ).pipe(Layer.provide(DiscordWSLive), Layer.provide(JsonDiscordWSCodecLive))
     const store = Layer.succeed(
@@ -59,6 +81,8 @@ export const openRelayGateway = (input: {
     const session = yield* shard.connect([0, 1])
     return {
       lifecycle: session.lifecycle,
+      heartbeatHealthy: () =>
+        lastAckAt >= lastHelloAt && lastAckAt > 0 && Date.now() - lastAckAt <= 2 * heartbeatInterval,
       failure: Effect.raceFirst(
         session.failure.pipe(Effect.orDie),
         Deferred.await(failed).pipe(

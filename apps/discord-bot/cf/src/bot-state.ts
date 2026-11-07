@@ -33,6 +33,7 @@ import {
   describeDiscordRestFailure,
   discordSafeLoggerLayer,
   DiscordRestFailure,
+  redactDiscordRestError,
   safeDiscordFailureMessage,
 } from '../../src/discord/rest-error-redaction.ts'
 import { routeInteraction, routeMessage } from '../../src/discord/routes.ts'
@@ -176,6 +177,8 @@ interface BotRuntime {
   readonly telemetry: GatewayTelemetryRecorder
   readonly automaticDiagnostics: AutomaticDiagnostics
   readonly pulseGateway: Effect.Effect<void>
+  readonly relayMessage: (source: DiscordMessageRef) => Effect.Effect<boolean>
+  readonly relayInteraction: (payload: unknown) => Effect.Effect<boolean>
   readonly journal: ThreadActionJournalService
   readonly docsStore: DocsStateStore
   /** The validated runtime config driving policy boundaries and routing. */
@@ -494,7 +497,7 @@ const buildRuntime = (
         // DFX models gateway event names as a separate enum from dispatch payload types.
         // oxlint-disable-next-line typescript-eslint/no-unsafe-enum-comparison
         payload.t === 'MESSAGE_CREATE'
-          ? diagnostics.frameReceived.pipe(Effect.andThen(routeMessage(payload.d, eventHandlers)))
+          ? diagnostics.frameReceived.pipe(Effect.andThen(routeMessage(payload.d, eventHandlers)), Effect.asVoid)
           : // oxlint-disable-next-line typescript-eslint/no-unsafe-enum-comparison
             payload.t === 'INTERACTION_CREATE'
             ? routeInteraction(payload.d, eventHandlers, docsEnabled)
@@ -514,6 +517,34 @@ const buildRuntime = (
             Effect.logError(`[bot-state] dispatch handler ended: ${safeDiscordFailureMessage(cause)}`),
           ]).pipe(Effect.asVoid),
         ),
+      )
+    }
+
+    const relayMessage = (source: DiscordMessageRef): Effect.Effect<boolean> => {
+      if (source.guildId !== config.guildId || config.actionChannelIds.includes(source.channelId) === false) {
+        return Effect.succeed(true)
+      }
+      return rest.getMessage(source.channelId, source.messageId).pipe(
+        Effect.flatMap((message) =>
+          message.id === source.messageId && message.channel_id === source.channelId
+            ? routeMessage({ ...message, guild_id: config.guildId }, eventHandlers).pipe(
+                Effect.map((outcome) => outcome !== undefined && outcome._tag !== 'TransientFailure'),
+              )
+            : Effect.succeed(false),
+        ),
+        Effect.catch((error) => Effect.succeed(redactDiscordRestError(error).status === 404)),
+        Effect.catchCause(() => Effect.succeed(false)),
+      )
+    }
+    const relayInteraction = (payload: unknown): Effect.Effect<boolean> => {
+      if (typeof payload !== 'object' || payload === null) return Effect.succeed(false)
+      const interaction = payload as Discord.GatewayInteractionCreateDispatchData
+      if (interaction.application_id !== config.applicationId || interaction.guild_id !== config.guildId) {
+        return Effect.succeed(false)
+      }
+      return routeInteraction(interaction, eventHandlers, docsEnabled).pipe(
+        Effect.as(true),
+        Effect.catchCause(() => Effect.succeed(false)),
       )
     }
 
@@ -694,6 +725,8 @@ const buildRuntime = (
       ),
       automaticDiagnostics: diagnostics,
       pulseGateway,
+      relayMessage,
+      relayInteraction,
       telemetry,
       journal,
       docsStore,
@@ -737,6 +770,9 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       // constructor's context so the gateway and its timers outlive that call.
       const instanceFibers = yield* makeInstanceFiberRunner
       const releaseId = readReleaseId(env)
+      const relayMode = readOptionalBinding(env, 'GATEWAY_TRANSPORT') === 'relay'
+      const relayHeartbeatKey = 'livestore-discord/relay-heartbeat-at'
+      const relayMaintenanceKey = 'livestore-discord/relay-maintenance-hour'
       const stage = readOptionalBinding(env, 'DEPLOY_STAGE') === 'production' ? 'production' : 'staging'
       const applicationId = readOptionalBinding(env, 'DISCORD_APPLICATION_ID')
       const configStore = makeRuntimeConfigStore(
@@ -797,15 +833,20 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
       const gatewayLease = yield* makeGatewayLease(stage, doState.raw.storage, stopGateway)
       const ensureAlarm = scheduleGatewayAlarmIfMissing(doState.raw.storage)
       const retryAlarm = makeGatewayAlarmRetry(doState.raw.storage)
-      const ensureRuntime: Effect.Effect<BotRuntime> = gatewayLease.whileActive(
-        () =>
-          Effect.suspend(() =>
-            awaitingAlarmBuild === true
-              ? ensureAlarm.pipe(Effect.andThen(Effect.die(new Error('Gateway runtime awaiting alarm activation'))))
-              : runtimeInstall.get,
-          ),
-        Effect.die(new Error('Staging gateway is parked')),
-      )
+      const ensureRuntime: Effect.Effect<BotRuntime> =
+        relayMode === true
+          ? runtimeInstall.get
+          : gatewayLease.whileActive(
+              () =>
+                Effect.suspend(() =>
+                  awaitingAlarmBuild === true
+                    ? ensureAlarm.pipe(
+                        Effect.andThen(Effect.die(new Error('Gateway runtime awaiting alarm activation'))),
+                      )
+                    : runtimeInstall.get,
+                ),
+              Effect.die(new Error('Staging gateway is parked')),
+            )
       const withRuntime = <A>(f: (rt: BotRuntime) => Effect.Effect<A>): Effect.Effect<A> =>
         Effect.flatMap(ensureRuntime, f)
       const configAdmin = makeRuntimeConfigAdminOperations({
@@ -845,15 +886,17 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             )
             .pipe(
               Effect.andThen(
-                gatewayLease.whileActive(
-                  () =>
-                    Effect.gen(function* () {
-                      const deadline = Date.now()
-                      yield* Effect.promise(() => doState.raw.storage.setAlarm(deadline))
-                      console.info(`[bot-state] reload alarmDeadlineMs=${deadline}`)
-                    }),
-                  Effect.void,
-                ),
+                relayMode === true
+                  ? Effect.void
+                  : gatewayLease.whileActive(
+                      () =>
+                        Effect.gen(function* () {
+                          const deadline = Date.now()
+                          yield* Effect.promise(() => doState.raw.storage.setAlarm(deadline))
+                          console.info(`[bot-state] reload alarmDeadlineMs=${deadline}`)
+                        }),
+                      Effect.void,
+                    ),
               ),
               Effect.tap(() =>
                 Effect.sync(() => {
@@ -1019,6 +1062,19 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
 
       const runTick = (origin: 'alarm' | 'cron') =>
         Effect.gen(function* () {
+          if (relayMode === true) {
+            if (origin === 'alarm') {
+              yield* Effect.promise(() => doState.raw.storage.deleteAlarm())
+              return
+            }
+            const hour = Math.floor(Date.now() / 3_600_000)
+            const lastHour = yield* Effect.promise(() => doState.raw.storage.get<number>(relayMaintenanceKey))
+            if (lastHour !== hour) {
+              yield* withRuntime((rt) => rt.runJournalMaintenance('stale-only'))
+              yield* Effect.promise(() => doState.raw.storage.put(relayMaintenanceKey, hour))
+            }
+            return
+          }
           const result = yield* gatewayLease.whileActive((expiresAt) => {
             const run = tick(origin, expiresAt)
             return origin === 'alarm' ? retryAlarm(run, expiresAt) : run
@@ -1042,7 +1098,10 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
         automaticDiagnostics: automaticDiagnostics.snapshot(),
       })
       const status: Effect.Effect<BotStatus> = Effect.gen(function* () {
-        const parked = yield* gatewayLease.whileActive(() => Effect.succeed(false), Effect.succeed(true))
+        const parked =
+          relayMode === true
+            ? false
+            : yield* gatewayLease.whileActive(() => Effect.succeed(false), Effect.succeed(true))
         if (parked === true) {
           return degradedStatus(
             makeGatewayHealthSummary({
@@ -1073,6 +1132,27 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
                   (error) => Effect.succeed({ schemaVersion: 0, error: error.message }),
                 ),
               )
+        if (relayMode === true) {
+          const seen = yield* Effect.promise(() => doState.raw.storage.get<number>(relayHeartbeatKey))
+          const relayHealthy = seen !== undefined && Date.now() - seen <= 90_000
+          return {
+            health: {
+              ...makeGatewayHealthSummary({
+                supervisor: relayHealthy === true ? 'ready' : 'disconnected',
+                sessionPresent: relayHealthy,
+                telemetry: null,
+                lastError: journalStatus.error,
+                releaseId,
+                workerVersionId: readWorkerVersionId(env),
+              }),
+              relayHealthy,
+            },
+            journalSchemaVersion: journalStatus.schemaVersion,
+            docsMonthlySpentUsdMicros: yield* rt.docsStore.monthlySpent(Date.now()),
+            configSummary: rt.configSummary,
+            automaticDiagnostics: automaticDiagnostics.snapshot(),
+          }
+        }
         const supervisor = yield* rt.supervisor.state
         const sessionPresent = session !== undefined && session.sessionId !== ''
         const diagnostics = automaticDiagnostics.snapshot()
@@ -1123,6 +1203,25 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
 
         gatewayPark: (payload: unknown) => gatewayLease.park(payload).pipe(Effect.provide(discordSafeLoggerLayer)),
 
+        relayMessage: (source: DiscordMessageRef) =>
+          (relayMode === true ? withRuntime((rt) => rt.relayMessage(source)) : Effect.succeed(false)).pipe(
+            Effect.provide(discordSafeLoggerLayer),
+          ),
+
+        relayInteraction: (payload: unknown) =>
+          (relayMode === true ? withRuntime((rt) => rt.relayInteraction(payload)) : Effect.succeed(false)).pipe(
+            Effect.provide(discordSafeLoggerLayer),
+          ),
+
+        relayHeartbeat: (ready: boolean) =>
+          relayMode === false
+            ? Effect.succeed(false)
+            : Effect.promise(async () => {
+                if (ready === true) await doState.raw.storage.put(relayHeartbeatKey, Date.now())
+                else await doState.raw.storage.delete(relayHeartbeatKey)
+                return true
+              }),
+
         status: () => status.pipe(Effect.provide(discordSafeLoggerLayer)),
 
         threadCreate: (payload: unknown) =>
@@ -1148,7 +1247,7 @@ export class BotState extends Cloudflare.DurableObject<BotState>()(
             controlMutationLock,
             1,
           )(
-            stage === 'production'
+            stage === 'production' || relayMode === true
               ? Effect.flatMap(ensureRuntime, () => runtimeInstall.withCurrent((rt) => rt.commandsSync(payload)))
               : Effect.flatMap(ensureRuntime, (rt) =>
                   gatewayLease.withActiveOperation(
