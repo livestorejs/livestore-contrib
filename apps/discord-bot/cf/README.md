@@ -495,3 +495,46 @@ gateway check is a failed redeploy proof, not a PASS.
 - `nodejs_compat` stays OFF (declared explicitly in `worker.ts`); the bundle
   must remain node-builtin-free. The bundle check always recrawls the source and
   scans emitted `dist/` JavaScript whenever a build exists.
+
+### Scheduled Gateway and signed Discord interactions
+
+The scheduled Worker owns the outbound Gateway socket for bounded invocations.
+BotState retains the stage lease, Discord resume state, and thread journal.
+Discord commands enter the same Worker over signed HTTP. Configure the
+stage's public `DISCORD_INTERACTIONS_PUBLIC_KEY` from the app's `verify_key`.
+The bot token stays in the existing staging or production secret.
+
+Use the same application identity for the HTTP endpoint and Gateway. Discord
+delivers interactions over one transport per application. Change the app URL
+separately from the Cloudflare Gateway mode so both paths can be verified.
+
+1. Deploy with `transport=embedded` and the public key. Check the exact Worker
+   version, Gateway readiness, and command convergence. Reject a request
+   without a valid Discord signature.
+2. From `apps/discord-bot`, run the endpoint operator with the stage bot token
+   supplied through the credential broker. Set `CF_WORKER_URL` to the
+   canonical stage URL. For production, also supply the production
+   `DISCORD_APPLICATION_ID` and `AGENT_ACTION_APPROVAL=deploy`.
+   Run `node --experimental-strip-types cf/scripts/interactions-endpoint.ts staging current`
+   to record the current URL, then repeat with `set` to point Discord at
+   `/discord/interactions`. Discord validates the signed PING before saving.
+   Confirm live command responses while the embedded Gateway still runs.
+3. Dispatch Alchemy with `transport=worker`. Plan and apply require Discord
+   to report the canonical HTTP endpoint and matching verification key. Wait
+   for the previous Gateway owner to release and the new release to report ready. Staging deploys
+   park after convergence. Acquire a bounded staging lease for live tests.
+   Post an eligible message in the dedicated channel during a confirmed
+   handoff and verify replay creates exactly one thread. Invoke both commands
+   during that gap and verify permissions and response timing. Clean the
+   fixtures and park staging.
+4. For rollback, dispatch `transport=embedded` while preserving the signed
+   HTTP key and endpoint. Embedded startup must wait for the prior scheduled
+   owner's lease to expire. After the embedded Gateway is healthy, run the
+   endpoint operator with `clear` to restore Discord Gateway delivery.
+   Verify command responses again. The explicit Alchemy rollback can remove
+   the transport binding while retaining the Worker and BotState identities.
+   Set the stage's `CF_GATEWAY_TRANSPORT` variable to the verified mode before
+   allowing later default deployments.
+5. Measure completed windows for Durable Object duration and Worker
+   invocations, CPU, and errors. Compare the full workload against the
+   embedded baseline. Confirm charged dollars separately in Billable Usage.

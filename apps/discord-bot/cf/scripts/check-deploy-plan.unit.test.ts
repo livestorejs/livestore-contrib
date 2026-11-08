@@ -1,3 +1,9 @@
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath, URL } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { checkDeployPlan } from './check-deploy-plan.ts'
@@ -72,4 +78,39 @@ it('admits precisely the first production Worker with its declared bindings only
 
 it('accepts a cron trigger binding row on a Worker update', () => {
   expect(checkDeployPlan(allowed + '[DiscordBot/Cron(* * * * *)] noop\n')).toBe(true)
+})
+
+it('allows removing only the Gateway transport binding during explicit rollback', () => {
+  const rollback = allowed + '[DiscordBot/GATEWAY_TRANSPORT] delete\n'
+  expect(checkDeployPlan(rollback, 'staging', false, true)).toBe(true)
+  expect(() => checkDeployPlan(rollback)).toThrow()
+  expect(() => checkDeployPlan(rollback + '[DiscordBot/BotState] delete\n', 'staging', false, true)).toThrow()
+})
+
+it('requires the explicit embedded rollback override at the deploy plan CLI', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'discord-bot-plan-'))
+  try {
+    const plan = join(directory, 'plan.log')
+    writeFileSync(plan, allowed + '[DiscordBot/GATEWAY_TRANSPORT] delete\n')
+    const cli = fileURLToPath(new URL('./check-deploy-plan.ts', import.meta.url))
+    const check = (transport: string, rollback: string) =>
+      spawnSync(process.execPath, ['--experimental-strip-types', cli, plan, '--stage', 'production'], {
+        env: { ...process.env, CF_GATEWAY_TRANSPORT: transport, CF_ALLOW_WORKER_GATEWAY_ROLLBACK: rollback },
+        encoding: 'utf8',
+      })
+
+    const approved = check('embedded', '1')
+    expect(approved.status).toBe(0)
+    expect(approved.stdout).toContain('Discord bot plan gate passed')
+    for (const [transport, rollback] of [
+      ['embedded', '0'],
+      ['worker', '1'],
+    ] as const) {
+      const rejected = check(transport, rollback)
+      expect(rejected.status).toBe(1)
+      expect(rejected.stderr).toContain('binding DiscordBot/GATEWAY_TRANSPORT cannot delete')
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
