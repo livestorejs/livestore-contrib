@@ -8,8 +8,14 @@ const channelId = '100000000000000002'
 const first = '100000000000000003'
 const second = '100000000000000004'
 
-it('captures a reference before DFX checkpoints it and closes resumably if intake fails', async () => {
+it.each([
+  { saved: false, failure: 'capture' },
+  { saved: true, failure: 'capture' },
+  { saved: true, failure: 'checkpoint' },
+])('fences DFX dispatch checkpoints (saved cursor: $saved, failed $failure)', async ({ saved, failure }) => {
   const observed: string[] = []
+  const handshakes: number[] = []
+  const savedSession = { sessionId: 'test', sequence: 1, resumeUrl: 'wss://gateway.discord.test' }
   let closeCode: number | undefined
   class GatewayFixture extends EventTarget {
     readonly CONNECTING = 0
@@ -31,7 +37,9 @@ it('captures a reference before DFX checkpoints it and closes resumably if intak
       super()
       queueMicrotask(() => {
         this.emit({ op: 10, d: { heartbeat_interval: 60_000 } })
-        this.emit({ op: 0, t: 'READY', s: 1, d: { session_id: 'test', resume_gateway_url: this.url } })
+        if (saved === false) {
+          this.emit({ op: 0, t: 'READY', s: 1, d: { session_id: 'test', resume_gateway_url: this.url } })
+        }
         this.emit({
           op: 0,
           t: 'MESSAGE_CREATE',
@@ -50,16 +58,20 @@ it('captures a reference before DFX checkpoints it and closes resumably if intak
           s: 3,
           d: { type: 0, guild_id: guildId, channel_id: channelId, id: first },
         })
+        if (saved === true) this.emit({ op: 0, t: 'RESUMED', s: 4, d: {} })
         this.emit({
           op: 0,
           t: 'MESSAGE_CREATE',
-          s: 4,
+          s: saved === true ? 5 : 4,
           d: { type: 0, guild_id: guildId, channel_id: channelId, id: second },
         })
       })
     }
 
-    send() {}
+    send(data: string) {
+      const { op } = JSON.parse(data) as { op: number }
+      if (op === 2 || op === 6) handshakes.push(op)
+    }
     close(code?: number) {
       closeCode = code
     }
@@ -78,7 +90,7 @@ it('captures a reference before DFX checkpoints it and closes resumably if intak
         applicationId: 'application',
         guildId,
         channels: [channelId],
-        session: undefined,
+        session: saved === true ? savedSession : undefined,
         until: Date.now() + 5_000,
         expiresAt: Date.now() + 5_000,
         owner: {
@@ -88,7 +100,7 @@ it('captures a reference before DFX checkpoints it and closes resumably if intak
           checkpoint: (session) =>
             Effect.sync(() => {
               observed.push(`checkpoint:${session?.sequence}`)
-              return true
+              return failure !== 'checkpoint' || session?.sequence !== 3
             }),
           capture: ({ messageId }) =>
             Effect.sync(() => {
@@ -99,7 +111,19 @@ it('captures a reference before DFX checkpoints it and closes resumably if intak
         },
       }),
     )
-    expect(observed).toEqual(['checkpoint:1', 'checkpoint:2', `capture:${first}`, 'checkpoint:3', `capture:${second}`])
+    expect(handshakes).toEqual([saved === true ? 6 : 2])
+    expect(observed).toEqual([
+      ...(saved === true ? [] : ['checkpoint:1']),
+      'checkpoint:2',
+      `capture:${first}`,
+      'checkpoint:3',
+      ...(failure === 'checkpoint'
+        ? []
+        : saved === true
+          ? ['checkpoint:4', `capture:${second}`]
+          : [`capture:${second}`]),
+    ])
+    expect(savedSession.sequence).toBe(1)
     expect(closeCode).toBe(4000)
   } finally {
     vi.unstubAllGlobals()

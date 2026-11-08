@@ -107,7 +107,9 @@ const makeWorkerGateway = (input: WorkerGatewayInput) => {
       ShardStateStore,
       ShardStateStore.of({
         forShard: () => ({
-          get: Effect.sync(() => Option.fromUndefinedOr(state)),
+          // DFX mutates the state it reads before calling set. Keep the
+          // comparison baseline separate until the checkpoint succeeds.
+          get: Effect.sync(() => (state === undefined ? Option.none() : Option.some({ ...state }))),
           set: (next) =>
             Effect.suspend(() => {
               if (
