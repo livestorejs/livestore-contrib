@@ -48,10 +48,11 @@ export class DiscordBot extends Cloudflare.Worker<DiscordBot>()(
     // construction and bundle-check.unit.test.ts enforces it (source recrawl
     // plus post-build dist scan when dist/ exists).
     // Local workerd binaries lag the edge; ALCHEMY_LOCAL=1 clamps the date
-    // so credential-free local runs work. Flags stay empty either way.
+    // so credential-free local runs work. The edge must keep pending DO work
+    // alive after the signed interaction request returns its acknowledgment.
     ...(process.env['ALCHEMY_LOCAL'] === '1'
       ? { compatibility: { date: '2026-07-11', flags: [] } }
-      : { compatibility: { date: '2026-08-01', flags: [] } }),
+      : { compatibility: { date: '2026-08-01', flags: ['durable_object_io_tasks_prevent_eviction'] } }),
     env: {
       // Redacted configs become secret_text bindings. RELEASE_ID is a
       // non-secret plain-text binding and is mandatory outside local workerd.
