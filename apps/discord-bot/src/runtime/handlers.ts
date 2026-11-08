@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema } from 'effect'
+import { Cause, Effect, Layer, Option, Schema } from 'effect'
 
 import {
   DiscordActions,
@@ -6,6 +6,7 @@ import {
   type AutomaticMessage,
   type CreateThreadInteraction,
   type DocsInteraction,
+  type DiscordActionError,
 } from '../discord/index.ts'
 // Selective imports: the docs barrel re-exports node-bound modules
 // (admission/workflow crypto, file state store), which would drag `node:*`
@@ -59,6 +60,7 @@ export interface RuntimeWorkflows {
   }) => Effect.Effect<void>
   readonly correlateSourceId?: (sourceMessageId: string) => Effect.Effect<string>
   readonly docsReady?: boolean
+  readonly docsHttpContinuation?: boolean
 }
 
 export class DocsChannelResolutionError extends Schema.TaggedError<DocsChannelResolutionError>()(
@@ -155,21 +157,32 @@ export const makeDiscordEventHandlersLayer = (config: RuntimeConfigPayload, work
           return
         }
         yield* actions.deferInteraction(input.route, 'public')
-        const result = yield* docs.query({
-          surface: 'discord',
-          principalId: input.actor.userId,
-          query: input.query,
-        })
-        const rendered = renderDocsMessages(result)
-        if (rendered._tag === 'RenderingFailed') {
-          yield* actions.editInteractionResponse({
-            route: input.route,
-            visibility: 'public',
-            content: 'The documentation answer could not be rendered safely for Discord.',
+        const deliver = (responseActions: typeof DiscordActions.Service) =>
+          Effect.gen(function* () {
+            const result = yield* docs.query({
+              surface: 'discord',
+              principalId: input.actor.userId,
+              query: input.query,
+            })
+            if (workflows.docsHttpContinuation === true) {
+              yield* Effect.logInfo('Discord HTTP docs query completed').pipe(
+                Effect.annotateLogs({ outcome: result._tag }),
+              )
+            }
+            const rendered = renderDocsMessages(result)
+            if (rendered._tag === 'RenderingFailed') {
+              yield* responseActions.editInteractionResponse({
+                route: input.route,
+                visibility: 'public',
+                content: 'The documentation answer could not be rendered safely for Discord.',
+              })
+              return
+            }
+            yield* deliverDocsMessages(responseActions, input.route, rendered.messages)
           })
-          return
-        }
-        yield* deliverDocsMessages(actions, input.route, rendered.messages)
+        yield* workflows.docsHttpContinuation === true
+          ? completeHttpDocsResponse(actions, input.route, deliver)
+          : deliver(actions)
       })
 
       return DiscordEventHandlers.of({
@@ -245,6 +258,57 @@ const safelyHandle = <A>(effect: Effect.Effect<A, never>) =>
     Effect.catchCause(() => Effect.logError('Discord event handler failed')),
     Effect.orDie,
   )
+
+/** The HTTP callback has succeeded. Bound the in-memory work and clear Discord's pending reply on failure. */
+export const completeHttpDocsResponse = (
+  actions: typeof DiscordActions.Service,
+  route: DocsInteraction['route'],
+  deliver: (actions: typeof DiscordActions.Service) => Effect.Effect<void, DiscordActionError>,
+) =>
+  Effect.gen(function* () {
+    let originalEditStarted = false
+    let originalEdited = false
+    const trackOriginalEdit: typeof DiscordActions.Service = {
+      ...actions,
+      editInteractionResponse: (message) =>
+        Effect.suspend(() => {
+          originalEditStarted = true
+          return actions.editInteractionResponse(message).pipe(
+            Effect.tap(() => {
+              originalEdited = true
+              return Effect.logInfo('Discord HTTP docs original response edited')
+            }),
+          )
+        }),
+    }
+    yield* Effect.logInfo('Discord HTTP docs acknowledged')
+    yield* deliver(trackOriginalEdit).pipe(
+      Effect.timeout('65 seconds'),
+      Effect.tap(() => Effect.logInfo('Discord HTTP docs response completed')),
+      Effect.catchCause((cause) =>
+        Effect.gen(function* () {
+          if (Cause.hasInterruptsOnly(cause) === true) return yield* Effect.failCause(cause)
+          const timedOut = Option.exists(Cause.findErrorOption(cause), Cause.isTimeoutError)
+          yield* Effect.logWarning('Discord HTTP docs continuation failed').pipe(
+            Effect.annotateLogs({ originalEditStarted, originalEdited, timedOut }),
+          )
+          // Discord may have applied an edit whose response was lost.
+          if (originalEditStarted === true) return
+          yield* actions
+            .editInteractionResponse({
+              route,
+              visibility: 'public',
+              content: 'The documentation assistant could not complete this request. Please try again.',
+            })
+            .pipe(
+              Effect.timeout('5 seconds'),
+              Effect.tap(() => Effect.logInfo('Discord HTTP docs fallback response sent')),
+              Effect.catchCause(() => Effect.logWarning('Discord HTTP docs fallback response failed')),
+            )
+        }),
+      ),
+    )
+  })
 
 /** Delivers one public initial response followed by ordered public messages. */
 export const deliverDocsMessages = (

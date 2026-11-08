@@ -479,12 +479,13 @@ const buildRuntime = (
         Effect.mapError((cause) => new DocsChannelResolutionError({ message: 'Discord channel request failed' })),
       )
 
-    const makeEventHandlers = (interactionActions: DiscordActionsService) =>
+    const makeEventHandlers = (interactionActions: DiscordActionsService, docsHttpContinuation = false) =>
       DiscordEventHandlers.pipe(
         Effect.provide(
           makeDiscordEventHandlersLayer(config, {
             thread: threadWorkflow,
             docsReady: true,
+            docsHttpContinuation,
             resolveDocsChannelParent,
             automaticDiagnostic: recordAutomatic,
             correlateSourceId,
@@ -502,12 +503,16 @@ const buildRuntime = (
       Effect.gen(function* () {
         const interaction = payload as Discord.GatewayInteractionCreateDispatchData
         if (interaction.application_id !== config.applicationId || interaction.guild_id !== config.guildId) return
-        const httpHandlers = yield* makeEventHandlers({
-          ...actions,
-          deferInteraction: (route, visibility) =>
-            observeDiscordCallback(actions.deferInteraction(route, visibility), onAcknowledged),
-          respondInteraction: (message) => observeDiscordCallback(actions.respondInteraction(message), onAcknowledged),
-        })
+        const httpHandlers = yield* makeEventHandlers(
+          {
+            ...actions,
+            deferInteraction: (route, visibility) =>
+              observeDiscordCallback(actions.deferInteraction(route, visibility), onAcknowledged),
+            respondInteraction: (message) =>
+              observeDiscordCallback(actions.respondInteraction(message), onAcknowledged),
+          },
+          true,
+        )
         yield* routeInteraction(interaction, httpHandlers, docsEnabled)
       }).pipe(Effect.catchCause(() => Effect.logWarning('Discord HTTP interaction failed')))
 

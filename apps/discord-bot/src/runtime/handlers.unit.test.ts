@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, Redacted, Schema } from 'effect'
+import { Effect, Fiber, Redacted, Schema } from 'effect'
+import { TestClock } from 'effect/testing'
 
 import {
   DiscordActionError,
@@ -7,7 +8,7 @@ import {
   InteractionRoute,
   type InteractionMessage,
 } from '../discord/actions.ts'
-import { deliverDocsMessages } from './handlers.ts'
+import { completeHttpDocsResponse, deliverDocsMessages } from './handlers.ts'
 
 describe('Discord docs delivery', () => {
   it.effect('edits the deferred public response then sends ordered public follow-ups', () =>
@@ -41,6 +42,63 @@ describe('Discord docs delivery', () => {
       }
       yield* Effect.flip(deliverDocsMessages(actions, route, ['first', 'second', 'third', 'never-sent']))
       expect(delivered.map(({ message }) => message.content)).toEqual(['first', 'second'])
+    }),
+  )
+})
+
+describe('Discord HTTP docs continuation', () => {
+  it.effect('edits the original response when post-acknowledgment work times out', () =>
+    Effect.gen(function* () {
+      const delivered: Array<{ readonly kind: string; readonly message: InteractionMessage }> = []
+      const run = yield* completeHttpDocsResponse(recordingActions(delivered), route, () => Effect.never).pipe(
+        Effect.forkChild,
+      )
+      yield* TestClock.adjust('64 seconds')
+      expect(delivered).toEqual([])
+      yield* TestClock.adjust('1 second')
+      yield* Fiber.join(run)
+      expect(delivered).toEqual([
+        {
+          kind: 'edit',
+          message: {
+            route,
+            visibility: 'public',
+            content: 'The documentation assistant could not complete this request. Please try again.',
+          },
+        },
+      ])
+    }),
+  )
+
+  it.effect('does not overwrite an original edit whose response never arrived', () =>
+    Effect.gen(function* () {
+      const delivered: Array<{ readonly kind: string; readonly message: InteractionMessage }> = []
+      const recording = recordingActions(delivered)
+      const actions: DiscordActionsService = {
+        ...recording,
+        editInteractionResponse: (message) =>
+          recording.editInteractionResponse(message).pipe(Effect.andThen(Effect.never)),
+      }
+      const run = yield* completeHttpDocsResponse(actions, route, (tracked) =>
+        deliverDocsMessages(tracked, route, ['first']),
+      ).pipe(Effect.forkChild)
+      yield* TestClock.adjust('65 seconds')
+      yield* Fiber.join(run)
+      expect(delivered.map(({ message }) => message.content)).toEqual(['first'])
+    }),
+  )
+
+  it.effect('keeps a delivered original answer if a follow-up fails', () =>
+    Effect.gen(function* () {
+      const delivered: Array<{ readonly kind: string; readonly message: InteractionMessage }> = []
+      const actions = {
+        ...recordingActions(delivered),
+        followUpInteractionResponse: () => Effect.fail(deliveryFailure),
+      }
+      yield* completeHttpDocsResponse(actions, route, (tracked) =>
+        deliverDocsMessages(tracked, route, ['first', 'next']),
+      )
+      expect(delivered.map(({ message }) => message.content)).toEqual(['first'])
     }),
   )
 })

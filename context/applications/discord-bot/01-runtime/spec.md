@@ -157,7 +157,11 @@ The Cloudflare Worker can receive signed Discord commands through an optional
 HTTP endpoint. Discord selects either the HTTP endpoint or Gateway delivery
 for application interactions. Both transports run the same typed routes,
 permission checks, and DFX REST callbacks in the Durable Object. Automatic
-threading continues to use Gateway message events.
+threading continues to use Gateway message events. Cloudflare keeps the
+acknowledged HTTP documentation request's continuation in memory while it runs.
+The continuation has a 65-second deadline and up to 5 seconds to clear the
+pending reply with a generic message if no original edit was attempted.
+Diagnostic phases contain no query, answer, or interaction token.
 
 ## Dependency Admission
 
