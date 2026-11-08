@@ -70,6 +70,24 @@ describe('Discord HTTP docs continuation', () => {
     }),
   )
 
+  it.effect('does not overwrite an original edit whose response never arrived', () =>
+    Effect.gen(function* () {
+      const delivered: Array<{ readonly kind: string; readonly message: InteractionMessage }> = []
+      const recording = recordingActions(delivered)
+      const actions: DiscordActionsService = {
+        ...recording,
+        editInteractionResponse: (message) =>
+          recording.editInteractionResponse(message).pipe(Effect.andThen(Effect.never)),
+      }
+      const run = yield* completeHttpDocsResponse(actions, route, (tracked) =>
+        deliverDocsMessages(tracked, route, ['first']),
+      ).pipe(Effect.forkChild)
+      yield* TestClock.adjust('65 seconds')
+      yield* Fiber.join(run)
+      expect(delivered.map(({ message }) => message.content)).toEqual(['first'])
+    }),
+  )
+
   it.effect('keeps a delivered original answer if a follow-up fails', () =>
     Effect.gen(function* () {
       const delivered: Array<{ readonly kind: string; readonly message: InteractionMessage }> = []

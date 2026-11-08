@@ -266,16 +266,20 @@ export const completeHttpDocsResponse = (
   deliver: (actions: typeof DiscordActions.Service) => Effect.Effect<void, DiscordActionError>,
 ) =>
   Effect.gen(function* () {
+    let originalEditStarted = false
     let originalEdited = false
     const trackOriginalEdit: typeof DiscordActions.Service = {
       ...actions,
       editInteractionResponse: (message) =>
-        actions.editInteractionResponse(message).pipe(
-          Effect.tap(() => {
-            originalEdited = true
-            return Effect.logInfo('Discord HTTP docs original response edited')
-          }),
-        ),
+        Effect.suspend(() => {
+          originalEditStarted = true
+          return actions.editInteractionResponse(message).pipe(
+            Effect.tap(() => {
+              originalEdited = true
+              return Effect.logInfo('Discord HTTP docs original response edited')
+            }),
+          )
+        }),
     }
     yield* Effect.logInfo('Discord HTTP docs acknowledged')
     yield* deliver(trackOriginalEdit).pipe(
@@ -286,9 +290,10 @@ export const completeHttpDocsResponse = (
           if (Cause.hasInterruptsOnly(cause) === true) return yield* Effect.failCause(cause)
           const timedOut = Option.exists(Cause.findErrorOption(cause), Cause.isTimeoutError)
           yield* Effect.logWarning('Discord HTTP docs continuation failed').pipe(
-            Effect.annotateLogs({ originalEdited, timedOut }),
+            Effect.annotateLogs({ originalEditStarted, originalEdited, timedOut }),
           )
-          if (originalEdited === true) return
+          // Discord may have applied an edit whose response was lost.
+          if (originalEditStarted === true) return
           yield* actions
             .editInteractionResponse({
               route,
