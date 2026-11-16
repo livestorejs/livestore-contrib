@@ -1,0 +1,59 @@
+import { checkoutStep, defaultActionlintConfig, githubWorkflow } from '../../genie/repo.ts'
+
+export default githubWorkflow({
+  name: 'Cloudflare spend guard',
+  actionlint: defaultActionlintConfig,
+  on: {
+    schedule: [{ cron: '17 */6 * * *' }],
+    workflow_dispatch: {
+      inputs: {
+        production_limit: {
+          description: 'Production GB-s limit, at most 500; lower it to verify alert delivery',
+          type: 'string',
+          default: '500',
+          required: false,
+        },
+      },
+    },
+    pull_request: {
+      paths: ['.github/scripts/cloudflare-spend-guard*', '.github/workflows/cloudflare-spend-guard.yml*'],
+    },
+  },
+  permissions: { contents: 'read' },
+  jobs: {
+    tests: {
+      'runs-on': 'ubuntu-24.04',
+      'timeout-minutes': 5,
+      steps: [
+        checkoutStep(),
+        { uses: 'actions/setup-node@v6', with: { 'node-version': '24', 'package-manager-cache': false } },
+        {
+          name: 'Verify spend regression fixtures',
+          run: 'node --test .github/scripts/cloudflare-spend-guard.test.mjs',
+        },
+      ],
+    },
+    usage: {
+      if: "${{ github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}",
+      needs: ['tests'],
+      environment: 'production',
+      'runs-on': 'ubuntu-24.04',
+      'timeout-minutes': 5,
+      concurrency: { group: 'cloudflare-spend-guard', 'cancel-in-progress': false },
+      steps: [
+        checkoutStep({ ref: '${{ github.sha }}' }),
+        { uses: 'actions/setup-node@v6', with: { 'node-version': '24', 'package-manager-cache': false } },
+        {
+          name: 'Check completed-day Cloudflare duration',
+          env: {
+            CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}',
+            CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}',
+            CF_BOT_STATE_NAMESPACE_ID: '${{ vars.CF_BOT_STATE_NAMESPACE_ID }}',
+            CF_PRODUCTION_DURATION_LIMIT: "${{ inputs.production_limit || '500' }}",
+          },
+          run: 'node .github/scripts/cloudflare-spend-guard.mjs',
+        },
+      ],
+    },
+  },
+})

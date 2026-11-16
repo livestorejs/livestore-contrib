@@ -40,3 +40,24 @@ Repository settings are generated from `.github/repository-settings.json.genie.t
 and `.github/repo-settings.json.genie.ts`. Those typed sources are authoritative;
 the generated JSON artifacts are the reviewable and applied projections for
 GitHub repository toggles and the `main-branch-rules` ruleset.
+
+## `cloudflare-spend-guard.yml`
+
+Runs every six hours and on manual dispatch from `main`, using the existing
+production environment's `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and
+`CF_BOT_STATE_NAMESPACE_ID`. It performs read-only analytics requests and
+requires no dependency installation or Cloudflare deployment.
+
+The latest complete 24-hour window ends one hour before the current UTC hour.
+The check fails above 500 GB-s for production Discord or 1,000 GB-s for the
+whole account, compared with approximately 165 and 201 GB-s/day after the fix.
+Missing credentials, API errors and missing samples also fail the workflow.
+Every run records its window, measured usage and thresholds in the job summary.
+Failures use GitHub Actions notifications. An overdue run also needs attention
+because scheduled GitHub Actions can be delayed or disabled. This guard covers
+DO duration; other billing meters are covered by the account budget alert.
+
+For an attended alert check, dispatch with `production_limit=1`, confirm the
+expected failed result, then dispatch with the default 500 to verify recovery.
+A manual input can lower this limit but cannot raise it above the scheduled
+guard. The account limit remains 1,000 GB-s.
