@@ -62,7 +62,7 @@ python3 rust/scripts/gen-parity.py --core <core checkout> --refresh  # re-collec
 
 `--refresh` needs a core checkout with its own `pnpm install`: `repos/livestore` only has the packages
 contrib installs, so core's root Vitest config does not load there. The committed list is for core
-`06b50576509984475cca71bea8ea3f243c7650d1` (746 tests, 0 todo), which is newer than the megarepo pin.
+`06b50576509984475cca71bea8ea3f243c7650d1` (746 tests, 0 todo), the same commit as the megarepo pin.
 
 ## Fixtures
 

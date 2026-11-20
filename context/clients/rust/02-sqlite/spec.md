@@ -16,7 +16,9 @@ Draft.
   `rust/scripts/vendor-sqlite.sh` the way wa-sqlite does it: the GitHub tarball of
   `sqliteCommit` from core's `packages/@livestore/wa-sqlite/flake.nix`, then
   `configure --enable-all && make sqlite3.c`, plus wa-sqlite's `alt1` source-id
-  marker. The sources stay vendored for now (LSC.CLIENT.RUST-DQ1).
+  marker. The sources stay vendored; `rust:sqlite-check`
+  (`rust/scripts/check-sqlite-build.sh`) compares the build with the pinned
+  core wa-sqlite on every Rust CI run.
 - `build.rs` compiles it with wa-sqlite's `WASQLITE_DEFINES` and
   `WASQLITE_EXTRA_DEFINES`, and core's `wa-sqlite/src/extension-functions.c`
   (read from `repos/livestore`). `src/livestore.c` calls `sqlite3_initialize()`

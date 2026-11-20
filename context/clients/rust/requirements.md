@@ -37,11 +37,10 @@ deviations.
 
 ## Open Design Questions
 
-- **LSC.CLIENT.RUST-DQ1 Vendored SQLite.** The SQLite amalgamation (~10 MB) is
-  vendored in `rust/crates/livestore-sqlite-sys/sqlite/` so the build matches
-  wa-sqlite exactly. Keep it vendored, fetch it at build time from the pinned
-  wa-sqlite commit, or publish it as a separate crate?
-- **LSC.CLIENT.RUST-DQ2 Parity baseline vs megarepo pin.** Parity was measured at
-  core `06b50576509984475cca71bea8ea3f243c7650d1`, newer than the megarepo pin.
-  Some tests read core snapshots and the core sync worker at test time, so they
-  fail at the older pin. Bump the pin, or vendor those inputs into `rust/`?
+None open.
+
+(LSC.CLIENT.RUST-DQ1 Vendored SQLite was resolved 2026-11-20: the sources stay
+vendored, and `rust:sqlite-check` fails CI when the build drifts from the pinned
+core wa-sqlite; see [02-sqlite](./02-sqlite/spec.md). LSC.CLIENT.RUST-DQ2 Parity
+baseline vs megarepo pin was resolved 2026-11-20: the megarepo pin moved to the
+parity baseline.)
