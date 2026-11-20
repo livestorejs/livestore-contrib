@@ -16,6 +16,7 @@ Draft.
 | [`01-schema`](./01-schema/spec.md) | schema DSL, DDL, client documents, events, materializers, query builder, schema hashes | `livestore-schema`, `livestore-core` |
 | [`02-sqlite`](./02-sqlite/spec.md) | SQLite setup and leader persistence (eventlog, state, rollback, rebuild) | `livestore-sqlite` |
 | [`03-leader`](./03-leader/spec.md) | leader sync processor, syncstate merge, backend contract | `livestore-sync`, `livestore-core` |
+| [`05-store`](./05-store/spec.md) | client session, store, reactivity, in-process adapter | `livestore` |
 
 `livestore-todomvc` (example schema) consumes the stack and owns no contract.
 

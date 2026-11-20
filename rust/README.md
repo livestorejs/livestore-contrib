@@ -15,6 +15,7 @@ Porting references: [`contributor-docs/rust/`](../contributor-docs/rust).
 | `crates/livestore-macros` | `#[derive(Event)]`: an event defined once, from its args struct |
 | `crates/livestore-sqlite` | Leader persistence: materialize + journal, rollback/rebase, boot from disk |
 | `crates/livestore-sync` | `SyncBackend` trait, `LeaderSyncProcessor` actor, `Leader` builder; `testing` feature: `MockSyncBackend`, `EventFactory` |
+| `crates/livestore` | Store: client session, commit, queries, reactivity |
 | `crates/livestore-todomvc` | TodoMVC schema on the DSL |
 
 ## Setup
