@@ -8,40 +8,49 @@ Draft.
 
 ## Build
 
-`crates/livestore-sqlite-sys` is published to the workspace as `libsqlite3-sys`
-0.35.0 (`links = "sqlite3"`) and replaces the crates.io crate through
-`[patch.crates-io]`; rusqlite runs without `bundled`.
+The client uses `rusqlite` (pinned in `rust/Cargo.toml`) with its `bundled`
+SQLite plus the `session` and `serialize` features. The repo holds no SQLite
+sources and needs no setup beyond a C compiler.
 
-- `sqlite/` holds `sqlite3.{c,h}` and `sqlite3ext.h`, produced by
-  `rust/scripts/vendor-sqlite.sh` the way wa-sqlite does it: the GitHub tarball of
-  `sqliteCommit` from core's `packages/@livestore/wa-sqlite/flake.nix`, then
-  `configure --enable-all && make sqlite3.c`, plus wa-sqlite's `alt1` source-id
-  marker. The sources stay vendored; `rust:sqlite-check`
-  (`rust/scripts/check-sqlite-build.sh`) compares the build with the pinned
-  core wa-sqlite on every Rust CI run.
-- `build.rs` compiles it with wa-sqlite's `WASQLITE_DEFINES` and
-  `WASQLITE_EXTRA_DEFINES`, and core's `wa-sqlite/src/extension-functions.c`
-  (read from `repos/livestore`). `src/livestore.c` calls `sqlite3_initialize()`
-  and registers the extension functions on every connection, as wa-sqlite's
-  `main()` does. Bindings come from bindgen with upstream's options.
+## Runtime Settings
 
-## Native Deviations
+`livestore_sqlite::configure_connection` runs on every connection the client
+opens (`LeaderDb::boot_with`, `SqliteDbWrapper::new`) and turns off what the
+bundled build enables but wa-sqlite does not:
 
-- `SQLITE_THREADSAFE=2` instead of `0`: rusqlite refuses single-threaded builds,
-  and connections move between tokio worker threads. `MUTEX_OMIT` becomes
-  `MUTEX_PTHREADS` as a result.
-- `SQLITE_MAX_WORKER_THREADS=0` and `SQLITE_MAX_MMAP_SIZE=0` are pinned to the
-  values wasm gets implicitly.
-- Not compared: `COMPILER=`, `busy_timeout` (rusqlite sets 5 s), `cache_spill`
-  (depends on pointer width).
+- `SQLITE_DBCONFIG_DQS_DML` and `SQLITE_DBCONFIG_DQS_DDL` (wa-sqlite builds with
+  `SQLITE_DQS=0`: double-quoted strings are identifiers only).
+- `SQLITE_DBCONFIG_ENABLE_FKEY` (rusqlite builds with
+  `SQLITE_DEFAULT_FOREIGN_KEYS=1`; wa-sqlite starts with foreign keys off).
 
-## Bumping With wa-sqlite
+## Known Differences
 
-1. After wa-sqlite's `flake.nix` or defines change: `rust/scripts/vendor-sqlite.sh`,
-   and mirror define changes in `build.rs`.
-2. `rust/scripts/check-sqlite-build.sh --refresh` must print `OK`.
-3. If rusqlite moves to a new `libsqlite3-sys`, bump the crate version and recopy
-   upstream `src/lib.rs`/`src/error.rs` and the bindgen options.
+Behavior LiveStore relies on is the same; these differ and are allow-listed in
+the drift check:
+
+- SQLite version and source id follow rusqlite, not wa-sqlite's pin.
+- wa-sqlite's `extension-functions.c` (math, string, and aggregate helpers such
+  as `sqrt`, `padl`, `stdev`) is not available.
+- `LIKE` matches blobs (wa-sqlite: `SQLITE_LIKE_DOESNT_MATCH_BLOBS`), and the
+  expression depth limit is 1000 (wa-sqlite: unlimited); neither has a runtime
+  switch.
+- No `bytecode`/`tables_used` virtual tables; the client derives the tables a
+  query uses from its plan.
+- Extra features LiveStore does not use: FTS3/4/5, R*Tree, STAT4, dbstat,
+  soundex, column metadata, and `load_extension` (compiled in but disabled).
+- `SQLITE_THREADSAFE=1` instead of `0`: connections move between tokio threads.
+- Build-only options with no effect on results (`OMIT_*`, `USE_ALLOCA`,
+  `DEFAULT_MEMSTATUS`, mmap and worker-thread maxima, WAL synchronous default),
+  plus `busy_timeout` (rusqlite sets 5 s) and `cache_spill` (pointer width).
+
+## Drift Check
+
+`rust:sqlite-check` (`rust/scripts/check-sqlite-build.sh`) dumps effective
+pragmas, behavior probes (double-quoted strings in DML and DDL, LIKE on blobs,
+JSON, optional modules), modules, functions, and compile options from the pinned
+core wa-sqlite and from a configured Rust connection. It requires the session
+and preupdate-hook options on both sides and fails on any difference outside
+its allow-list.
 
 ## Persistence
 

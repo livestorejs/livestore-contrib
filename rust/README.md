@@ -13,7 +13,6 @@ Porting references: [`contributor-docs/rust/`](../contributor-docs/rust).
 | `crates/livestore-core` | Sequence numbers, events, port of `sync/syncstate.ts` (`merge`) |
 | `crates/livestore-schema` | Schema DSL: tables + DDL (byte-identical to TS), client documents, typed events, materializers, query builder |
 | `crates/livestore-sqlite` | Leader persistence: materialize + journal, rollback/rebase, boot from disk |
-| `crates/livestore-sqlite-sys` | The SQLite library, built from vendored sources to match wa-sqlite (replaces `libsqlite3-sys`) |
 | `crates/livestore-sync` | `SyncBackend` trait, `LeaderSyncProcessor` actor, `Leader` builder; `testing` feature: `MockSyncBackend`, `EventFactory` |
 | `crates/livestore-sync-cf` | sync-cf WebSocket/HTTP transport and its `SyncBackend` (`make_ws_sync`) |
 | `crates/livestore` | Store: client session, commit, queries, reactivity |
@@ -23,7 +22,7 @@ Porting references: [`contributor-docs/rust/`](../contributor-docs/rust).
 ## Setup
 
 Run everything from the contrib root inside `devenv shell`. It pins the Rust toolchain and provides
-libclang (bindgen) and libiconv (macOS linking). The build reads files from the megarepo-pinned core
+libiconv (macOS linking). Some tests read files from the megarepo-pinned core
 (`repos/livestore`), so bootstrap it first:
 
 ```bash
@@ -72,8 +71,7 @@ Fixtures come from the real TypeScript implementation of the pinned core:
 bun rust/scripts/gen-syncstate-fixtures.ts       # fixtures/syncstate
 bun rust/scripts/gen-leader-fixtures.ts          # fixtures/leader
 bun rust/scripts/gen-schema-hash-fixtures.ts     # crates/livestore-schema/tests/fixtures
-rust/scripts/check-sqlite-build.sh             # compares the native SQLite build with wa-sqlite
-rust/scripts/vendor-sqlite.sh                    # re-vendors SQLite from wa-sqlite's flake.nix pin
+rust/scripts/check-sqlite-build.sh               # compares SQLite behavior with wa-sqlite (known differences allow-listed)
 ```
 
 `fixtures/wire/` holds real WebSocket captures; see

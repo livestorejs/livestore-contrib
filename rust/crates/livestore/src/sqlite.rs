@@ -51,6 +51,7 @@ pub struct SqliteDbWrapper {
 
 impl SqliteDbWrapper {
     pub fn new(conn: Connection) -> rusqlite::Result<Self> {
+        livestore_sqlite::configure_connection(&conn)?;
         Ok(Self {
             conn: ReentrantMutex::new(conn),
             cache: Mutex::new(QueryCache::default()),

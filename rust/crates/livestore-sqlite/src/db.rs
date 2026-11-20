@@ -90,6 +90,8 @@ impl LeaderDb {
         schema: Arc<Schema>,
         options: BootOptions,
     ) -> Result<Self> {
+        crate::configure_connection(&state)?;
+        crate::configure_connection(&eventlog)?;
         if let Some(snapshot) = &options.import_snapshot {
             state.deserialize_read_exact("main", snapshot.as_slice(), snapshot.len(), false)?;
             state::migrate(&state, &schema)?;

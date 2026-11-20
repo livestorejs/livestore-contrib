@@ -14,7 +14,7 @@ Draft.
 | Child | Owns | Crates |
 | --- | --- | --- |
 | [`01-schema`](./01-schema/spec.md) | schema DSL, DDL, client documents, events, materializers, query builder, schema hashes | `livestore-schema`, `livestore-core` |
-| [`02-sqlite`](./02-sqlite/spec.md) | the SQLite build and leader persistence (eventlog, state, rollback, rebuild) | `livestore-sqlite-sys`, `livestore-sqlite` |
+| [`02-sqlite`](./02-sqlite/spec.md) | SQLite setup and leader persistence (eventlog, state, rollback, rebuild) | `livestore-sqlite` |
 | [`03-leader`](./03-leader/spec.md) | leader sync processor, syncstate merge, backend contract | `livestore-sync`, `livestore-core` |
 | [`04-sync-cf`](./04-sync-cf/spec.md) | sync-cf provider client (WebSocket, HTTP) | `livestore-sync-cf` |
 | [`05-store`](./05-store/spec.md) | client session, store, reactivity, in-process adapter | `livestore` |
@@ -28,7 +28,6 @@ Dependency direction:
 livestore-core <- livestore-schema <- livestore-sqlite <- livestore-sync <- livestore-sync-cf
                                                                       ^
                                                                       +--- livestore (store)
-livestore-sqlite-sys: linked by rusqlite in place of libsqlite3-sys
 ```
 
 ## Mapping From Effect

@@ -52,8 +52,8 @@ fn should_vacuum_to_minimize_page_count() {
     let Some(Value::Integer(before)) = exec_value(&db, "PRAGMA page_count;") else {
         panic!()
     };
-    // sqrt/floor come from extension-functions.c, registered like in wa-sqlite.
-    db.execute_batch("DELETE FROM t WHERE sqrt(n) != floor(sqrt(n));")
+    // Upstream deletes non-squares with sqrt/floor from wa-sqlite's extension-functions.c; same rows here.
+    db.execute_batch("DELETE FROM t WHERE n NOT IN (SELECT n * n FROM t);")
         .unwrap();
     db.execute_batch("VACUUM;").unwrap();
     let Some(Value::Integer(after)) = exec_value(&db, "PRAGMA page_count;") else {

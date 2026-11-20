@@ -7,15 +7,15 @@ top of it.
 
 Realizes the portable SQLite substrate (core LS.SYS.RT-R09) and the SQLite state
 contract ([`02-state/`](https://github.com/livestorejs/livestore/tree/main/context/02-system/02-state), `LS.SYS.STATE-*`) in
-`rust/crates/livestore-sqlite-sys` and `rust/crates/livestore-sqlite`. Parent:
+`rust/crates/livestore-sqlite`. Parent:
 [../requirements.md](../requirements.md).
 
 ## Requirements
 
-- **LSC.CLIENT.RUST.SQLITE-R01 Same SQLite as wa-sqlite:** The native build uses
-  the same SQLite version, source id, compile options, extension functions, and
-  behavior as the wa-sqlite build core adapters load, except the deviations listed
-  in the spec. `rust/scripts/check-sqlite-build.sh` checks it.
+- **LSC.CLIENT.RUST.SQLITE-R01 Same SQL behavior as wa-sqlite:** The client uses
+  rusqlite's bundled SQLite, configured at runtime so SQL behaves like the
+  wa-sqlite build core adapters load, except the known differences listed in
+  the spec. `rust/scripts/check-sqlite-build.sh` fails on any other difference.
   `refines: LS.SYS.RT-R09`
 - **LSC.CLIENT.RUST.SQLITE-R02 Same persistence:** Eventlog and state databases,
   materialization with session changesets, the journal, rollback, and rebuild

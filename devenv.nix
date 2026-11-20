@@ -127,7 +127,7 @@ in
   ]
   ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
 
-  # Rust client (`rust/`): toolchain pinned here; bindgen needs libclang, macOS linking needs libiconv.
+  # Rust client (`rust/`): toolchain pinned here; macOS linking needs libiconv.
   languages.rust = {
     enable = true;
     channel = "stable";
@@ -142,7 +142,6 @@ in
   };
 
   env = {
-    LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
     MEGAREPO_SKIP_MEMBERS = "effect-utils,livestore";
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     PUPPETEER_SKIP_DOWNLOAD = "1";

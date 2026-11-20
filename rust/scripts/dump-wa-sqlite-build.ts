@@ -43,6 +43,7 @@ const build = {
     fts5: probe('create virtual table t_fts5 using fts5(a)'),
     rtree: probe('create virtual table t_rtree using rtree(id, x0, x1)'),
     dqsSelect: probe('select "x"'),
+    dqsDdl: probe(`create table t_dqs(a check ("x" <> ''))`),
     likeBlob: probe(`select X'00' like '%'`),
     json: probe(`select json('{"a":1}')`),
     jsonb: probe(`select typeof(jsonb('{}'))`),

@@ -1,4 +1,4 @@
-//! Prints this build's SQLite in the shape of `scripts/dump-wa-sqlite-build.ts` output (used by scripts/check-sqlite-build.sh).
+//! Prints the SQLite LiveStore connections get (after `configure_connection`) in the shape of `scripts/dump-wa-sqlite-build.ts` output (used by scripts/check-sqlite-build.sh).
 use rusqlite::{Connection, types::Value};
 use serde_json::{Map, Value as Json, json};
 
@@ -41,6 +41,7 @@ const PROBES: &[(&str, &str)] = &[
         "create virtual table t_rtree using rtree(id, x0, x1)",
     ),
     ("dqsSelect", r#"select "x""#),
+    ("dqsDdl", r#"create table t_dqs(a check ("x" <> ''))"#),
     ("likeBlob", "select X'00' like '%'"),
     ("json", r#"select json('{"a":1}')"#),
     ("jsonb", "select typeof(jsonb('{}'))"),
@@ -51,6 +52,7 @@ const PROBES: &[(&str, &str)] = &[
 
 fn main() {
     let db = Connection::open_in_memory().unwrap();
+    livestore_sqlite::configure_connection(&db).unwrap();
     let rows = |sql: &str| -> rusqlite::Result<Vec<Json>> {
         let mut stmt = db.prepare(sql)?;
         stmt.query_map([], |r| r.get::<_, Value>(0))

@@ -13,6 +13,17 @@ pub use local::{LocalLeader, session_id_symbol};
 
 use livestore_core::MergeError;
 use livestore_schema::{MaterializeError, UnknownEventError};
+use rusqlite::Connection;
+use rusqlite::config::DbConfig;
+
+/// Runtime settings that make rusqlite's bundled SQLite behave like core's wa-sqlite build
+/// (`SQLITE_DQS=0`, no `SQLITE_DEFAULT_FOREIGN_KEYS`). Applied to every connection LiveStore opens.
+pub fn configure_connection(conn: &Connection) -> rusqlite::Result<()> {
+    conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DQS_DML, false)?;
+    conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DQS_DDL, false)?;
+    conn.set_db_config(DbConfig::SQLITE_DBCONFIG_ENABLE_FKEY, false)?;
+    Ok(())
+}
 
 /// Storage errors, named after the TS tagged errors they mirror.
 #[derive(Debug, thiserror::Error)]
