@@ -1022,7 +1022,8 @@
           "effect-utils",
           "nixpkgs"
         ],
-        "playwright": "playwright"
+        "playwright": "playwright",
+        "rust-overlay": "rust-overlay_2"
       }
     },
     "rust-overlay": {
@@ -1038,6 +1039,26 @@
         "owner": "oxalica",
         "repo": "rust-overlay",
         "rev": "dbba5f888c82ef3ce594c451c33ac2474eb80847",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "rust-overlay_2": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795168384,
+        "narHash": "sha256-aQ4Ns5O78Pg6B1i2hNRbI1HpRtnZst/jW34MSOOeaX4=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "a5c999945da3991d7aa3cc2a6075cfd22bd387e9",
         "type": "github"
       },
       "original": {

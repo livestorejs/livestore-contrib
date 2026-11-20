@@ -1,0 +1,33 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+livestore-core = { path = "crates/livestore-core" }
+livestore-schema = { path = "crates/livestore-schema" }
+livestore-sqlite = { path = "crates/livestore-sqlite" }
+livestore-sync = { path = "crates/livestore-sync" }
+livestore-sync-cf = { path = "crates/livestore-sync-cf" }
+livestore = { path = "crates/livestore" }
+livestore-todomvc = { path = "crates/livestore-todomvc" }
+futures = "0.3.34"
+futures-util = "0.3.34"
+ratatui = "0.30"
+# SQLite itself comes from crates/livestore-sqlite-sys (patched in below), not rusqlite's bundled copy.
+rusqlite = { version = "=0.37.0", features = ["session"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-std", "io-util", "process"] }
+tokio-tungstenite = "0.30.0"
+tokio-util = "0.7.19"
+tracing = "0.1.44"
+
+# Links rusqlite against LiveStore's wa-sqlite SQLite build (see context/clients/rust/02-sqlite/spec.md).
+[patch.crates-io]
+libsqlite3-sys = { path = "crates/livestore-sqlite-sys" }

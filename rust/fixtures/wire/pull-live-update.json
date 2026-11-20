@@ -1,0 +1,144 @@
+[
+  {
+    "dir": "open",
+    "url": "ws://localhost:8787/?storeId=raw-1795165521892-big&transport=ws"
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":\"live-1\",\"tag\":\"SyncWsRpc.Pull\",\"payload\":{\"storeId\":\"raw-1795165521892-big\",\"live\":true,\"cursor\":{\"_tag\":\"Some\",\"value\":{\"backendId\":\"X4N6Uj254zU5hjTO272QD\",\"eventSequenceNumber\":249}}},\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": "live-1",
+      "tag": "SyncWsRpc.Pull",
+      "payload": {
+        "storeId": "raw-1795165521892-big",
+        "live": true,
+        "cursor": {
+          "_tag": "Some",
+          "value": {
+            "backendId": "X4N6Uj254zU5hjTO272QD",
+            "eventSequenceNumber": 249
+          }
+        }
+      },
+      "headers": []
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Chunk\",\"requestId\":\"live-1\",\"values\":[{\"batch\":[{\"eventEncoded\":{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-250\",\"text\":\"Todo 250\"},\"seqNum\":250,\"parentSeqNum\":249,\"clientId\":\"rust-client\",\"sessionId\":\"rust-session\"},\"metadata\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"SyncMessage.SyncMetadata\",\"createdAt\":\"2026-11-20T09:05:22.054Z\"}}}],\"pageInfo\":{\"_tag\":\"NoMore\"},\"backendId\":\"X4N6Uj254zU5hjTO272QD\"}]}",
+    "json": {
+      "_tag": "Chunk",
+      "requestId": "live-1",
+      "values": [
+        {
+          "batch": [
+            {
+              "eventEncoded": {
+                "name": "todoCreated-v1",
+                "args": {
+                  "id": "todo-250",
+                  "text": "Todo 250"
+                },
+                "seqNum": 250,
+                "parentSeqNum": 249,
+                "clientId": "rust-client",
+                "sessionId": "rust-session"
+              },
+              "metadata": {
+                "_tag": "Some",
+                "value": {
+                  "_tag": "SyncMessage.SyncMetadata",
+                  "createdAt": "2026-11-20T09:05:22.054Z"
+                }
+              }
+            }
+          ],
+          "pageInfo": {
+            "_tag": "NoMore"
+          },
+          "backendId": "X4N6Uj254zU5hjTO272QD"
+        }
+      ]
+    }
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ack\",\"requestId\":\"live-1\"}",
+    "json": {
+      "_tag": "Ack",
+      "requestId": "live-1"
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Chunk\",\"requestId\":\"live-1\",\"values\":[{\"batch\":[{\"eventEncoded\":{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-251\",\"text\":\"Todo 251\"},\"seqNum\":251,\"parentSeqNum\":250,\"clientId\":\"rust-client\",\"sessionId\":\"rust-session\"},\"metadata\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"SyncMessage.SyncMetadata\",\"createdAt\":\"2026-11-20T09:05:23.691Z\"}}}],\"pageInfo\":{\"_tag\":\"NoMore\"},\"backendId\":\"X4N6Uj254zU5hjTO272QD\"}]}",
+    "json": {
+      "_tag": "Chunk",
+      "requestId": "live-1",
+      "values": [
+        {
+          "batch": [
+            {
+              "eventEncoded": {
+                "name": "todoCreated-v1",
+                "args": {
+                  "id": "todo-251",
+                  "text": "Todo 251"
+                },
+                "seqNum": 251,
+                "parentSeqNum": 250,
+                "clientId": "rust-client",
+                "sessionId": "rust-session"
+              },
+              "metadata": {
+                "_tag": "Some",
+                "value": {
+                  "_tag": "SyncMessage.SyncMetadata",
+                  "createdAt": "2026-11-20T09:05:23.691Z"
+                }
+              }
+            }
+          ],
+          "pageInfo": {
+            "_tag": "NoMore"
+          },
+          "backendId": "X4N6Uj254zU5hjTO272QD"
+        }
+      ]
+    }
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ack\",\"requestId\":\"live-1\"}",
+    "json": {
+      "_tag": "Ack",
+      "requestId": "live-1"
+    }
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Interrupt\",\"requestId\":\"live-1\"}",
+    "json": {
+      "_tag": "Interrupt",
+      "requestId": "live-1"
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":\"live-1\",\"exit\":{\"_tag\":\"Failure\",\"cause\":[{\"_tag\":\"Interrupt\",\"fiberId\":499}]}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": "live-1",
+      "exit": {
+        "_tag": "Failure",
+        "cause": [
+          {
+            "_tag": "Interrupt",
+            "fiberId": 499
+          }
+        ]
+      }
+    }
+  }
+]

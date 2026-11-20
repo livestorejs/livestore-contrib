@@ -16,6 +16,12 @@ Core LiveStore packages are consumed from the pinned `livestore` megarepo member
 under `repos/livestore`; they remain owned by
 [`livestorejs/livestore`](https://github.com/livestorejs/livestore).
 
+## Rust Client
+
+[`rust/`](./rust/README.md) holds an experimental native Rust LiveStore client
+(a Cargo workspace, outside the pnpm workspace). It builds and tests inside
+`devenv shell` with `devenv tasks run check:rust`.
+
 ## Scenario Verification
 
 The private [`tests/scenarios`](./tests/scenarios) workspace runs portable sync

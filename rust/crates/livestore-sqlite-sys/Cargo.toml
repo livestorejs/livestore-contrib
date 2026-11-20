@@ -1,0 +1,27 @@
+# Stand-in for `libsqlite3-sys` (via `[patch.crates-io]`) that builds LiveStore's wa-sqlite SQLite natively.
+[package]
+name = "libsqlite3-sys"
+version = "0.35.0"
+edition = "2024"
+publish = false
+links = "sqlite3"
+build = "build.rs"
+
+[lib]
+name = "libsqlite3_sys"
+
+# Feature names rusqlite forwards; the SQLite build itself is fixed.
+[features]
+default = ["min_sqlite_version_3_14_0"]
+min_sqlite_version_3_14_0 = []
+buildtime_bindgen = []
+bundled = []
+bundled_bindings = []
+preupdate_hook = []
+session = []
+column_metadata = []
+unlock_notify = []
+
+[build-dependencies]
+bindgen = { version = "0.72.1", default-features = false, features = ["runtime"] }
+cc = "1.11.2"

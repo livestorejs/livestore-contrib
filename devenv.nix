@@ -124,9 +124,25 @@ in
     effectUtilsPackages.megarepo
     pkgs.tsgolint
     pkgs.jq
-  ];
+  ]
+  ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+
+  # Rust client (`rust/`): toolchain pinned here; bindgen needs libclang, macOS linking needs libiconv.
+  languages.rust = {
+    enable = true;
+    channel = "stable";
+    version = "1.99.1";
+    components = [
+      "rustc"
+      "cargo"
+      "clippy"
+      "rustfmt"
+      "rust-std"
+    ];
+  };
 
   env = {
+    LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
     MEGAREPO_SKIP_MEMBERS = "effect-utils,livestore";
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     PUPPETEER_SKIP_DOWNLOAD = "1";
@@ -661,6 +677,40 @@ in
       "pnpm:install"
     ];
     exec = "DEVENV_TASK_PASSTHROUGH=1 TEST_SYNC_PROVIDER=s2 pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/s2-specific.test.ts";
+  };
+  tasks."rust:check" = {
+    description = "Type-check the Rust client workspace (rust/)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && cargo check --workspace --all-targets --locked";
+  };
+  tasks."rust:fmt" = {
+    description = "Check Rust client formatting";
+    exec = "cd rust && cargo fmt --all --check";
+  };
+  tasks."rust:clippy" = {
+    description = "Lint the Rust client workspace with clippy (warnings are errors)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && cargo clippy --workspace --all-targets --locked -- -D warnings";
+  };
+  tasks."rust:test" = {
+    description = "Run the Rust client tests (live tests skip without a backend)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && DEVENV_TASK_PASSTHROUGH=1 cargo test --workspace --locked";
+  };
+  tasks."rust:test-live" = {
+    description = "Run the Rust client live tests against the pinned core sync-cf worker";
+    after = [ "pnpm:install" ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 rust/scripts/test-live.sh";
+  };
+  tasks."check:rust" = {
+    description = "All Rust client checks (kept out of check:all)";
+    after = [
+      "rust:fmt"
+      "rust:check"
+      "rust:clippy"
+      "rust:test"
+      "rust:test-live"
+    ];
   };
   tasks."workspace:shape-check" = {
     description = "Validate the contrib workspace shape";

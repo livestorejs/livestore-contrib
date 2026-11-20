@@ -1,0 +1,8565 @@
+[
+ {
+  "name": "rebase: rollback until start",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-rebase",
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 1,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 1,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 1,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-rebase",
+     "rollbackEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "1_0_b",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "rebase: rollback to point",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-rebase",
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 1,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 1,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 1,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-rebase",
+     "rollbackEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "rebase: empty pending",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-rebase",
+   "rollbackEvents": [],
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-rebase",
+     "rollbackEvents": [],
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "1_0_b",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "rebase: empty newEvents keeps upstream head",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-rebase",
+   "rollbackEvents": [],
+   "newEvents": []
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 0,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 0,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-rebase",
+     "rollbackEvents": [],
+     "newEvents": []
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "rebase: rebaseGeneration bump from r2 head",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-rebase",
+   "rollbackEvents": [],
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 3
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 2
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 1,
+       "rebaseGeneration": 3
+      },
+      "parentSeqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 3
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 2
+    },
+    "localHead": {
+     "global": 3,
+     "client": 1,
+     "rebaseGeneration": 3
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 3
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 1,
+      "rebaseGeneration": 3
+     },
+     "parentSeqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 3
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-rebase",
+     "rollbackEvents": [],
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 2
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 2
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 2
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "rebase: unsorted payload dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-rebase",
+   "rollbackEvents": [],
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Events must be ordered in monotonically ascending order by eventNum. Received: [e2, e1]"
+  }
+ },
+ {
+  "name": "advance: empty newEvents",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": []
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 0,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 0,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": []
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: unsorted client dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Events must be ordered in monotonically ascending order by eventNum. Received: [e1.2, e1.1]"
+  }
+ },
+ {
+  "name": "advance: unsorted global dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Events must be ordered in monotonically ascending order by eventNum. Received: [e2, e1]"
+  }
+ },
+ {
+  "name": "advance: incoming < upstream head dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 2,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Incoming events must be greater than upstream head. Expected greater than: e2. Received: [e1]"
+  }
+ },
+ {
+  "name": "advance: incoming = upstream head dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 2,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Incoming events must be greater than upstream head. Expected greater than: e2. Received: [e2]"
+  }
+ },
+ {
+  "name": "advance: confirm pending",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: confirm partial pending",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 1,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 1,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: confirm pending and add new",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 1,
+     "client": 1,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 1,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: confirm pending and add many",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 3,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: confirm global keep client",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 1,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 1,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: ignore client subset",
+  "ignoreClientOnlyEvents": true,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: ignore client subset 2",
+  "ignoreClientOnlyEvents": true,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: ignore client beyond pending",
+  "ignoreClientOnlyEvents": true,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 3,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 3,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 3,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: ignore client all client pending",
+  "ignoreClientOnlyEvents": true,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 0,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 0,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 0,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 0,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 0,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: no pending",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance: localHead ahead of upstream w/o pending",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 1,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: single event to end",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 1,
+     "client": 1,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: different event same id",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "1_0_b",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 3,
+     "client": 0,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "1_0_b",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: more incoming",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 3,
+     "client": 0,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 3,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: first matches",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 1,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 1,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 1,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 3,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: all differ",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 1,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 3,
+     "client": 1,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 1,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 3,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: other client same seq",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "other",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "other",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "other",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: ignore client",
+  "ignoreClientOnlyEvents": true,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "rebase",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 2,
+       "client": 1,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 1
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 3,
+     "client": 0,
+     "rebaseGeneration": 1
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "1_0_b",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 1,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 1
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "rollbackEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "1_0_b",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "advance-rebase: rebase gen r2 upstream",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "upstream-advance",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 2
+    },
+    "localHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 2
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 2
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "mergeContext": {
+    "payload": {
+     "_tag": "upstream-advance",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 2
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 2
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 2
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: empty",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": []
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 0,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 0,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": []
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: advance",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 0,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 1,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 2,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 1,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     },
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": true
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 3,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 1,
+       "client": 2,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 0,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 3,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 3,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 3,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: ignore client only",
+  "ignoreClientOnlyEvents": true,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 0,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [],
+    "upstreamHead": {
+     "global": 0,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 0,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 0,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 0,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: ignore client keep global",
+  "ignoreClientOnlyEvents": true,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 0,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 1,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 0,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 0,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 1,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 0,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 0,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: reject",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "reject",
+   "expectedMinimumId": {
+    "global": 1,
+    "client": 2,
+    "rebaseGeneration": 0
+   },
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 2,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      },
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": true
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 1,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: reject equal global",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "reject",
+   "expectedMinimumId": {
+    "global": 1,
+    "client": 1,
+    "rebaseGeneration": 0
+   },
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 0,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ],
+     "upstreamHead": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: reject with rebase gen",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 3
+   },
+   "localHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 3
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "reject",
+   "expectedMinimumId": {
+    "global": 2,
+    "client": 1,
+    "rebaseGeneration": 3
+   },
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 1,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [],
+     "upstreamHead": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 3
+     },
+     "localHead": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 3
+     }
+    }
+   }
+  }
+ },
+ {
+  "name": "push: unsorted dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Events must be ordered in monotonically ascending order by eventNum. Received: [e1.1, e1]"
+  }
+ },
+ {
+  "name": "push: invalid pending chain dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 2,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 2,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": []
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Events must be linked in a continuous chain via the parentSeqNum"
+  }
+ },
+ {
+  "name": "push: global pending with client != 0 dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": true
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 1,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 2,
+    "client": 1,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": []
+  },
+  "result": {
+   "_tag": "die",
+   "message": "New global events must point to clientId 0 in the parentSeqNum. Received: (e2.1)"
+  }
+ },
+ {
+  "name": "push: pending unsorted dies",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    },
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 0,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "upstreamHead": {
+    "global": 0,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": []
+  },
+  "result": {
+   "_tag": "die",
+   "message": "Events must be ordered in monotonically ascending order by eventNum. Received: [e2, e1]"
+  }
+ },
+ {
+  "name": "push: localHead lower than upstream after empty",
+  "ignoreClientOnlyEvents": false,
+  "syncState": {
+   "pending": [],
+   "upstreamHead": {
+    "global": 2,
+    "client": 0,
+    "rebaseGeneration": 0
+   },
+   "localHead": {
+    "global": 1,
+    "client": 0,
+    "rebaseGeneration": 0
+   }
+  },
+  "payload": {
+   "_tag": "local-push",
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ]
+  },
+  "result": {
+   "_tag": "advance",
+   "newSyncState": {
+    "pending": [
+     {
+      "name": "a",
+      "args": {
+       "payload": "a",
+       "isClientOnly": false
+      },
+      "seqNum": {
+       "global": 3,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "parentSeqNum": {
+       "global": 2,
+       "client": 0,
+       "rebaseGeneration": 0
+      },
+      "clientId": "static-local-id",
+      "sessionId": "static-session-id"
+     }
+    ],
+    "upstreamHead": {
+     "global": 2,
+     "client": 0,
+     "rebaseGeneration": 0
+    },
+    "localHead": {
+     "global": 3,
+     "client": 0,
+     "rebaseGeneration": 0
+    }
+   },
+   "newEvents": [
+    {
+     "name": "a",
+     "args": {
+      "payload": "a",
+      "isClientOnly": false
+     },
+     "seqNum": {
+      "global": 3,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "parentSeqNum": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "clientId": "static-local-id",
+     "sessionId": "static-session-id"
+    }
+   ],
+   "confirmedEvents": [],
+   "mergeContext": {
+    "payload": {
+     "_tag": "local-push",
+     "newEvents": [
+      {
+       "name": "a",
+       "args": {
+        "payload": "a",
+        "isClientOnly": false
+       },
+       "seqNum": {
+        "global": 3,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "parentSeqNum": {
+        "global": 2,
+        "client": 0,
+        "rebaseGeneration": 0
+       },
+       "clientId": "static-local-id",
+       "sessionId": "static-session-id"
+      }
+     ]
+    },
+    "syncState": {
+     "pending": [],
+     "upstreamHead": {
+      "global": 2,
+      "client": 0,
+      "rebaseGeneration": 0
+     },
+     "localHead": {
+      "global": 1,
+      "client": 0,
+      "rebaseGeneration": 0
+     }
+    }
+   }
+  }
+ }
+]

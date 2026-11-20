@@ -1,0 +1,622 @@
+{
+  "name": "failed-local-commit",
+  "clientId": "client-a",
+  "sessionId": "session-a",
+  "steps": [
+    {
+      "op": {
+        "op": "commit",
+        "name": "v1.TodoCreated",
+        "args": {
+          "id": "a",
+          "text": "One"
+        }
+      },
+      "result": "ok",
+      "snapshot": {
+        "todos": [
+          {
+            "id": "a",
+            "text": "One",
+            "completed": 0,
+            "deletedAt": null
+          }
+        ],
+        "uiState": [],
+        "stateHead": [
+          {
+            "id": 1,
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0
+          }
+        ],
+        "journalKeys": [
+          {
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "changesetIsNull": 0
+          }
+        ],
+        "rebuildMarker": [
+          {
+            "id": 1
+          }
+        ],
+        "eventlog": [
+          {
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "parentSeqNumGlobal": 0,
+            "parentSeqNumClient": 0,
+            "parentSeqNumRebaseGeneration": 0,
+            "name": "v1.TodoCreated",
+            "argsJson": "{\"id\":\"a\",\"text\":\"One\"}",
+            "clientId": "client-a",
+            "sessionId": "session-a",
+            "schemaHash": -579073215,
+            "syncMetadataJson": "{\"_tag\":\"None\"}"
+          }
+        ],
+        "syncStatus": [
+          {
+            "head": 0,
+            "backendId": null
+          }
+        ],
+        "schemaMeta": [
+          {
+            "tableName": "__livestore_materialization_journal",
+            "schemaHash": "aKJU65RI0U_6bv7S4sg37rIRLSFFIQrTb3NMlyronzE"
+          },
+          {
+            "tableName": "__livestore_rebuild",
+            "schemaHash": "jALpkj9ADetAtguwA2zwp7tzMRsLZOsHqktR5i4eXHc"
+          },
+          {
+            "tableName": "__livestore_schema",
+            "schemaHash": "1S6T69pV8iMH9lVTDNYgDG1ZQP7jUWFxxJ9QlfeW9n8"
+          },
+          {
+            "tableName": "__livestore_schema_event_defs",
+            "schemaHash": "zupkceesO3b5jPD6EnKYG6PiVygZRW3uhTtIVwkGa1Q"
+          },
+          {
+            "tableName": "__livestore_state_head",
+            "schemaHash": "bKZXO_UQVjSzGXx2hoYTYRsMhWUhgHqV48CSS7mdAWA"
+          },
+          {
+            "tableName": "todos",
+            "schemaHash": "bbCxh_s-0HXVod69cs-D9IYuo_dCR00SLv0ZsOYxYjo"
+          },
+          {
+            "tableName": "uiState",
+            "schemaHash": "q_TZIVYq22gaCpt0edLMwGpWzcXKerTe_UKmIyAL2Mc"
+          }
+        ],
+        "eventDefs": [
+          {
+            "eventName": "uiStateSet",
+            "schemaHash": 273761964
+          },
+          {
+            "eventName": "v1.TodoClearedCompleted",
+            "schemaHash": -76499913
+          },
+          {
+            "eventName": "v1.TodoCompleted",
+            "schemaHash": 41031549
+          },
+          {
+            "eventName": "v1.TodoCreated",
+            "schemaHash": -579073215
+          },
+          {
+            "eventName": "v1.TodoDeleted",
+            "schemaHash": -840107781
+          },
+          {
+            "eventName": "v1.TodoUncompleted",
+            "schemaHash": 41031549
+          }
+        ],
+        "syncState": {
+          "pending": [
+            {
+              "name": "v1.TodoCreated",
+              "args": {
+                "id": "a",
+                "text": "One"
+              },
+              "seqNum": {
+                "global": 1,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "parentSeqNum": {
+                "global": 0,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "clientId": "client-a",
+              "sessionId": "session-a"
+            }
+          ],
+          "upstreamHead": {
+            "global": 0,
+            "client": 0,
+            "rebaseGeneration": 0
+          },
+          "localHead": {
+            "global": 1,
+            "client": 0,
+            "rebaseGeneration": 0
+          }
+        }
+      }
+    },
+    {
+      "op": {
+        "op": "commit",
+        "name": "v1.TodoCreated",
+        "args": {
+          "id": "a",
+          "text": "Duplicate"
+        }
+      },
+      "result": "error",
+      "snapshot": {
+        "todos": [
+          {
+            "id": "a",
+            "text": "One",
+            "completed": 0,
+            "deletedAt": null
+          }
+        ],
+        "uiState": [],
+        "stateHead": [
+          {
+            "id": 1,
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0
+          }
+        ],
+        "journalKeys": [
+          {
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "changesetIsNull": 0
+          }
+        ],
+        "rebuildMarker": [
+          {
+            "id": 1
+          }
+        ],
+        "eventlog": [
+          {
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "parentSeqNumGlobal": 0,
+            "parentSeqNumClient": 0,
+            "parentSeqNumRebaseGeneration": 0,
+            "name": "v1.TodoCreated",
+            "argsJson": "{\"id\":\"a\",\"text\":\"One\"}",
+            "clientId": "client-a",
+            "sessionId": "session-a",
+            "schemaHash": -579073215,
+            "syncMetadataJson": "{\"_tag\":\"None\"}"
+          }
+        ],
+        "syncStatus": [
+          {
+            "head": 0,
+            "backendId": null
+          }
+        ],
+        "schemaMeta": [
+          {
+            "tableName": "__livestore_materialization_journal",
+            "schemaHash": "aKJU65RI0U_6bv7S4sg37rIRLSFFIQrTb3NMlyronzE"
+          },
+          {
+            "tableName": "__livestore_rebuild",
+            "schemaHash": "jALpkj9ADetAtguwA2zwp7tzMRsLZOsHqktR5i4eXHc"
+          },
+          {
+            "tableName": "__livestore_schema",
+            "schemaHash": "1S6T69pV8iMH9lVTDNYgDG1ZQP7jUWFxxJ9QlfeW9n8"
+          },
+          {
+            "tableName": "__livestore_schema_event_defs",
+            "schemaHash": "zupkceesO3b5jPD6EnKYG6PiVygZRW3uhTtIVwkGa1Q"
+          },
+          {
+            "tableName": "__livestore_state_head",
+            "schemaHash": "bKZXO_UQVjSzGXx2hoYTYRsMhWUhgHqV48CSS7mdAWA"
+          },
+          {
+            "tableName": "todos",
+            "schemaHash": "bbCxh_s-0HXVod69cs-D9IYuo_dCR00SLv0ZsOYxYjo"
+          },
+          {
+            "tableName": "uiState",
+            "schemaHash": "q_TZIVYq22gaCpt0edLMwGpWzcXKerTe_UKmIyAL2Mc"
+          }
+        ],
+        "eventDefs": [
+          {
+            "eventName": "uiStateSet",
+            "schemaHash": 273761964
+          },
+          {
+            "eventName": "v1.TodoClearedCompleted",
+            "schemaHash": -76499913
+          },
+          {
+            "eventName": "v1.TodoCompleted",
+            "schemaHash": 41031549
+          },
+          {
+            "eventName": "v1.TodoCreated",
+            "schemaHash": -579073215
+          },
+          {
+            "eventName": "v1.TodoDeleted",
+            "schemaHash": -840107781
+          },
+          {
+            "eventName": "v1.TodoUncompleted",
+            "schemaHash": 41031549
+          }
+        ],
+        "syncState": {
+          "pending": [
+            {
+              "name": "v1.TodoCreated",
+              "args": {
+                "id": "a",
+                "text": "One"
+              },
+              "seqNum": {
+                "global": 1,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "parentSeqNum": {
+                "global": 0,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "clientId": "client-a",
+              "sessionId": "session-a"
+            }
+          ],
+          "upstreamHead": {
+            "global": 0,
+            "client": 0,
+            "rebaseGeneration": 0
+          },
+          "localHead": {
+            "global": 1,
+            "client": 0,
+            "rebaseGeneration": 0
+          }
+        }
+      }
+    },
+    {
+      "op": {
+        "op": "commit",
+        "name": "v1.TodoCreated",
+        "args": {
+          "id": "b",
+          "text": "Two"
+        }
+      },
+      "result": "ok",
+      "snapshot": {
+        "todos": [
+          {
+            "id": "a",
+            "text": "One",
+            "completed": 0,
+            "deletedAt": null
+          },
+          {
+            "id": "b",
+            "text": "Two",
+            "completed": 0,
+            "deletedAt": null
+          }
+        ],
+        "uiState": [],
+        "stateHead": [
+          {
+            "id": 1,
+            "seqNumGlobal": 2,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0
+          }
+        ],
+        "journalKeys": [
+          {
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "changesetIsNull": 0
+          },
+          {
+            "seqNumGlobal": 2,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "changesetIsNull": 0
+          }
+        ],
+        "rebuildMarker": [
+          {
+            "id": 1
+          }
+        ],
+        "eventlog": [
+          {
+            "seqNumGlobal": 1,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "parentSeqNumGlobal": 0,
+            "parentSeqNumClient": 0,
+            "parentSeqNumRebaseGeneration": 0,
+            "name": "v1.TodoCreated",
+            "argsJson": "{\"id\":\"a\",\"text\":\"One\"}",
+            "clientId": "client-a",
+            "sessionId": "session-a",
+            "schemaHash": -579073215,
+            "syncMetadataJson": "{\"_tag\":\"None\"}"
+          },
+          {
+            "seqNumGlobal": 2,
+            "seqNumClient": 0,
+            "seqNumRebaseGeneration": 0,
+            "parentSeqNumGlobal": 1,
+            "parentSeqNumClient": 0,
+            "parentSeqNumRebaseGeneration": 0,
+            "name": "v1.TodoCreated",
+            "argsJson": "{\"id\":\"b\",\"text\":\"Two\"}",
+            "clientId": "client-a",
+            "sessionId": "session-a",
+            "schemaHash": -579073215,
+            "syncMetadataJson": "{\"_tag\":\"None\"}"
+          }
+        ],
+        "syncStatus": [
+          {
+            "head": 0,
+            "backendId": null
+          }
+        ],
+        "schemaMeta": [
+          {
+            "tableName": "__livestore_materialization_journal",
+            "schemaHash": "aKJU65RI0U_6bv7S4sg37rIRLSFFIQrTb3NMlyronzE"
+          },
+          {
+            "tableName": "__livestore_rebuild",
+            "schemaHash": "jALpkj9ADetAtguwA2zwp7tzMRsLZOsHqktR5i4eXHc"
+          },
+          {
+            "tableName": "__livestore_schema",
+            "schemaHash": "1S6T69pV8iMH9lVTDNYgDG1ZQP7jUWFxxJ9QlfeW9n8"
+          },
+          {
+            "tableName": "__livestore_schema_event_defs",
+            "schemaHash": "zupkceesO3b5jPD6EnKYG6PiVygZRW3uhTtIVwkGa1Q"
+          },
+          {
+            "tableName": "__livestore_state_head",
+            "schemaHash": "bKZXO_UQVjSzGXx2hoYTYRsMhWUhgHqV48CSS7mdAWA"
+          },
+          {
+            "tableName": "todos",
+            "schemaHash": "bbCxh_s-0HXVod69cs-D9IYuo_dCR00SLv0ZsOYxYjo"
+          },
+          {
+            "tableName": "uiState",
+            "schemaHash": "q_TZIVYq22gaCpt0edLMwGpWzcXKerTe_UKmIyAL2Mc"
+          }
+        ],
+        "eventDefs": [
+          {
+            "eventName": "uiStateSet",
+            "schemaHash": 273761964
+          },
+          {
+            "eventName": "v1.TodoClearedCompleted",
+            "schemaHash": -76499913
+          },
+          {
+            "eventName": "v1.TodoCompleted",
+            "schemaHash": 41031549
+          },
+          {
+            "eventName": "v1.TodoCreated",
+            "schemaHash": -579073215
+          },
+          {
+            "eventName": "v1.TodoDeleted",
+            "schemaHash": -840107781
+          },
+          {
+            "eventName": "v1.TodoUncompleted",
+            "schemaHash": 41031549
+          }
+        ],
+        "syncState": {
+          "pending": [
+            {
+              "name": "v1.TodoCreated",
+              "args": {
+                "id": "a",
+                "text": "One"
+              },
+              "seqNum": {
+                "global": 1,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "parentSeqNum": {
+                "global": 0,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "clientId": "client-a",
+              "sessionId": "session-a"
+            },
+            {
+              "name": "v1.TodoCreated",
+              "args": {
+                "id": "b",
+                "text": "Two"
+              },
+              "seqNum": {
+                "global": 2,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "parentSeqNum": {
+                "global": 1,
+                "client": 0,
+                "rebaseGeneration": 0
+              },
+              "clientId": "client-a",
+              "sessionId": "session-a"
+            }
+          ],
+          "upstreamHead": {
+            "global": 0,
+            "client": 0,
+            "rebaseGeneration": 0
+          },
+          "localHead": {
+            "global": 2,
+            "client": 0,
+            "rebaseGeneration": 0
+          }
+        }
+      }
+    }
+  ],
+  "ddl": {
+    "state": [
+      {
+        "type": "table",
+        "name": "__livestore_materialization_journal",
+        "tbl_name": "__livestore_materialization_journal",
+        "sql": "CREATE TABLE \"__livestore_materialization_journal\" (\"seqNumGlobal\" integer   not null , \"seqNumClient\" integer   not null , \"seqNumRebaseGeneration\" integer   not null , \"changeset\" blob    ) strict"
+      },
+      {
+        "type": "table",
+        "name": "__livestore_rebuild",
+        "tbl_name": "__livestore_rebuild",
+        "sql": "CREATE TABLE \"__livestore_rebuild\" (\"id\" integer primary key   ) strict"
+      },
+      {
+        "type": "table",
+        "name": "__livestore_schema",
+        "tbl_name": "__livestore_schema",
+        "sql": "CREATE TABLE \"__livestore_schema\" (\"tableName\" text primary key   , \"schemaHash\" text   not null , \"updatedAt\" text   not null ) strict"
+      },
+      {
+        "type": "table",
+        "name": "__livestore_schema_event_defs",
+        "tbl_name": "__livestore_schema_event_defs",
+        "sql": "CREATE TABLE \"__livestore_schema_event_defs\" (\"eventName\" text primary key   , \"schemaHash\" integer   not null , \"updatedAt\" text   not null ) strict"
+      },
+      {
+        "type": "table",
+        "name": "__livestore_state_head",
+        "tbl_name": "__livestore_state_head",
+        "sql": "CREATE TABLE \"__livestore_state_head\" (\"id\" integer primary key   , \"seqNumGlobal\" integer   not null , \"seqNumClient\" integer   not null , \"seqNumRebaseGeneration\" integer   not null ) strict"
+      },
+      {
+        "type": "index",
+        "name": "idx_materialization_journal_id",
+        "tbl_name": "__livestore_materialization_journal",
+        "sql": "CREATE INDEX \"idx_materialization_journal_id\" on \"__livestore_materialization_journal\" (\"seqNumGlobal\", \"seqNumClient\")"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex___livestore_schema_1",
+        "tbl_name": "__livestore_schema",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex___livestore_schema_event_defs_1",
+        "tbl_name": "__livestore_schema_event_defs",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_todos_1",
+        "tbl_name": "todos",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_uiState_1",
+        "tbl_name": "uiState",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "todos",
+        "tbl_name": "todos",
+        "sql": "CREATE TABLE \"todos\" (\"id\" text primary key   , \"text\" text   not null default '', \"completed\" integer   not null default 0, \"deletedAt\" integer    ) strict"
+      },
+      {
+        "type": "table",
+        "name": "uiState",
+        "tbl_name": "uiState",
+        "sql": "CREATE TABLE \"uiState\" (\"id\" text primary key   , \"value\" text   not null ) strict"
+      }
+    ],
+    "eventlog": [
+      {
+        "type": "table",
+        "name": "__livestore_sync_status",
+        "tbl_name": "__livestore_sync_status",
+        "sql": "CREATE TABLE \"__livestore_sync_status\" (\"head\" integer primary key   , \"backendId\" text    ) strict"
+      },
+      {
+        "type": "table",
+        "name": "eventlog",
+        "tbl_name": "eventlog",
+        "sql": "CREATE TABLE \"eventlog\" (\"seqNumGlobal\" integer   not null , \"seqNumClient\" integer   not null , \"seqNumRebaseGeneration\" integer   not null , \"parentSeqNumGlobal\" integer   not null , \"parentSeqNumClient\" integer   not null , \"parentSeqNumRebaseGeneration\" integer   not null , \"name\" text   not null , \"argsJson\" text   not null , \"clientId\" text   not null , \"sessionId\" text   not null , \"schemaHash\" integer   not null , \"syncMetadataJson\" text   not null , PRIMARY KEY (\"seqNumGlobal\", \"seqNumClient\", \"seqNumRebaseGeneration\")) strict"
+      },
+      {
+        "type": "index",
+        "name": "idx_eventlog_seqNum",
+        "tbl_name": "eventlog",
+        "sql": "CREATE INDEX \"idx_eventlog_seqNum\" on \"eventlog\" (\"seqNumGlobal\", \"seqNumClient\", \"seqNumRebaseGeneration\")"
+      },
+      {
+        "type": "index",
+        "name": "idx_eventlog_seqNumGlobal",
+        "tbl_name": "eventlog",
+        "sql": "CREATE INDEX \"idx_eventlog_seqNumGlobal\" on \"eventlog\" (\"seqNumGlobal\")"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_eventlog_1",
+        "tbl_name": "eventlog",
+        "sql": null
+      }
+    ]
+  }
+}

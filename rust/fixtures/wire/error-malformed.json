@@ -1,0 +1,76 @@
+[
+  {
+    "dir": "open",
+    "url": "ws://localhost:8787/?storeId=raw-1795165521892-big&transport=ws"
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":1,\"tag\":\"SyncWsRpc.Pull\",\"payload\":{\"storeId\":\"raw-1795165521892-big\"},\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 1,
+      "tag": "SyncWsRpc.Pull",
+      "payload": {
+        "storeId": "raw-1795165521892-big"
+      },
+      "headers": []
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":1,\"exit\":{\"_tag\":\"Failure\",\"cause\":[{\"_tag\":\"Die\",\"defect\":\"Missing key\\n  at [\\\"live\\\"]\"}]}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 1,
+      "exit": {
+        "_tag": "Failure",
+        "cause": [
+          {
+            "_tag": "Die",
+            "defect": "Missing key\n  at [\"live\"]"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":2,\"tag\":\"SyncWsRpc.Nope\",\"payload\":{},\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 2,
+      "tag": "SyncWsRpc.Nope",
+      "payload": {},
+      "headers": []
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":2,\"exit\":{\"_tag\":\"Failure\",\"cause\":[{\"_tag\":\"Die\",\"defect\":\"Unknown request tag: SyncWsRpc.Nope\"}]}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 2,
+      "exit": {
+        "_tag": "Failure",
+        "cause": [
+          {
+            "_tag": "Die",
+            "defect": "Unknown request tag: SyncWsRpc.Nope"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "dir": "client->server",
+    "raw": "not json"
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Defect\",\"defect\":{}}",
+    "json": {
+      "_tag": "Defect",
+      "defect": {}
+    }
+  }
+]
