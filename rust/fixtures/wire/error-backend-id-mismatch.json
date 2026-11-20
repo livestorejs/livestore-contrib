@@ -1,0 +1,99 @@
+[
+  {
+    "dir": "open",
+    "url": "ws://localhost:8787/?storeId=raw-1795165521892-big&transport=ws"
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":1,\"tag\":\"SyncWsRpc.Push\",\"payload\":{\"storeId\":\"raw-1795165521892-big\",\"batch\":[{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-252\",\"text\":\"Todo 252\"},\"seqNum\":252,\"parentSeqNum\":251,\"clientId\":\"rust-client\",\"sessionId\":\"rust-session\"}],\"backendId\":{\"_tag\":\"Some\",\"value\":\"wrong-backend-id\"}},\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 1,
+      "tag": "SyncWsRpc.Push",
+      "payload": {
+        "storeId": "raw-1795165521892-big",
+        "batch": [
+          {
+            "name": "todoCreated-v1",
+            "args": {
+              "id": "todo-252",
+              "text": "Todo 252"
+            },
+            "seqNum": 252,
+            "parentSeqNum": 251,
+            "clientId": "rust-client",
+            "sessionId": "rust-session"
+          }
+        ],
+        "backendId": {
+          "_tag": "Some",
+          "value": "wrong-backend-id"
+        }
+      },
+      "headers": []
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":1,\"exit\":{\"_tag\":\"Failure\",\"cause\":[{\"_tag\":\"Fail\",\"error\":{\"_tag\":\"BackendIdMismatchError\",\"expected\":\"X4N6Uj254zU5hjTO272QD\",\"received\":\"wrong-backend-id\"}}]}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 1,
+      "exit": {
+        "_tag": "Failure",
+        "cause": [
+          {
+            "_tag": "Fail",
+            "error": {
+              "_tag": "BackendIdMismatchError",
+              "expected": "X4N6Uj254zU5hjTO272QD",
+              "received": "wrong-backend-id"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":2,\"tag\":\"SyncWsRpc.Pull\",\"payload\":{\"storeId\":\"raw-1795165521892-big\",\"live\":false,\"cursor\":{\"_tag\":\"Some\",\"value\":{\"backendId\":\"wrong-backend-id\",\"eventSequenceNumber\":3}}},\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 2,
+      "tag": "SyncWsRpc.Pull",
+      "payload": {
+        "storeId": "raw-1795165521892-big",
+        "live": false,
+        "cursor": {
+          "_tag": "Some",
+          "value": {
+            "backendId": "wrong-backend-id",
+            "eventSequenceNumber": 3
+          }
+        }
+      },
+      "headers": []
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":2,\"exit\":{\"_tag\":\"Failure\",\"cause\":[{\"_tag\":\"Fail\",\"error\":{\"_tag\":\"BackendIdMismatchError\",\"expected\":\"X4N6Uj254zU5hjTO272QD\",\"received\":\"wrong-backend-id\"}}]}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 2,
+      "exit": {
+        "_tag": "Failure",
+        "cause": [
+          {
+            "_tag": "Fail",
+            "error": {
+              "_tag": "BackendIdMismatchError",
+              "expected": "X4N6Uj254zU5hjTO272QD",
+              "received": "wrong-backend-id"
+            }
+          }
+        ]
+      }
+    }
+  }
+]
