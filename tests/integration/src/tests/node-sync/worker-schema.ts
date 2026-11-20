@@ -1,3 +1,4 @@
+import type { MaterializationJournal } from '@livestore/common'
 import { ShutdownChannel } from '@livestore/common/leader-thread'
 import { Rpc, RpcGroup, Schema } from '@livestore/utils/effect'
 

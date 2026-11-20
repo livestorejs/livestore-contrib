@@ -406,13 +406,14 @@ const reconcileClientObservation =
 const acknowledge = (operationId: string): HostAcknowledgement => ({ operationId, status: 'acknowledged' })
 
 class ProcessRequestFailure extends Error {
-  constructor(
-    readonly code: ParticipantHostFailureCode,
-    readonly operationOutcome: ScenarioOperationFailureOutcome,
-    message: string,
-  ) {
+  readonly code: ParticipantHostFailureCode
+  readonly operationOutcome: ScenarioOperationFailureOutcome
+
+  constructor(code: ParticipantHostFailureCode, operationOutcome: ScenarioOperationFailureOutcome, message: string) {
     super(message)
     this.name = 'ProcessRequestFailure'
+    this.code = code
+    this.operationOutcome = operationOutcome
   }
 }
 

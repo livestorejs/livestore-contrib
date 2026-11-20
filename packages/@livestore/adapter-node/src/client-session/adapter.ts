@@ -7,16 +7,17 @@ import {
   type Adapter,
   type BootStatus,
   ClientSessionLeaderThreadProxy,
+  EventlogSqliteDb,
   IntentionalShutdownCause,
   type LockStatus,
   type MakeSqliteDb,
   makeClientSession,
+  StateSqliteDb,
   type SyncOptions,
   UnknownError,
 } from '@livestore/common'
 import { Eventlog, LeaderThreadCtx, streamEventsWithSyncState } from '@livestore/common/leader-thread'
 import type { LiveStoreSchema } from '@livestore/common/schema'
-import { LiveStoreEvent } from '@livestore/common/schema'
 import { loadSqlite3Wasm } from '@livestore/sqlite-wasm/load-wasm'
 import { sqliteDbFactory } from '@livestore/sqlite-wasm/node'
 import { omitUndefineds } from '@livestore/utils'
@@ -408,8 +409,9 @@ const makeLocalLeaderThread = ({
     const layer = yield* Layer.buildWithScope(leaderThreadLayer, leaderThreadScope)
 
     return yield* Effect.gen(function* () {
-      const { dbState, dbEventlog, syncProcessor, extraIncomingMessagesQueue, initialState, networkStatus } =
-        yield* LeaderThreadCtx
+      const { syncProcessor, extraIncomingMessagesQueue, initialState, networkStatus } = yield* LeaderThreadCtx
+      const dbState = yield* StateSqliteDb.StateSqliteDb
+      const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
 
       const initialLeaderHead = Eventlog.getClientHeadFromDb(dbEventlog)
 
@@ -422,9 +424,7 @@ const makeLocalLeaderThread = ({
               // Together with the dedicated `leaderThreadScope` above, this guarantees an in-flight batch is
               // fully persisted by the (still-live) leader before the co-located pusher fiber is interrupted
               // on store shutdown.
-              syncProcessor
-                .push(batch.map((item) => new LiveStoreEvent.Client.EncodedWithMeta(item)))
-                .pipe(Effect.uninterruptible),
+              syncProcessor.push(batch).pipe(Effect.uninterruptible),
             stream: (options) =>
               streamEventsWithSyncState({
                 dbEventlog,

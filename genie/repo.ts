@@ -17,7 +17,6 @@ import {
   livestorePackageDefaults as coreLivestorePackageDefaults,
   pnpmStateSetupStep,
   preparePinnedDevenvStep,
-  restorePnpmStateStep,
   type PnpmPackageClosureConfig,
   validateNixStoreStep,
   utilsEffectPeerDeps,
@@ -123,7 +122,6 @@ export const livestoreContribSetupStepsAfterCheckout = [
   prepareLivestoreContribCiScriptsStep,
   preparePinnedDevenvStep,
   pnpmStateSetupStep,
-  restorePnpmStateStep({ keyPrefix: 'livestore-contrib-pnpm-state-v1' }),
   validateNixStoreStep,
 ] as const
 

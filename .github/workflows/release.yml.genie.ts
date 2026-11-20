@@ -7,15 +7,10 @@ import {
   namespaceRunner,
   nixDiagnosticsArtifactStep,
   runDevenvTasksBefore,
-  savePnpmStateStep,
 } from '../../genie/repo.ts'
 import { prSnapshotForeignEventGuard, prSnapshotReleaseJobs } from '../../repos/effect-utils/genie/ci-workflow.ts'
 
-const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
-  ...steps,
-  savePnpmStateStep({ keyPrefix: 'livestore-contrib-pnpm-state-v1' }),
-  nixDiagnosticsArtifactStep(),
-]
+const withNixDiagnosticsOnFailure = (steps: unknown[]) => [...steps, nixDiagnosticsArtifactStep()]
 
 const prSnapshot = prSnapshotReleaseJobs({
   // Q415: hosted under the Q423 exception until 2026-12-31; moves to a fleet profile on admission.
@@ -90,7 +85,6 @@ export default githubWorkflow({
   },
 
   env: {
-    CACHIX_AUTH_TOKEN: '${{ secrets.CACHIX_AUTH_TOKEN }}',
     CI: 'true',
     FORCE_SETUP: '1',
   },

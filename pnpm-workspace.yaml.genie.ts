@@ -114,6 +114,28 @@ const contribPeerDependencyRules = {
  */
 const contribCatalogDuplicateExceptions = [
   {
+    package: 'acorn',
+    versions: ['8.16.0', '8.14.0'],
+    reason:
+      'Transitive duplicate in the examples closure: miniflare (via wrangler and @cloudflare/vite-plugin) pins its own acorn line.',
+  },
+  {
+    package: 'acorn-walk',
+    versions: ['8.3.5', '8.3.2'],
+    reason:
+      'Transitive duplicate in the examples closure: miniflare (via wrangler and @cloudflare/vite-plugin) pins its own acorn-walk line.',
+  },
+  {
+    package: 'ajv',
+    versions: ['8.20.0', '8.11.0'],
+    reason: 'Transitive duplicate in the Expo example closure: eas-cli and its helpers pin ajv 8.11.0.',
+  },
+  {
+    package: 'pngjs',
+    versions: ['7.0.0', '3.4.0'],
+    reason: 'Transitive duplicate in the Expo example closure: parse-png (via @expo/image-utils) depends on pngjs 3.',
+  },
+  {
     package: '@cloudflare/workers-types',
     versions: ['4.20251118.0', '4.20250924.0'],
     reason:
@@ -208,12 +230,6 @@ const contribCatalogDuplicateExceptions = [
     versions: ['2.9.0', '2.6.0'],
     reason:
       "Transitive duplicate in the examples closure. The catalog already pins the newer version; the older one arrives through an example app's own dependency tree, so nothing in contrib selects it directly.",
-  },
-  {
-    package: '@types/node',
-    versions: ['26.0.0', '25.3.3'],
-    reason:
-      'Transitive duplicate in the examples closure; the catalog pins the older line and a newer one arrives through an example app.',
   },
   {
     package: 'vite',

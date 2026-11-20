@@ -102,8 +102,11 @@ class ClosingWebSocket extends EventTarget implements globalThis.WebSocket {
   onmessage: ((this: WebSocket, ev: MessageEvent) => unknown) | null = null
   onopen: ((this: WebSocket, ev: Event) => unknown) | null = null
 
-  constructor(private readonly code: number) {
+  private readonly code: number
+
+  constructor(code: number) {
     super()
+    this.code = code
   }
 
   send(_data: string | ArrayBufferLike | Blob | ArrayBufferView) {}

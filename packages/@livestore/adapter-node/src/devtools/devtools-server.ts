@@ -117,6 +117,10 @@ export const startDevtoolsServer = ({
           // TODO replace this once @effect/platform-node supports Node HTTP middlewares
           const nodeReq = PlatformNode.NodeHttpServerRequest.toIncomingMessage(req)
           const nodeRes = PlatformNode.NodeHttpServerRequest.toServerResponse(req)
+          // The devtools server is a plain `http` server, so HTTP/2 requests never reach this branch.
+          if (nodeReq instanceof http.IncomingMessage === false || nodeRes instanceof http.ServerResponse === false) {
+            return yield* Effect.die(new Error('Expected an HTTP/1 request/response for the Vite devtools middleware'))
+          }
           const deferred = yield* Deferred.make<void>()
           viteMiddleware.middlewares(nodeReq, nodeRes, () => Deferred.doneUnsafe(deferred, Exit.void))
           yield* Deferred.await(deferred)

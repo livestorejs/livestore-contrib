@@ -7,7 +7,16 @@ if (process.execArgv.includes('--inspect') === true) {
 }
 
 import type { ClientSessionLeaderThreadProxy, MakeSqliteDb, SqliteDb, SyncOptions } from '@livestore/common'
-import { Devtools, liveStoreStorageFormatVersion, migrateDb, StateHead, UnknownError } from '@livestore/common'
+import {
+  Devtools,
+  EventlogSqliteDb,
+  liveStoreStorageFormatVersion,
+  MaterializationJournal,
+  migrateDb,
+  StateHead,
+  StateSqliteDb,
+  UnknownError,
+} from '@livestore/common'
 import type { DevtoolsOptions, LeaderSqliteDb, LeaderThreadCtx } from '@livestore/common/leader-thread'
 import { configureConnection, makeLeaderThreadLayer } from '@livestore/common/leader-thread'
 import type { LiveStoreSchema } from '@livestore/common/schema'
@@ -60,7 +69,11 @@ export const makeLeaderThread = ({
   syncPayloadSchema,
   testing,
 }: MakeLeaderThreadArgs): Effect.Effect<
-  Layer.Layer<LeaderThreadCtx, UnknownError, Scope.Scope | HttpClient.HttpClient | FileSystem.FileSystem>,
+  Layer.Layer<
+    LeaderThreadCtx | StateSqliteDb.StateSqliteDb | EventlogSqliteDb.EventlogSqliteDb,
+    UnknownError,
+    Scope.Scope | HttpClient.HttpClient | FileSystem.FileSystem
+  >,
   UnknownError,
   Scope.Scope
 > =>
@@ -107,19 +120,24 @@ export const makeLeaderThread = ({
 
     const shutdownChannel = yield* makeShutdownChannel(storeId)
 
-    return makeLeaderThreadLayer({
+    const sqliteDbLayer = Layer.mergeAll(StateSqliteDb.layer(dbState), EventlogSqliteDb.layer(dbEventlog))
+    const stateServicesLayer = Layer.mergeAll(StateHead.layer, MaterializationJournal.layer).pipe(
+      Layer.provide(sqliteDbLayer),
+    )
+
+    const leaderThreadLayer = makeLeaderThreadLayer({
       schema,
       storeId,
       clientId,
       makeSqliteDb,
       syncOptions,
-      dbState,
-      dbEventlog,
       devtoolsOptions,
       shutdownChannel,
       syncPayloadEncoded,
       syncPayloadSchema: syncPayloadSchema as Schema.Decoder<Schema.Json, never> | undefined,
-    }).pipe(Layer.provide(StateHead.layer({ dbState })))
+    }).pipe(Layer.provide(Layer.mergeAll(sqliteDbLayer, stateServicesLayer)))
+
+    return Layer.mergeAll(leaderThreadLayer, sqliteDbLayer)
   }).pipe(
     Effect.tapCauseLogPretty,
     UnknownError.mapToUnknownError,

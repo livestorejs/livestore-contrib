@@ -1,7 +1,9 @@
-import { makeInMemoryAdapter } from '@livestore/adapter-web'
-import { EventSequenceNumber, LiveStoreEvent, SystemTables } from '@livestore/common/schema'
-import { createStorePromise, StoreInternalsSymbol } from '@livestore/livestore'
-import { Effect } from '@livestore/utils/effect'
+import { type BootStatus, EventlogSqliteDb, MaterializationJournal, StateHead, StateSqliteDb } from '@livestore/common'
+import { Eventlog, makeMaterializeEvent, recreateDb } from '@livestore/common/leader-thread'
+import { EventSequenceNumber, LiveStoreEvent, SystemTables, UNKNOWN_EVENT_SCHEMA_HASH } from '@livestore/common/schema'
+import { sqliteDbFactory } from '@livestore/sqlite-wasm/browser'
+import { loadSqlite3Wasm } from '@livestore/sqlite-wasm/load-wasm'
+import { Effect, Layer, Queue, Schema } from '@livestore/utils/effect'
 
 import { getScenarioApplication } from '../corpus/applications/registry.ts'
 import type {
@@ -11,26 +13,24 @@ import type {
   ReconstructedValue,
 } from './leader-state.ts'
 
-let storeSequence = 0
+/**
+ * Replays exactly the selected Leader observation's retained Event facts through real materializers.
+ * The events go into a fresh eventlog with their recorded positions and origins, and core's state rebuild
+ * (`recreateDb` → `rematerializeFromEventlog`) derives the State from it.
+ */
+export const materializeLeaderState = (source: LeaderStateSource): Promise<ReconstructedLeaderState> => {
+  const { schema } = getScenarioApplication(source.applicationId)
 
-/** Replays exactly the selected Leader observation's retained Event facts through real materializers. */
-export const materializeLeaderState = async (source: LeaderStateSource): Promise<ReconstructedLeaderState> => {
-  const application = getScenarioApplication(source.applicationId)
-  storeSequence += 1
-  const store = await createStorePromise({
-    schema: application.schema,
-    storeId: `scenario-viewer-reconstruction-${storeSequence}`,
-    disableDevtools: true,
-    adapter: makeInMemoryAdapter({
-      clientId: `viewer-${source.clientId}`,
-      sessionId: 'reconstruction',
-    }),
-  })
+  return Effect.gen(function* () {
+    const makeSqliteDb = sqliteDbFactory({ sqlite3: yield* Effect.promise(() => loadSqlite3Wasm()) })
+    const dbState = yield* makeSqliteDb({ _tag: 'in-memory' })
+    const dbEventlog = yield* makeSqliteDb({ _tag: 'in-memory' })
 
-  try {
-    const events = source.observation.events.map(
-      (event) =>
-        new LiveStoreEvent.Client.EncodedWithMeta({
+    yield* Eventlog.initEventlogDb(dbEventlog)
+    for (const event of source.observation.events) {
+      const eventDef = schema.eventsDefsMap.get(event.name)
+      yield* Eventlog.insertIntoEventlog(
+        LiveStoreEvent.Client.Encoded.make({
           name: event.name,
           args: event.args,
           seqNum: EventSequenceNumber.Client.fromString(event.position),
@@ -38,13 +38,28 @@ export const materializeLeaderState = async (source: LeaderStateSource): Promise
           clientId: event.origin.clientId,
           sessionId: event.origin.sessionId,
         }),
+        dbEventlog,
+        eventDef === undefined ? UNKNOWN_EVENT_SCHEMA_HASH : Schema.hash(eventDef.schema),
+        event.origin.clientId,
+        event.origin.sessionId,
+      )
+    }
+
+    const sqliteDbLayer = Layer.mergeAll(StateSqliteDb.layer(dbState), EventlogSqliteDb.layer(dbEventlog))
+    const servicesLayer = Layer.mergeAll(StateHead.layer, MaterializationJournal.layer).pipe(
+      Layer.provideMerge(sqliteDbLayer),
     )
-    await Effect.runPromise(store[StoreInternalsSymbol].syncProcessor.materializeEvents(events))
+    yield* Effect.gen(function* () {
+      const materializeEvent = yield* makeMaterializeEvent({ schema })
+      yield* recreateDb({ schema, bootStatusQueue: yield* Queue.unbounded<BootStatus>(), materializeEvent })
+    }).pipe(Effect.provide(servicesLayer))
 
     const tables: ReconstructedTable[] = []
-    for (const [name, table] of application.schema.state.sqlite.tables) {
+    for (const [name, table] of schema.state.sqlite.tables) {
       if (SystemTables.isStateSystemTable(name) === true) continue
-      const rawRows = store.query(table) as ReadonlyArray<Readonly<Record<string, unknown>>>
+      const rawRows = (yield* Schema.decodeUnknownEffect(Schema.Array(table.rowSchema))(
+        dbState.select(`SELECT * FROM '${name}'`),
+      )) as ReadonlyArray<Readonly<Record<string, unknown>>>
       const columns = [
         ...new Set([...Object.keys(table.sqliteDef.columns), ...rawRows.flatMap((row) => Object.keys(row))]),
       ]
@@ -57,9 +72,7 @@ export const materializeLeaderState = async (source: LeaderStateSource): Promise
       })
     }
     return { source, tables }
-  } finally {
-    await store.shutdownPromise()
-  }
+  }).pipe(Effect.scoped, Effect.runPromise)
 }
 
 const normalizeValue = (value: unknown): ReconstructedValue => {

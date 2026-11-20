@@ -15,29 +15,18 @@ export type ParticipantHostFailureCode =
 
 export class ScenarioOperationError extends Error {
   readonly _tag = 'ScenarioOperationError'
+  readonly code: ScenarioOperationErrorCode
+  /** Whether the controller knows that request handling failed or lost the response boundary. */
+  readonly operationOutcome: ScenarioOperationFailureOutcome
 
   constructor(
-    readonly code:
-      | 'application-mismatch'
-      | 'capability-unavailable'
-      | 'duplicate-client'
-      | ParticipantHostFailureCode
-      | 'invalid-action-input'
-      | 'invalid-inspector-output'
-      | 'invalid-observation-evidence'
-      | 'invalid-scenario'
-      | 'missing-client'
-      | 'missing-participant'
-      | 'operations-in-flight'
-      | 'participant-runtime-failure'
-      | 'settlement-timeout'
-      | 'unknown-action'
-      | 'unknown-inspector',
+    code: ScenarioOperationErrorCode,
     message: string,
-    /** Whether the controller knows that request handling failed or lost the response boundary. */
-    readonly operationOutcome: ScenarioOperationFailureOutcome = 'definite-failure',
+    operationOutcome: ScenarioOperationFailureOutcome = 'definite-failure',
   ) {
     super(message)
+    this.code = code
+    this.operationOutcome = operationOutcome
     this.name = 'ScenarioOperationError'
   }
 }
@@ -161,3 +150,20 @@ export const inspectApplicationState = <TSchema extends LiveStoreSchema>(args: {
   }
   return inspector.inspect(args.store)
 }
+
+type ScenarioOperationErrorCode =
+  | 'application-mismatch'
+  | 'capability-unavailable'
+  | 'duplicate-client'
+  | ParticipantHostFailureCode
+  | 'invalid-action-input'
+  | 'invalid-inspector-output'
+  | 'invalid-observation-evidence'
+  | 'invalid-scenario'
+  | 'missing-client'
+  | 'missing-participant'
+  | 'operations-in-flight'
+  | 'participant-runtime-failure'
+  | 'settlement-timeout'
+  | 'unknown-action'
+  | 'unknown-inspector'
