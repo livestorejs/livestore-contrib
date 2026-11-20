@@ -6,11 +6,10 @@ if (process.execArgv.includes('--inspect') === true) {
   inspector.waitForDebugger()
 }
 
-import { type LogConfig, type SyncOptions, UnknownError } from '@livestore/common'
+import { EventlogSqliteDb, type LogConfig, StateSqliteDb, type SyncOptions, UnknownError } from '@livestore/common'
 import type { StreamEventsOptions } from '@livestore/common/leader-thread'
 import { Eventlog, LeaderThreadCtx, streamEventsWithSyncState } from '@livestore/common/leader-thread'
 import type { LiveStoreSchema } from '@livestore/common/schema'
-import { LiveStoreEvent } from '@livestore/common/schema'
 import { loadSqlite3Wasm } from '@livestore/sqlite-wasm/load-wasm'
 import { sqliteDbFactory } from '@livestore/sqlite-wasm/node'
 import { isDevEnv } from '@livestore/utils'
@@ -133,7 +132,8 @@ const makeWorkerRunnerInner = (options: WorkerOptions) =>
         GetRecreateSnapshot: Effect.fn('@livestore/adapter-node:worker:GetRecreateSnapshot')(
           function* () {
             const workerCtx = yield* LeaderThreadCtx
-            const snapshot = workerCtx.dbState.export()
+            const dbState = yield* StateSqliteDb.StateSqliteDb
+            const snapshot = dbState.export()
             return { snapshot, migrationsReport: workerCtx.initialState.migrationsReport }
           },
           provideLeaderThread,
@@ -144,31 +144,30 @@ const makeWorkerRunnerInner = (options: WorkerOptions) =>
             return syncProcessor.pull({ cursor })
           }).pipe(provideLeaderThread, Stream.unwrap),
         PushToLeader: ({ batch }) =>
-          Effect.andThen(LeaderThreadCtx, ({ syncProcessor }) =>
-            syncProcessor.push(batch.map((event) => new LiveStoreEvent.Client.EncodedWithMeta(event))),
-          ).pipe(provideLeaderThread, Effect.uninterruptible, Effect.withSpan('@livestore/adapter-node:worker:PushToLeader')),
+          Effect.andThen(LeaderThreadCtx, ({ syncProcessor }) => syncProcessor.push(batch)).pipe(provideLeaderThread, Effect.uninterruptible, Effect.withSpan('@livestore/adapter-node:worker:PushToLeader')),
         StreamEvents: (options) =>
-          LeaderThreadCtx.pipe(
-            Effect.map(({ dbEventlog, syncProcessor }) =>
-              streamEventsWithSyncState({
-                dbEventlog,
-                syncState: syncProcessor.syncState,
-                options: options as StreamEventsOptions,
-              }),
-            ),
+          Effect.gen(function* () {
+            const { syncProcessor } = yield* LeaderThreadCtx
+            const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
+            return streamEventsWithSyncState({
+              dbEventlog,
+              syncState: syncProcessor.syncState,
+              options: options as StreamEventsOptions,
+            })
+          }).pipe(
             provideLeaderThread,
             Stream.unwrap,
             Stream.withSpan('@livestore/adapter-node:worker:StreamEvents'),
           ),
         Export: () =>
-          LeaderThreadCtx.pipe(
-            Effect.flatMap((_) => Effect.sync(() => _.dbState.export())),
+          StateSqliteDb.StateSqliteDb.pipe(
+            Effect.flatMap((dbState) => Effect.sync(() => dbState.export())),
             provideLeaderThread,
             Effect.withSpan('@livestore/adapter-node:worker:Export'),
           ),
         ExportEventlog: () =>
-          LeaderThreadCtx.pipe(
-            Effect.flatMap((_) => Effect.sync(() => _.dbEventlog.export())),
+          EventlogSqliteDb.EventlogSqliteDb.pipe(
+            Effect.flatMap((dbEventlog) => Effect.sync(() => dbEventlog.export())),
             provideLeaderThread,
             Effect.withSpan('@livestore/adapter-node:worker:ExportEventlog'),
           ),
@@ -180,8 +179,8 @@ const makeWorkerRunnerInner = (options: WorkerOptions) =>
           ),
         GetLeaderHead: Effect.fn('@livestore/adapter-node:worker:GetLeaderHead')(
           function* () {
-            const workerCtx = yield* LeaderThreadCtx
-            return Eventlog.getClientHeadFromDb(workerCtx.dbEventlog)
+            const dbEventlog = yield* EventlogSqliteDb.EventlogSqliteDb
+            return Eventlog.getClientHeadFromDb(dbEventlog)
           },
           provideLeaderThread,
         ),

@@ -88,9 +88,8 @@ const mcpServerCommand = Cli.Command.make(
       name: 'livestore-mcp',
       version: '0.1.0',
       protocols: supportedMcpProtocols,
+      registrations: Layer.mergeAll(LivestoreResources, LivestoreTools),
     }).pipe(
-      Layer.provide(LivestoreResources),
-      Layer.provide(LivestoreTools),
       Layer.provide(
         Layer.merge(Logger.layer([Logger.consolePretty()]), Layer.succeed(Logger.LogToStderr, true)),
       ),

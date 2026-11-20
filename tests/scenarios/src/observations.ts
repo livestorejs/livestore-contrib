@@ -106,7 +106,7 @@ export const collectConfirmedEvents = <TSchema extends LiveStoreSchema>(
 
 export const makeComponentSyncObservation = (args: {
   confirmed: ReadonlyArray<ClientEvent>
-  pending: ReadonlyArray<LiveStoreEvent.Client.EncodedWithMeta>
+  pending: ReadonlyArray<LiveStoreEvent.Client.Encoded>
   localHead: EventSequenceNumber.Client.Composite
   upstreamHead: EventSequenceNumber.Client.Composite
   eventRefs: EventRefRegistry

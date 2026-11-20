@@ -3,6 +3,7 @@ import adapterWebPkg from '../../repos/livestore/packages/@livestore/adapter-web
 import commonPkg from '../../repos/livestore/packages/@livestore/common/package.json.genie.ts'
 import livestorePkg from '../../repos/livestore/packages/@livestore/livestore/package.json.genie.ts'
 import reactPkg from '../../repos/livestore/packages/@livestore/react/package.json.genie.ts'
+import sqliteWasmPkg from '../../repos/livestore/packages/@livestore/sqlite-wasm/package.json.genie.ts'
 import syncCfPkg from '../../repos/livestore/packages/@livestore/sync-cf/package.json.genie.ts'
 import utilsDevPkg from '../../repos/livestore/packages/@livestore/utils-dev/package.json.genie.ts'
 import utilsPkg from '../../repos/livestore/packages/@livestore/utils/package.json.genie.ts'
@@ -10,7 +11,7 @@ import utilsPkg from '../../repos/livestore/packages/@livestore/utils/package.js
 const runtimeDeps = catalog.compose({
   workspace: workspaceMember('tests/scenarios'),
   dependencies: {
-    workspace: [adapterWebPkg, commonPkg, livestorePkg, reactPkg, syncCfPkg, utilsPkg],
+    workspace: [adapterWebPkg, commonPkg, livestorePkg, reactPkg, sqliteWasmPkg, syncCfPkg, utilsPkg],
     external: {
       ...catalog.pick('@cloudflare/workers-types'),
       ...catalog.pick('@playwright/test'),

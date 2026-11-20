@@ -144,12 +144,19 @@ export type ScenarioApplication<TApplication extends ScenarioApplicationShape> =
 
 export class ScenarioPlan {
   readonly _tag = 'ScenarioPlan'
+  readonly start: ScenarioStart
+  readonly instructions: ReadonlyArray<InstructionSpec>
+  readonly expectations: ReadonlyArray<OracleSpec> | undefined
 
   constructor(
-    readonly start: ScenarioStart,
-    readonly instructions: ReadonlyArray<InstructionSpec> = [],
-    readonly expectations: ReadonlyArray<OracleSpec> | undefined = undefined,
-  ) {}
+    start: ScenarioStart,
+    instructions: ReadonlyArray<InstructionSpec> = [],
+    expectations: ReadonlyArray<OracleSpec> | undefined = undefined,
+  ) {
+    this.start = start
+    this.instructions = instructions
+    this.expectations = expectations
+  }
 }
 
 export class ScenarioBuilder extends ScenarioPlan {

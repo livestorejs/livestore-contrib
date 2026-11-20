@@ -9,15 +9,10 @@ import {
   namespaceRunner,
   nixDiagnosticsArtifactStep,
   runDevenvTasksBefore,
-  savePnpmStateStep,
 } from '../../genie/repo.ts'
 import { prSnapshotPackJob } from '../../repos/effect-utils/genie/ci-workflow.ts'
 
-const withNixDiagnosticsOnFailure = (steps: unknown[]) => [
-  ...steps,
-  savePnpmStateStep({ keyPrefix: 'livestore-contrib-pnpm-state-v1' }),
-  nixDiagnosticsArtifactStep(),
-]
+const withNixDiagnosticsOnFailure = (steps: unknown[]) => [...steps, nixDiagnosticsArtifactStep()]
 
 const standardCIJob = (config: { name?: string; steps: unknown[] }) => ({
   name: config.name,
@@ -44,7 +39,6 @@ export default githubWorkflow({
   },
 
   env: {
-    CACHIX_AUTH_TOKEN: '${{ secrets.CACHIX_AUTH_TOKEN }}',
     CI: 'true',
     FORCE_SETUP: '1',
   },

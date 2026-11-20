@@ -5,11 +5,14 @@ import {
   type BootStatus,
   ClientSessionLeaderThreadProxy,
   Devtools,
+  EventlogSqliteDb,
   IntentionalShutdownCause,
   type LockStatus,
   liveStoreStorageFormatVersion,
   makeClientSession,
+  MaterializationJournal,
   StateHead,
+  StateSqliteDb,
   type SyncOptions,
   UnknownError,
 } from '@livestore/common'
@@ -21,7 +24,7 @@ import {
   streamEventsWithSyncState,
 } from '@livestore/common/leader-thread'
 import type { LiveStoreSchema } from '@livestore/common/schema'
-import { getStateDbBaseName, LiveStoreEvent } from '@livestore/common/schema'
+import { getStateDbBaseName } from '@livestore/common/schema'
 import { shouldNeverHappen } from '@livestore/utils'
 import type { Schema, Scope } from '@livestore/utils/effect'
 import {
@@ -267,11 +270,14 @@ const makeLeaderThread = ({
       clientId,
     })
 
+    const sqliteDbLayer = Layer.mergeAll(StateSqliteDb.layer(dbState), EventlogSqliteDb.layer(dbEventlog))
+    const stateServicesLayer = Layer.mergeAll(StateHead.layer, MaterializationJournal.layer).pipe(
+      Layer.provide(sqliteDbLayer),
+    )
+
     const layer = yield* Layer.build(
       makeLeaderThreadLayer({
         clientId,
-        dbState,
-        dbEventlog,
         devtoolsOptions,
         makeSqliteDb,
         schema,
@@ -281,19 +287,15 @@ const makeLeaderThread = ({
         syncOptions,
         syncPayloadEncoded,
         syncPayloadSchema,
-      }).pipe(Layer.provide(StateHead.layer({ dbState })), Layer.provideMerge(FetchHttpClient.layer)),
+      }).pipe(
+        Layer.provide(Layer.mergeAll(sqliteDbLayer, stateServicesLayer)),
+        Layer.provideMerge(FetchHttpClient.layer),
+      ),
     )
 
     return yield* Effect.gen(function* () {
-      const {
-        dbState: db,
-        dbEventlog,
-        syncProcessor,
-        extraIncomingMessagesQueue,
-        initialState,
-        bootStatusQueue,
-        networkStatus,
-      } = yield* LeaderThreadCtx
+      const { syncProcessor, extraIncomingMessagesQueue, initialState, bootStatusQueue, networkStatus } =
+        yield* LeaderThreadCtx
 
       const bootStatusFiber = yield* Queue.takeBetween(bootStatusQueue, 1, 1000).pipe(
         Effect.tap((bootStatus) => Queue.offerAll(bootStatusQueueClientSession, bootStatus)),
@@ -313,8 +315,7 @@ const makeLeaderThread = ({
       const leaderThread = ClientSessionLeaderThreadProxy.of({
         events: {
           pull: ({ cursor }) => syncProcessor.pull({ cursor }),
-          push: (batch) =>
-            syncProcessor.push(batch.map((item) => new LiveStoreEvent.Client.EncodedWithMeta(item))),
+          push: syncProcessor.push,
           stream: (options) =>
             streamEventsWithSyncState({
               dbEventlog,
@@ -327,14 +328,14 @@ const makeLeaderThread = ({
           migrationsReport: initialState.migrationsReport,
           storageMode: 'persisted',
         },
-        export: Effect.sync(() => db.export()),
+        export: Effect.sync(() => dbState.export()),
         getEventlogData: Effect.sync(() => dbEventlog.export()),
         syncState: syncProcessor.syncState,
         sendDevtoolsMessage: (message) => Queue.offer(extraIncomingMessagesQueue, message),
         networkStatus,
       })
 
-      const initialSnapshot = db.export()
+      const initialSnapshot = dbState.export()
 
       return { leaderThread, initialSnapshot }
     }).pipe(Effect.provide(layer))
