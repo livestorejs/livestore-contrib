@@ -1,12 +1,12 @@
 # Release-sensitive repository policy and release automation.
-/.github/ @schickling
-/genie/ @schickling
-/devenv.lock @schickling
-/devenv.nix @schickling
-/devenv.yaml @schickling
-/megarepo.kdl @schickling
-/megarepo.lock @schickling
-/release/ @schickling
+/.github/ @schickling @bohdanbirdie
+/genie/ @schickling @bohdanbirdie
+/devenv.lock @schickling @bohdanbirdie
+/devenv.nix @schickling @bohdanbirdie
+/devenv.yaml @schickling @bohdanbirdie
+/megarepo.kdl @schickling @bohdanbirdie
+/megarepo.lock @schickling @bohdanbirdie
+/release/ @schickling @bohdanbirdie
 
 # Registering an example needs no code-owner review.
 /genie/examples.ts

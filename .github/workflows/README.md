@@ -39,7 +39,21 @@ for the dispatch and hypothetical stable dry-run runbook.
 Repository settings are generated from `.github/repository-settings.json.genie.ts`
 and `.github/repo-settings.json.genie.ts`. Those typed sources are authoritative;
 the generated JSON artifacts are the reviewable and applied projections for
-GitHub repository toggles and the `main-branch-rules` ruleset.
+GitHub repository toggles and the `main-branch-rules` ruleset. The separate
+`main-code-owner-review` ruleset is generated from
+`.github/code-owner-review.json.genie.ts`.
+
+After this change lands on `main`, a repository admin can apply both files from
+a checkout of that branch. Apply the code-owner rule first so the approval
+requirement stays in force during the migration.
+
+```bash
+set -euo pipefail
+endpoint=repos/livestorejs/livestore-contrib/rulesets
+version='X-GitHub-Api-Version: 2026-03-10'
+gh api "$endpoint" --method POST -H "$version" --input .github/code-owner-review.json
+gh api "$endpoint/17366197" --method PUT -H "$version" --input .github/repo-settings.json
+```
 
 ## `cloudflare-spend-guard.yml`
 
