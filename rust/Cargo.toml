@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+livestore-core = { path = "crates/livestore-core" }
+livestore-schema = { path = "crates/livestore-schema" }
+livestore-todomvc = { path = "crates/livestore-todomvc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tracing = "0.1.44"
