@@ -10,9 +10,11 @@ Porting references: [`contributor-docs/rust/`](../contributor-docs/rust).
 
 | Crate | What it is |
 |---|---|
-| `crates/livestore-core` | Sequence numbers and events |
+| `crates/livestore-core` | Sequence numbers, events, port of `sync/syncstate.ts` (`merge`) |
 | `crates/livestore-schema` | Schema DSL: tables + DDL (byte-identical to TS), client documents, typed events, materializers, query builder |
 | `crates/livestore-macros` | `#[derive(Event)]`: an event defined once, from its args struct |
+| `crates/livestore-sqlite` | Leader persistence: materialize + journal, rollback/rebase, boot from disk |
+| `crates/livestore-sync` | `SyncBackend` trait, `LeaderSyncProcessor` actor, `Leader` builder; `testing` feature: `MockSyncBackend`, `EventFactory` |
 | `crates/livestore-todomvc` | TodoMVC schema on the DSL |
 
 ## Setup
@@ -38,3 +40,13 @@ devenv tasks run rust:test                  # unit, fixture, mock- and fake-back
 
 `check:rust` is separate from `check:all`; CI runs it in `.github/workflows/rust.yml` on changes under
 `rust/`, the devenv files, or the megarepo pin.
+
+## Fixtures
+
+Fixtures come from the real TypeScript implementation of the pinned core:
+
+```bash
+bun rust/scripts/gen-syncstate-fixtures.ts       # fixtures/syncstate
+bun rust/scripts/gen-leader-fixtures.ts          # fixtures/leader
+rust/scripts/check-sqlite-build.sh               # compares SQLite behavior with wa-sqlite (known differences allow-listed)
+```
