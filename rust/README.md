@@ -14,6 +14,7 @@ Porting references: [`contributor-docs/rust/`](../contributor-docs/rust).
 | `crates/livestore-schema` | Schema DSL: tables + DDL (byte-identical to TS), client documents, typed events, materializers, query builder |
 | `crates/livestore-sqlite` | Leader persistence: materialize + journal, rollback/rebase, boot from disk |
 | `crates/livestore-sync` | `SyncBackend` trait, `LeaderSyncProcessor` actor, `Leader` builder; `testing` feature: `MockSyncBackend`, `EventFactory` |
+| `crates/livestore` | Store: client session, commit, queries, reactivity |
 | `crates/livestore-todomvc` | TodoMVC schema on the DSL |
 
 ## Setup

@@ -29,6 +29,7 @@ livestore-core = { path = "crates/livestore-core" }
 livestore-schema = { path = "crates/livestore-schema" }
 livestore-sqlite = { path = "crates/livestore-sqlite" }
 livestore-sync = { path = "crates/livestore-sync" }
+livestore = { path = "crates/livestore" }
 livestore-todomvc = { path = "crates/livestore-todomvc" }
 futures = "0.3.34"
 rusqlite = { version = "=0.37.0", features = ["bundled", "session"] }
