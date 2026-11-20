@@ -1,0 +1,53 @@
+[
+  {
+    "dir": "open",
+    "url": "ws://localhost:8787/?storeId=raw-1795165521892-payload&payload=%257B%2522authToken%2522%253A%2522insecure-token%2522%257D&transport=ws"
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":1,\"tag\":\"SyncWsRpc.Push\",\"payload\":{\"storeId\":\"raw-1795165521892-payload\",\"batch\":[{\"name\":\"todoCreated-v1\",\"args\":{\"nested\":{\"a\":[1,null,\"x\"]},\"n\":null},\"seqNum\":1,\"parentSeqNum\":0,\"clientId\":\"rust-client\",\"sessionId\":\"rust-session\"}],\"backendId\":{\"_tag\":\"None\"}},\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 1,
+      "tag": "SyncWsRpc.Push",
+      "payload": {
+        "storeId": "raw-1795165521892-payload",
+        "batch": [
+          {
+            "name": "todoCreated-v1",
+            "args": {
+              "nested": {
+                "a": [
+                  1,
+                  null,
+                  "x"
+                ]
+              },
+              "n": null
+            },
+            "seqNum": 1,
+            "parentSeqNum": 0,
+            "clientId": "rust-client",
+            "sessionId": "rust-session"
+          }
+        ],
+        "backendId": {
+          "_tag": "None"
+        }
+      },
+      "headers": []
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":1,\"exit\":{\"_tag\":\"Success\",\"value\":{}}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 1,
+      "exit": {
+        "_tag": "Success",
+        "value": {}
+      }
+    }
+  }
+]

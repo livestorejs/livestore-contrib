@@ -32,7 +32,7 @@ context/
   cli/             standalone tool; realizes no core dimension
   clients/         native clients in other languages; realize core 02-system/ end to end
     rust/
-      01-schema/  02-sqlite/  03-leader/  05-store/
+      01-schema/  02-sqlite/  03-leader/  04-sync-cf/  05-store/
   applications/    independently deployed applications
     discord-bot/
       01-runtime/  02-threading/  03-docs-assistant/  04-operations/  05-cli/
@@ -73,6 +73,7 @@ IDs with links (see below).
 | `LSC.CLIENT.RUST.SCHEMA-*` | `clients/rust/01-schema/` |
 | `LSC.CLIENT.RUST.SQLITE-*` | `clients/rust/02-sqlite/` |
 | `LSC.CLIENT.RUST.LEAD-*` | `clients/rust/03-leader/` |
+| `LSC.CLIENT.RUST.CF-*` | `clients/rust/04-sync-cf/` |
 | `LSC.CLIENT.RUST.STORE-*` | `clients/rust/05-store/` |
 | `LSC.APP.DISCORD-*`   | `applications/discord-bot/` |
 | `LSC.APP.DISCORD.RT-*` | `applications/discord-bot/01-runtime/` |

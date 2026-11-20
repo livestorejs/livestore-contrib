@@ -1,0 +1,20 @@
+[
+  {
+    "dir": "open",
+    "url": "ws://localhost:8787/?storeId=raw-1795165521892-ping&transport=ws"
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ping\"}",
+    "json": {
+      "_tag": "Ping"
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Pong\"}",
+    "json": {
+      "_tag": "Pong"
+    }
+  }
+]
