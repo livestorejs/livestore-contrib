@@ -1,4 +1,4 @@
-//! Prints this build's SQLite in the shape of `fixtures/sqlite/wa-sqlite.json` (used by scripts/check-sqlite-build.sh).
+//! Prints this build's SQLite in the shape of `scripts/dump-wa-sqlite-build.ts` output (used by scripts/check-sqlite-build.sh).
 use rusqlite::{Connection, types::Value};
 use serde_json::{Map, Value as Json, json};
 

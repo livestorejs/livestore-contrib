@@ -697,6 +697,11 @@ in
     after = [ "mr:bootstrap" ];
     exec = "cd rust && DEVENV_TASK_PASSTHROUGH=1 cargo test --workspace --locked";
   };
+  tasks."rust:sqlite-check" = {
+    description = "Fail if the Rust client's SQLite build drifts from the pinned core wa-sqlite build";
+    after = [ "pnpm:install" ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 rust/scripts/check-sqlite-build.sh";
+  };
   tasks."rust:test-live" = {
     description = "Run the Rust client live tests against the pinned core sync-cf worker";
     after = [ "pnpm:install" ];
@@ -709,6 +714,7 @@ in
       "rust:check"
       "rust:clippy"
       "rust:test"
+      "rust:sqlite-check"
       "rust:test-live"
     ];
   };

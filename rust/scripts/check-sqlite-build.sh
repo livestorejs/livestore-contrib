@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
 # Compares the Rust client's SQLite build with the wa-sqlite build LiveStore loads.
-# Usage: rust/scripts/check-sqlite-build.sh [--refresh]
-#   --refresh re-dumps fixtures/sqlite/wa-sqlite.json from the pinned core wa-sqlite dist (needs bun).
+# Both sides are read live: wa-sqlite from the pinned core in repos/livestore, so a core bump that changes SQLite fails here.
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
-fixture="$here/fixtures/sqlite/wa-sqlite.json"
-if [ "${1:-}" = "--refresh" ]; then
-  bun "$here/scripts/dump-wa-sqlite-build.ts"
-fi
+wasm="$(mktemp)"
 rust="$(mktemp)"
-trap 'rm -f "$rust"' EXIT
+trap 'rm -f "$wasm" "$rust"' EXIT
+bun "$here/scripts/dump-wa-sqlite-build.ts" > "$wasm"
 (cd "$here" && cargo run -q -p livestore-sqlite --example dump_sqlite_build) > "$rust"
-python3 - "$fixture" "$rust" <<'PY'
+python3 - "$wasm" "$rust" <<'PY'
 import json, sys
 wasm, native = (json.load(open(p)) for p in sys.argv[1:])
 # Justified native deviations (see crates/livestore-sqlite-sys/build.rs NATIVE_DEFINES).

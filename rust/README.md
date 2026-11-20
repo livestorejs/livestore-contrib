@@ -72,7 +72,7 @@ Fixtures come from the real TypeScript implementation of the pinned core:
 bun rust/scripts/gen-syncstate-fixtures.ts       # fixtures/syncstate
 bun rust/scripts/gen-leader-fixtures.ts          # fixtures/leader
 bun rust/scripts/gen-schema-hash-fixtures.ts     # crates/livestore-schema/tests/fixtures
-rust/scripts/check-sqlite-build.sh [--refresh]   # compares the native SQLite build with wa-sqlite
+rust/scripts/check-sqlite-build.sh             # compares the native SQLite build with wa-sqlite
 rust/scripts/vendor-sqlite.sh                    # re-vendors SQLite from wa-sqlite's flake.nix pin
 ```
 

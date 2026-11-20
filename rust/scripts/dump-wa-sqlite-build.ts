@@ -1,4 +1,4 @@
-// Dumps the SQLite build LiveStore's adapters load (wa-sqlite dist, non-FTS5 variant) as the parity fixture.
+// Prints the SQLite build LiveStore's adapters load (pinned core wa-sqlite dist, non-FTS5 variant) as JSON.
 // Run from the contrib root: bun rust/scripts/dump-wa-sqlite-build.ts
 import WaSqliteFactory from '../../repos/livestore/packages/@livestore/wa-sqlite/dist/wa-sqlite.node.mjs'
 import * as WaSqlite from '../../repos/livestore/packages/@livestore/wa-sqlite/src/sqlite-api.js'
@@ -31,7 +31,7 @@ const pragmas = [
   'hard_heap_limit', 'soft_heap_limit', 'mmap_size', 'locking_mode', 'cache_spill', 'analysis_limit',
 ]
 
-const fixture = {
+const build = {
   source: 'packages/@livestore/wa-sqlite/dist/wa-sqlite.node.mjs',
   version: scalar('select sqlite_version()'),
   sourceId: scalar('select sqlite_source_id()'),
@@ -52,8 +52,4 @@ const fixture = {
   },
 }
 
-await Bun.write(
-  new URL('../fixtures/sqlite/wa-sqlite.json', import.meta.url),
-  `${JSON.stringify(fixture, null, 2)}\n`,
-)
-console.log(fixture.version, fixture.sourceId, fixture.compileOptions.length, 'options')
+console.log(JSON.stringify(build, null, 2))
