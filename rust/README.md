@@ -70,7 +70,6 @@ Fixtures come from the real TypeScript implementation of the pinned core:
 ```bash
 bun rust/scripts/gen-syncstate-fixtures.ts       # fixtures/syncstate
 bun rust/scripts/gen-leader-fixtures.ts          # fixtures/leader
-bun rust/scripts/gen-schema-hash-fixtures.ts     # crates/livestore-schema/tests/fixtures
 rust/scripts/check-sqlite-build.sh               # compares SQLite behavior with wa-sqlite (known differences allow-listed)
 ```
 

@@ -15,9 +15,10 @@ deviations.
 ## Requirements
 
 - **LSC.CLIENT.RUST-R01 Byte-compatible with TypeScript:** Every artifact another
-  client can observe (eventlog rows, state rows and DDL, schema hashes, wire
-  frames, SQLite behavior) equals what the TypeScript implementation produces for
-  the same input. Equality is checked against fixtures dumped from core, not
+  client can observe (eventlog rows, state rows and DDL, wire frames, SQLite
+  behavior) equals what the TypeScript implementation produces for the same
+  input. Schema hashes are excluded: they never leave the device, so each client
+  only has to agree with itself. Equality is checked against fixtures dumped from core, not
   asserted by review. `refines: LS-R05, LS-R07`
 - **LSC.CLIENT.RUST-R02 Test-for-test parity:** Each in-scope core Vitest test has
   a named Rust port or a stated `n/a` reason; parity is claimed only when none is

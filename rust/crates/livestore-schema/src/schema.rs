@@ -11,7 +11,7 @@ use crate::client_document::ClientDocument;
 use crate::event_def::{
     EventDef, IntoStatements, MaterializeContext, MaterializeError, Materializer,
 };
-use crate::representation::schema_hash;
+use crate::fingerprint::schema_hash;
 use crate::table::Table;
 
 /// Runtime view of one event definition.

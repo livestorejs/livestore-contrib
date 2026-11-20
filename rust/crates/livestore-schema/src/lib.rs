@@ -9,7 +9,6 @@ pub mod event_def;
 pub mod fingerprint;
 pub mod migration;
 pub mod query_builder;
-pub mod representation;
 pub mod schema;
 pub mod system_tables;
 pub mod table;

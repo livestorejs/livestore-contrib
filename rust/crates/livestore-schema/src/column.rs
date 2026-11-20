@@ -57,9 +57,6 @@ pub struct Column {
     pub nullable: bool,
     pub primary_key: bool,
     pub auto_increment: bool,
-    /// Overrides the `SchemaRepresentation` document derived from `schema`, for Effect schemas the DSL cannot
-    /// express (recursive or opaque declarations).
-    pub schema_repr: Option<serde_json::Value>,
     base: ValueSchema,
     wrap_custom: fn(ValueSchema) -> ValueSchema,
 }
@@ -110,7 +107,6 @@ impl Column {
             nullable: false,
             primary_key: false,
             auto_increment: false,
-            schema_repr: None,
             base,
             wrap_custom: |schema| schema,
         }
@@ -178,11 +174,6 @@ impl Column {
     pub fn schema(mut self, schema: ValueSchema) -> Self {
         self.base = (self.wrap_custom)(schema);
         self.rebuild_schema()
-    }
-
-    pub fn schema_repr(mut self, repr: serde_json::Value) -> Self {
-        self.schema_repr = Some(repr);
-        self
     }
 
     pub fn primary_key(mut self) -> Self {

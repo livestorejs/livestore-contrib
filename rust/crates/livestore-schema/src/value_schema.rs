@@ -69,7 +69,8 @@ pub enum Ast {
         rest: Option<ValueSchema>,
     },
     Declaration(Declaration),
-    Suspend(Arc<dyn Fn() -> ValueSchema + Send + Sync>),
+    /// A recursive reference. The name identifies the thunk, so describing a schema can detect the cycle.
+    Suspend(&'static str, Arc<dyn Fn() -> ValueSchema + Send + Sync>),
 }
 
 #[derive(Clone, Debug)]
@@ -164,7 +165,7 @@ impl ValueSchema {
             Ast::Objects(_) | Ast::Record(_) => "Objects",
             Ast::Arrays { .. } => "Arrays",
             Ast::Declaration(_) => "Declaration",
-            Ast::Suspend(_) => "Suspend",
+            Ast::Suspend(..) => "Suspend",
         }
     }
 
@@ -430,7 +431,7 @@ impl ValueSchema {
                     .collect::<Result<_, _>>()
                     .map(Val::Array)
             }
-            (Ast::Suspend(f), v) => child(&f(), v),
+            (Ast::Suspend(_, f), v) => child(&f(), v),
             (_, v) => fail(&v),
         }
     }
@@ -584,8 +585,8 @@ pub fn record(value: ValueSchema) -> ValueSchema {
     ValueSchema::new(Ast::Record(value))
 }
 
-pub fn suspend(f: impl Fn() -> ValueSchema + Send + Sync + 'static) -> ValueSchema {
-    ValueSchema::new(Ast::Suspend(Arc::new(f)))
+pub fn suspend<F: Fn() -> ValueSchema + Send + Sync + 'static>(f: F) -> ValueSchema {
+    ValueSchema::new(Ast::Suspend(std::any::type_name::<F>(), Arc::new(f)))
 }
 
 /// `Schema.Class<Self>(name)(fields)`.

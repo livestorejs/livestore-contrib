@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 use livestore_schema::query_builder::{
     Cond, Direction, Filter, First, OnConflict, Op, QueryBuilderError, SqlQuery,
 };
+use livestore_schema::value_schema as s;
 use livestore_schema::{Column, SqlValue, Table};
 use serde_json::{Value, json};
 
@@ -48,7 +49,7 @@ static PERSON_PROFILES: LazyLock<Table> = LazyLock::new(|| {
 
 /// `State.SQLite.json({ schema: Schema.Array(...) })`: only the decoded side being an array matters here.
 fn json_array(name: &str) -> Column {
-    Column::json(name).schema_repr(json!({ "representations": [{ "_tag": "String" }, { "_tag": "Arrays", "elements": [], "rest": [] }] }))
+    Column::json(name).schema(s::array(s::string()))
 }
 
 fn sql(query: &str, binds: impl IntoIterator<Item = SqlValue>, table: &str) -> SqlQuery {

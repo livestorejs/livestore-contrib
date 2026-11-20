@@ -18,11 +18,13 @@ per-table schema hash live in `migration.rs`.
 
 ## Hashes
 
-Table fingerprints hash the Effect `SchemaRepresentation` of JSON columns; event
-`schemaHash` is Effect `Hash.string` of the schema AST JSON. Both derive from
-`ValueSchema` (`representation.rs`). Gaps: recursive (`suspend`) and opaque
-declaration schemas need a TS-dumped `Column::schema_repr`; events without
-`EventDef::schema` hash as `Schema.Any`.
+Hashes never leave the device: table hashes decide when a table is rebuilt, and
+event hashes only produce a warning on rematerialization. So the Rust client
+hashes its own description of a `ValueSchema` (`fingerprint::describe`) instead of
+Effect's internal JSON. Its hashes stay the same from run to run but differ from
+TypeScript's. Table fingerprints keep core's descriptor, so tables without JSON
+columns hash exactly like core. Recursive schemas (`suspend`) are described once
+and then referenced.
 
 ## Syncstate
 

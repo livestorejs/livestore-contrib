@@ -15,10 +15,10 @@ Realizes core [`01-event-model/`](https://github.com/livestorejs/livestore/tree/
   sequence numbers, their notation, and event equality behave as in TypeScript,
   checked by the ported `EventSequenceNumber` and `LiveStoreEvent` tests.
   `refines: LS.SYS.EVT-R05, LS.SYS.EVT-R06, LS.SYS.EVT-R10`
-- **LSC.CLIENT.RUST.SCHEMA-R02 Same DDL and hashes:** Tables, indexes, client
-  documents, and system tables generate byte-identical DDL; table fingerprints and
-  event schema hashes equal the TypeScript values, checked against fixtures from
-  `rust/scripts/gen-schema-hash-fixtures.ts`.
+- **LSC.CLIENT.RUST.SCHEMA-R02 Same DDL, stable hashes:** Tables, indexes, client
+  documents, and system tables generate byte-identical DDL. Table fingerprints and
+  event schema hashes come from Rust's own schema description and stay the same
+  from run to run; they do not have to equal the TypeScript values.
   `refines: LS.SYS.STATE.SQLITE-R01, LS.SYS.STATE.SQLITE-R03, LS.SYS.STATE.SQLITE-R08`
 - **LSC.CLIENT.RUST.SCHEMA-R03 Materializers return statements:** Materializers
   return SQL statements (like TS query builders) instead of running them, so the

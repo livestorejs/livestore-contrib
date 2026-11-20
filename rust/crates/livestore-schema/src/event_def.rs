@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Value, json};
 
 use crate::codec::{date_from_iso_string, iso_string_from_millis};
-use crate::representation::schema_hash;
+use crate::fingerprint::schema_hash;
 use crate::value::{SqlStatement, SqlValue};
 use crate::value_schema::{self as s, ValueSchema};
 

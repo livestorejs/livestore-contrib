@@ -8,7 +8,7 @@ Every LiveStore client so far is TypeScript, so "compatible with LiveStore" has
 meant "runs the same code". A native client cannot borrow that guarantee. The
 Rust client earns it another way: it ports the TypeScript behavior test by test
 and checks its outputs against fixtures dumped from the real TypeScript
-implementation. The eventlog rows, state rows, DDL, schema hashes, wire frames,
+implementation. The eventlog rows, state rows, DDL, wire frames,
 and even the SQLite build must come out identical, because a Rust client and a
 browser tab share one store through the same sync backend.
 

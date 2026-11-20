@@ -1,23 +1,37 @@
-//! Port of `schema/state/sqlite/db-schema/ast/fingerprint.test.ts`. Effect schema representation
-//! documents are dumped from TS into `fixtures/fingerprint_schemas.json`.
-
-use std::sync::LazyLock;
+//! Port of `schema/state/sqlite/db-schema/ast/fingerprint.test.ts`. Physical tables hash exactly like core.
+//! JSON columns hash Rust's own schema description instead of Effect's `SchemaRepresentation`, so the
+//! tests use Rust schemas and the pinned JSON values are Rust's own.
 
 use livestore_schema::fingerprint::{db_fingerprint, digest_to_fingerprint, table_fingerprint};
 use livestore_schema::migration::state_hash;
 use livestore_schema::system_tables::{REBUILD_TABLE, state_tables};
+use livestore_schema::value_schema::{self as s, Annotation, ValueSchema};
 use livestore_schema::{Column, ColumnDefault, Table};
-use serde_json::Value;
+use serde_json::json;
 
 /// `liveStoreStorageFormatVersion`.
 const STORAGE_FORMAT_VERSION: u32 = 6;
 
-static SCHEMAS: LazyLock<Value> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("fixtures/fingerprint_schemas.json")).unwrap()
-});
+fn value(schema: ValueSchema) -> ValueSchema {
+    s::struct_([("value", schema)])
+}
 
-fn repr(key: &str) -> Value {
-    SCHEMAS[key].clone()
+fn min_length(min: usize) -> ValueSchema {
+    value(s::string().check(s::is_min_length(min)))
+}
+
+fn opaque(payload: &str) -> ValueSchema {
+    s::date().annotate(
+        "representation",
+        Annotation::Json(json!({ "id": "example/opaque", "payload": { "annotations": payload } })),
+    )
+}
+
+fn tree() -> ValueSchema {
+    s::struct_([
+        ("value", s::string()),
+        ("children", s::array(s::suspend(tree))),
+    ])
 }
 
 fn physical_table() -> Table {
@@ -27,10 +41,10 @@ fn physical_table() -> Table {
         .index("users_by_age", &["age"])
 }
 
-fn json_table(name: &str, schema: &str) -> Table {
+fn json_table(name: &str, schema: ValueSchema) -> Table {
     Table::new(name)
         .column(Column::text("id").primary_key())
-        .column(Column::json("value").schema_repr(repr(schema)))
+        .column(Column::json("value").schema(schema))
 }
 
 #[test]
@@ -40,12 +54,18 @@ fn pins_the_final_fingerprint_output() {
         "UnLwYzVBhwzPCK5q7TrPU3q2N0dTe8m_98bud8HsAs8"
     );
     assert_eq!(
-        table_fingerprint(&json_table("documents", "representative")),
-        "kUzaurzV2rcXYLljHOZ64TDR9c_RebqD7y5ZUM_nPBE"
+        table_fingerprint(&json_table(
+            "documents",
+            s::struct_([
+                ("title", s::non_empty_string()),
+                ("tags", s::array(s::string()))
+            ])
+        )),
+        "LrvW7RAfw8ZUYQ4rDIp1bmBdwbMD0hOt01UfbMs1L90"
     );
     assert_eq!(
-        table_fingerprint(&json_table("documents", "normalized")),
-        "I0XYuOUSYqWwG5Opxbc1u-TNNE3pFQCHzpBZ_ChYGaA"
+        table_fingerprint(&json_table("documents", value(s::string()))),
+        "D0ql3NRW601aHUWj9-wVsQ_wAvyURYWD0NMeSAq8hsc"
     );
     assert_eq!(
         state_hash([]),
@@ -81,8 +101,8 @@ fn keeps_the_full_digest_inside_the_cloudflare_vfs_filename_limit() {
 
 #[test]
 fn is_independent_of_table_and_index_declaration_order() {
-    let first = json_table("first", "value_string");
-    let second = json_table("second", "value_finite");
+    let first = json_table("first", value(s::string()));
+    let second = json_table("second", value(s::finite()));
     assert_eq!(
         db_fingerprint([&first, &second]),
         db_fingerprint([&second, &first])
@@ -101,43 +121,49 @@ fn is_independent_of_table_and_index_declaration_order() {
 #[test]
 fn ignores_effect_metadata_that_does_not_affect_accepted_encoded_json() {
     assert_eq!(
-        table_fingerprint(&json_table("documents", "value_string")),
-        table_fingerprint(&json_table("documents", "value_string_annotated"))
+        table_fingerprint(&json_table("documents", value(s::string()))),
+        table_fingerprint(&json_table(
+            "documents",
+            value(s::string()).title("Document")
+        ))
     );
     assert_eq!(
-        table_fingerprint(&json_table("documents", "array_string")),
-        table_fingerprint(&json_table("documents", "array_string_mutable"))
+        table_fingerprint(&json_table("documents", s::array(s::string()))),
+        table_fingerprint(&json_table(
+            "documents",
+            s::array(s::string()).title("Tags")
+        ))
     );
 }
 
 #[test]
 fn changes_when_represented_json_checks_change() {
     assert_ne!(
-        table_fingerprint(&json_table("documents", "min2")),
-        table_fingerprint(&json_table("documents", "min3"))
+        table_fingerprint(&json_table("documents", min_length(2))),
+        table_fingerprint(&json_table("documents", min_length(3)))
     );
 }
 
 #[test]
 fn distinguishes_codecs_with_the_same_encoded_primitive() {
     assert_ne!(
-        table_fingerprint(&json_table("documents", "date")),
-        table_fingerprint(&json_table("documents", "value_string"))
+        table_fingerprint(&json_table("documents", value(s::date_from_string()))),
+        table_fingerprint(&json_table("documents", value(s::string())))
     );
 }
 
 #[test]
 fn handles_recursive_json_schemas_deterministically() {
     assert_eq!(
-        table_fingerprint(&json_table("trees", "tree")),
-        table_fingerprint(&json_table("trees", "tree"))
+        table_fingerprint(&json_table("trees", tree())),
+        table_fingerprint(&json_table("trees", tree()))
     );
 }
 
 #[test]
 fn supports_opaque_effect_schemas_without_persistence_annotations() {
     assert_eq!(
-        table_fingerprint(&json_table("opaque_documents", "opaque")).len(),
+        table_fingerprint(&json_table("opaque_documents", value(s::date()))).len(),
         43
     );
 }
@@ -145,26 +171,26 @@ fn supports_opaque_effect_schemas_without_persistence_annotations() {
 #[test]
 fn keeps_application_owned_representation_payload_fields() {
     assert_ne!(
-        table_fingerprint(&json_table("documents", "payload_first")),
-        table_fingerprint(&json_table("documents", "payload_second"))
+        table_fingerprint(&json_table("documents", opaque("first"))),
+        table_fingerprint(&json_table("documents", opaque("second")))
     );
 }
 
 #[test]
 fn tracks_json_codecs_passed_through_the_generic_text_column_api() {
-    let first =
-        Table::new("documents").column(Column::text("value").schema_repr(repr("json_generic")));
-    let second =
-        Table::new("documents").column(Column::text("value").schema_repr(repr("value_finite")));
+    let first = Table::new("documents")
+        .column(Column::text("value").schema(s::from_json_string(value(s::string()))));
+    let second = Table::new("documents")
+        .column(Column::text("value").schema(s::from_json_string(value(s::finite()))));
     assert_ne!(table_fingerprint(&first), table_fingerprint(&second));
 }
 
 #[test]
 fn gives_equivalent_json_dsl_forms_the_same_fingerprint() {
     let specialized =
-        Table::new("documents").column(Column::json("value").schema_repr(repr("value_string")));
-    let generic =
-        Table::new("documents").column(Column::text("value").schema_repr(repr("json_generic")));
+        Table::new("documents").column(Column::json("value").schema(value(s::string())));
+    let generic = Table::new("documents")
+        .column(Column::text("value").schema(s::from_json_string(value(s::string()))));
     assert_eq!(table_fingerprint(&specialized), table_fingerprint(&generic));
 }
 

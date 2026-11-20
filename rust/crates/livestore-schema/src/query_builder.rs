@@ -686,15 +686,17 @@ fn where_clause(wheres: &[Where], table: &Table, binds: &mut Vec<SqlValue>) -> R
     Ok(format!("WHERE {}", parts.join(" AND ")))
 }
 
-/// A JSON column whose decoded (type-side) schema representation is an array.
+/// A JSON column whose decoded side is an array, directly or as a member of a nullable union
+/// (`getJsonArrayElementSchema`).
 fn is_json_array(col: &Column) -> bool {
+    use crate::fingerprint::has_json_string_encoding;
+    use crate::value_schema::{Ast, ValueSchema};
+    let direct = |s: &ValueSchema| {
+        has_json_string_encoding(s) && matches!(s.to_type().ast(), Ast::Arrays { .. })
+    };
     col.kind == ColumnKind::Json
-        && col
-            .schema_repr
-            .clone()
-            .unwrap_or_else(|| crate::representation::representation_document(&col.schema))["representations"]
-            [1]["_tag"]
-            == "Arrays"
+        && (direct(&col.schema)
+            || matches!(col.schema.ast(), Ast::Union(members) if members.iter().any(direct)))
 }
 
 /// `json_each()` yields scalars as-is and objects/arrays as JSON text.
