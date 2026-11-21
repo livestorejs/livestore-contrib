@@ -13,16 +13,20 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use livestore::{
-    InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, create_store, query_db,
+    EventInput, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, create_store,
+    query_db,
 };
-use livestore_schema::codec::iso_string_from_millis;
+use livestore_schema::event_def::DateFromString;
 use livestore_sqlite::Row;
 use livestore_sync::{Storage, SyncOptions};
 use livestore_sync_cf::make_ws_sync;
 use livestore_sync_cf::transport::ClientOptions;
+use livestore_todomvc::{
+    TodoClearedCompleted, TodoCompleted, TodoCreated, TodoDeleted, TodoUncompleted,
+};
 use rune::tok::{self, Theme, radius, space, type_};
 use rune::{App, AppHandle, AppSpec, Cx, El, TextEdit, Tx, col, el, row, text, text_input};
-use serde_json::{Value, json};
+use serde_json::json;
 
 const APP_TITLE: &str = "LiveStore · rune";
 
@@ -149,12 +153,9 @@ impl Default for State {
 }
 
 impl State {
-    fn commit(&mut self, name: &str, args: Value) {
+    fn commit(&mut self, event: impl Into<EventInput>) {
         let Some(store) = &self.store else { return };
-        self.error = store
-            .commit([(name.to_owned(), args)])
-            .err()
-            .map(|e| e.to_string());
+        self.error = store.commit([event.into()]).err().map(|e| e.to_string());
     }
 }
 
@@ -203,7 +204,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         .child(filter_tab("Completed", Filter::Completed, s.filter, t))
         .child(
             button("clear", "Clear completed", t).on_press(|s: &mut State| {
-                s.commit("v1.TodoClearedCompleted", json!({"deletedAt": now_iso()}));
+                s.commit(TodoClearedCompleted { deleted_at: now() });
             }),
         );
 
@@ -275,12 +276,13 @@ fn todo_row(todo: &Row, t: Theme) -> El {
             t.control_off
         })
         .on_press(move |s: &mut State| {
-            let name = if done {
-                "v1.TodoUncompleted"
+            let id = toggle_id.clone();
+            let event = if done {
+                TodoUncompleted { id }.into()
             } else {
-                "v1.TodoCompleted"
+                EventInput::from(TodoCompleted { id })
             };
-            s.commit(name, json!({"id": toggle_id}));
+            s.commit(event);
         });
     let title = text(todo["text"].as_str().unwrap_or_default().to_owned())
         .font(type_::BODY)
@@ -293,10 +295,10 @@ fn todo_row(todo: &Row, t: Theme) -> El {
         .font(type_::LABEL)
         .color(t.text_secondary)
         .on_press(move |s: &mut State| {
-            s.commit(
-                "v1.TodoDeleted",
-                json!({"id": delete_id, "deletedAt": now_iso()}),
-            );
+            s.commit(TodoDeleted {
+                id: delete_id.clone(),
+                deleted_at: now(),
+            });
         });
     row()
         .key(format!("todo-{id}"))
@@ -339,7 +341,10 @@ fn add_todo(s: &mut State, _: &mut Tx) {
     if title.is_empty() {
         return;
     }
-    s.commit("v1.TodoCreated", json!({"id": random_id(), "text": title}));
+    s.commit(TodoCreated {
+        id: random_id(),
+        text: title,
+    });
     if s.error.is_none() {
         s.draft.clear();
     }
@@ -415,15 +420,13 @@ fn random_id() -> String {
     )
 }
 
-/// `new Date().toISOString()`.
-fn now_iso() -> Value {
-    iso_string_from_millis(
+/// `new Date()`.
+fn now() -> DateFromString {
+    DateFromString(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("the system clock is after 1970")
-            .as_millis()
-            .try_into()
-            .expect("milliseconds since 1970 fit in i64"),
+            .as_secs_f64()
+            * 1000.0,
     )
-    .into()
 }

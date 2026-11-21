@@ -13,20 +13,24 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use livestore::{
-    InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, create_store, query_db,
+    EventInput, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, create_store,
+    query_db,
 };
-use livestore_schema::codec::iso_string_from_millis;
+use livestore_schema::event_def::DateFromString;
 use livestore_sqlite::Row;
 use livestore_sync::{Storage, SyncOptions};
 use livestore_sync_cf::make_ws_sync;
 use livestore_sync_cf::transport::ClientOptions;
+use livestore_todomvc::{
+    TodoClearedCompleted, TodoCompleted, TodoCreated, TodoDeleted, TodoUncompleted,
+};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, List, ListItem, ListState, Paragraph};
 use ratatui::{DefaultTerminal, Frame};
-use serde_json::{Value, json};
+use serde_json::json;
 use tokio::sync::mpsc;
 
 #[tokio::main]
@@ -190,10 +194,10 @@ fn handle(
     if app.focus == Focus::Input {
         match code {
             KeyCode::Enter if !app.input.trim().is_empty() => {
-                store.commit([(
-                    "v1.TodoCreated".to_owned(),
-                    json!({"id": random_id(), "text": app.input.trim()}),
-                )])?;
+                store.commit([TodoCreated {
+                    id: random_id(),
+                    text: app.input.trim().to_owned(),
+                }])?;
                 app.input.clear();
             }
             KeyCode::Char(c) => app.input.push(c),
@@ -220,26 +224,23 @@ fn handle(
                     .shown()
                     .iter()
                     .any(|r| r["id"] == id.as_str() && r["completed"] == 1);
-                let name = if done {
-                    "v1.TodoUncompleted"
+                let event = if done {
+                    TodoUncompleted { id }.into()
                 } else {
-                    "v1.TodoCompleted"
+                    EventInput::from(TodoCompleted { id })
                 };
-                store.commit([(name.to_owned(), json!({"id": id}))])?;
+                store.commit([event])?;
             }
         }
         KeyCode::Char('d' | 'x') | KeyCode::Delete | KeyCode::Backspace => {
             if let Some(id) = app.selected_id() {
-                store.commit([(
-                    "v1.TodoDeleted".to_owned(),
-                    json!({"id": id, "deletedAt": now_iso()}),
-                )])?;
+                store.commit([TodoDeleted {
+                    id,
+                    deleted_at: now(),
+                }])?;
             }
         }
-        KeyCode::Char('c') => store.commit([(
-            "v1.TodoClearedCompleted".to_owned(),
-            json!({"deletedAt": now_iso()}),
-        )])?,
+        KeyCode::Char('c') => store.commit([TodoClearedCompleted { deleted_at: now() }])?,
         KeyCode::Char('1') => app.filter = Filter::All,
         KeyCode::Char('2') => app.filter = Filter::Active,
         KeyCode::Char('3') => app.filter = Filter::Completed,
@@ -459,15 +460,13 @@ fn random_id() -> String {
     )
 }
 
-/// `new Date().toISOString()`.
-fn now_iso() -> Value {
-    iso_string_from_millis(
+/// `new Date()`.
+fn now() -> DateFromString {
+    DateFromString(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("the system clock is after 1970")
-            .as_millis()
-            .try_into()
-            .expect("milliseconds since 1970 fit in i64"),
+            .as_secs_f64()
+            * 1000.0,
     )
-    .into()
 }

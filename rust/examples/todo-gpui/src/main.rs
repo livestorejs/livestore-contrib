@@ -21,15 +21,18 @@ use gpui::{
     prelude::*, px, rgb, size,
 };
 use livestore::{
-    InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, Subscription, create_store,
-    query_db,
+    EventInput, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, Subscription,
+    create_store, query_db,
 };
-use livestore_schema::codec::iso_string_from_millis;
+use livestore_schema::event_def::DateFromString;
 use livestore_sqlite::Row;
 use livestore_sync::{Storage, SyncOptions};
 use livestore_sync_cf::make_ws_sync;
 use livestore_sync_cf::transport::ClientOptions;
-use serde_json::{Value, json};
+use livestore_todomvc::{
+    TodoClearedCompleted, TodoCompleted, TodoCreated, TodoDeleted, TodoUncompleted,
+};
+use serde_json::json;
 
 const TITLE: &str = "LiveStore · GPUI";
 
@@ -193,10 +196,10 @@ impl TodoView {
         }
     }
 
-    fn commit(&mut self, name: &str, args: Value, cx: &mut Context<Self>) {
+    fn commit(&mut self, event: impl Into<EventInput>, cx: &mut Context<Self>) {
         self.error = self
             .store
-            .commit([(name.to_owned(), args)])
+            .commit([event.into()])
             .err()
             .map(|e| e.to_string());
         cx.notify();
@@ -213,8 +216,10 @@ impl TodoView {
                 if !text.is_empty() {
                     self.input.clear();
                     self.commit(
-                        "v1.TodoCreated",
-                        json!({"id": random_id(), "text": text}),
+                        TodoCreated {
+                            id: random_id(),
+                            text,
+                        },
                         cx,
                     );
                 }
@@ -265,12 +270,13 @@ impl TodoView {
                     .cursor_pointer()
                     .child(if done { "✓" } else { "" })
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        let name = if done {
-                            "v1.TodoUncompleted"
+                        let id = toggle_id.clone();
+                        let event = if done {
+                            TodoUncompleted { id }.into()
                         } else {
-                            "v1.TodoCompleted"
+                            EventInput::from(TodoCompleted { id })
                         };
-                        this.commit(name, json!({"id": toggle_id}), cx);
+                        this.commit(event, cx);
                     })),
             )
             .child(
@@ -294,8 +300,10 @@ impl TodoView {
                     .child("×")
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.commit(
-                            "v1.TodoDeleted",
-                            json!({"id": delete_id, "deletedAt": now_iso()}),
+                            TodoDeleted {
+                                id: delete_id.clone(),
+                                deleted_at: now(),
+                            },
                             cx,
                         );
                     })),
@@ -422,11 +430,7 @@ impl Render for TodoView {
                                     .cursor_pointer()
                                     .child("Clear completed")
                                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                        this.commit(
-                                            "v1.TodoClearedCompleted",
-                                            json!({"deletedAt": now_iso()}),
-                                            cx,
-                                        );
+                                        this.commit(TodoClearedCompleted { deleted_at: now() }, cx);
                                     })),
                             ),
                     ),
@@ -532,15 +536,13 @@ fn random_id() -> String {
     )
 }
 
-/// `new Date().toISOString()`.
-fn now_iso() -> Value {
-    iso_string_from_millis(
+/// `new Date()`.
+fn now() -> DateFromString {
+    DateFromString(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("the system clock is after 1970")
-            .as_millis()
-            .try_into()
-            .expect("milliseconds since 1970 fit in i64"),
+            .as_secs_f64()
+            * 1000.0,
     )
-    .into()
 }
