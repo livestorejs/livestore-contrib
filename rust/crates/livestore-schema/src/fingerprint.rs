@@ -41,7 +41,7 @@ pub fn has_json_string_encoding(schema: &ValueSchema) -> bool {
 /// `fingerprint(tableAst)`.
 #[must_use]
 pub fn table_fingerprint(table: &Table) -> String {
-    digest(json!([DOMAIN, table_descriptor(table)]))
+    digest(&json!([DOMAIN, table_descriptor(table)]))
 }
 
 /// `fingerprint({ _tag: 'dbSchema', tables })`.
@@ -51,7 +51,7 @@ pub fn db_fingerprint<'a>(tables: impl IntoIterator<Item = &'a Table>) -> String
         .map(|t| (js_stringify(&json!(t.name)), table_descriptor(t)))
         .collect();
     tables.sort_by(|a, b| a.0.cmp(&b.0));
-    digest(json!([
+    digest(&json!([
         DOMAIN,
         [
             "database",
@@ -67,13 +67,17 @@ pub fn digest_to_fingerprint(bytes: &[u8]) -> String {
 }
 
 /// `JSON.stringify` for canonical values (integral floats print without a fraction).
+///
+/// # Panics
+///
+/// Never in practice: serializing a `serde_json::Value` cannot fail.
 #[must_use]
 pub fn js_stringify(value: &Value) -> String {
     serde_json::to_string(&js_numbers(value)).expect("json values serialize")
 }
 
-fn digest(descriptor: Value) -> String {
-    digest_to_fingerprint(js_stringify(&descriptor).as_bytes())
+fn digest(descriptor: &Value) -> String {
+    digest_to_fingerprint(js_stringify(descriptor).as_bytes())
 }
 
 fn table_descriptor(table: &Table) -> Value {
@@ -136,6 +140,10 @@ fn sort_canonical(values: &mut [Value]) {
     values.sort_by_cached_key(js_stringify);
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "JSON.stringify prints integral floats as integers"
+)]
 pub(crate) fn js_numbers(value: &Value) -> Value {
     match value {
         Value::Number(n) => match n.as_f64() {

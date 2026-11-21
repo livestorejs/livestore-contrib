@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Value, json};
 
-use crate::codec::{date_from_iso_string, iso_string_from_millis};
+use crate::codec::{date_from_iso_string, iso_string_from_js_date};
 use crate::fingerprint::schema_hash;
 use crate::value::{SqlStatement, SqlValue};
 use crate::value_schema::{self as s, ValueSchema};
@@ -106,6 +106,10 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     }
 
     /// `Schema.encodeSync(Schema.fromJsonString(event.schema))`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the args do not serialize, for example a `DateFromString` holding an invalid date.
     pub fn encode_json(&self, args: &A) -> Result<String, MaterializeError> {
         serde_json::to_string(args).map_err(|e| MaterializeError::InvalidArgs {
             event: self.name.clone(),
@@ -114,6 +118,10 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     }
 
     /// `Schema.decodeSync(Schema.fromJsonString(event.schema))`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `json` is not valid JSON or does not match the args type.
     pub fn decode_json(&self, json: &str) -> Result<A, MaterializeError> {
         serde_json::from_str(json).map_err(|e| MaterializeError::InvalidArgs {
             event: self.name.clone(),
@@ -122,6 +130,10 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     }
 
     /// `eventDef(args)`: name plus encoded args, ready to commit.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the args do not serialize, for example a `DateFromString` holding an invalid date.
     pub fn make(&self, args: A) -> (String, Value) {
         (
             self.name.clone(),
@@ -129,6 +141,9 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
         )
     }
 
+    /// # Errors
+    ///
+    /// Fails when `args` does not match the args type.
     pub fn decode(&self, args: &Value) -> Result<A, MaterializeError> {
         serde_json::from_value(args.clone()).map_err(|e| MaterializeError::InvalidArgs {
             event: self.name.clone(),
@@ -153,6 +168,9 @@ impl<'a> MaterializeContext<'a> {
         Self { event, query: None }
     }
 
+    /// # Errors
+    ///
+    /// Fails when no query function is set on the context, or with the error the query returns.
     pub fn query(&self, sql: &str, binds: &[SqlValue]) -> Result<Vec<Value>, MaterializeError> {
         let query = self
             .query
@@ -252,11 +270,15 @@ impl Serialize for DateFromString {
         if !self.0.is_finite() {
             return Err(serde::ser::Error::custom("Invalid Date"));
         }
-        serializer.serialize_str(&iso_string_from_millis(self.0 as i64))
+        serializer.serialize_str(&iso_string_from_js_date(self.0))
     }
 }
 
 impl<'de> Deserialize<'de> for DateFromString {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "epoch millis become a JS Date number"
+    )]
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         date_from_iso_string(&s)

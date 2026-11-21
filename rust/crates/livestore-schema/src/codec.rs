@@ -10,14 +10,23 @@ pub fn date_from_iso_string(s: &str) -> Option<i64> {
 #[must_use]
 pub fn iso_string_from_millis(ms: i64) -> String {
     let (days, rem) = (ms.div_euclid(86_400_000), ms.rem_euclid(86_400_000));
-    let (y, m, d) = civil_from_days(days);
-    let (h, mi, s, milli) = (
+    let (year, month, day) = civil_from_days(days);
+    let (hour, minute, second, milli) = (
         rem / 3_600_000,
         rem / 60_000 % 60,
         rem / 1000 % 60,
         rem % 1000,
     );
-    format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}.{milli:03}Z")
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{milli:03}Z")
+}
+
+/// `Date.prototype.toISOString` on a JS `Date` number (finite epoch millis).
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "a JS Date holds integral millis well inside i64"
+)]
+pub(crate) fn iso_string_from_js_date(ms: f64) -> String {
+    iso_string_from_millis(ms as i64)
 }
 
 /// Parses `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM[:SS[.fff]](Z|±HH:MM)` to epoch millis.
@@ -58,7 +67,7 @@ fn parse_iso_millis(s: &str) -> Option<i64> {
                 return None;
             }
             let frac = &r[..digits.min(3)];
-            ms = frac.parse::<i64>().ok()? * 10i64.pow(3 - frac.len() as u32);
+            ms = frac.parse::<i64>().ok()? * [100, 10, 1][frac.len() - 1];
             rest = &r[digits..];
         }
     }

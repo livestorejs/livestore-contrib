@@ -46,6 +46,11 @@ impl Table {
 
     /// `table({ name?, schema, indexes })`. Columns follow the encoded side of the schema; unique
     /// annotations add `idx_<table>_<column>_unique` indexes after `indexes`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when a primary key field is nullable, or when `name` is `None` and the schema has no
+    /// `title` or `identifier` annotation.
     pub fn from_schema(
         name: Option<&str>,
         schema: &ValueSchema,
@@ -72,6 +77,9 @@ impl Table {
         })
     }
 
+    /// # Panics
+    ///
+    /// Panics when the table has no column called `name`.
     #[must_use]
     pub fn col(&self, name: &str) -> &Column {
         self.columns
@@ -105,6 +113,10 @@ impl Table {
     }
 
     /// Encodes `insert(values)` like the query builder does: `undefined` values are dropped first.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `values` is not an object or does not encode with the insert schema.
     pub fn encode_insert_values(&self, values: Val) -> Result<Val, SchemaError> {
         let Val::Object(values) = values else {
             return Err(SchemaError("insert values must be an object".into()));

@@ -47,6 +47,10 @@ pub enum ColumnDefault {
 }
 
 #[derive(Clone, Debug)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors the column definition flags of the TS table DSL"
+)]
 pub struct Column {
     pub name: String,
     pub ty: ColumnType,
@@ -211,6 +215,7 @@ impl Column {
         self.rebuild_schema()
     }
 
+    #[must_use]
     pub fn default(mut self, value: impl Into<ColumnDefault>) -> Self {
         self.default = Some(value.into());
         self
@@ -306,6 +311,10 @@ pub fn get_column_def_for_schema(schema: &ValueSchema) -> Column {
 }
 
 /// `schemaFieldsToColumns`: optional fields become nullable columns; returns columns and unique column names.
+///
+/// # Errors
+///
+/// Fails when a primary key field is nullable.
 pub fn schema_fields_to_columns(
     fields: &[(String, ValueSchema)],
 ) -> Result<(Vec<Column>, Vec<String>), TableDefError> {

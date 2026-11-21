@@ -148,11 +148,13 @@ pub trait Filter: Sized {
     fn wheres(&mut self) -> &mut Vec<Where>;
 
     /// `where(col, value)`.
+    #[must_use]
     fn where_eq(self, col: &str, value: Value) -> Self {
         self.where_op(col, Op::Eq, value)
     }
 
     /// `where(col, op, value)`.
+    #[must_use]
     fn where_op(mut self, col: &str, op: Op, value: Value) -> Self {
         self.wheres().push(Where {
             col: col.into(),
@@ -163,6 +165,7 @@ pub trait Filter: Sized {
     }
 
     /// `where({ ... })`; [`Cond::Undefined`] entries are dropped.
+    #[must_use]
     fn where_all<'a>(mut self, conds: impl IntoIterator<Item = (&'a str, Cond)>) -> Self {
         for (col, cond) in conds {
             let (op, value) = match cond {
@@ -230,6 +233,7 @@ impl<'t> Select<'t> {
     }
 
     /// `orderBy([{ col, direction }, ...])`.
+    #[must_use]
     pub fn order_by_all<'a>(
         mut self,
         items: impl IntoIterator<Item = (&'a str, Direction)>,
@@ -320,6 +324,10 @@ impl<'t> Select<'t> {
         }
     }
 
+    /// # Errors
+    ///
+    /// Fails when the builder was marked invalid, a column is unknown, an operator does not fit
+    /// the value or column, or a value does not encode for its column.
     pub fn as_sql(&self) -> Result<SqlQuery> {
         if let Some(msg) = &self.invalid {
             return Err(QueryBuilderError::Invalid(msg.clone()));
@@ -375,6 +383,11 @@ impl<'t> Select<'t> {
     }
 
     /// `getResultSchema(qb)` decode: SQLite rows (JSON) to the query result.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `rows` is not an array of row objects, a row misses a selected column or a value
+    /// does not decode, or when `first` is set to error and there are no rows.
     pub fn decode_result(&self, rows: &Value) -> Result<Value> {
         let rows = rows
             .as_array()
@@ -414,6 +427,10 @@ impl Filter for Count<'_> {
 }
 
 impl Count<'_> {
+    /// # Errors
+    ///
+    /// Fails when a where column is unknown, an operator does not fit the value or column, or a
+    /// value does not encode for its column.
     pub fn as_sql(&self) -> Result<SqlQuery> {
         let mut binds = vec![];
         let mut query = format!("SELECT COUNT(*) as count FROM '{}'", self.table.name);
@@ -424,6 +441,9 @@ impl Count<'_> {
         Ok(sql_query(self.table, query, binds))
     }
 
+    /// # Errors
+    ///
+    /// Fails when `rows` is not a non-empty array whose first row has a numeric `count`.
     pub fn decode_result(&self, rows: &Value) -> Result<Value> {
         let row = rows
             .as_array()
@@ -458,6 +478,10 @@ impl Insert<'_> {
         self
     }
 
+    /// # Errors
+    ///
+    /// Fails when a required column has no value, a column is unknown, `ON CONFLICT DO UPDATE` has
+    /// no columns, or a value does not encode for its column.
     pub fn as_sql(&self) -> Result<SqlQuery> {
         // `insertSchema`: columns without a default that are not nullable are required.
         for col in &self.table.columns {
@@ -489,7 +513,8 @@ impl Insert<'_> {
                         sets.push(format!("{} = ?", quote(col)));
                         binds.push(encode(column(self.table, col)?, value)?);
                     }
-                    conflict.push_str(&format!("DO UPDATE SET {}", sets.join(", ")));
+                    conflict.push_str("DO UPDATE SET ");
+                    conflict.push_str(&sets.join(", "));
                 } else {
                     conflict.push_str("DO NOTHING");
                 }
@@ -506,6 +531,9 @@ impl Insert<'_> {
         Ok(sql_query(self.table, query, binds))
     }
 
+    /// # Errors
+    ///
+    /// Fails when the result is not a number (no `RETURNING`) or not an array of rows that decode.
     pub fn decode_result(&self, result: &Value) -> Result<Value> {
         decode_write_result(self.table, &self.returning, result)
     }
@@ -532,6 +560,10 @@ impl Update<'_> {
         self
     }
 
+    /// # Errors
+    ///
+    /// Fails when a column is unknown, an operator does not fit the value or column, or a value
+    /// does not encode for its column.
     pub fn as_sql(&self) -> Result<SqlQuery> {
         if self.values.is_empty() {
             tracing::warn!(
@@ -559,6 +591,9 @@ impl Update<'_> {
         Ok(sql_query(self.table, query, binds))
     }
 
+    /// # Errors
+    ///
+    /// Fails when the result is not a number (no `RETURNING`) or not an array of rows that decode.
     pub fn decode_result(&self, result: &Value) -> Result<Value> {
         decode_write_result(self.table, &self.returning, result)
     }
@@ -584,6 +619,10 @@ impl Delete<'_> {
         self
     }
 
+    /// # Errors
+    ///
+    /// Fails when a where column is unknown, an operator does not fit the value or column, or a
+    /// value does not encode for its column.
     pub fn as_sql(&self) -> Result<SqlQuery> {
         let mut binds = vec![];
         let where_stmt = where_clause(&self.wheres, self.table, &mut binds)?;
@@ -595,6 +634,9 @@ impl Delete<'_> {
         Ok(sql_query(self.table, query, binds))
     }
 
+    /// # Errors
+    ///
+    /// Fails when the result is not a number (no `RETURNING`) or not an array of rows that decode.
     pub fn decode_result(&self, result: &Value) -> Result<Value> {
         decode_write_result(self.table, &self.returning, result)
     }
@@ -855,7 +897,12 @@ fn sql_value(col: &Column, encoded: Val) -> Option<SqlValue> {
     Some(match encoded {
         Val::Null => SqlValue::Null,
         Val::Bool(b) => SqlValue::from(b),
-        Val::Number(n) if col.ty == ColumnType::Integer && n.fract() == 0.0 => {
+        Val::Number(n) if col.ty == ColumnType::Integer && n.fract() == 0.0 =>
+        {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "integral JS number stored as a SQLite integer"
+            )]
             SqlValue::Integer(n as i64)
         }
         Val::Number(n) => SqlValue::Real(n),

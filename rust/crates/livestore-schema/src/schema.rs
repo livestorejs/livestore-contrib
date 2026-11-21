@@ -94,6 +94,11 @@ impl Schema {
     }
 
     /// `resolveEventDef`: `Ok(Some(_))` for a known event, `Ok(None)` to skip (warn/ignore/callback), `Err` for `Fail`.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`UnknownEventError`] when the event or its materializer is missing and unknown
+    /// events are set to fail.
     pub fn resolve(
         &self,
         event: &Event,
@@ -155,6 +160,7 @@ impl SchemaBuilder {
     }
 
     /// Registers an event with a typed materializer (`State.SQLite.materializers`).
+    #[must_use]
     pub fn event<A, R>(
         mut self,
         def: &EventDef<A>,

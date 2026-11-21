@@ -121,6 +121,11 @@ impl ClientDocument {
     }
 
     /// The derived set materializer on decoded args `{ id, value }`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `id` is not a string (the session id was not replaced yet) or the value does not
+    /// encode with the document schema.
     pub fn set_statement(&self, args: &Val) -> Result<SqlStatement, SchemaError> {
         let id = match args.get("id") {
             Some(Val::String(id)) => id.clone(),

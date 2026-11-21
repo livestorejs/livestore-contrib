@@ -13,7 +13,7 @@ use base64::Engine;
 use indexmap::IndexMap;
 use serde_json::{Value, json};
 
-use crate::codec::{date_from_iso_string, iso_string_from_millis};
+use crate::codec::{date_from_iso_string, iso_string_from_js_date};
 use crate::column::ColumnDefault;
 
 pub const DATE_REPRESENTATION: &str = "effect/schema/Date";
@@ -207,6 +207,7 @@ impl ValueSchema {
     }
 
     /// `schema.pipe(f)`.
+    #[must_use]
     pub fn pipe(&self, f: impl FnOnce(&Self) -> Self) -> Self {
         f(self)
     }
@@ -272,11 +273,13 @@ impl ValueSchema {
     }
 
     /// `from.pipe(Schema.decodeTo(self, { decode, encode }))`: `decode` maps `from`'s type to this schema's encoded form.
+    #[must_use]
     pub fn decode_from(&self, from: &ValueSchema, decode: Transform, encode: Transform) -> Self {
         self.link(from, decode, encode, ("Transform", "Transform"), false)
     }
 
     /// `from.pipe(Schema.decodeTo(self))` with a passthrough transformation.
+    #[must_use]
     pub fn decode_from_passthrough(&self, from: &ValueSchema) -> Self {
         self.link(
             from,
@@ -307,6 +310,7 @@ impl ValueSchema {
     }
 
     /// `Schema.toType`: strips encodings recursively.
+    #[must_use]
     pub fn to_type(&self) -> Self {
         let ast = self.map_children(Self::to_type);
         self.map(|n| {
@@ -316,6 +320,7 @@ impl ValueSchema {
     }
 
     /// `Schema.toEncoded`: follows encodings recursively.
+    #[must_use]
     pub fn to_encoded(&self) -> Self {
         if let Some(link) = self.0.encoding.last() {
             let optional = self.0.optional;
@@ -354,6 +359,11 @@ impl ValueSchema {
     }
 
     /// `Schema.decodeUnknownSync`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the value does not match the schema, a check rejects it, or a decoding
+    /// transformation fails.
     pub fn decode(&self, value: Val) -> Result<Val, SchemaError> {
         let mut value = value;
         for link in self.0.encoding.iter().rev() {
@@ -365,6 +375,11 @@ impl ValueSchema {
     }
 
     /// `Schema.encodeUnknownSync`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when a check rejects the value, it does not match the schema, or an encoding
+    /// transformation fails.
     pub fn encode(&self, value: Val) -> Result<Val, SchemaError> {
         self.run_checks(&value)?;
         let mut out = self.parse(value, Self::encode)?;
@@ -395,8 +410,8 @@ impl ValueSchema {
             )))
         };
         match (&self.0.ast, value) {
-            (Ast::Unknown | Ast::Any, v) => Ok(v),
-            (Ast::String, v @ Val::String(_))
+            (Ast::Unknown | Ast::Any, v)
+            | (Ast::String, v @ Val::String(_))
             | (Ast::Number, v @ Val::Number(_))
             | (Ast::Boolean, v @ Val::Bool(_))
             | (Ast::BigInt, v @ Val::BigInt(_))
@@ -583,6 +598,10 @@ pub fn optional(schema: ValueSchema) -> ValueSchema {
 
 /// Marks a schema as an optional key without adding `undefined`.
 #[must_use]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Effect Schema combinator; takes the schema by value like its siblings"
+)]
 pub fn optional_key(schema: ValueSchema) -> ValueSchema {
     schema.map(|n| n.optional = true)
 }
@@ -626,6 +645,10 @@ pub fn suspend<F: Fn() -> ValueSchema + Send + Sync + 'static>(f: F) -> ValueSch
 }
 
 /// `Schema.Class<Self>(name)(fields)`.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Effect Schema combinator; takes the schema by value like its siblings"
+)]
 pub fn class(name: &str, fields: ValueSchema) -> ValueSchema {
     ValueSchema::new(Ast::Declaration(Declaration::Class(
         name.into(),
@@ -663,6 +686,10 @@ pub fn uint8array() -> ValueSchema {
 }
 
 #[must_use]
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "epoch millis become a JS Date number"
+)]
 pub fn date_from_string() -> ValueSchema {
     date().decode_from(
         &string().expected("a string that will be decoded as a Date"),
@@ -674,7 +701,7 @@ pub fn date_from_string() -> ValueSchema {
             ))
         }),
         Arc::new(|v| match v {
-            Val::Date(ms) if ms.is_finite() => Ok(Val::String(iso_string_from_millis(ms as i64))),
+            Val::Date(ms) if ms.is_finite() => Ok(Val::String(iso_string_from_js_date(ms))),
             other => Err(SchemaError(format!(
                 "Invalid date {}",
                 other.js_to_string()
@@ -775,6 +802,10 @@ pub fn trim() -> ValueSchema {
 
 /// `Schema.fromJsonString(schema)`.
 #[must_use]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Effect Schema combinator; takes the schema by value like its siblings"
+)]
 pub fn from_json_string(schema: ValueSchema) -> ValueSchema {
     schema.link(
         &string().expected("a string that will be decoded as JSON"),
@@ -863,17 +894,19 @@ pub fn is_min_length(min: usize) -> Check {
     )
 }
 
-#[must_use]
-pub fn is_pattern(pattern: &str) -> Check {
-    let re = regex::Regex::new(pattern).expect("valid pattern");
-    Check::new(format!("Expected a string matching the RegExp {pattern}"), move |v| v.as_str().is_some_and(|s| re.is_match(s))).effect(
+/// # Errors
+///
+/// Fails when `pattern` is not a valid regular expression.
+pub fn is_pattern(pattern: &str) -> Result<Check, SchemaError> {
+    let re = regex::Regex::new(pattern).map_err(|e| SchemaError(e.to_string()))?;
+    Ok(Check::new(format!("Expected a string matching the RegExp {pattern}"), move |v| v.as_str().is_some_and(|s| re.is_match(s))).effect(
         "effect/schema/isPattern",
         json!({
             "expected": format!("a string matching the RegExp {pattern}"),
             "representation": { "id": "effect/schema/isPattern", "payload": { "source": pattern, "flags": "" } },
             "arbitraryConstraint": { "patterns": [{ "source": pattern, "flags": "" }] }
         }),
-    )
+    ))
 }
 
 #[must_use]
@@ -912,7 +945,7 @@ fn regex_check(source: &str, expected: &str) -> Check {
 
 #[must_use]
 pub fn is_greater_than_date(ms: f64) -> Check {
-    let at = iso_string_from_millis(ms as i64);
+    let at = iso_string_from_js_date(ms);
     Check::new(format!("Expected a date after {at}"), move |v| matches!(v, Val::Date(d) if *d > ms)).effect(
         "effect/schema/isGreaterThanDate",
         json!({
@@ -966,6 +999,10 @@ impl Val {
     }
 
     /// `JSON.parse`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `s` is not valid JSON.
     pub fn parse_json(s: &str) -> Result<Val, SchemaError> {
         serde_json::from_str::<Value>(s)
             .map(Val::from)
@@ -976,17 +1013,14 @@ impl Val {
     #[must_use]
     pub fn to_json_string(&self) -> Option<String> {
         Some(match self {
-            Val::Undefined | Val::Symbol(_) => return None,
-            Val::Null => "null".into(),
+            Val::Undefined | Val::Symbol(_) | Val::BigInt(_) => return None,
             Val::Bool(b) => b.to_string(),
             Val::Number(n) if n.is_finite() => js_number(*n),
-            Val::Number(_) => "null".into(),
-            Val::BigInt(_) => return None,
             Val::String(s) => Value::String(s.clone()).to_string(),
             Val::Date(ms) if ms.is_finite() => {
-                format!("\"{}\"", iso_string_from_millis(*ms as i64))
+                format!("\"{}\"", iso_string_from_js_date(*ms))
             }
-            Val::Date(_) => "null".into(),
+            Val::Null | Val::Number(_) | Val::Date(_) => "null".into(),
             Val::Bytes(b) => Val::obj(
                 b.iter()
                     .enumerate()
@@ -1027,7 +1061,7 @@ impl Val {
             Val::BigInt(n) => n.to_string(),
             Val::String(s) => s.clone(),
             Val::Symbol(s) => format!("Symbol({s})"),
-            Val::Date(ms) => iso_string_from_millis(*ms as i64),
+            Val::Date(ms) => iso_string_from_js_date(*ms),
             Val::Bytes(b) => b.iter().map(u8::to_string).collect::<Vec<_>>().join(","),
             Val::Array(items) => items
                 .iter()
@@ -1085,6 +1119,10 @@ impl From<i32> for Val {
 }
 
 impl From<i64> for Val {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "mirrors a JS number, which is an f64"
+    )]
     fn from(v: i64) -> Self {
         Val::Number(v as f64)
     }

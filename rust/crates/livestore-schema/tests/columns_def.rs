@@ -148,7 +148,10 @@ fn maps_string_refinements_to_text_column() {
         (s::string().check(s::is_uuid()), "UUID"),
         (s::string().check(s::is_ulid()), "ULID"),
         (s::string().check(s::is_min_length(5)), "minLength"),
-        (s::string().check(s::is_pattern("^[A-Z]+$")), "pattern"),
+        (
+            s::string().check(s::is_pattern("^[A-Z]+$").expect("valid pattern")),
+            "pattern",
+        ),
     ];
     for (schema, name) in refinements {
         assert_eq!(
