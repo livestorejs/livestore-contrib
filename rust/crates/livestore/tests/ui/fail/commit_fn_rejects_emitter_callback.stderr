@@ -1,7 +1,0 @@
-error[E0593]: closure is expected to take 0 arguments, but it takes 1 argument
- --> tests/ui/fail/commit_fn_rejects_emitter_callback.rs:4:19
-  |
-4 |     let _ = store.commit_fn(CommitOptions::default(), |emit: fn()| {
-  |                   ^^^^^^^^^                           ------------ takes 1 argument
-  |                   |
-  |                   expected closure that takes 0 arguments

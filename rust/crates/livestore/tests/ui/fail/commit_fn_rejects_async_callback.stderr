@@ -1,8 +1,0 @@
-error[E0308]: mismatched types
- --> tests/ui/fail/commit_fn_rejects_async_callback.rs:4:58
-  |
-4 |     let _ = store.commit_fn(CommitOptions::default(), || async { Vec::<(String, serde_json::Value)>::new() });
-  |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<_>`, found `async` block
-  |
-  = note:     expected struct `Vec<_>`
-          found `async` block `{async block@$DIR/tests/ui/fail/commit_fn_rejects_async_callback.rs:4:58: 4:63}`

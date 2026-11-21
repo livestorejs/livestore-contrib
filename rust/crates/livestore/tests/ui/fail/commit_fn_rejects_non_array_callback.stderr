@@ -1,8 +1,0 @@
-error[E0308]: mismatched types
- --> tests/ui/fail/commit_fn_rejects_non_array_callback.rs:4:58
-  |
-4 |     let _ = store.commit_fn(CommitOptions::default(), || {});
-  |                                                          ^^ expected `Vec<_>`, found `()`
-  |
-  = note: expected struct `Vec<_>`
-          found unit type `()`

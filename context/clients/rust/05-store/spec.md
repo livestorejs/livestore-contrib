@@ -15,11 +15,16 @@ wires the leader proxy (`session.rs`). There is exactly one session per store
 
 ## Commit
 
-`store.commit([..])` takes `EventInput`s, and only a derived event
-(`#[derive(Event)]`) or a client document's `set` builds one. An app cannot
-commit an event by a string name or with JSON args. The ported core tests need
-untyped events; they use `EventInput::raw`, which exists only with the
-`testing` feature of `livestore-schema`.
+There are two calls: `store.commit(events)` and `store.commit_with(options, events)`.
+`events` implements `Events`: one derived event, a tuple of events of mixed types,
+or a `Vec`/array of them. Each item is type-checked, so an app cannot commit an
+event by a string name or with JSON args. Only a derived event (`#[derive(Event)]`)
+or a client document's `set` builds an `EventInput`.
+
+Unlike TypeScript, there is no batch builder (`store.commit(() => [..])`): an app
+builds the batch first and then commits it, so there is one way to commit. The
+ported core tests need untyped events; they use `EventInput::raw`, which exists
+only with the `testing` feature of `livestore-schema`.
 
 ## Process and Threads
 

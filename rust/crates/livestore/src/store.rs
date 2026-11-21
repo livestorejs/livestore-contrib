@@ -9,8 +9,8 @@ use std::time::Duration;
 use futures::future::{BoxFuture, FutureExt, Shared};
 use futures::stream::{BoxStream, StreamExt};
 use livestore_core::{Event, SeqNum};
-use livestore_schema::EventInput;
 use livestore_schema::system_tables::state_tables;
+use livestore_schema::{EventInput, Events};
 use livestore_schema::{MaterializeContext, Schema, SqlStatement, SqlValue};
 use livestore_sqlite::EventQuery;
 use serde_json::{Value, json};
@@ -353,16 +353,13 @@ impl Store {
         &self.inner.schema
     }
 
-    /// `store.commit(...events)`.
+    /// `store.commit(...events)`: one event, a tuple of events of mixed types, or a list.
     ///
     /// # Errors
     ///
     /// Fails when the store is shut down or the batch cannot be encoded or materialized; a
     /// materialization failure also shuts the store down.
-    pub fn commit(
-        &self,
-        events: impl IntoIterator<Item = impl Into<EventInput>>,
-    ) -> Result<(), StoreError> {
+    pub fn commit(&self, events: impl Events) -> Result<(), StoreError> {
         self.commit_with(CommitOptions::default(), events)
     }
 
@@ -373,35 +370,15 @@ impl Store {
     /// Same as [`Self::commit`].
     #[expect(
         clippy::needless_pass_by_value,
-        reason = "options by value like `commit_fn`, whose call shape the trybuild UI snapshots pin"
+        reason = "options by value, so a call reads like `commit_with(CommitOptions { .. }, events)`"
     )]
     pub fn commit_with(
         &self,
         options: CommitOptions,
-        events: impl IntoIterator<Item = impl Into<EventInput>>,
+        events: impl Events,
     ) -> Result<(), StoreError> {
         self.check_shutdown("commit")?;
-        self.commit_events(&options, events.into_iter().map(Into::into).collect())
-    }
-
-    /// `store.commit(options, () => events)`: the batch is built synchronously first; a panicking builder
-    /// commits nothing (TS: a throwing callback).
-    ///
-    /// # Errors
-    ///
-    /// Same as [`Self::commit`].
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "options by value like `commit_fn`, whose call shape the trybuild UI snapshots pin"
-    )]
-    pub fn commit_fn<I: Into<EventInput>>(
-        &self,
-        options: CommitOptions,
-        build: impl FnOnce() -> Vec<I>,
-    ) -> Result<(), StoreError> {
-        self.check_shutdown("commit")?;
-        let events = build().into_iter().map(Into::into).collect();
-        self.commit_events(&options, events)
+        self.commit_events(&options, events.into_inputs())
     }
 
     fn commit_events(
