@@ -4,6 +4,7 @@
 mod common;
 
 use common::*;
+use livestore_todomvc::TodoCreated;
 use serde_json::json;
 
 #[tokio::test]
@@ -24,12 +25,21 @@ async fn two_clients_converge_after_concurrent_offline_commits_and_restart() {
         options(&url, &store_id),
     )
     .await;
-    a.commit("v1.TodoCreated", json!({"id": "t1", "text": "one"}))
-        .unwrap();
-    a.commit("v1.TodoCreated", json!({"id": "t2", "text": "two"}))
-        .unwrap();
-    b.commit("v1.TodoCreated", json!({"id": "t3", "text": "three"}))
-        .unwrap();
+    a.commit(TodoCreated {
+        id: "t1".into(),
+        text: "one".into(),
+    })
+    .unwrap();
+    a.commit(TodoCreated {
+        id: "t2".into(),
+        text: "two".into(),
+    })
+    .unwrap();
+    b.commit(TodoCreated {
+        id: "t3".into(),
+        text: "three".into(),
+    })
+    .unwrap();
     converge(&[&a, &b], 3).await;
     a.shutdown().await;
     b.shutdown().await;
@@ -112,7 +122,10 @@ async fn restart_from_disk_pushes_pending() {
     .await;
     assert!(store.wait_synced(T).await, "{:?}", store.info());
     store
-        .commit("v1.TodoCreated", json!({"id": "r2", "text": "online"}))
+        .commit(TodoCreated {
+            id: "r2".into(),
+            text: "online".into(),
+        })
         .unwrap();
     assert!(store.wait_synced(T).await);
     store.shutdown().await;

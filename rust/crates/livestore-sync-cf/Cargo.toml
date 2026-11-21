@@ -24,6 +24,7 @@ tracing.workspace = true
 [dev-dependencies]
 livestore.workspace = true
 livestore-sqlite.workspace = true
+livestore-schema.workspace = true
 livestore-todomvc.workspace = true
 livestore-sync = { workspace = true, features = ["testing"] }
 tokio = { workspace = true, features = ["test-util"] }

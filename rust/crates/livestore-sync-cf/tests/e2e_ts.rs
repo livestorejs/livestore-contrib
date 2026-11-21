@@ -8,6 +8,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use common::*;
+use livestore_todomvc::{TodoClearedCompleted, TodoCompleted, TodoCreated};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
@@ -22,26 +23,33 @@ async fn typescript_and_rust_clients_converge() {
         options(&url, &store_id),
     )
     .await;
-    rust.commit("v1.TodoCreated", json!({"id": "r1", "text": "from rust 1"}))
-        .unwrap();
-    rust.commit("v1.TodoCreated", json!({"id": "r2", "text": "from rust 2"}))
-        .unwrap();
+    rust.commit(TodoCreated {
+        id: "r1".into(),
+        text: "from rust 1".into(),
+    })
+    .unwrap();
+    rust.commit(TodoCreated {
+        id: "r2".into(),
+        text: "from rust 2".into(),
+    })
+    .unwrap();
     assert!(rust.wait_synced(T).await);
 
     let mut ts = TsClient::spawn(&url, &store_id).await;
     ts.call("commit v1.TodoCreated {\"id\":\"ts1\",\"text\":\"from typescript\"}")
         .await;
     ts.call("commit v1.TodoCompleted {\"id\":\"r1\"}").await;
-    rust.commit("v1.TodoCreated", json!({"id": "r3", "text": "from rust 3"}))
-        .unwrap();
-    rust.commit("v1.TodoCompleted", json!({"id": "r2"}))
-        .unwrap();
+    rust.commit(TodoCreated {
+        id: "r3".into(),
+        text: "from rust 3".into(),
+    })
+    .unwrap();
+    rust.commit(TodoCompleted { id: "r2".into() }).unwrap();
     ts.call("commit v1.TodoDeleted {\"id\":\"r2\",\"deletedAt\":\"2026-05-06T07:08:09.010Z\"}")
         .await;
-    rust.commit(
-        "v1.TodoClearedCompleted",
-        json!({"deletedAt": "2026-05-06T07:08:10.000Z"}),
-    )
+    rust.commit(TodoClearedCompleted {
+        deleted_at: date("2026-05-06T07:08:10.000Z"),
+    })
     .unwrap();
 
     let deadline = tokio::time::Instant::now() + T;

@@ -12,6 +12,7 @@ use livestore_sqlite::{LeaderDb, LocalLeader};
 use livestore_sync_cf::transport::{
     ClientMessage, GlobalEvent, PullRequest, PushRequest, RequestId,
 };
+use livestore_todomvc::TodoCreated;
 use serde_json::{Value, json};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
@@ -59,7 +60,10 @@ async fn reconnects_after_drop_and_resumes_from_cursor() {
     fake.drop_connections();
     fake.preload(&[other(2, "o2")]);
     store
-        .commit("v1.TodoCreated", json!({"id": "b", "text": "b"}))
+        .commit(TodoCreated {
+            id: "b".into(),
+            text: "b".into(),
+        })
         .unwrap();
 
     wait_until(|| fake.state().events.len() == 3 && store.info().pending == 0).await;
@@ -116,7 +120,10 @@ async fn ignores_live_pages_delivered_twice() {
     let store = start(leader_with(&[]), "rust", fake.options()).await;
     assert!(store.wait_synced(T).await);
     store
-        .commit("v1.TodoCreated", json!({"id": "a", "text": "a"}))
+        .commit(TodoCreated {
+            id: "a".into(),
+            text: "a".into(),
+        })
         .unwrap();
     wait_until(|| store.info().upstream_head.global == 1).await;
     fake.preload(&[other(2, "o2")]);

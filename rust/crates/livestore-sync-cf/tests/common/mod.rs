@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use livestore::{InMemoryAdapter, Store, StoreOptions, create_store};
+use livestore::{Event, InMemoryAdapter, Store, StoreOptions, create_store};
+use livestore_schema::codec::date_from_iso_string;
+use livestore_schema::event_def::DateFromString;
 use livestore_sqlite::{LeaderDb, LocalLeader, Row};
 use livestore_sync::{Backoff, Leader, SyncOptions};
 use livestore_sync_cf::make_ws_sync;
@@ -60,8 +62,8 @@ pub struct Info {
 }
 
 impl TestStore {
-    pub fn commit(&self, name: &str, args: Value) -> Result<(), livestore::StoreError> {
-        self.store.commit([(name.to_owned(), args)])
+    pub fn commit(&self, event: impl Event) -> Result<(), livestore::StoreError> {
+        self.store.commit([event])
     }
 
     pub fn query(&self, sql: &str) -> Result<Vec<Row>, livestore::StoreError> {
@@ -167,6 +169,12 @@ pub fn open(dir: &Path, client_id: &str) -> LocalLeader {
         &format!("{client_id}-session"),
     )
     .unwrap()
+}
+
+/// A `DateFromString` from an ISO string.
+pub fn date(iso: &str) -> DateFromString {
+    #[expect(clippy::cast_precision_loss, reason = "epoch millis fit in f64")]
+    DateFromString(date_from_iso_string(iso).expect("valid ISO date") as f64)
 }
 
 pub fn unique(prefix: &str) -> String {

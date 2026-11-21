@@ -787,6 +787,7 @@ dependencies = [
  "futures-util",
  "livestore",
  "livestore-core",
+ "livestore-schema",
  "livestore-sqlite",
  "livestore-sync",
  "livestore-todomvc",
