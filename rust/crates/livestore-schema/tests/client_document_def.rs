@@ -32,10 +32,12 @@ fn set_event() {
         val(json!({"showSidebar": true})),
     );
     assert_eq!(
-        ui_state.set(val(json!({"showSidebar": false})), Some("session-1")),
+        ui_state
+            .set(val(json!({"showSidebar": false})), Some("session-1"))
+            .into_parts(),
         (
             "UiStateSet".into(),
-            val(json!({"id": "session-1", "value": {"showSidebar": false}}))
+            json!({"id": "session-1", "value": {"showSidebar": false}})
         )
     );
 
@@ -50,10 +52,12 @@ fn set_event() {
     )
     .default_id("static");
     assert_eq!(
-        app_config.set(val(json!({"fontSize": 12, "theme": "dark"})), None),
+        app_config
+            .set(val(json!({"fontSize": 12, "theme": "dark"})), None)
+            .into_parts(),
         (
             "AppConfigSet".into(),
-            val(json!({"id": "static", "value": {"fontSize": 12, "theme": "dark"}}))
+            json!({"id": "static", "value": {"fontSize": 12, "theme": "dark"}})
         )
     );
 }
@@ -401,7 +405,8 @@ fn for_schema(schema: ValueSchema, value: Val, partial_set: Option<bool>) -> Sql
         Some(p) => doc.partial_set(p),
         None => doc,
     };
-    doc.set_statement(&doc.set(value, Some("id1")).1).unwrap()
+    doc.set_statement(&doc.set_args(value, Some("id1")))
+        .unwrap()
 }
 
 fn full_replace(insert: &str, update: &str) -> SqlStatement {

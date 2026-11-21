@@ -22,6 +22,75 @@ pub trait Event: Serialize + DeserializeOwned + Sized + 'static {
     fn def() -> &'static EventDef<Self>;
 }
 
+/// An event to commit: its name and encoded args (`LiveStoreEvent.Input`).
+///
+/// Only a derived [`Event`] or a client document's `set` builds one, so a commit can never name
+/// an unknown event or pass args of the wrong shape. Tests that port core's untyped cases use
+/// `EventInput::raw`, behind the `testing` feature.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EventInput {
+    name: String,
+    args: Value,
+}
+
+impl EventInput {
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[must_use]
+    pub fn args(&self) -> &Value {
+        &self.args
+    }
+
+    #[must_use]
+    pub fn into_parts(self) -> (String, Value) {
+        (self.name, self.args)
+    }
+
+    /// An event from a name and JSON args, without type checks. Only for tests.
+    #[cfg(feature = "testing")]
+    #[must_use]
+    pub fn raw(name: impl Into<String>, args: Value) -> Self {
+        Self {
+            name: name.into(),
+            args,
+        }
+    }
+
+    pub(crate) fn new(name: String, args: Value) -> Self {
+        Self { name, args }
+    }
+}
+
+/// # Panics
+///
+/// Panics when the args do not serialize, for example a `DateFromString` holding an invalid date.
+impl<E: Event> From<E> for EventInput {
+    fn from(event: E) -> Self {
+        let (name, args) = E::def().make(event);
+        Self { name, args }
+    }
+}
+
+#[cfg(feature = "testing")]
+impl From<(String, Value)> for EventInput {
+    fn from((name, args): (String, Value)) -> Self {
+        Self { name, args }
+    }
+}
+
+#[cfg(feature = "testing")]
+impl From<&LogEvent> for EventInput {
+    fn from(e: &LogEvent) -> Self {
+        Self {
+            name: e.name.clone(),
+            args: e.args.clone(),
+        }
+    }
+}
+
 /// Typed event definition. `A` is the args type; its serde form is the encoded args JSON.
 pub struct EventDef<A> {
     pub name: String,

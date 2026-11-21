@@ -6,7 +6,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::column::Column;
-use crate::event_def::{MaterializeError, Materializer};
+use crate::event_def::{EventInput, MaterializeError, Materializer};
 use crate::table::Table;
 use crate::value::{SqlStatement, SqlValue};
 use crate::value_schema::{self as s, SchemaError, Val, ValueSchema};
@@ -81,16 +81,21 @@ impl ClientDocument {
         s::struct_([("id", s::string()), ("value", value)]).title(&format!("{}Set:Args", self.name))
     }
 
-    /// `Doc.set(value, id?)`: the `<name>Set` event name and its (decoded) args.
-    pub fn set(&self, value: impl Into<Val>, id: Option<&str>) -> (String, Val) {
+    /// `Doc.set(value, id?)`: the `<name>Set` event, ready to commit.
+    pub fn set(&self, value: impl Into<Val>, id: Option<&str>) -> EventInput {
+        EventInput::new(
+            self.set_event_name(),
+            self.set_args(value, id).to_json_value(),
+        )
+    }
+
+    /// The decoded args of `Doc.set(value, id?)`.
+    pub fn set_args(&self, value: impl Into<Val>, id: Option<&str>) -> Val {
         let id = id
             .map(str::to_string)
             .or_else(|| self.default_id.clone())
             .map_or(Val::Undefined, Val::String);
-        (
-            self.set_event_name(),
-            Val::obj([("id", id), ("value", value.into())]),
-        )
+        Val::obj([("id", id), ("value", value.into())])
     }
 
     /// Materializer over encoded JSON args: decodes the value optimistically, then [`Self::set_statement`].

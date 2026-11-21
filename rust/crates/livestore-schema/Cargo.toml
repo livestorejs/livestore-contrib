@@ -8,6 +8,10 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
+[features]
+# `EventInput::raw` and raw conversions, for tests that port core's untyped cases.
+testing = []
+
 [dependencies]
 regex = "1"
 indexmap = "2"
