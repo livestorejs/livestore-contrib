@@ -713,6 +713,11 @@ in
     after = [ "pnpm:install" ];
     exec = "DEVENV_TASK_PASSTHROUGH=1 rust/scripts/test-live.sh";
   };
+  tasks."rust:examples" = {
+    description = "Format-check, lint and build the Rust example apps (separate workspace: rust/examples)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust/examples && cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings";
+  };
   tasks."check:rust" = {
     description = "All Rust client checks (kept out of check:all)";
     after = [
@@ -723,6 +728,7 @@ in
       "rust:test"
       "rust:sqlite-check"
       "rust:test-live"
+      "rust:examples"
     ];
   };
   tasks."workspace:shape-check" = {

@@ -56,5 +56,25 @@ export default githubWorkflow({
         nixDiagnosticsArtifactStep(),
       ],
     },
+    examples: {
+      name: 'rust/examples',
+      'runs-on': namespaceRunner('${{ github.run_id }}-examples'),
+      'timeout-minutes': 60,
+      defaults: bashShellDefaults,
+      steps: [
+        ...livestoreContribSetupSteps,
+        {
+          name: 'Restore cargo cache',
+          uses: 'actions/cache@v4',
+          with: {
+            path: '~/.cargo/registry\n~/.cargo/git\nrust/examples/target',
+            key: "cargo-examples-${{ runner.os }}-${{ hashFiles('rust/examples/Cargo.lock', 'devenv.lock') }}",
+            'restore-keys': 'cargo-examples-${{ runner.os }}-',
+          },
+        },
+        { name: 'Check, lint and build the examples', run: runDevenvTasksBefore('rust:examples') },
+        nixDiagnosticsArtifactStep(),
+      ],
+    },
   },
 })
