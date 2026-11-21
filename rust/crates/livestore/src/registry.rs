@@ -74,6 +74,7 @@ enum State {
 }
 
 impl StoreRegistry {
+    #[must_use]
     pub fn new(defaults: RegistryDefaults) -> Self {
         Self {
             inner: Arc::new(Mutex::new(Inner {
@@ -84,6 +85,10 @@ impl StoreRegistry {
     }
 
     /// `getOrLoad(options).pipe(Effect.scoped)`: acquires and immediately releases the entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns the (shared, cached) error of a failed store load.
     pub async fn get_or_load(&self, options: &RegistryStoreOptions) -> LoadResult {
         let (generation, result) = match self.acquire(options) {
             Acquired::Ready(generation, result) => (generation, result),
@@ -98,6 +103,10 @@ impl StoreRegistry {
 
     /// `getOrLoadPromise`: the cached store or the shared pending load; a cached failure is returned as `Err`
     /// (TS throws synchronously).
+    ///
+    /// # Errors
+    ///
+    /// Returns the cached error of a failed store load.
     pub fn get_or_load_promise(
         &self,
         options: &RegistryStoreOptions,
@@ -264,5 +273,5 @@ enum Acquired {
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

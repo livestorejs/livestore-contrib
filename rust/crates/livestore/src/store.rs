@@ -52,10 +52,18 @@ pub struct AdapterArgs {
 /// `ShutdownDeferred`: resolved with the exit of the first store shutdown.
 pub type ShutdownDeferred = Arc<watch::Sender<Option<Exit>>>;
 
+#[must_use]
 pub fn make_shutdown_deferred() -> ShutdownDeferred {
     Arc::new(watch::channel(None).0)
 }
 
+/// # Errors
+///
+/// Returns the error exit the store shut down with.
+///
+/// # Panics
+///
+/// Does not panic in practice: the value is read only after `wait_for` saw it set.
 pub async fn await_shutdown(deferred: &ShutdownDeferred) -> Exit {
     let mut rx = deferred.subscribe();
     rx.wait_for(Option::is_some)
@@ -168,6 +176,12 @@ impl std::fmt::Debug for Store {
 }
 
 /// `createStore`.
+///
+/// # Errors
+///
+/// Fails when `state_rebuild_batch_size` is not an integer of at least 1, the store id has
+/// characters other than ASCII letters, digits, `_` and `-`, no adapter is set, the adapter fails,
+/// or the session database cannot be configured.
 pub async fn create_store(options: StoreOptions) -> Result<Store, StoreError> {
     let state_rebuild_batch_size =
         validate_state_rebuild_batch_size(options.params.state_rebuild_batch_size)?;
@@ -243,7 +257,7 @@ impl Store {
                     RefOptions {
                         label: Some(format!("tableRef:{}", t.name)),
                         meta: Some(json!({ "liveStoreRefType": "table" })),
-                        equal: Some(Arc::new(|_, _| false)),
+                        equal: Some(Arc::new(|(), ()| false)),
                     },
                 );
                 (t.name.clone(), r)
@@ -309,23 +323,32 @@ impl Store {
         Ok(Store { inner })
     }
 
+    #[must_use]
     pub fn store_id(&self) -> &str {
         &self.inner.store_id
     }
 
+    #[must_use]
     pub fn session_id(&self) -> &str {
         &self.inner.session.session_id
     }
 
+    #[must_use]
     pub fn client_id(&self) -> &str {
         &self.inner.session.client_id
     }
 
+    #[must_use]
     pub fn schema(&self) -> &Arc<Schema> {
         &self.inner.schema
     }
 
     /// `store.commit(...events)`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the store is shut down or the batch cannot be encoded or materialized; a
+    /// materialization failure also shuts the store down.
     pub fn commit(
         &self,
         events: impl IntoIterator<Item = impl Into<EventInput>>,
@@ -334,17 +357,33 @@ impl Store {
     }
 
     /// `store.commit(options, ...events)`.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::commit`].
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "options by value like `commit_fn`, whose call shape the trybuild UI snapshots pin"
+    )]
     pub fn commit_with(
         &self,
         options: CommitOptions,
         events: impl IntoIterator<Item = impl Into<EventInput>>,
     ) -> Result<(), StoreError> {
         self.check_shutdown("commit")?;
-        self.commit_events(options, events.into_iter().map(Into::into).collect())
+        self.commit_events(&options, events.into_iter().map(Into::into).collect())
     }
 
     /// `store.commit(options, () => events)`: the batch is built synchronously first; a panicking builder
     /// commits nothing (TS: a throwing callback).
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::commit`].
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "options by value like `commit_fn`, whose call shape the trybuild UI snapshots pin"
+    )]
     pub fn commit_fn<I: Into<EventInput>>(
         &self,
         options: CommitOptions,
@@ -352,12 +391,12 @@ impl Store {
     ) -> Result<(), StoreError> {
         self.check_shutdown("commit")?;
         let events = build().into_iter().map(Into::into).collect();
-        self.commit_events(options, events)
+        self.commit_events(&options, events)
     }
 
     fn commit_events(
         &self,
-        options: CommitOptions,
+        options: &CommitOptions,
         events: Vec<EventInput>,
     ) -> Result<(), StoreError> {
         let names: Vec<&str> = events.iter().map(|e| e.name.as_str()).collect();
@@ -416,6 +455,10 @@ impl Store {
     }
 
     /// `store.query({ query, bindValues })`: raw rows.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the store is shut down or SQLite cannot run the query.
     pub fn query_raw(
         &self,
         sql: &str,
@@ -449,7 +492,7 @@ impl Store {
         &self,
         query: &Q,
         on_update: impl Fn(Q::Result) + Send + Sync + 'static,
-        options: SubscribeOptions,
+        options: &SubscribeOptions,
     ) -> Subscription {
         let rc = query.make(self);
         let value = rc.value.clone();
@@ -496,7 +539,7 @@ impl Store {
     pub fn subscribe_stream<Q: Queryable>(
         &self,
         query: &Q,
-        options: SubscribeOptions,
+        options: &SubscribeOptions,
     ) -> BoxStream<'static, Q::Result>
     where
         Q::Result: 'static,
@@ -529,6 +572,7 @@ impl Store {
         })
     }
 
+    #[must_use]
     pub fn sync_status(&self) -> SyncStatus {
         let s = self.inner.processor.sync_state();
         SyncStatus {
@@ -539,6 +583,7 @@ impl Store {
         }
     }
 
+    #[must_use]
     pub fn network_status(&self) -> watch::Receiver<bool> {
         self.inner.session.leader_thread.network_status.clone()
     }
@@ -547,7 +592,7 @@ impl Store {
     pub fn manual_refresh(&self, label: Option<&str>) {
         self.inner
             .graph
-            .run_deferred_effects(label.map(RefreshReason::tagged));
+            .run_deferred_effects(label.map(RefreshReason::tagged).as_ref());
     }
 
     /// `store.shutdown(cause?)`: stops the session (graceful drain unless a cause is given).
@@ -565,24 +610,29 @@ impl Store {
         let _ = tokio::time::timeout(SHUTDOWN_SOFT_BOUND, teardown).await;
     }
 
+    #[must_use]
     pub fn is_shutdown(&self) -> bool {
         self.inner.is_shutdown.load(Ordering::SeqCst)
     }
 
     // `store[StoreInternalsSymbol]`
 
+    #[must_use]
     pub fn sync_processor(&self) -> &ClientSessionSyncProcessor {
         &self.inner.processor
     }
 
+    #[must_use]
     pub fn sqlite_db_wrapper(&self) -> &Arc<SqliteDbWrapper> {
         &self.inner.db
     }
 
+    #[must_use]
     pub fn reactivity_graph(&self) -> &ReactiveGraph<Ctx> {
         &self.inner.graph
     }
 
+    #[must_use]
     pub fn client_session(&self) -> &ClientSession {
         &self.inner.session
     }
@@ -844,6 +894,7 @@ fn materialize_event(
 }
 
 /// `hashMaterializerResults`: identical statements hash identically on leader and session.
+#[must_use]
 pub fn materializer_hash(statements: &[SqlStatement]) -> i64 {
     livestore_sqlite::state::materializer_hash(statements)
 }
@@ -866,11 +917,15 @@ pub(crate) fn resolve_session_id_bind(value: &SqlValue, session_id: &str) -> Sql
 }
 
 /// Creates state and system tables missing from an imported snapshot (`migrateDb`, create-only).
+///
+/// # Errors
+///
+/// Fails when SQLite rejects one of the `CREATE TABLE` statements.
 pub fn ensure_state_tables(db: &SqliteDbWrapper, schema: &Schema) -> Result<(), StoreError> {
     for sql in state_tables()
         .iter()
         .chain(schema.tables())
-        .flat_map(|t| t.ddl())
+        .flat_map(livestore_schema::Table::ddl)
     {
         db.execute(&sql)?;
     }
@@ -878,6 +933,11 @@ pub fn ensure_state_tables(db: &SqliteDbWrapper, schema: &Schema) -> Result<(), 
 }
 
 /// `StateRebuildBatchSizeSchema`: a finite integer of at least 1.
+#[expect(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    reason = "the size is a JS number; it is checked to be an integer in i64 range before the cast"
+)]
 fn validate_state_rebuild_batch_size(size: Option<f64>) -> Result<i64, StoreError> {
     match size {
         None => Ok(STATE_REBUILD_BATCH_SIZE_DEFAULT),
@@ -906,14 +966,14 @@ fn validate_store_id(store_id: &str) -> Result<(), StoreError> {
 pub(crate) fn rand_id() -> String {
     use std::hash::{BuildHasher, Hasher};
     let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-    h.write_u64(
+    h.write_u128(
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| d.as_nanos() as u64),
+            .map_or(0, |d| d.as_nanos()),
     );
     format!("{:010x}", h.finish() & 0xff_ffff_ffff)
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

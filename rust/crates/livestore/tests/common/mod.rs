@@ -259,3 +259,8 @@ pub fn ids(rows: &Value) -> Vec<String> {
 pub fn len(rows: &Value) -> usize {
     rows.as_array().map_or(0, Vec::len)
 }
+
+/// Test counts and indices as the `i64` sequence numbers they become.
+pub fn to_i64(n: usize) -> i64 {
+    i64::try_from(n).expect("test counts fit in i64")
+}

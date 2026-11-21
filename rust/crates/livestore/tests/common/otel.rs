@@ -1,6 +1,7 @@
 //! `utils/tests/otel.ts`: a `tracing` layer standing in for the in-memory span exporter, the simplified span
 //! trees the TS tests snapshot, and pretty-format rendering to compare them with the TS `.snap` files.
 
+use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 
 use serde_json::{Map, Value};
@@ -160,7 +161,7 @@ impl<S: tracing::Subscriber + for<'a> LookupSpan<'a>> Layer<S> for SpanCapture {
     }
 }
 
-/// Attribute values as OTel keeps them; `otel.name` renames the span (`span.updateName`).
+/// Attribute values as `OTel` keeps them; `otel.name` renames the span (`span.updateName`).
 struct Visitor<'a>(&'a mut SpanData);
 
 impl Visitor<'_> {
@@ -232,7 +233,9 @@ fn reorder(tree: &mut Value, parent: &str, order: &[String]) {
         return;
     };
     if !is_parent {
-        children.iter_mut().for_each(|c| reorder(c, parent, order));
+        for c in children.iter_mut() {
+            reorder(c, parent, order);
+        }
         return;
     }
     let mut rest = std::mem::take(children);
@@ -285,7 +288,7 @@ fn write_pretty(value: &Value, indent: usize, out: &mut String) {
             keys.sort();
             out.push_str("{\n");
             for key in keys {
-                out.push_str(&format!("{pad}\"{key}\": "));
+                let _ = write!(out, "{pad}\"{key}\": ");
                 write_pretty(&map[key], indent + 1, out);
                 out.push_str(",\n");
             }
@@ -304,7 +307,9 @@ fn write_pretty(value: &Value, indent: usize, out: &mut String) {
         }
         Value::Object(_) => out.push_str("{}"),
         Value::Array(_) => out.push_str("[]"),
-        Value::String(s) => out.push_str(&format!("\"{s}\"")),
+        Value::String(s) => {
+            let _ = write!(out, "\"{s}\"");
+        }
         other => out.push_str(&other.to_string()),
     }
 }

@@ -16,6 +16,10 @@ struct Trivial {
     runs_c: Arc<AtomicUsize>,
 }
 
+#[expect(
+    clippy::many_single_char_names,
+    reason = "atom names a..e mirror the TS reactive graph tests"
+)]
 fn trivial() -> Trivial {
     let graph = ReactiveGraph::new();
     graph.set_context(());
@@ -61,7 +65,7 @@ fn panic_message(f: impl FnOnce()) -> String {
     let err = catch_unwind(AssertUnwindSafe(f)).expect_err("expected a panic");
     err.downcast_ref::<String>()
         .cloned()
-        .or_else(|| err.downcast_ref::<&str>().map(|s| s.to_string()))
+        .or_else(|| err.downcast_ref::<&str>().map(ToString::to_string))
         .unwrap_or_default()
 }
 
@@ -313,6 +317,10 @@ struct Dynamic {
     runs_d: Arc<AtomicUsize>,
 }
 
+#[expect(
+    clippy::many_single_char_names,
+    reason = "atom names a..e mirror the TS reactive graph tests"
+)]
 fn dynamic() -> Dynamic {
     let graph = ReactiveGraph::new();
     graph.set_context(());
@@ -466,6 +474,10 @@ fn only_runs_d_once_when_a_changes() {
 // a trivial graph with undefined
 
 #[test]
+#[expect(
+    clippy::many_single_char_names,
+    reason = "atom names a..e mirror the TS reactive graph tests"
+)]
 fn trivial_with_undefined_has_the_right_initial_values() {
     let graph = ReactiveGraph::new();
     graph.set_context(());

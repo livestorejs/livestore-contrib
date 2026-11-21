@@ -122,6 +122,7 @@ impl<T> RcRef<T> {
     }
 
     /// Current reference count (`rc`).
+    #[must_use]
     pub fn rc(&self) -> usize {
         match (&self.hash, self.store.upgrade()) {
             (Some(hash), Some(store)) => lock(&store.def_rc_map).get(hash).map_or(0, |e| e.rc),
@@ -150,21 +151,19 @@ fn with_rc_map<T: GraphValue>(
             e.value.clone()
         })
     };
-    let value = match existing {
-        Some(v) => v
-            .downcast::<LiveQuery<T>>()
-            .expect("one result type per query hash"),
-        None => {
-            let query = make();
-            let destroy_target = query.clone();
-            let entry = RcEntry {
-                rc: 1,
-                value: query.clone(),
-                destroy: Arc::new(move || destroy_target.destroy()),
-            };
-            lock(&inner.def_rc_map).insert(hash.into(), entry);
-            query
-        }
+    let value = if let Some(v) = existing {
+        v.downcast::<LiveQuery<T>>()
+            .expect("one result type per query hash")
+    } else {
+        let query = make();
+        let destroy_target = query.clone();
+        let entry = RcEntry {
+            rc: 1,
+            value: query.clone(),
+            destroy: Arc::new(move || destroy_target.destroy()),
+        };
+        lock(&inner.def_rc_map).insert(hash.into(), entry);
+        query
     };
     let (weak, key) = (Arc::downgrade(inner), hash.to_string());
     let deref: RcDeref = Arc::new(move || {
@@ -209,6 +208,7 @@ impl QueryGet<'_> {
         self.get.get(atom)
     }
 
+    #[must_use]
     pub fn store(&self) -> &Store {
         &self.store
     }
@@ -299,6 +299,7 @@ pub fn computed<T: GraphValue, F: Fn(&QueryGet<'_>) -> T + Send + Sync + 'static
 }
 
 impl<T> ComputedDef<T> {
+    #[must_use]
     pub fn deps(mut self, deps: &str) -> Self {
         self.hash = deps.into();
         self
@@ -399,17 +400,29 @@ impl<T: GraphValue> QueryInput<T> {
         }
     }
 
+    #[must_use]
     pub fn queried_tables(mut self, tables: &[&str]) -> Self {
-        self.queried_tables = Some(tables.iter().map(|t| t.to_string()).collect());
+        self.queried_tables = Some(
+            tables
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+        );
         self
     }
 
+    #[must_use]
     pub fn exec_before_first_run(mut self, f: impl Fn(&Store) + Send + Sync + 'static) -> Self {
         self.exec_before_first_run = Some(Arc::new(f));
         self
     }
 
-    /// Decodes the result rows (`Schema.decode`); a failure is a defect, like in TS.
+    /// Decodes the result rows (`Schema.decode`).
+    ///
+    /// # Panics
+    ///
+    /// Panics when the rows do not match the result schema (a defect, as in TS).
+    #[must_use]
     pub fn decode(&self, rows: Vec<Row>) -> T {
         (self.decode)(rows).unwrap_or_else(|e| panic!("This should never happen: Error parsing SQL query result.\n\nQuery: {}\n\nError: {e}", self.query))
     }
@@ -508,11 +521,13 @@ pub fn query_db_fn<T: GraphValue>(
 }
 
 impl<T> DbQueryDef<T> {
+    #[must_use]
     pub fn label(mut self, label: &str) -> Self {
         self.label = label.into();
         self
     }
 
+    #[must_use]
     pub fn deps(mut self, deps: &str) -> Self {
         self.hash = deps.into();
         self
@@ -529,6 +544,10 @@ impl<T: GraphValue> Queryable for DbQueryDef<T> {
 
 /// `Doc.get(id)`: the client document's value; the default row is written (without refresh) before the
 /// first run, like TS `execBeforeFirstRun`.
+///
+/// # Panics
+///
+/// Panics when no `id` is given and the document has no default id.
 pub fn client_document_get(doc: &ClientDocument, id: Option<&str>) -> DbQueryDef<Value> {
     let id = id
         .map(str::to_string)
@@ -617,6 +636,10 @@ impl<T: GraphValue> Queryable for Arc<LiveQuery<T>> {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "ports TS `makeDbQuery` (query-input thunk + results thunk) as one unit"
+)]
 fn make_db_query<T: GraphValue>(store: &Store, def: &DbQueryDef<T>) -> Arc<LiveQuery<T>> {
     let graph = &store.inner.graph;
     let dependencies: Arc<Mutex<Vec<RcDeref>>> = Arc::default();
@@ -799,5 +822,5 @@ fn truncate(s: &str, n: usize) -> &str {
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

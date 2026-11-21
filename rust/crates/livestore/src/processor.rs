@@ -69,11 +69,29 @@ pub type Barrier = Arc<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>;
 
 /// The state DB services the processor drives (`StateSqliteDb` savepoints, `StateHead`, `MaterializationJournal`).
 pub trait StateServices: Send + Sync {
+    /// # Errors
+    ///
+    /// Fails when the state DB rejects the `SAVEPOINT`.
     fn begin_savepoint(&self) -> Result<String, StoreError>;
+    /// # Errors
+    ///
+    /// Fails when no savepoint with that name is open.
     fn release_savepoint(&self, name: &str) -> Result<(), StoreError>;
+    /// # Errors
+    ///
+    /// Fails when no savepoint with that name is open.
     fn rollback_savepoint(&self, name: &str) -> Result<(), StoreError>;
+    /// # Errors
+    ///
+    /// Fails when the state head row cannot be written.
     fn set_head(&self, head: SeqNum) -> Result<(), StoreError>;
+    /// # Errors
+    ///
+    /// Fails when a journaled changeset cannot be read or reverted.
     fn journal_rollback(&self, keys: &[SeqNum]) -> Result<(), StoreError>;
+    /// # Errors
+    ///
+    /// Fails when the journal rows cannot be deleted.
     fn journal_discard_up_to(&self, key: SeqNum) -> Result<(), StoreError>;
 }
 
@@ -122,6 +140,7 @@ pub struct ClientSessionSyncProcessor {
 }
 
 impl ClientSessionSyncProcessor {
+    #[must_use]
     pub fn new(args: ProcessorArgs) -> Self {
         let leader_head = args.client_session.leader_thread.leader_head;
         let (jobs_tx, jobs_rx) = mpsc::unbounded_channel();
@@ -160,6 +179,10 @@ impl ClientSessionSyncProcessor {
     }
 
     /// Starts the runner and the pull loop.
+    ///
+    /// # Panics
+    ///
+    /// Panics when called more than once.
     pub fn boot(&self) {
         let boot = tracing::info_span!("client-session-sync-processor:boot");
         self.p
@@ -184,6 +207,11 @@ impl ClientSessionSyncProcessor {
     }
 
     /// Commits a batch synchronously (encode, merge, materialize in one savepoint) and schedules its push.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the processor is shutting down, an event cannot be encoded, or materializing
+    /// fails (the savepoint is then rolled back).
     pub fn commit(&self, events: Vec<EventInput>) -> Result<TableSet, StoreError> {
         let _span = tracing::info_span!(
             "client-session-sync-processor:commit",
@@ -196,6 +224,11 @@ impl ClientSessionSyncProcessor {
     }
 
     /// Graceful drain (success exit) or stop (failure exit); resolves with the shutdown result.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exit the processor stopped with, or the error when the shutdown request
+    /// cannot be recorded.
     pub async fn shutdown(&self, exit: Exit) -> Exit {
         self.begin_shutdown(exit).await
     }
@@ -212,6 +245,7 @@ impl ClientSessionSyncProcessor {
         }
     }
 
+    #[must_use]
     pub fn sync_state(&self) -> SyncState {
         lock(&self.p.model).sync_state.clone()
     }
@@ -226,6 +260,7 @@ impl ClientSessionSyncProcessor {
         .boxed()
     }
 
+    #[must_use]
     pub fn debug_info(&self) -> DebugInfo {
         *lock(&self.p.debug)
     }
@@ -468,16 +503,16 @@ impl Processor {
         }
     }
 
-    async fn report_failure(self: &Arc<Self>, cause: StoreError) {
+    fn report_failure(self: &Arc<Self>, cause: StoreError) {
         if let Err(record_error) = self.dispatch(Message::Failed {
             cause: cause.clone(),
         }) {
-            self.escalate_unrecorded_failure(cause, record_error);
+            self.escalate_unrecorded_failure(cause, &record_error);
         }
     }
 
     /// Last resort when the owner cannot record a failure: shut down the Store directly.
-    fn escalate_unrecorded_failure(&self, cause: StoreError, record_error: StoreError) {
+    fn escalate_unrecorded_failure(&self, cause: StoreError, record_error: &StoreError) {
         let mut escalated = lock(&self.escalated);
         if *escalated {
             return;
@@ -487,9 +522,9 @@ impl Processor {
         tokio::spawn((self.session.shutdown)(Err(cause)));
     }
 
-    async fn report(self: &Arc<Self>, message: Message) {
+    fn report(self: &Arc<Self>, message: Message) {
         if let Err(cause) = self.dispatch(message) {
-            self.report_failure(cause).await;
+            self.report_failure(cause);
         }
     }
 
@@ -497,7 +532,7 @@ impl Processor {
         while !matches!(lock(&self.model).lifecycle, Lifecycle::Stopped) {
             let Some(job) = jobs.recv().await else { break };
             if let Err(cause) = self.run_job(job).await {
-                self.report_failure(cause).await;
+                self.report_failure(cause);
             }
         }
     }
@@ -557,20 +592,18 @@ impl Processor {
                 .then(move |result| async move {
                     match result {
                         None | Some(Ok(Err(LeaderPushFailure::Interrupted))) => {}
-                        Some(Ok(Ok(()))) => p.report(Message::PushSucceeded { operation_id }).await,
+                        Some(Ok(Ok(()))) => p.report(Message::PushSucceeded { operation_id }),
                         Some(Ok(Err(LeaderPushFailure::Rejected(error)))) => {
                             p.report(Message::PushRejected {
                                 operation_id,
                                 error,
-                            })
-                            .await
+                            });
                         }
                         Some(Ok(Err(LeaderPushFailure::Defect(d))) | Err(d)) => {
                             p.report(Message::PushFailed {
                                 operation_id,
                                 cause: StoreError::Defect(d),
-                            })
-                            .await
+                            });
                         }
                     }
                 })
@@ -686,11 +719,11 @@ impl Processor {
             while let Some(item) = stream.next().await {
                 let item = match item {
                     Ok(item) => item,
-                    Err(defect) => return self.report_failure(StoreError::Defect(defect)).await,
+                    Err(defect) => return self.report_failure(StoreError::Defect(defect)),
                 };
                 let (completed, done) = oneshot::channel();
                 if let Err(cause) = self.dispatch(Message::PullReceived { item, completed }) {
-                    return self.report_failure(cause).await;
+                    return self.report_failure(cause);
                 }
                 let _ = done.await;
             }
@@ -727,7 +760,7 @@ impl Owner<'_> {
             Message::PullFinished { id } => self.finish_pull(id),
             Message::PushCancelled { operation_id } => self.finish_push_cancellation(operation_id),
             Message::PushSucceeded { operation_id } => {
-                self.complete_push(operation_id, PushOutcome::Succeeded)
+                self.complete_push(operation_id, PushOutcome::Succeeded);
             }
             Message::PushRejected {
                 operation_id,
@@ -1109,7 +1142,7 @@ impl Owner<'_> {
         }
     }
 
-    /// Development check of the propagation bookkeeping that commit and finish_pull rely on.
+    /// Development check of the propagation bookkeeping that commit and `finish_pull` rely on.
     fn check_model_invariants(&self) -> Result<(), StoreError> {
         let reconciling = self.m.active_reconciliation().is_some();
         if matches!(self.m.push, PushState::Cancelling { .. }) && !reconciling {
@@ -1395,6 +1428,7 @@ fn is_rejected_batch_recovered(rejected: &[Event], pending: &[Event]) -> bool {
 }
 
 /// `resolveSessionIdSymbolInEventArgs`: replaces [`SESSION_ID_SYMBOL`] values (top level and `id`).
+#[must_use]
 pub fn resolve_session_id(args: Value, session_id: &str) -> Value {
     match args {
         Value::String(s) if s == SESSION_ID_SYMBOL => Value::String(session_id.into()),
@@ -1417,7 +1451,11 @@ async fn catch_defect<T>(fut: BoxFuture<'static, T>) -> Result<T, Defect> {
             let message = panic
                 .downcast_ref::<String>()
                 .cloned()
-                .or_else(|| panic.downcast_ref::<&str>().map(|s| s.to_string()))
+                .or_else(|| {
+                    panic
+                        .downcast_ref::<&str>()
+                        .map(std::string::ToString::to_string)
+                })
                 .unwrap_or_else(|| "leader push panicked".into());
             Defect::msg(message)
         })
@@ -1431,5 +1469,5 @@ async fn abort_and_wait(handle: Option<JoinHandle<()>>) {
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
