@@ -8,7 +8,7 @@ conflict with each other. They use the client crates through path dependencies
 | Example | UI | Shows |
 |---|---|---|
 | `todo-tui` | ratatui (terminal) | An app that already runs tokio |
-| `todo-gpui` | GPUI | An app without tokio; Cmd-N opens a second window on the same store |
+| `todo-gpui` | GPUI | An app without tokio; Cmd-N opens a second window on the same store. macOS only: GPUI 0.2.2 does not build on Linux |
 | `todo-rune` | rune | An Elm-style app whose UI thread must not block; results arrive through `AppHandle::update` |
 
 All three are TodoMVC on the `livestore-todomvc` schema, so they sync with core's web TodoMVC.

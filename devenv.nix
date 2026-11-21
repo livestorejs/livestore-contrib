@@ -716,7 +716,8 @@ in
   tasks."rust:examples" = {
     description = "Format-check, lint and build each Rust example app (each is its own workspace in rust/examples)";
     after = [ "mr:bootstrap" ];
-    exec = "set -e; for d in rust/examples/*/; do (cd \"$d\" && cargo fmt --all --check && cargo clippy --all-targets --locked -- -D warnings); done";
+    # GPUI 0.2.2 does not build on Linux (its xattr 0.2 needs a libc older than tokio allows), so only macOS checks todo-gpui.
+    exec = "set -e; for d in rust/examples/*/; do if [ \"$d\" = rust/examples/todo-gpui/ ] && [ \"$(uname)\" != Darwin ]; then continue; fi; (cd \"$d\" && cargo fmt --all --check && cargo clippy --all-targets --locked -- -D warnings); done";
   };
   tasks."check:rust" = {
     description = "All Rust client checks (kept out of check:all)";
