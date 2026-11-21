@@ -102,6 +102,19 @@ fn should_consider_events_with_different_names_as_not_equal() {
     assert!(!is_equal_encoded(&a, &b));
 }
 
+/// A Rust `1.0` comes back as `1` after a TypeScript client round-trips the event.
+#[test]
+fn treats_whole_floats_and_integers_as_equal_args() {
+    assert!(is_equal_encoded(
+        &make(json!({ "score": 1.0, "tags": [2.0] })),
+        &make(json!({ "tags": [2], "score": 1 }))
+    ));
+    assert!(!is_equal_encoded(
+        &make(json!({ "score": 1.5 })),
+        &make(json!({ "score": 1 }))
+    ));
+}
+
 #[derive(Serialize)]
 struct WithFlag {
     id: &'static str,

@@ -30,7 +30,8 @@ impl Event {
     }
 }
 
-/// `LiveStoreEvent.Client.isEqualEncoded`; JSON args are already canonical.
+/// `LiveStoreEvent.Client.isEqualEncoded`. Args compare like JS values after a JSON round trip, so
+/// `1.0` and `1` are equal: TypeScript clients send whole numbers back without a fraction.
 #[must_use]
 pub fn is_equal_encoded(a: &Event, b: &Event) -> bool {
     a.seq_num.global == b.seq_num.global
@@ -38,7 +39,7 @@ pub fn is_equal_encoded(a: &Event, b: &Event) -> bool {
         && a.name == b.name
         && a.client_id == b.client_id
         && a.session_id == b.session_id
-        && a.args == b.args
+        && js_equal(&a.args, &b.args)
 }
 
 /// Global encoded event (`LiveStoreEvent.Global.Encoded`): the wire/backend shape.
@@ -79,5 +80,20 @@ impl From<GlobalEvent> for Event {
             client_id: e.client_id,
             session_id: e.session_id,
         }
+    }
+}
+
+fn js_equal(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(x), Value::Number(y)) => x.as_f64() == y.as_f64(),
+        (Value::Array(x), Value::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y).all(|(x, y)| js_equal(x, y))
+        }
+        (Value::Object(x), Value::Object(y)) => {
+            x.len() == y.len()
+                && x.iter()
+                    .all(|(k, v)| y.get(k).is_some_and(|w| js_equal(v, w)))
+        }
+        _ => a == b,
     }
 }
