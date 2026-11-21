@@ -17,7 +17,8 @@ fn reproduces_livestore_optional_field_bug_repo_scenario() {
     let schema = Schema::builder().client_document(ui_state.clone()).build();
     let mut store = LocalLeader::open_in_memory(schema, "client", "session").unwrap();
 
-    let (name, mut args) = ui_state.set(
+    let name = ui_state.set_event_name();
+    let mut args = ui_state.set_args(
         Val::obj([
             ("newTodoText", Val::from("")),
             ("description", Val::from("First attempt")),

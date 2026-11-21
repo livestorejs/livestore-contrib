@@ -13,7 +13,8 @@ fn encodes_commit_events_without_mutating_caller_provided_args() {
     let schema = Schema::builder().client_document(ui_state.clone()).build();
     let mut store = LocalLeader::open_in_memory(schema, "client", "test-session").unwrap();
 
-    let (name, mut args) = ui_state.set(Val::obj([("draft", Val::from("hello"))]), None);
+    let name = ui_state.set_event_name();
+    let mut args = ui_state.set_args(Val::obj([("draft", Val::from("hello"))]), None);
     if let Val::Object(fields) = &mut args {
         fields.insert("id".into(), session_id_symbol());
     }
