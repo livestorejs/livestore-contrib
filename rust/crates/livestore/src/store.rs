@@ -60,8 +60,7 @@ pub async fn await_shutdown(deferred: &ShutdownDeferred) -> Exit {
     let mut rx = deferred.subscribe();
     rx.wait_for(Option::is_some)
         .await
-        .map(|v| v.clone().expect("checked"))
-        .unwrap_or(Ok(()))
+        .map_or(Ok(()), |v| v.clone().expect("checked"))
 }
 
 pub type BootFn = Arc<dyn Fn(&Store) + Send + Sync>;

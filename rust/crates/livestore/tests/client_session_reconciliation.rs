@@ -4,7 +4,7 @@ mod common;
 
 use std::sync::{Arc, LazyLock, Mutex};
 
-use common::harness::{Deferred, never, yield_now};
+use common::harness::{Deferred, never};
 use common::session::{self, TODO_COMPLETED, TODOS, TodoId};
 use common::{journal_count, state_head};
 use futures::{FutureExt, StreamExt};
@@ -16,7 +16,7 @@ use livestore::{
 use livestore_core::{Event, Payload, SeqNum, SyncState};
 use livestore_schema::{Column, EventDef, Schema, SqlStatement, SqlValue, Table};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::json;
 use tokio::sync::mpsc;
 
 /// Batches are sized in whole pull steps so they keep their meaning if the chunk size changes.
@@ -663,9 +663,4 @@ fn counter_batch(count: i64) -> Vec<Event> {
             ..remote_created(i + 1)
         })
         .collect()
-}
-
-#[allow(dead_code)]
-fn _unused(_: Value) {
-    let _ = yield_now;
 }

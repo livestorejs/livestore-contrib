@@ -1,6 +1,7 @@
 //! Store layer (`packages/@livestore/livestore` and `ClientSessionSyncProcessor`): the reactive graph,
 //! live queries, the session sync processor over a leader proxy, the [`Store`] and the [`StoreRegistry`].
 
+#![warn(clippy::unwrap_used)]
 // Errors carry full TS fields (sequence numbers, session ids); boxing them would only hurt matching.
 #![allow(clippy::result_large_err)]
 
