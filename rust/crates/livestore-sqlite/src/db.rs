@@ -61,10 +61,14 @@ pub struct LeaderDb {
 }
 
 impl LeaderDb {
+    /// Both files stay locked by SQLite while the leader runs (exclusive locking mode): no other
+    /// connection, in this or another process, can read or write them meanwhile.
+    ///
     /// # Errors
     ///
     /// Fails with [`Error::Locked`] when another leader, in this or another process, has the eventlog open, with
-    /// [`Error::Sqlite`] when a database file cannot be opened, and otherwise as [`Self::boot_with`].
+    /// [`Error::Sqlite`] when a database file cannot be opened or another connection holds it, and otherwise as
+    /// [`Self::boot_with`].
     pub fn open(
         state_path: impl AsRef<Path>,
         eventlog_path: impl AsRef<Path>,
@@ -72,8 +76,8 @@ impl LeaderDb {
     ) -> Result<Self> {
         let lock = lock_file(eventlog_path.as_ref())?;
         let mut db = Self::boot(
-            Connection::open(state_path)?,
-            Connection::open(eventlog_path)?,
+            open_exclusive(state_path.as_ref())?,
+            open_exclusive(eventlog_path.as_ref())?,
             schema,
         )?;
         db.lock = Some(lock);
@@ -82,15 +86,18 @@ impl LeaderDb {
 
     /// Opens the databases in a data folder, like core's adapters: `eventlog.db` and
     /// `state<state hash>.db`. A schema change that changes the state hash opens a new, empty state
-    /// file, which boot rebuilds from the eventlog. Older state files are deleted.
+    /// file, which boot rebuilds from the eventlog. Older state files are deleted. On Unix, only the
+    /// folder's owner may access it (mode `0700`).
     ///
     /// # Errors
     ///
-    /// Fails with [`Error::Unknown`] when the folder cannot be created, and otherwise as [`Self::open`].
+    /// Fails with [`Error::Unknown`] when the folder cannot be created or restricted, and otherwise as
+    /// [`Self::open`].
     pub fn open_folder(dir: impl AsRef<Path>, schema: Arc<Schema>) -> Result<Self> {
         let dir = dir.as_ref();
         std::fs::create_dir_all(dir)
             .map_err(|e| Error::Unknown(format!("cannot create {}: {e}", dir.display())))?;
+        restrict_to_owner(dir)?;
         let state_name = format!(
             "state{}.db",
             livestore_schema::migration::state_hash(schema.tables())
@@ -459,4 +466,29 @@ fn remove_old_state_files(dir: &Path, current: &str) {
             let _ = std::fs::remove_file(entry.path());
         }
     }
+}
+
+/// Opens a database file in exclusive locking mode and takes the write lock right away, so SQLite
+/// keeps the file locked against every other connection until this one closes.
+fn open_exclusive(path: &Path) -> Result<Connection> {
+    let conn = Connection::open(path)?;
+    conn.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
+    conn.execute_batch("BEGIN EXCLUSIVE; COMMIT;")?;
+    Ok(conn)
+}
+
+#[cfg(unix)]
+fn restrict_to_owner(dir: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| Error::Unknown(format!("cannot restrict {}: {e}", dir.display())))
+}
+
+#[cfg(not(unix))]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "same signature as the Unix version"
+)]
+fn restrict_to_owner(_dir: &Path) -> Result<()> {
+    Ok(())
 }

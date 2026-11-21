@@ -65,6 +65,17 @@ folder, like core's adapters: `eventlog.db` and `state<state hash>.db`. A schema
 change that changes the state hash opens a new, empty state file, and boot
 rebuilds it from the eventlog. Boot deletes the state files of older schemas.
 
+Only the leader touches the files while it runs, as with OPFS in the browser:
+
+- On Unix, the folder has mode `0700`, so other OS users cannot access it.
+- Both connections use SQLite's exclusive locking mode and take the write lock
+  at open. Other connections, in any process, cannot read or write the files
+  until the leader closes. A long outside read can therefore never make a
+  leader commit fail halfway.
+
+The files are not encrypted. Programs of the same OS user can read them while
+the app is closed.
+
 ## One Leader per Data Folder
 
 `LeaderDb::open` takes an exclusive OS lock (`File::try_lock`) on

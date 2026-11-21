@@ -69,3 +69,29 @@ fn a_changed_table_rebuilds_the_state_from_the_eventlog() {
             .clone()]
     );
 }
+
+#[test]
+fn other_connections_cannot_read_the_files_while_the_leader_runs() {
+    let dir = data_folder("exclusive");
+    let leader = open(&dir).unwrap();
+    let outside = rusqlite::Connection::open(dir.join("eventlog.db")).unwrap();
+    outside.busy_timeout(std::time::Duration::ZERO).unwrap();
+    let read = |conn: &rusqlite::Connection| {
+        conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| {
+            r.get::<_, i64>(0)
+        })
+    };
+    assert!(read(&outside).is_err());
+    drop(leader);
+    assert!(read(&outside).is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn only_the_owner_can_access_the_data_folder() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = data_folder("permissions");
+    let _leader = open(&dir).unwrap();
+    let mode = std::fs::metadata(&dir).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o700);
+}
