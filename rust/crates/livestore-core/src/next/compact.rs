@@ -3,6 +3,7 @@ use super::history_dag::{ConnectionType, HistoryDag, empty_history_dag};
 
 /// `compactEvents`: drops earlier sub-DAGs that a later event's sub-DAG fully replaces.
 /// The returned count is always 0, like TS.
+#[must_use]
 pub fn compact_events(input: &HistoryDag) -> (HistoryDag, usize) {
     let mut dag = input.copy();
     let mut ordered = dag.topological_node_ids();

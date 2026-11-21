@@ -15,7 +15,7 @@ fn rolls_back_failed_effects() {
         Err(Error::Invariant("rollback".into()))
     });
     assert!(result.is_err());
-    assert!(values(&db).is_empty());
+    assert_eq!(values(&db), Vec::<serde_json::Value>::new());
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn rolls_back_and_releases_on_interruption() {
         })
     }));
     assert!(interrupted.is_err());
-    assert!(values(&db).is_empty());
+    assert_eq!(values(&db), Vec::<serde_json::Value>::new());
 
     db.execute_batch("INSERT INTO test (id, value) VALUES (2, 'after-interrupt')")
         .unwrap();

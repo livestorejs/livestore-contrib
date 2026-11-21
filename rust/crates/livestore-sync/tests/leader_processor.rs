@@ -66,7 +66,9 @@ async fn pushes_events_pending_across_a_restart_exactly_once_when_the_first_page
     let mut state = leader.sync_state();
     tokio::time::timeout(
         Duration::from_secs(10),
-        state.wait_for(|s| s.pending.is_empty() && s.upstream_head.global == ids.len() as i64 + 1),
+        state.wait_for(|s| {
+            s.pending.is_empty() && s.upstream_head.global == i64::try_from(ids.len()).unwrap() + 1
+        }),
     )
     .await
     .unwrap()
@@ -82,7 +84,7 @@ async fn pushes_events_pending_across_a_restart_exactly_once_when_the_first_page
         pushed,
         ids.iter()
             .enumerate()
-            .map(|(i, id)| (json!(id), i as i64 + 2))
+            .map(|(i, id)| (json!(id), i64::try_from(i).unwrap() + 2))
             .collect::<Vec<_>>()
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -501,11 +503,11 @@ async fn confirms_a_pending_event_that_was_rebased_before_the_backend_accepted_i
     let mut ids = ctx.ids();
     ids.sort();
     assert_eq!(ids, ["local", "remote"]);
-    assert!(
+    assert_eq!(
         ctx.leader
             .query("SELECT * FROM __livestore_materialization_journal")
-            .unwrap()
-            .is_empty()
+            .unwrap(),
+        Vec::<livestore_sqlite::Row>::new()
     );
 }
 
@@ -522,7 +524,7 @@ async fn many_local_pushes() {
         .unwrap();
     ctx.wait_state(|s| s.local_head.global == number_of_pushes)
         .await;
-    assert_eq!(ctx.ids().len(), number_of_pushes as usize);
+    assert_eq!(ctx.ids().len(), usize::try_from(number_of_pushes).unwrap());
     assert!(
         ctx.drain_queue()
             .await
@@ -540,8 +542,8 @@ async fn handles_duplicate_local_push_events() {
         ..Default::default()
     };
     let ctx = Ctx::start(Opts {
-        testing,
         params,
+        testing,
         ..Default::default()
     })
     .await;

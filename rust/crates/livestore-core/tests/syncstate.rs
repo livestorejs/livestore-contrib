@@ -27,7 +27,7 @@ fn should_rollback_until_start() {
     let e1_1_e2_1 = rebase(&e(1, 1), e1_0_e2_0.seq_num, 0);
     let result = merge(
         &state,
-        Payload::UpstreamRebase {
+        &Payload::UpstreamRebase {
             rollback_events: vec![e(1, 0), e(1, 1)],
             new_events: vec![e1_0_e2_0.clone(), e1_1_e2_1.clone()],
         },
@@ -48,7 +48,7 @@ fn should_rollback_only_to_specified_point() {
     let e1_1_e2_0 = rebase(&e(1, 1), e(1, 0).seq_num, 0);
     let result = merge(
         &state,
-        Payload::UpstreamRebase {
+        &Payload::UpstreamRebase {
             new_events: vec![e1_1_e2_0.clone()],
             rollback_events: vec![e(1, 1)],
         },
@@ -68,7 +68,7 @@ fn should_work_for_empty_pending() {
     let state = st(vec![], SeqNum::ROOT, e(1, 0).seq_num);
     let result = merge(
         &state,
-        Payload::UpstreamRebase {
+        &Payload::UpstreamRebase {
             rollback_events: vec![e(1, 0)],
             new_events: vec![e(2, 0)],
         },
@@ -84,31 +84,31 @@ fn should_work_for_empty_pending() {
 #[test]
 fn should_die_if_new_events_are_not_sorted_in_ascending_order_by_event_number_client() {
     let state = st(vec![e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
-    assert!(try_merge(&state, advance(vec![e(1, 1), e(1, 0)]), false).is_err());
+    assert!(try_merge(&state, &advance(vec![e(1, 1), e(1, 0)]), false).is_err());
 }
 
 #[test]
 fn should_die_if_new_events_are_not_sorted_in_ascending_order_by_event_number_global() {
     let state = st(vec![e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
-    assert!(try_merge(&state, advance(vec![e(2, 0), e(1, 0)]), false).is_err());
+    assert!(try_merge(&state, &advance(vec![e(2, 0), e(1, 0)]), false).is_err());
 }
 
 #[test]
 fn should_die_if_incoming_event_is_lt_expected_upstream_head() {
     let state = st(vec![], e(2, 0).seq_num, e(2, 0).seq_num);
-    assert!(try_merge(&state, advance(vec![e(1, 0)]), false).is_err());
+    assert!(try_merge(&state, &advance(vec![e(1, 0)]), false).is_err());
 }
 
 #[test]
 fn should_die_if_incoming_event_is_eq_expected_upstream_head() {
     let state = st(vec![], e(2, 0).seq_num, e(2, 0).seq_num);
-    assert!(try_merge(&state, advance(vec![e(2, 0)]), false).is_err());
+    assert!(try_merge(&state, &advance(vec![e(2, 0)]), false).is_err());
 }
 
 #[test]
 fn should_confirm_pending_event_when_receiving_matching_event() {
     let state = st(vec![e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
-    let (s, new_events, confirmed) = expect_advance(merge(&state, advance(vec![e(1, 0)]), false));
+    let (s, new_events, confirmed) = expect_advance(merge(&state, &advance(vec![e(1, 0)]), false));
     assert_events(&s.pending, &[]);
     assert_eq!(s.upstream_head, e(1, 0).seq_num);
     assert_eq!(s.local_head, e(1, 0).seq_num);
@@ -119,7 +119,7 @@ fn should_confirm_pending_event_when_receiving_matching_event() {
 #[test]
 fn should_confirm_partial_pending_event_when_receiving_matching_event() {
     let state = st(vec![e(1, 0), e(2, 0)], SeqNum::ROOT, e(2, 0).seq_num);
-    let (s, new_events, confirmed) = expect_advance(merge(&state, advance(vec![e(1, 0)]), false));
+    let (s, new_events, confirmed) = expect_advance(merge(&state, &advance(vec![e(1, 0)]), false));
     assert_events(&s.pending, &[e(2, 0)]);
     assert_eq!(s.upstream_head, e(1, 0).seq_num);
     assert_eq!(s.local_head, e(2, 0).seq_num);
@@ -131,7 +131,7 @@ fn should_confirm_partial_pending_event_when_receiving_matching_event() {
 fn should_confirm_pending_event_and_add_new_event() {
     let state = st(vec![e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
     let (s, new_events, confirmed) =
-        expect_advance(merge(&state, advance(vec![e(1, 0), e(1, 1)]), false));
+        expect_advance(merge(&state, &advance(vec![e(1, 0), e(1, 1)]), false));
     assert_events(&s.pending, &[]);
     assert_eq!(s.upstream_head, e(1, 1).seq_num);
     assert_eq!(s.local_head, e(1, 1).seq_num);
@@ -144,7 +144,7 @@ fn should_confirm_pending_event_and_add_multiple_new_events() {
     let state = st(vec![e(1, 1)], e(1, 0).seq_num, e(1, 1).seq_num);
     let (s, new_events, confirmed) = expect_advance(merge(
         &state,
-        advance(vec![e(1, 1), e(1, 2), e(1, 3), e(2, 0), e(2, 1)]),
+        &advance(vec![e(1, 1), e(1, 2), e(1, 3), e(2, 0), e(2, 1)]),
         false,
     ));
     assert_events(&s.pending, &[]);
@@ -157,7 +157,7 @@ fn should_confirm_pending_event_and_add_multiple_new_events() {
 #[test]
 fn should_confirm_pending_global_event_while_keep_pending_client_events() {
     let state = st(vec![e(1, 0), e(1, 1)], SeqNum::ROOT, e(1, 1).seq_num);
-    let (s, new_events, confirmed) = expect_advance(merge(&state, advance(vec![e(1, 0)]), false));
+    let (s, new_events, confirmed) = expect_advance(merge(&state, &advance(vec![e(1, 0)]), false));
     assert_events(&s.pending, &[e(1, 1)]);
     assert_eq!(s.upstream_head, e(1, 0).seq_num);
     assert_eq!(s.local_head, e(1, 1).seq_num);
@@ -168,7 +168,7 @@ fn should_confirm_pending_global_event_while_keep_pending_client_events() {
 #[test]
 fn should_ignore_client_events_incoming_is_subset_of_pending() {
     let state = st(vec![e(0, 1), e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
-    let (s, new_events, confirmed) = expect_advance(merge(&state, advance(vec![e(1, 0)]), true));
+    let (s, new_events, confirmed) = expect_advance(merge(&state, &advance(vec![e(1, 0)]), true));
     assert_events(&s.pending, &[]);
     assert_eq!(s.upstream_head, e(1, 0).seq_num);
     assert_eq!(s.local_head, e(1, 0).seq_num);
@@ -183,7 +183,7 @@ fn should_ignore_client_events_incoming_is_subset_of_pending_case_2() {
         SeqNum::ROOT,
         e(1, 0).seq_num,
     );
-    let (s, new_events, confirmed) = expect_advance(merge(&state, advance(vec![e(1, 0)]), true));
+    let (s, new_events, confirmed) = expect_advance(merge(&state, &advance(vec![e(1, 0)]), true));
     assert_events(&s.pending, &[e(2, 0)]);
     assert_eq!(s.upstream_head, e(1, 0).seq_num);
     assert_eq!(s.local_head, e(2, 0).seq_num);
@@ -199,7 +199,7 @@ fn should_ignore_client_events_incoming_goes_beyond_pending() {
         e(1, 1).seq_num,
     );
     let (s, new_events, confirmed) =
-        expect_advance(merge(&state, advance(vec![e(1, 0), e(2, 0)]), true));
+        expect_advance(merge(&state, &advance(vec![e(1, 0), e(2, 0)]), true));
     assert_events(&s.pending, &[]);
     assert_eq!(s.upstream_head, e(2, 0).seq_num);
     assert_eq!(s.local_head, e(2, 0).seq_num);
@@ -210,7 +210,7 @@ fn should_ignore_client_events_incoming_goes_beyond_pending() {
 #[test]
 fn should_die_if_incoming_event_is_le_local_head() {
     let state = st(vec![], e(2, 0).seq_num, e(2, 0).seq_num);
-    assert!(try_merge(&state, advance(vec![e(1, 0)]), false).is_err());
+    assert!(try_merge(&state, &advance(vec![e(1, 0)]), false).is_err());
 }
 
 #[test]
@@ -232,7 +232,7 @@ fn should_advance_not_rebase_when_pending_event_has_undefined_valued_key_dropped
         SeqNum::ROOT,
         local_pending.seq_num,
     );
-    let (s, _, confirmed) = expect_advance(merge(&state, advance(vec![from_upstream]), false));
+    let (s, _, confirmed) = expect_advance(merge(&state, &advance(vec![from_upstream]), false));
     assert_eq!(confirmed.len(), 1);
     assert_eq!(s.pending.len(), 0);
 }
@@ -240,7 +240,7 @@ fn should_advance_not_rebase_when_pending_event_has_undefined_valued_key_dropped
 #[test]
 fn should_rebase_single_client_event_to_end() {
     let state = st(vec![e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
-    let result = merge(&state, advance(vec![e(1, 1)]), false);
+    let result = merge(&state, &advance(vec![e(1, 1)]), false);
     let e1_0_e1_2 = rebase(&e(1, 0), e(1, 1).seq_num, 1);
     let (s, new_events, rollback) = expect_rebase(result);
     assert_events(&s.pending, std::slice::from_ref(&e1_0_e1_2));
@@ -254,7 +254,7 @@ fn should_rebase_single_client_event_to_end() {
 fn should_rebase_different_event_with_same_id() {
     let e2_0_b = make(SeqNum::new(1, 0, 0), e(1, 0).seq_num, "1_0_b", false);
     let state = st(vec![e2_0_b.clone()], SeqNum::ROOT, e2_0_b.seq_num);
-    let result = merge(&state, advance(vec![e(2, 0)]), false);
+    let result = merge(&state, &advance(vec![e(2, 0)]), false);
     let e2_0_e3_0 = rebase(&e2_0_b, e(2, 0).seq_num, 1);
     let (s, new_events, rollback) = expect_rebase(result);
     assert_events(&s.pending, std::slice::from_ref(&e2_0_e3_0));
@@ -269,7 +269,7 @@ fn should_rebase_single_client_event_to_end_more_incoming_events() {
     let state = st(vec![e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
     let result = merge(
         &state,
-        advance(vec![e(1, 1), e(1, 2), e(1, 3), e(2, 0)]),
+        &advance(vec![e(1, 1), e(1, 2), e(1, 3), e(2, 0)]),
         false,
     );
     let e1_0_e3_0 = rebase(&e(1, 0), e(2, 0).seq_num, 1);
@@ -284,7 +284,7 @@ fn should_only_rebase_divergent_events_when_first_event_matches() {
     let state = st(vec![e(1, 0), e(1, 1)], SeqNum::ROOT, e(1, 0).seq_num);
     let result = merge(
         &state,
-        advance(vec![e(1, 0), e(1, 2), e(1, 3), e(2, 0)]),
+        &advance(vec![e(1, 0), e(1, 2), e(1, 3), e(2, 0)]),
         false,
     );
     let e1_1_e2_1 = rebase(&e(1, 1), e(2, 0).seq_num, 1);
@@ -301,7 +301,7 @@ fn should_rebase_all_client_events_when_incoming_chain_starts_differently() {
     let state = st(vec![e(1, 0), e(1, 1)], SeqNum::ROOT, e(1, 1).seq_num);
     let result = merge(
         &state,
-        advance(vec![e(1, 1), e(1, 2), e(1, 3), e(2, 0)]),
+        &advance(vec![e(1, 1), e(1, 2), e(1, 3), e(2, 0)]),
         false,
     );
     let e1_0_e2_1 = rebase(&e(1, 0), e(2, 0).seq_num, 1);
@@ -329,7 +329,7 @@ fn should_advance_with_new_events() {
     let state = st(vec![e(1, 0)], SeqNum::ROOT, e(1, 0).seq_num);
     let (s, new_events, confirmed) = expect_advance(merge(
         &state,
-        Payload::LocalPush {
+        &Payload::LocalPush {
             new_events: vec![e(1, 1), e(1, 2), e(1, 3)],
         },
         false,
@@ -346,7 +346,7 @@ fn keeps_pending_empty_when_pushing_only_client_only_events_that_are_being_ignor
     let state = st(vec![], SeqNum::ROOT, SeqNum::ROOT);
     let (s, new_events, _) = expect_advance(merge(
         &state,
-        Payload::LocalPush {
+        &Payload::LocalPush {
             new_events: vec![e(0, 1)],
         },
         true,
@@ -362,7 +362,7 @@ fn appends_only_upstream_bound_events_to_pending_when_ignoring_client_only_pushe
     let state = st(vec![], SeqNum::ROOT, SeqNum::ROOT);
     let (s, new_events, _) = expect_advance(merge(
         &state,
-        Payload::LocalPush {
+        &Payload::LocalPush {
             new_events: vec![e(0, 1), e(1, 0)],
         },
         true,
@@ -378,7 +378,7 @@ fn should_reject_when_new_events_are_greater_than_pending_events() {
     let state = st(vec![e(1, 0), e(1, 1)], SeqNum::ROOT, e(1, 1).seq_num);
     match merge(
         &state,
-        Payload::LocalPush {
+        &Payload::LocalPush {
             new_events: vec![e(1, 1), e(1, 2)],
         },
         false,
@@ -433,13 +433,13 @@ fn advance(new_events: Vec<Event>) -> Payload {
 
 fn try_merge(
     state: &SyncState,
-    payload: Payload,
+    payload: &Payload,
     ignore: bool,
 ) -> Result<MergeResult, livestore_core::MergeError> {
-    livestore_core::merge(state, &payload, is_client_only, is_equal_encoded, ignore)
+    livestore_core::merge(state, payload, is_client_only, is_equal_encoded, ignore)
 }
 
-fn merge(state: &SyncState, payload: Payload, ignore: bool) -> MergeResult {
+fn merge(state: &SyncState, payload: &Payload, ignore: bool) -> MergeResult {
     try_merge(state, payload, ignore).unwrap()
 }
 

@@ -73,7 +73,7 @@ fn should_track_changes_when_session_is_enabled() {
     .unwrap();
     session.set_enabled(false);
 
-    assert!(!changeset(&mut session).is_empty());
+    assert_ne!(changeset(&mut session), Vec::<u8>::new());
 }
 
 #[test]
@@ -160,8 +160,8 @@ fn should_handle_multiple_independent_sessions() {
     let changeset1 = changeset(&mut session1);
     let changeset2 = changeset(&mut session2);
     assert_ne!(changeset1, changeset2);
-    assert!(!changeset1.is_empty());
-    assert!(!changeset2.is_empty());
+    assert_ne!(changeset1, Vec::<u8>::new());
+    assert_ne!(changeset2, Vec::<u8>::new());
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn should_track_specific_table_changes_when_attached_to_specific_table() {
     .unwrap();
     session.set_enabled(false);
 
-    assert!(!changeset(&mut session).is_empty());
+    assert_ne!(changeset(&mut session), Vec::<u8>::new());
 }
 
 #[test]
@@ -417,6 +417,6 @@ fn should_handle_complex_changeset_operations() {
     session.set_enabled(false);
 
     let cs = changeset(&mut session);
-    assert!(!cs.is_empty());
-    assert!(!invert(&cs).is_empty());
+    assert_ne!(cs, Vec::<u8>::new());
+    assert_ne!(invert(&cs), Vec::<u8>::new());
 }

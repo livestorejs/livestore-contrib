@@ -247,6 +247,10 @@ impl Processor {
         }
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one match arm per mailbox message, mirroring the TS processor"
+    )]
     async fn handle(&mut self, msg: Msg) -> bool {
         match msg {
             Msg::ShutdownRequested => return self.stop(Lifecycle::Stopping, None, false),
@@ -544,10 +548,10 @@ impl Processor {
             self.send(Msg::ContinueWork);
             return true;
         }
-        self.process_local_batch(active)
+        self.process_local_batch(&active)
     }
 
-    fn process_local_batch(&mut self, items: Vec<LocalItem>) -> bool {
+    fn process_local_batch(&mut self, items: &[LocalItem]) -> bool {
         let span = tracing::debug_span!(
             "@livestore/common:LeaderSyncProcessor:processLocalBatch",
             batch_size = items.len()
@@ -645,7 +649,7 @@ impl Processor {
             | PushState::AwaitingPull { queued } => queued.extend(to_push),
         }
         self.start_provider_push();
-        self.complete(&items);
+        self.complete(items);
         self.send(Msg::ContinueWork);
         true
     }
@@ -708,7 +712,7 @@ impl Processor {
             .db
             .lock()
             .expect("mutex poisoned")
-            .persist_upstream(commit);
+            .persist_upstream(&commit);
         let receipt = match persisted {
             Ok(r) => r,
             Err(e) => return self.stop_for_sync_failure(ShutdownCause::from_storage(&e)),
@@ -846,7 +850,7 @@ impl Processor {
                 Err(panic) => Msg::PushFailed {
                     operation_id,
                     error: UnknownError::with_note(
-                        panic_message(panic),
+                        panic_message(&*panic),
                         "Sync backend push defected",
                     )
                     .into(),
@@ -936,9 +940,11 @@ impl Processor {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => _ = tx.send(Msg::PullFailed { pull_id, error }),
                 Err(panic) => {
-                    let error =
-                        UnknownError::with_note(panic_message(panic), "Sync backend pull defected")
-                            .into();
+                    let error = UnknownError::with_note(
+                        panic_message(&*panic),
+                        "Sync backend pull defected",
+                    )
+                    .into();
                     let _ = tx.send(Msg::PullFailed { pull_id, error });
                 }
             }
@@ -1023,14 +1029,15 @@ impl Processor {
     }
 
     fn publish(&mut self, sync_state: SyncState, payload: Payload) {
+        let (local_head, global_head) = (sync_state.local_head, sync_state.upstream_head);
         self.model.sync_state = sync_state.clone();
-        self.d.sync_state.send_replace(sync_state.clone());
+        self.d.sync_state.send_replace(sync_state);
         let materializer_hashes = materializer_hashes(&self.d.schema, payload.new_events());
         self.d.sessions.offer(
-            sync_state.local_head,
+            local_head,
             SessionPullItem {
                 payload,
-                global_head: sync_state.upstream_head,
+                global_head,
                 materializer_hashes,
             },
         );
@@ -1185,10 +1192,10 @@ fn unknown(message: &str) -> ShutdownCause {
     ShutdownCause::UnknownError(UnknownError::new(message))
 }
 
-fn panic_message(panic: Box<dyn std::any::Any + Send>) -> String {
+fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
     panic
         .downcast_ref::<&str>()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .or_else(|| panic.downcast_ref::<String>().cloned())
         .unwrap_or_else(|| "panic".into())
 }
@@ -1203,7 +1210,8 @@ fn materializer_hashes(schema: &Schema, events: &[Event]) -> Vec<MaterializerHas
                 .and_then(|e| e.materializer.as_ref())
                 .and_then(|m| m(&event.args, &MaterializeContext::new(event)).ok());
             // Same hash the session computes, so pure materializers always agree.
-            let hash = statements.map(|s| livestore_sqlite::state::materializer_hash(&s) as u64);
+            let hash =
+                statements.map(|s| livestore_sqlite::state::materializer_hash(&s).cast_unsigned());
             MaterializerHash {
                 event_num: event.seq_num,
                 hash,

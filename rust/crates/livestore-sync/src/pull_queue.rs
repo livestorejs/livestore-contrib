@@ -73,8 +73,8 @@ impl PullQueueSet {
 
     pub fn offer(&self, leader_head: SeqNum, item: SessionPullItem) {
         let mut inner = self.inner.lock().expect("mutex poisoned");
-        inner.cache.push((leader_head, item.clone()));
         inner.queues.retain(|q| q.send(item.clone()).is_ok());
+        inner.cache.push((leader_head, item));
     }
 
     pub fn close(&self) {

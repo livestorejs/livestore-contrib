@@ -1,4 +1,4 @@
-//! Port of packages/@livestore/wa-sqlite/test/api.test.js (api_exec.js, api_misc.js, api_statements.js) for the
+//! Port of packages/@livestore/wa-sqlite/test/api.test.js (`api_exec.js`, `api_misc.js`, `api_statements.js`) for the
 //! default build without a custom VFS: each test opens `demo` as a file, like wa-sqlite's default VFS.
 #![allow(clippy::approx_constant)]
 
@@ -137,15 +137,15 @@ fn should_iterate() {
 }
 
 /// Binds `value` to `SELECT ?`, steps, and checks column count, type and value (both TS loops: typed + generic bind).
-fn check_bind(db: &Connection, value: Value, expected: Value) {
+fn check_bind(db: &Connection, value: &Value, expected: &Value) {
     let mut stmt = db.prepare("SELECT ?").unwrap();
-    stmt.raw_bind_parameter(1, &value).unwrap();
+    stmt.raw_bind_parameter(1, value).unwrap();
     assert_eq!(stmt.column_count(), 1);
     let mut rows = stmt.raw_query();
     let mut seen = 0;
     while let Some(row) = rows.next().unwrap() {
         assert_eq!(col_type(row.get_ref(0).unwrap()), expected.data_type());
-        assert_eq!(row.get::<_, Value>(0).unwrap(), expected);
+        assert_eq!(row.get::<_, Value>(0).unwrap(), *expected);
         seen += 1;
     }
     assert_eq!(seen, 1);
@@ -156,8 +156,8 @@ fn should_bind_blob() {
     let db = open_demo("should_bind_blob");
     check_bind(
         &db,
-        Value::Blob(vec![1, 2, 3, 4, 5]),
-        Value::Blob(vec![1, 2, 3, 4, 5]),
+        &Value::Blob(vec![1, 2, 3, 4, 5]),
+        &Value::Blob(vec![1, 2, 3, 4, 5]),
     );
 }
 
@@ -166,29 +166,29 @@ fn should_bind_double() {
     let db = open_demo("should_bind_double");
     check_bind(
         &db,
-        Value::Real(std::f64::consts::PI),
-        Value::Real(std::f64::consts::PI),
+        &Value::Real(std::f64::consts::PI),
+        &Value::Real(std::f64::consts::PI),
     );
 }
 
 #[test]
 fn should_bind_int() {
     let db = open_demo("should_bind_int");
-    check_bind(&db, Value::Integer(42), Value::Integer(42));
+    check_bind(&db, &Value::Integer(42), &Value::Integer(42));
 }
 
 #[test]
 fn should_bind_int64() {
     let db = open_demo("should_bind_int64");
     let value = (1i64 << 53) + 1; // Number.MAX_SAFE_INTEGER + 1
-    check_bind(&db, Value::Integer(value), Value::Integer(value));
+    check_bind(&db, &Value::Integer(value), &Value::Integer(value));
 }
 
 #[test]
 fn should_bind_null() {
     let db = open_demo("should_bind_null");
     assert_eq!(db.prepare("SELECT ?").unwrap().parameter_count(), 1);
-    check_bind(&db, Value::Null, Value::Null);
+    check_bind(&db, &Value::Null, &Value::Null);
 }
 
 #[test]
@@ -196,8 +196,8 @@ fn should_bind_text() {
     let db = open_demo("should_bind_text");
     check_bind(
         &db,
-        Value::Text("Hello, world!".into()),
-        Value::Text("Hello, world!".into()),
+        &Value::Text("Hello, world!".into()),
+        &Value::Text("Hello, world!".into()),
     );
 }
 

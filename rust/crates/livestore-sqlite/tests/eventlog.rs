@@ -26,5 +26,8 @@ fn deletes_every_rebase_generation_at_a_logical_event_position() {
 
     eventlog::delete_events(&db, &[generations[0].seq_num]).unwrap();
 
-    assert!(common::select(&db, "SELECT * FROM eventlog").is_empty());
+    assert_eq!(
+        common::select(&db, "SELECT * FROM eventlog"),
+        Vec::<livestore_sqlite::Row>::new()
+    );
 }

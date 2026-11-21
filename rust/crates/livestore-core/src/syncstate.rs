@@ -29,6 +29,7 @@ pub enum Payload {
 }
 
 impl Payload {
+    #[must_use]
     pub fn new_events(&self) -> &[Event] {
         match self {
             Payload::UpstreamRebase { new_events, .. }
@@ -76,6 +77,20 @@ pub enum MergeResult {
 #[error("{0}")]
 pub struct MergeError(pub String);
 
+/// `SyncState.merge`: applies a local push or an upstream advance to `sync_state`.
+///
+/// # Errors
+///
+/// Fails with [`MergeError`] when the sync state or the payload is invalid, e.g. events out of order or incoming
+/// upstream events not after the upstream head.
+///
+/// # Panics
+///
+/// Panics only on internal invariants (a non-empty batch or divergent slice turning out empty).
+#[expect(
+    clippy::too_many_lines,
+    reason = "ports `SyncState.merge` line for line"
+)]
 pub fn merge(
     sync_state: &SyncState,
     payload: &Payload,

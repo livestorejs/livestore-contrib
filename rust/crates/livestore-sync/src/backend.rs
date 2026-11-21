@@ -36,6 +36,7 @@ pub struct PullResItem {
 
 impl PullResItem {
     /// `pullResItemEmpty`.
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             batch: vec![],
@@ -133,6 +134,7 @@ impl BackendOverride {
         }
     }
 
+    #[must_use]
     pub fn pull(
         mut self,
         f: impl Fn(&Arc<dyn SyncBackend>, Option<PullCursor>, PullOptions) -> PullStream
@@ -144,6 +146,7 @@ impl BackendOverride {
         self
     }
 
+    #[must_use]
     pub fn push(
         mut self,
         f: impl Fn(&Arc<dyn SyncBackend>, Vec<GlobalEvent>) -> BoxFuture<'static, Result<(), PushError>>

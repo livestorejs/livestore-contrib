@@ -40,6 +40,9 @@ pub struct RebaseInput<'a> {
 
 pub type RebaseFn = dyn Fn(RebaseInput) -> Result<Vec<InputEvent>, String>;
 
+/// # Errors
+///
+/// Fails when a pending event still has a missing-requirement conflict.
 pub fn default_rebase_fn(input: RebaseInput) -> Result<Vec<InputEvent>, String> {
     if input
         .pending_local_events
@@ -58,6 +61,9 @@ pub fn default_rebase_fn(input: RebaseInput) -> Result<Vec<InputEvent>, String> 
         .collect())
 }
 
+/// # Errors
+///
+/// Fails with the error of `rebase_fn`, or when `new_remote_events` is empty.
 pub fn rebase_events(
     rebase_fn: &RebaseFn,
     pending_local_events: &[HistoryDagNode],
@@ -102,17 +108,17 @@ pub fn rebase_events(
 
     let head = new_remote_events
         .last()
-        .expect("newRemoteEvents must not be empty")
+        .ok_or("newRemoteEvents must not be empty")?
         .seq_num
         .global;
     Ok(rebased
         .into_iter()
-        .enumerate()
-        .map(|(i, e)| Event {
+        .zip(head..)
+        .map(|(e, parent)| Event {
             name: e.name,
             args: e.args,
-            seq_num: SeqNum::new(head + i as i64 + 1, 0, 0),
-            parent_seq_num: SeqNum::new(head + i as i64, 0, 0),
+            seq_num: SeqNum::new(parent + 1, 0, 0),
+            parent_seq_num: SeqNum::new(parent, 0, 0),
             client_id: client_id.to_owned(),
             session_id: session_id.to_owned(),
         })

@@ -54,7 +54,10 @@ fn rolls_changesets_back_in_reverse_materialization_order_and_removes_their_reco
 
     state::rollback(&db, &[insert_key, no_op_key, update_key]).unwrap();
 
-    assert!(select(&db, "SELECT id, value FROM journal_test").is_empty());
+    assert_eq!(
+        select(&db, "SELECT id, value FROM journal_test"),
+        Vec::<livestore_sqlite::Row>::new()
+    );
     assert_eq!(journal_changeset(&db, insert_key), None);
     assert_eq!(journal_changeset(&db, update_key), None);
     assert_eq!(journal_changeset(&db, no_op_key), None);
@@ -83,7 +86,7 @@ fn rolls_back_more_records_than_fit_in_one_statement() {
     let reversed: Vec<SeqNum> = keys.iter().rev().copied().collect();
     state::rollback(&db, &reversed).unwrap();
 
-    assert!(rows(&db).is_empty());
+    assert_eq!(rows(&db), Vec::<serde_json::Value>::new());
     assert!(keys.iter().all(|k| journal_changeset(&db, *k).is_none()));
 }
 

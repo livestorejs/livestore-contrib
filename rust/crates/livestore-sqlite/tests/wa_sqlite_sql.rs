@@ -1,5 +1,5 @@
-//! Port of packages/@livestore/wa-sqlite/test/sql.test.js (sql_0001..sql_0005) for the default build on a file DB.
-//! wa-sqlite's default config skips sql_0004 (not persistent) and sql_0005 (single connection); a native file
+//! Port of packages/@livestore/wa-sqlite/test/sql.test.js (`sql_0001..sql_0005`) for the default build on a file DB.
+//! wa-sqlite's default config skips `sql_0004` (not persistent) and `sql_0005` (single connection); a native file
 //! is both, so they run here too.
 mod wa_sqlite;
 
@@ -185,7 +185,10 @@ fn should_transact_atomically() {
     values.dedup();
 
     assert_eq!(values.len(), 8 * iterations);
-    assert_eq!(values.last().copied(), Some(values.len() as i64));
+    assert_eq!(
+        values.last().copied(),
+        Some(i64::try_from(values.len()).unwrap())
+    );
 }
 
 /// Retries while another connection holds the write lock (TS: `e.message === 'database is locked'`).

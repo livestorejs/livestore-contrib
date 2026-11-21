@@ -1,5 +1,7 @@
 //! Eventlog DB (`leader-thread/eventlog.ts`, `system-tables/eventlog-tables.ts`).
 
+use std::fmt::Write as _;
+
 use livestore_core::{Event, SeqNum};
 use livestore_schema::system_tables::{SYNC_STATUS_TABLE, eventlog_tables};
 use rusqlite::types::Value as SqlValue;
@@ -29,14 +31,23 @@ pub struct EventQuery {
 
 pub const STREAM_EVENTS_BATCH_SIZE_DEFAULT: usize = 100;
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn init(conn: &Connection) -> rusqlite::Result<()> {
-    for sql in eventlog_tables().iter().flat_map(|t| t.ddl()) {
+    for sql in eventlog_tables()
+        .iter()
+        .flat_map(livestore_schema::Table::ddl)
+    {
         conn.execute(&sql, [])?;
     }
     conn.execute(&format!("INSERT INTO {SYNC_STATUS_TABLE} (head) SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM {SYNC_STATUS_TABLE})"), [])?;
     Ok(())
 }
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn insert(
     conn: &Connection,
     event: &Event,
@@ -64,6 +75,10 @@ pub fn insert(
 }
 
 /// Deletes every generation at the given `(global, client)` positions.
+///
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn delete_events(conn: &Connection, keys: &[SeqNum]) -> rusqlite::Result<()> {
     let mut stmt =
         conn.prepare_cached("DELETE FROM eventlog WHERE seqNumGlobal = ? AND seqNumClient = ?")?;
@@ -73,6 +88,9 @@ pub fn delete_events(conn: &Connection, keys: &[SeqNum]) -> rusqlite::Result<()>
     Ok(())
 }
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn update_sync_metadata(
     conn: &Connection,
     seq_num: SeqNum,
@@ -89,6 +107,9 @@ pub fn update_sync_metadata(
     Ok(())
 }
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn client_head(conn: &Connection) -> rusqlite::Result<SeqNum> {
     conn.query_row(
         "select seqNumGlobal, seqNumClient, seqNumRebaseGeneration from eventlog order by seqNumGlobal DESC, seqNumClient DESC limit 1",
@@ -99,17 +120,26 @@ pub fn client_head(conn: &Connection) -> rusqlite::Result<SeqNum> {
     .map(|h| h.unwrap_or(SeqNum::ROOT))
 }
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn backend_head(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row("select head from __livestore_sync_status", [], |r| r.get(0))
         .optional()
         .map(Option::unwrap_or_default)
 }
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn set_backend_head(conn: &Connection, head: i64) -> rusqlite::Result<()> {
     conn.execute("UPDATE __livestore_sync_status SET head = ?", [head])?;
     Ok(())
 }
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn backend_id(conn: &Connection) -> rusqlite::Result<Option<String>> {
     conn.query_row("select backendId from __livestore_sync_status", [], |r| {
         r.get(0)
@@ -118,6 +148,9 @@ pub fn backend_id(conn: &Connection) -> rusqlite::Result<Option<String>> {
     .map(Option::flatten)
 }
 
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn set_backend_id(conn: &Connection, backend_id: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE __livestore_sync_status SET backendId = ?",
@@ -127,6 +160,10 @@ pub fn set_backend_id(conn: &Connection, backend_id: &str) -> rusqlite::Result<(
 }
 
 /// `getSyncBackendCursorInfoForDb`: `None` at head 0, else the metadata stored at the upstream head.
+///
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn cursor_info(
     conn: &Connection,
     upstream_head: i64,
@@ -148,6 +185,10 @@ pub fn cursor_info(
 }
 
 /// All events strictly after `since` (position semantics, generation ignored), ascending.
+///
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn events_after(conn: &Connection, since: SeqNum) -> rusqlite::Result<Vec<Event>> {
     let sql = format!(
         "SELECT {EVENT_COLUMNS} FROM eventlog WHERE seqNumGlobal > ?1 OR (seqNumGlobal = ?1 AND seqNumClient > ?2) ORDER BY seqNumGlobal, seqNumClient"
@@ -158,6 +199,10 @@ pub fn events_after(conn: &Connection, since: SeqNum) -> rusqlite::Result<Vec<Ev
 }
 
 /// One `rematerializeFromEventlog` page: up to `limit` events strictly after `since`.
+///
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn events_after_limit(
     conn: &Connection,
     since: SeqNum,
@@ -168,13 +213,21 @@ pub fn events_after_limit(
     );
     let mut stmt = conn.prepare(&sql)?;
     stmt.query_map(
-        params![since.global, since.client, limit as i64],
+        params![
+            since.global,
+            since.client,
+            i64::try_from(limit).unwrap_or(i64::MAX)
+        ],
         read_event,
     )?
     .collect()
 }
 
 /// `getEventsFromEventlog`.
+///
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn query_events(conn: &Connection, q: &EventQuery) -> rusqlite::Result<Vec<Event>> {
     let since = q.since.unwrap_or(SeqNum::ROOT);
     let mut sql = format!("SELECT {EVENT_COLUMNS} FROM eventlog WHERE seqNumGlobal > ?");
@@ -189,10 +242,11 @@ pub fn query_events(conn: &Connection, q: &EventQuery) -> rusqlite::Result<Vec<E
         ("sessionId", &q.session_ids),
     ] {
         if let Some(values) = values.as_ref().filter(|v| !v.is_empty()) {
-            sql.push_str(&format!(
+            let _ = write!(
+                sql,
                 " AND {col} IN ({})",
                 vec!["?"; values.len()].join(", ")
-            ));
+            );
             binds.extend(values.iter().map(|v| SqlValue::Text(v.clone())));
         }
     }
@@ -200,13 +254,21 @@ pub fn query_events(conn: &Connection, q: &EventQuery) -> rusqlite::Result<Vec<E
         sql.push_str(" AND seqNumClient <= 0");
     }
     sql.push_str(" ORDER BY seqNumGlobal ASC, seqNumClient ASC LIMIT ?");
-    binds.push((q.batch_size.unwrap_or(STREAM_EVENTS_BATCH_SIZE_DEFAULT) as i64).into());
+    binds.push(
+        i64::try_from(q.batch_size.unwrap_or(STREAM_EVENTS_BATCH_SIZE_DEFAULT))
+            .unwrap_or(i64::MAX)
+            .into(),
+    );
     let mut stmt = conn.prepare(&sql)?;
     stmt.query_map(params_from_iter(binds), read_event)?
         .collect()
 }
 
 /// `clearLocalDatabases` (eventlog half).
+///
+/// # Errors
+///
+/// Fails when a SQLite statement fails.
 pub fn clear(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch("DELETE FROM eventlog; DELETE FROM __livestore_sync_status;")
 }

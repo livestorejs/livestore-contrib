@@ -50,6 +50,10 @@ const SYSTEM_TABLES: &[&str] = &[
 ];
 
 /// All system tables plus the rebuild marker exist (`hasCompletedState`).
+///
+/// # Errors
+///
+/// Fails when the `sqlite_master` query fails.
 pub fn has_completed_state(conn: &Connection) -> rusqlite::Result<bool> {
     for table in SYSTEM_TABLES {
         let exists: bool = conn.query_row(
@@ -70,6 +74,11 @@ pub fn has_completed_state(conn: &Connection) -> rusqlite::Result<bool> {
 
 /// `recreateDb`: drops every table, runs the hooks around `migrateDb`, replays the eventlog in batches
 /// (each its own savepoint, so a failure keeps the committed batches) and only then marks the state complete.
+///
+/// # Errors
+///
+/// Fails with [`Error::Unknown`] when a migration hook fails, with [`Error::Sqlite`] when a statement fails,
+/// and with a materialize error when replaying an event fails (earlier batches stay committed).
 pub fn rebuild(
     conn: &Connection,
     eventlog_conn: &Connection,
@@ -77,9 +86,9 @@ pub fn rebuild(
     options: &RebuildOptions,
 ) -> Result<(), Error> {
     drop_all_tables(conn)?;
-    run_hook(&options.hooks.init, conn)?;
+    run_hook(options.hooks.init.as_ref(), conn)?;
     migrate(conn, schema)?;
-    run_hook(&options.hooks.pre, conn)?;
+    run_hook(options.hooks.pre.as_ref(), conn)?;
     let mut cursor = SeqNum::ROOT;
     loop {
         let batch = eventlog::events_after_limit(eventlog_conn, cursor, options.batch_size)?;
@@ -91,12 +100,16 @@ pub fn rebuild(
                 .try_for_each(|event| materialize(conn, schema, event).map(drop))
         })?;
     }
-    run_hook(&options.hooks.post, conn)?;
+    run_hook(options.hooks.post.as_ref(), conn)?;
     mark_completed(conn)?;
     Ok(())
 }
 
 /// `migrateDb`: creates the system and app tables and records table and event definitions.
+///
+/// # Errors
+///
+/// Fails with [`Error::Sqlite`] when creating a table or recording a definition fails.
 pub fn migrate(conn: &Connection, schema: &Schema) -> Result<(), Error> {
     let tables: Vec<Table> = state_tables()
         .into_iter()
@@ -122,6 +135,10 @@ pub fn migrate(conn: &Connection, schema: &Schema) -> Result<(), Error> {
 }
 
 /// `markStateAsCompleted`.
+///
+/// # Errors
+///
+/// Fails when the insert fails.
 pub fn mark_completed(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT OR IGNORE INTO __livestore_rebuild (id) VALUES (1)",
@@ -131,6 +148,10 @@ pub fn mark_completed(conn: &Connection) -> rusqlite::Result<()> {
 }
 
 /// `clearLocalDatabases` (state half): drops every table; the next boot rebuilds.
+///
+/// # Errors
+///
+/// Fails when listing or dropping a table fails.
 pub fn drop_all_tables(conn: &Connection) -> rusqlite::Result<()> {
     let tables: Vec<String> = conn
         .prepare(
@@ -146,6 +167,12 @@ pub fn drop_all_tables(conn: &Connection) -> rusqlite::Result<()> {
 
 /// Applies one event to the state DB in a savepoint and journals its changeset. Unknown events only
 /// advance the head and journal a NULL changeset. Returns the schema hash for the eventlog row.
+///
+/// # Errors
+///
+/// Fails with [`Error::UnknownEvent`] when the schema cannot resolve the event, with [`Error::Materialize`] when
+/// the materializer fails, and with [`Error::Sqlite`] when a statement, the head or the journal write fails; the
+/// savepoint is rolled back then.
 #[tracing::instrument(name = "@livestore/common:leader-thread:materializeEvent", skip_all, fields(event = %event.name, seq_num = %event.seq_num))]
 pub fn materialize(conn: &Connection, schema: &Schema, event: &Event) -> Result<i64, Error> {
     with_savepoint(conn, || -> Result<(), Error> {
@@ -181,6 +208,9 @@ pub fn materialize(conn: &Connection, schema: &Schema, event: &Event) -> Result<
     Ok(event_schema_hash(schema, &event.name))
 }
 
+/// # Errors
+///
+/// Fails when the head query fails.
 pub fn head(conn: &Connection) -> rusqlite::Result<SeqNum> {
     conn.query_row(
         "SELECT seqNumGlobal, seqNumClient, seqNumRebaseGeneration FROM __livestore_state_head WHERE id = 1",
@@ -191,6 +221,9 @@ pub fn head(conn: &Connection) -> rusqlite::Result<SeqNum> {
     .map(|h| h.unwrap_or(SeqNum::ROOT))
 }
 
+/// # Errors
+///
+/// Fails when the head update fails.
 pub fn set_head(conn: &Connection, head: SeqNum) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT OR REPLACE INTO __livestore_state_head (id, seqNumGlobal, seqNumClient, seqNumRebaseGeneration) VALUES (1, ?, ?, ?)",
@@ -202,6 +235,11 @@ pub fn set_head(conn: &Connection, head: SeqNum) -> rusqlite::Result<()> {
 /// Undoes journaled events newest-first via inverted changesets, then deletes their journal rows.
 /// Fails with `MaterializationJournalError` (method `rollback`) without changing anything when a key is missing
 /// or a changeset cannot be applied.
+///
+/// # Errors
+///
+/// Fails with [`Error::MaterializationJournal`] when a key has no journal row or its changeset cannot be
+/// applied, and with [`Error::Sqlite`] when a statement fails.
 pub fn rollback(conn: &Connection, keys: &[SeqNum]) -> Result<(), Error> {
     let mut sorted = keys.to_vec();
     sorted.sort_by(|a, b| b.compare(a));
@@ -248,6 +286,10 @@ fn rollback_sorted(conn: &Connection, sorted: &[SeqNum]) -> Result<(), Error> {
 }
 
 /// Drops journal rows at or before `key` (they can no longer be rolled back).
+///
+/// # Errors
+///
+/// Fails when the delete fails.
 pub fn discard_journal_up_to(conn: &Connection, key: SeqNum) -> rusqlite::Result<()> {
     conn.execute(
         "DELETE FROM __livestore_materialization_journal WHERE seqNumGlobal < ?1 OR (seqNumGlobal = ?1 AND seqNumClient <= ?2)",
@@ -257,6 +299,10 @@ pub fn discard_journal_up_to(conn: &Connection, key: SeqNum) -> rusqlite::Result
 }
 
 /// `MaterializationJournal.record`: replaces any row at the exact key.
+///
+/// # Errors
+///
+/// Fails when the delete or insert fails.
 pub fn journal_record(
     conn: &Connection,
     key: SeqNum,
@@ -274,7 +320,7 @@ pub fn journal_record(
     Ok(())
 }
 
-fn run_hook(hook: &Option<MigrationHook>, conn: &Connection) -> Result<(), Error> {
+fn run_hook(hook: Option<&MigrationHook>, conn: &Connection) -> Result<(), Error> {
     match hook {
         Some(hook) => hook(conn).map_err(Error::Unknown),
         None => Ok(()),
@@ -300,10 +346,10 @@ pub(crate) fn to_sql(v: &SqlValue) -> rusqlite::types::Value {
 }
 
 fn stable_hash(s: &str) -> i64 {
-    let h = s.bytes().fold(0x811c9dc5u32, |h, b| {
-        (h ^ b as u32).wrapping_mul(0x01000193)
+    let h = s.bytes().fold(0x811c_9dc5_u32, |h, b| {
+        (h ^ u32::from(b)).wrapping_mul(0x0100_0193)
     });
-    h as i32 as i64
+    i64::from(h.cast_signed())
 }
 
 fn now_millis() -> String {
@@ -315,6 +361,7 @@ fn now_millis() -> String {
 
 /// `hashMaterializerResults`: a stable hash of a materializer's statements, compared between leader
 /// and session to catch side-effecting materializers.
+#[must_use]
 pub fn materializer_hash(statements: &[livestore_schema::SqlStatement]) -> i64 {
     let text: Vec<String> = statements
         .iter()

@@ -9,6 +9,7 @@ pub struct ClientIdentity {
 
 impl ClientIdentity {
     /// `clientIdentity(label, session = `${label}-session`)`.
+    #[must_use]
     pub fn new(label: &str) -> Self {
         Self {
             client_id: label.into(),
@@ -16,6 +17,7 @@ impl ClientIdentity {
         }
     }
 
+    #[must_use]
     pub fn with_session(label: &str, session: &str) -> Self {
         Self {
             client_id: label.into(),
@@ -41,10 +43,12 @@ pub struct EventFactory {
 }
 
 impl EventFactory {
+    #[must_use]
     pub fn new(client: ClientIdentity) -> Self {
         Self::starting_at(client, 1, Sequence::Root)
     }
 
+    #[must_use]
     pub fn starting_at(client: ClientIdentity, start_seq: i64, initial_parent: Sequence) -> Self {
         Self {
             client,
@@ -84,6 +88,7 @@ impl EventFactory {
         self.parent = parent;
     }
 
+    #[must_use]
     pub fn current(&self) -> (i64, Sequence) {
         (self.next_seq, self.parent)
     }

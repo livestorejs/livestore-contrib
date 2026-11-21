@@ -58,6 +58,9 @@ pub struct LeaderDb {
 }
 
 impl LeaderDb {
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when a database file cannot be opened, and otherwise as [`Self::boot_with`].
     pub fn open(
         state_path: impl AsRef<Path>,
         eventlog_path: impl AsRef<Path>,
@@ -70,6 +73,9 @@ impl LeaderDb {
         )
     }
 
+    /// # Errors
+    ///
+    /// Fails as [`Self::boot_with`].
     pub fn open_in_memory(schema: Arc<Schema>) -> Result<Self> {
         Self::boot(
             Connection::open_in_memory()?,
@@ -84,6 +90,11 @@ impl LeaderDb {
 
     /// Boot half of `makeLeaderThreadLayer`: import a snapshot (migrated and marked complete, like the in-memory
     /// adapter), init the eventlog, rebuild incomplete state.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when configuring a connection, importing the snapshot or migrating fails, and
+    /// with a materialize error when rebuilding the state from the eventlog fails.
     pub fn boot_with(
         mut state: Connection,
         eventlog: Connection,
@@ -114,6 +125,11 @@ impl LeaderDb {
     }
 
     /// `getInitialSyncState`: pending = rows after the backend head.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when reading the eventlog fails, and with [`Error::Invariant`] when the stored
+    /// backend head is ahead of the local head.
     pub fn initial_sync_state(&self) -> Result<SyncState> {
         let backend_head = eventlog::backend_head(&self.eventlog)?;
         let local_head = eventlog::client_head(&self.eventlog)?;
@@ -133,6 +149,11 @@ impl LeaderDb {
     }
 
     /// `persistLocal`: materialize and append a local batch atomically over both DBs.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Materialize`], [`Error::MaterializationJournal`] or [`Error::UnknownEvent`] when an event
+    /// cannot be applied; both databases are rolled back then.
     pub fn persist_local(&self, events: &[Event]) -> Result<Receipt> {
         self.in_transaction(|| {
             for e in events {
@@ -150,7 +171,11 @@ impl LeaderDb {
 
     /// `persistUpstream`: rollback + eventlog delete, materialize the new events, write confirmation
     /// metadata, trim the journal and advance the backend head, in one transaction over both DBs.
-    pub fn persist_upstream(&self, c: UpstreamCommit<'_>) -> Result<Receipt> {
+    ///
+    /// # Errors
+    ///
+    /// Fails like [`Self::persist_local`]; both databases are rolled back then.
+    pub fn persist_upstream(&self, c: &UpstreamCommit<'_>) -> Result<Receipt> {
         self.in_transaction(|| {
             if let Some(first) = c.rollback_events.first() {
                 let keys: Vec<SeqNum> = c.rollback_events.iter().map(|e| e.seq_num).collect();
@@ -190,33 +215,56 @@ impl LeaderDb {
     }
 
     /// Wipes the state DB and replays the eventlog (what boot does after a schema change).
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] or a materialize error when replaying an event fails.
     pub fn rebuild_state(&self) -> Result<()> {
         state::rebuild(&self.state, &self.eventlog, &self.schema, &self.rebuild)
     }
 
     /// `clearLocalDatabases`: empty the eventlog and sync status, drop all state tables.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when a statement fails.
     pub fn clear_for_reset(&self) -> Result<()> {
         eventlog::clear(&self.eventlog)?;
         state::drop_all_tables(&self.state)?;
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when the eventlog query fails.
     pub fn cursor_info(&self, upstream_head: i64) -> Result<Option<PullCursorInfo>> {
         Ok(eventlog::cursor_info(&self.eventlog, upstream_head)?)
     }
 
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when the eventlog query fails or a row does not decode.
     pub fn query_events(&self, query: &EventQuery) -> Result<Vec<Event>> {
         Ok(eventlog::query_events(&self.eventlog, query)?)
     }
 
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when the sync status query fails.
     pub fn backend_id(&self) -> Result<Option<String>> {
         Ok(eventlog::backend_id(&self.eventlog)?)
     }
 
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when the sync status update fails.
     pub fn set_backend_id(&self, backend_id: &str) -> Result<()> {
         Ok(eventlog::set_backend_id(&self.eventlog, backend_id)?)
     }
 
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when reading the state head fails.
     pub fn state_head(&self) -> Result<SeqNum> {
         Ok(state::head(&self.state)?)
     }
@@ -230,6 +278,10 @@ impl LeaderDb {
     }
 
     /// Runs a read query on the state DB and returns JSON rows.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Sqlite`] when `sql` does not prepare or run.
     pub fn query(&self, sql: &str) -> Result<Vec<Row>> {
         query_rows(&self.state, sql)
     }
@@ -274,6 +326,11 @@ impl LeaderDb {
 }
 
 /// `makeMaterializeEvent`: applies `event` to the state DB and, unless `skip_eventlog`, appends it to the eventlog.
+///
+/// # Errors
+///
+/// Fails with [`Error::Materialize`] or [`Error::UnknownEvent`] when the event cannot be applied, and with
+/// [`Error::Sqlite`] when appending it to the eventlog fails.
 pub fn materialize_event(
     state_conn: &Connection,
     eventlog_conn: &Connection,
@@ -290,14 +347,25 @@ pub fn materialize_event(
 }
 
 /// `isSameSequencePosition`: global and client equal, generation ignored.
+#[must_use]
 pub fn same_position(a: SeqNum, b: SeqNum) -> bool {
     a.global == b.global && a.client == b.client
 }
 
+/// Runs `sql` on `conn` and returns JSON rows.
+///
+/// # Errors
+///
+/// Fails with [`Error::Sqlite`] when `sql` does not prepare or run.
 pub fn query_rows(conn: &Connection, sql: &str) -> Result<Vec<Row>> {
     query_rows_with(conn, sql, &[])
 }
 
+/// Like [`query_rows`], with bound parameters.
+///
+/// # Errors
+///
+/// Fails with [`Error::Sqlite`] when `sql` does not prepare or run.
 pub fn query_rows_with(
     conn: &Connection,
     sql: &str,

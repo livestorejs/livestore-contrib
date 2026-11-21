@@ -34,7 +34,7 @@ fn rolls_back_both_databases_when_an_upstream_batch_fails_during_materialization
     let duplicate = todo(2, 0, first.seq_num, "duplicate", "Second");
 
     let error = db
-        .persist_upstream(UpstreamCommit {
+        .persist_upstream(&UpstreamCommit {
             pulled_events: &[pulled(&first, None), pulled(&duplicate, None)],
             events: &[first.clone(), duplicate.clone()],
             rollback_events: &[],
@@ -88,7 +88,7 @@ fn restores_rollback_eventlog_journal_and_heads_when_an_upstream_rebase_fails_at
     let replacement = todo(1, 1, SeqNum::ROOT, "replacement", "Replacement");
 
     let error = db
-        .persist_upstream(UpstreamCommit {
+        .persist_upstream(&UpstreamCommit {
             pulled_events: &[pulled(&replacement, None)],
             events: std::slice::from_ref(&replacement),
             rollback_events: &pending,
@@ -110,7 +110,7 @@ fn replaces_rolled_back_history_and_advances_the_backend_head_in_one_upstream_co
     let replacement = todo(1, 1, SeqNum::ROOT, "replacement", "Replacement");
 
     let receipt = db
-        .persist_upstream(UpstreamCommit {
+        .persist_upstream(&UpstreamCommit {
             pulled_events: &[pulled(&replacement, Some(json!({"cursor": "upstream-1"})))],
             events: std::slice::from_ref(&replacement),
             rollback_events: std::slice::from_ref(&original),
@@ -129,13 +129,13 @@ fn replaces_rolled_back_history_and_advances_the_backend_head_in_one_upstream_co
     );
     assert_eq!(eventlog::backend_head(db.eventlog_conn()).unwrap(), 1);
     assert_eq!(db.state_head().unwrap(), replacement.seq_num);
-    assert!(
+    assert_eq!(
         rows(
             &db,
             true,
             "SELECT * FROM __livestore_materialization_journal"
-        )
-        .is_empty()
+        ),
+        Vec::<serde_json::Value>::new()
     );
     assert_eq!(receipt.rolled_back_event_nums, vec![original.seq_num]);
 }
@@ -147,7 +147,7 @@ fn persists_confirmation_metadata_with_the_matching_backend_head() {
     db.persist_local(std::slice::from_ref(&pending)).unwrap();
     let upstream = todo(1, 0, SeqNum::ROOT, "confirmed", "Confirmed");
 
-    db.persist_upstream(UpstreamCommit {
+    db.persist_upstream(&UpstreamCommit {
         pulled_events: &[pulled(&upstream, Some(json!({"cursor": "confirmed-1"})))],
         events: &[],
         rollback_events: &[],
@@ -164,13 +164,13 @@ fn persists_confirmation_metadata_with_the_matching_backend_head() {
         })
     );
     assert_eq!(eventlog::backend_head(db.eventlog_conn()).unwrap(), 1);
-    assert!(
+    assert_eq!(
         rows(
             &db,
             true,
             "SELECT * FROM __livestore_materialization_journal"
-        )
-        .is_empty()
+        ),
+        Vec::<serde_json::Value>::new()
     );
 }
 
