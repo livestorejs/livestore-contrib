@@ -182,6 +182,11 @@ impl std::fmt::Debug for Store {
 /// Fails when `state_rebuild_batch_size` is not an integer of at least 1, the store id has
 /// characters other than ASCII letters, digits, `_` and `-`, no adapter is set, the adapter fails,
 /// or the session database cannot be configured.
+///
+/// # Panics
+///
+/// Panics when called outside a tokio runtime. The store keeps that runtime for its tasks, so the
+/// returned store can be used from any thread afterwards.
 pub async fn create_store(options: StoreOptions) -> Result<Store, StoreError> {
     let state_rebuild_batch_size =
         validate_state_rebuild_batch_size(options.params.state_rebuild_batch_size)?;
@@ -191,8 +196,12 @@ pub async fn create_store(options: StoreOptions) -> Result<Store, StoreError> {
         .clone()
         .ok_or_else(|| StoreError::defect("Cannot read properties of null (adapter)"))?;
     let lifetime = Arc::new(Lifetime {
+        runtime: tokio::runtime::Handle::current(),
+        processor: OnceLock::new(),
+        teardown: Mutex::new(None),
+        finalizers: Mutex::new(Vec::new()),
         shutdown_deferred: options.shutdown_deferred.clone(),
-        ..Lifetime::default()
+        spans: Mutex::new(None),
     });
     let shutdown: ShutdownFn = {
         let lifetime = Arc::downgrade(&lifetime);
@@ -419,7 +428,8 @@ impl Store {
                 tracing::error!(error = %e, label = ?options.label, "commit failed");
                 let lifetime = self.inner.lifetime.clone();
                 let exit = Err(e.clone());
-                tokio::spawn(async move { lifetime.shutdown(exit).await });
+                let runtime = lifetime.runtime.clone();
+                runtime.spawn(async move { lifetime.shutdown(exit).await });
                 return Err(e);
             }
         };
@@ -678,8 +688,9 @@ impl Drop for Subscription {
 }
 
 /// Teardown of one store: the processor drain, then the adapter's finalizers. Runs once.
-#[derive(Default)]
 pub(crate) struct Lifetime {
+    /// The runtime that created the store. Teardown spawns on it, so callers need no tokio context.
+    runtime: tokio::runtime::Handle,
     processor: OnceLock<ClientSessionSyncProcessor>,
     teardown: Mutex<Option<Shared<BoxFuture<'static, ()>>>>,
     finalizers: Mutex<Vec<BoxFuture<'static, ()>>>,
@@ -714,7 +725,7 @@ impl Lifetime {
                 .in_scope(|| p.begin_shutdown(exit))
                 .instrument(shutdown_span)
         });
-        let task = tokio::spawn(async move {
+        let task = self.runtime.spawn(async move {
             if let Some(drain) = drain
                 && tokio::time::timeout(SHUTDOWN_DRAIN_HARD_TIMEOUT, drain)
                     .await

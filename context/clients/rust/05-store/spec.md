@@ -37,8 +37,10 @@ App process (needs a tokio runtime)
   the caller's thread after a commit, a tokio worker after a pull. Apps whose
   UI thread must not block forward the result to it, for example with GPUI's
   `notify`, rune's `AppHandle::update`, or a channel into a TUI event loop.
-- **Runtime.** The store needs a tokio runtime. An app that has none (GPUI,
-  rune) starts one on a background thread and creates the store there.
+- **Runtime.** `create_store` must run inside a tokio runtime (1.47 or newer),
+  and the store keeps that runtime for its tasks. After that, any thread may
+  commit, query and subscribe. An app without tokio (GPUI, rune) starts one
+  runtime on a background thread and creates its stores there.
 - **One store.** One `Store` = one session, one leader, one data folder, one
   sync connection.
 - **Several stores.** Each store is independent: its own leader, folder and

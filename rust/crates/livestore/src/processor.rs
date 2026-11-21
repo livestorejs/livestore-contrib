@@ -140,6 +140,9 @@ pub struct ClientSessionSyncProcessor {
 }
 
 impl ClientSessionSyncProcessor {
+    /// # Panics
+    ///
+    /// Panics when called outside a tokio runtime: the processor keeps that runtime for its tasks.
     #[must_use]
     pub fn new(args: ProcessorArgs) -> Self {
         let leader_head = args.client_session.leader_thread.leader_head;
@@ -174,6 +177,7 @@ impl ClientSessionSyncProcessor {
             pending_hashes: Mutex::new(HashMap::new()),
             handles: Mutex::new(Handles::default()),
             escalated: Mutex::new(false),
+            runtime: tokio::runtime::Handle::current(),
         };
         Self { p: Arc::new(p) }
     }
@@ -189,11 +193,11 @@ impl ClientSessionSyncProcessor {
             .dispatch(Message::Started)
             .expect("starting the processor cannot fail");
         let jobs = lock(&self.p.jobs_rx).take().expect("boot runs once");
-        tokio::spawn(self.p.clone().run_jobs(jobs));
+        self.p.runtime.spawn(self.p.clone().run_jobs(jobs));
         let pull = tracing::info_span!(parent: &boot, "client-session-sync-processor:pull", "effect.fiber.interrupted" = Empty);
         let p = self.p.clone();
         let mark = MarkInterrupted(Some(pull.clone()));
-        let pull = tokio::spawn(
+        let pull = self.p.runtime.spawn(
             async move {
                 let mut mark = mark;
                 p.pull().await;
@@ -295,6 +299,8 @@ struct Processor {
     pending_hashes: Mutex<HashMap<String, i64>>,
     handles: Mutex<Handles>,
     escalated: Mutex<bool>,
+    /// The runtime that created the store. Tasks spawn on it, so a commit from a thread without tokio works.
+    runtime: tokio::runtime::Handle,
 }
 
 #[derive(Default)]
@@ -519,7 +525,7 @@ impl Processor {
         }
         *escalated = true;
         tracing::error!(%cause, %record_error, "Client session sync processor could not record a failure; shutting down the store");
-        tokio::spawn((self.session.shutdown)(Err(cause)));
+        self.runtime.spawn((self.session.shutdown)(Err(cause)));
     }
 
     fn report(self: &Arc<Self>, message: Message) {
@@ -568,7 +574,7 @@ impl Processor {
                 self.clear_pull().await;
                 self.clear_push().await;
                 // Store shutdown may call back into this processor; don't block the runner it needs.
-                let shutdown = tokio::spawn((self.session.shutdown)(Err(cause)));
+                let shutdown = self.runtime.spawn((self.session.shutdown)(Err(cause)));
                 lock(&self.handles).shutdown = Some(shutdown);
             }
         }
@@ -587,7 +593,7 @@ impl Processor {
         let push = (self.session.leader_thread.push)(batch);
         let boot = lock(&self.handles).boot.clone().unwrap_or_else(Span::none);
         let interrupt = CancellationToken::new();
-        let task = tokio::spawn(
+        let task = self.runtime.spawn(
             interruptible(interrupt.clone(), catch_defect(push))
                 .then(move |result| async move {
                     match result {

@@ -131,3 +131,16 @@ async fn should_still_accept_direct_events_with_options_and_no_events() {
         json!([todo("1", "Make coffee", true)])
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_failed_commit_from_a_thread_without_tokio_returns_the_error() {
+    let store = make_todo_mvc().await;
+    store.close().await;
+    let result = std::thread::spawn(move || {
+        store
+            .commit(vec![todo_created("1", "Make coffee", false)])
+            .is_err()
+    })
+    .join();
+    assert_eq!(result.ok(), Some(true));
+}
