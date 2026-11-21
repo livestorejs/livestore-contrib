@@ -63,7 +63,7 @@ pub struct Info {
 
 impl TestStore {
     pub fn commit(&self, event: impl Event) -> Result<(), livestore::StoreError> {
-        self.store.commit([event])
+        self.store.commit(event)
     }
 
     pub fn query(&self, sql: &str) -> Result<Vec<Row>, livestore::StoreError> {

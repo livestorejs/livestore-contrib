@@ -4,8 +4,7 @@
 mod common;
 
 use common::*;
-use livestore_todomvc::TodoCreated;
-use serde_json::json;
+use livestore_todomvc::{TodoCompleted, TodoCreated, TodoDeleted};
 
 #[tokio::test]
 async fn two_clients_converge_after_concurrent_offline_commits_and_restart() {
@@ -46,25 +45,24 @@ async fn two_clients_converge_after_concurrent_offline_commits_and_restart() {
 
     // Offline on both sides: committed straight into the on-disk leaders.
     let mut la = open(&dir_a, "client-a");
-    la.commit("v1.TodoCompleted", json!({"id": "t1"})).unwrap();
-    la.commit(
-        "v1.TodoCreated",
-        json!({"id": "a-off", "text": "from a offline"}),
-    )
+    la.commit(TodoCompleted { id: "t1".into() }).unwrap();
+    la.commit(TodoCreated {
+        id: "a-off".into(),
+        text: "from a offline".into(),
+    })
     .unwrap();
     let mut lb = open(&dir_b, "client-b");
-    lb.commit(
-        "v1.TodoDeleted",
-        json!({"id": "t2", "deletedAt": "2026-03-04T05:06:07.089Z"}),
-    )
+    lb.commit(TodoDeleted {
+        id: "t2".into(),
+        deleted_at: date("2026-03-04T05:06:07.089Z"),
+    })
     .unwrap();
-    lb.commit(
-        "v1.TodoCreated",
-        json!({"id": "b-off", "text": "from b offline"}),
-    )
+    lb.commit(TodoCreated {
+        id: "b-off".into(),
+        text: "from b offline".into(),
+    })
     .unwrap();
-    lb.commit("v1.TodoCompleted", json!({"id": "a-off"}))
-        .unwrap();
+    lb.commit(TodoCompleted { id: "a-off".into() }).unwrap();
     drop((la, lb));
 
     // Restart from disk: boot pushes the pending events. A goes first so B deterministically rebases onto A.
@@ -107,10 +105,10 @@ async fn restart_from_disk_pushes_pending() {
 
     let mut leader = open(&dir, "client-r");
     leader
-        .commit(
-            "v1.TodoCreated",
-            json!({"id": "r1", "text": "before first connect"}),
-        )
+        .commit(TodoCreated {
+            id: "r1".into(),
+            text: "before first connect".into(),
+        })
         .unwrap();
     drop(leader);
 

@@ -796,15 +796,15 @@ Parity is claimed only when no row says `todo`.
 
 | Test | Status |
 |---|---|
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should materialize events returned by the commit callback | ported: livestore::should_materialize_events_returned_by_the_commit_callback |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should materialize a single callback event | ported: livestore::should_materialize_a_single_callback_event |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should accept an empty callback | ported: livestore::should_accept_an_empty_callback |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should apply no events when the callback throws | ported: livestore::should_apply_no_events_when_the_callback_throws |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should commit multiple returned event types in order | ported: livestore::should_commit_multiple_returned_event_types_in_order |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should accept callback options {} | ported: livestore::should_accept_callback_options (both option cases in one loop) |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should accept callback options {"label":"Create todo"} | ported: livestore::should_accept_callback_options (both option cases in one loop) |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should reject callback values that are not event arrays | ported: livestore::ui::commit_fn_rejects_non_array_callback, livestore::ui::commit_fn_rejects_async_callback, livestore::ui::commit_fn_accepts_event_arrays (TS throws at runtime; Rust rejects at compile time) |
-| packages/@livestore/livestore/src/store/store-commit.test.ts :: should reject non-array and asynchronous callbacks at the type level | ported: livestore::ui::commit_fn_rejects_non_array_callback, livestore::ui::commit_fn_rejects_emitter_callback, livestore::ui::commit_fn_rejects_async_callback, livestore::ui::commit_fn_accepts_event_arrays |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should materialize events returned by the commit callback | n/a: Rust has no commit builder; an app builds the batch, then calls commit (one way to commit, deliberate divergence) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should materialize a single callback event | n/a: Rust has no commit builder; an app builds the batch, then calls commit (one way to commit, deliberate divergence) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should accept an empty callback | n/a: Rust has no commit builder; an app builds the batch, then calls commit (one way to commit, deliberate divergence) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should apply no events when the callback throws | n/a: Rust has no commit builder; an app builds the batch, then calls commit (one way to commit, deliberate divergence) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should commit multiple returned event types in order | ported: livestore::should_commit_multiple_event_types_in_order (a tuple of event types, no builder) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should accept callback options {} | ported: livestore::should_accept_commit_options (commit_with, no builder; both option cases in one loop) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should accept callback options {"label":"Create todo"} | ported: livestore::should_accept_commit_options (commit_with, no builder; both option cases in one loop) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should reject callback values that are not event arrays | ported: livestore::ui::commit_rejects_untyped_events, livestore::ui::commit_accepts_typed_events (no builder; the compiler checks each event) |
+| packages/@livestore/livestore/src/store/store-commit.test.ts :: should reject non-array and asynchronous callbacks at the type level | ported: livestore::ui::commit_rejects_untyped_events, livestore::ui::commit_accepts_typed_events (no builder; the compiler checks each event) |
 | packages/@livestore/livestore/src/store/store-commit.test.ts :: should still accept direct events with options and no events | ported: livestore::should_still_accept_direct_events_with_options_and_no_events |
 
 ### `packages/@livestore/livestore/src/store/store-eventstream.test.ts`

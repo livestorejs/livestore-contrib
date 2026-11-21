@@ -139,7 +139,10 @@ fn leader_with(todos: &[&str]) -> LeaderDb {
         LocalLeader::open_in_memory(livestore_todomvc::schema(), "rust", "rust-session").unwrap();
     for id in todos {
         leader
-            .commit("v1.TodoCreated", json!({"id": id, "text": id}))
+            .commit(TodoCreated {
+                id: (*id).to_owned(),
+                text: (*id).to_owned(),
+            })
             .unwrap();
     }
     leader.into_db()
