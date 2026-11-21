@@ -1,6 +1,10 @@
 //! Terminal TodoMVC client (TUI) that syncs with the sync-cf backend (same events as `examples/web-todomvc-sync-cf`).
 //!
-//!   todo --url ws://localhost:8787 --store <id> --data <dir> [--token <authToken>]
+//! ```text
+//! todo --url ws://localhost:8787 --store <id> --data <dir> [--token <authToken>]
+//! ```
+
+#![warn(clippy::unwrap_used)]
 
 use std::collections::hash_map::RandomState;
 use std::hash::BuildHasher;
@@ -91,7 +95,7 @@ async fn run(
         ..App::default()
     };
     loop {
-        app.todos = visible(store)?;
+        app.todos = visible(store);
         app.clamp();
         terminal.draw(|f| draw(f, &mut app, store))?;
         tokio::select! {
@@ -418,8 +422,8 @@ impl Args {
     }
 }
 
-fn visible(store: &Store) -> Result<Vec<Row>, Box<dyn std::error::Error>> {
-    Ok(store.query(&todos_query()))
+fn visible(store: &Store) -> Vec<Row> {
+    store.query(&todos_query())
 }
 
 fn todos_query() -> livestore::DbQueryDef<Vec<Row>> {
@@ -464,7 +468,7 @@ fn now_iso() -> Value {
     iso_string_from_millis(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .expect("the system clock is after 1970")
             .as_millis() as i64,
     )
     .into()
