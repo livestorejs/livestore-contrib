@@ -91,6 +91,84 @@ impl From<&LogEvent> for EventInput {
     }
 }
 
+/// What a commit accepts: one event, a tuple of events (a batch of mixed types), or a list.
+///
+/// Each item is checked on its own, so a batch can mix event types and still cannot hold an
+/// unknown event or raw JSON.
+pub trait Events {
+    /// Appends the events in order.
+    fn push_into(self, out: &mut Vec<EventInput>);
+
+    /// The events in order.
+    fn into_inputs(self) -> Vec<EventInput>
+    where
+        Self: Sized,
+    {
+        let mut out = Vec::new();
+        self.push_into(&mut out);
+        out
+    }
+}
+
+impl<E: Event> Events for E {
+    fn push_into(self, out: &mut Vec<EventInput>) {
+        out.push(self.into());
+    }
+}
+
+impl Events for EventInput {
+    fn push_into(self, out: &mut Vec<EventInput>) {
+        out.push(self);
+    }
+}
+
+impl<T: Events> Events for Vec<T> {
+    fn push_into(self, out: &mut Vec<EventInput>) {
+        for events in self {
+            events.push_into(out);
+        }
+    }
+}
+
+impl<T: Events, const N: usize> Events for [T; N] {
+    fn push_into(self, out: &mut Vec<EventInput>) {
+        for events in self {
+            events.push_into(out);
+        }
+    }
+}
+
+#[cfg(feature = "testing")]
+impl Events for (String, Value) {
+    fn push_into(self, out: &mut Vec<EventInput>) {
+        out.push(self.into());
+    }
+}
+
+macro_rules! tuple_events {
+    ($($name:ident),+) => {
+        impl<$($name: Events),+> Events for ($($name,)+) {
+            #[expect(non_snake_case, reason = "the tuple's type names bind its items")]
+            fn push_into(self, out: &mut Vec<EventInput>) {
+                let ($($name,)+) = self;
+                $($name.push_into(out);)+
+            }
+        }
+    };
+}
+
+tuple_events!(A, B);
+tuple_events!(A, B, C);
+tuple_events!(A, B, C, D);
+tuple_events!(A, B, C, D, E);
+tuple_events!(A, B, C, D, E, F);
+tuple_events!(A, B, C, D, E, F, G);
+tuple_events!(A, B, C, D, E, F, G, H);
+tuple_events!(A, B, C, D, E, F, G, H, I);
+tuple_events!(A, B, C, D, E, F, G, H, I, J);
+tuple_events!(A, B, C, D, E, F, G, H, I, J, K);
+tuple_events!(A, B, C, D, E, F, G, H, I, J, K, L);
+
 /// Typed event definition. `A` is the args type; its serde form is the encoded args JSON.
 pub struct EventDef<A> {
     pub name: String,

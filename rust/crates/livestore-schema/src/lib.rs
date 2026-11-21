@@ -20,7 +20,8 @@ pub mod value_schema;
 
 pub use client_document::ClientDocument;
 pub use event_def::{
-    Event, EventDef, EventInput, IntoStatements, MaterializeContext, MaterializeError, Materializer,
+    Event, EventDef, EventInput, Events, IntoStatements, MaterializeContext, MaterializeError,
+    Materializer,
 };
 pub use livestore_macros::Event;
 pub use schema::{

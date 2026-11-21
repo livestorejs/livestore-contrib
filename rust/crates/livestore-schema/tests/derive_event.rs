@@ -2,7 +2,7 @@
 
 use livestore_schema::event_def::DateFromString;
 use livestore_schema::value_schema as s;
-use livestore_schema::{Event, EventDef};
+use livestore_schema::{Event, EventDef, Events};
 use serde::{Deserialize, Serialize};
 
 #[derive(Event, Serialize, Deserialize)]
@@ -61,4 +61,19 @@ fn a_unit_struct_is_a_client_only_event_without_args() {
                 .schema_hash()
         ),
     );
+}
+
+#[test]
+fn a_mixed_tuple_keeps_its_order() {
+    let deleted = TodoDeleted {
+        id: "a".into(),
+        deleted_at: DateFromString(0.0),
+        reason: None,
+    };
+    let names: Vec<String> = (Reset, (deleted, vec![Reset]))
+        .into_inputs()
+        .iter()
+        .map(|e| e.name().to_owned())
+        .collect();
+    assert_eq!(names, ["reset", "v1.TodoDeleted", "reset"]);
 }
