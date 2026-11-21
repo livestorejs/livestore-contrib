@@ -101,7 +101,9 @@ impl HistoryDag {
             out.push(self.id_at(current));
             for &e in &self.slot(current).outgoing {
                 let target = self.edge(e).target;
-                let degree = in_degree.get_mut(&target).unwrap();
+                let degree = in_degree
+                    .get_mut(&target)
+                    .expect("in_degree has an entry for every node");
                 *degree -= 1;
                 if *degree == 0 {
                     queue.push_back(target);
@@ -137,7 +139,7 @@ impl HistoryDag {
 
     pub fn get_node_attributes_mut(&mut self, id: &str) -> &mut HistoryDagNode {
         let index = self.index(id);
-        &mut self.nodes[index].as_mut().unwrap().node
+        &mut self.slot_mut(index).node
     }
 
     pub fn nodes(&self) -> Vec<String> {
@@ -168,8 +170,8 @@ impl HistoryDag {
             target: t,
             connection,
         }));
-        self.nodes[s].as_mut().unwrap().outgoing.push(e);
-        self.nodes[t].as_mut().unwrap().incoming.push(e);
+        self.slot_mut(s).outgoing.push(e);
+        self.slot_mut(t).incoming.push(e);
         e
     }
 
@@ -220,7 +222,9 @@ impl HistoryDag {
         let Some(index) = self.id_to_index.remove(id) else {
             return;
         };
-        let slot = self.nodes[index].take().unwrap();
+        let slot = self.nodes[index]
+            .take()
+            .expect("id_to_index only points at live nodes");
         for e in slot.outgoing.iter().chain(&slot.incoming) {
             let Some(edge) = self.edges[*e].take() else {
                 continue;
@@ -271,6 +275,12 @@ impl HistoryDag {
     fn slot(&self, index: usize) -> &NodeSlot {
         self.nodes[index]
             .as_ref()
+            .expect("HistoryDag node data missing")
+    }
+
+    fn slot_mut(&mut self, index: usize) -> &mut NodeSlot {
+        self.nodes[index]
+            .as_mut()
             .expect("HistoryDag node data missing")
     }
 

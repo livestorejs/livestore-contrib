@@ -62,10 +62,7 @@ fn callback_strategy_invokes_observer_once() {
     assert_eq!(changeset_tag(db.state_conn(), event.seq_num), Some("no-op"));
     assert_eq!(
         *calls.lock().unwrap(),
-        vec![(
-            event.name.clone(),
-            UnknownEventReason::EventDefinitionMissing
-        )]
+        vec![(event.name, UnknownEventReason::EventDefinitionMissing)]
     );
 }
 

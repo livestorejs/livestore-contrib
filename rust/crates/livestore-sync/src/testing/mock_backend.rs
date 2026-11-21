@@ -96,12 +96,12 @@ impl MockSyncBackend {
 
     /// Fails the next `count` pushes with `error(batch)` or an `UnknownError`.
     pub fn fail_next_pushes(&self, count: usize, error: Option<PushFailure>) {
-        *self.shared.fail_push.lock().unwrap() = (count, error);
+        *self.shared.fail_push.lock().expect("mutex poisoned") = (count, error);
     }
 
     /// Fails the next `count` pulls with `error()` or an `UnknownError`.
     pub fn fail_next_pulls(&self, count: usize, error: Option<PullFailure>) {
-        *self.shared.fail_pull.lock().unwrap() = (count, error);
+        *self.shared.fail_pull.lock().expect("mutex poisoned") = (count, error);
     }
 
     /// Next event accepted by a push (`pushedEvents` stream).
@@ -307,7 +307,7 @@ fn item(event_encoded: GlobalEvent) -> PullItem {
 
 /// Consumes one scripted failure: `Some(custom)` when one should fire.
 fn consume<F: Clone>(failure: &Mutex<(usize, Option<F>)>) -> Option<Option<F>> {
-    let mut f = failure.lock().unwrap();
+    let mut f = failure.lock().expect("mutex poisoned");
     if f.0 == 0 {
         return None;
     }

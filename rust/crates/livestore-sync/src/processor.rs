@@ -226,7 +226,7 @@ impl Processor {
             .testing
             .local_push_processing
             .as_ref()
-            .and_then(|d| d.lock().unwrap().take())
+            .and_then(|d| d.lock().expect("mutex poisoned").take())
         {
             let tx = self.d.mailbox.clone();
             self.background.spawn(async move {
@@ -525,10 +525,11 @@ impl Processor {
             .params
             .local_push_batch_size
             .min(self.model.local_queue.len());
-        let selected: Vec<LocalItem> = self.model.local_queue.drain(..n).collect();
         let generation = self.model.sync_state.local_head.rebase_generation;
-        let (stale, active): (Vec<LocalItem>, Vec<LocalItem>) = selected
-            .into_iter()
+        let (stale, active): (Vec<LocalItem>, Vec<LocalItem>) = self
+            .model
+            .local_queue
+            .drain(..n)
             .partition(|i| i.event.seq_num.rebase_generation < generation);
         if !stale.is_empty() {
             for item in &stale {
@@ -608,7 +609,12 @@ impl Processor {
             }
         };
         let events = new_sync_state.pending[self.model.sync_state.pending.len()..].to_vec();
-        let persisted = self.d.db.lock().unwrap().persist_local(&events);
+        let persisted = self
+            .d
+            .db
+            .lock()
+            .expect("mutex poisoned")
+            .persist_local(&events);
         let receipt = match persisted {
             Ok(r) => r,
             Err(e) => return self.stop_for_sync_failure(ShutdownCause::from_storage(&e)),
@@ -697,7 +703,12 @@ impl Processor {
             confirmed_events: &confirmed,
             backend_head,
         };
-        let persisted = self.d.db.lock().unwrap().persist_upstream(commit);
+        let persisted = self
+            .d
+            .db
+            .lock()
+            .expect("mutex poisoned")
+            .persist_upstream(commit);
         let receipt = match persisted {
             Ok(r) => r,
             Err(e) => return self.stop_for_sync_failure(ShutdownCause::from_storage(&e)),
@@ -762,7 +773,7 @@ impl Processor {
                 // Stop all work that could still touch the databases before clearing them.
                 self.model.lifecycle = Lifecycle::Stopping;
                 self.interrupt_all_work();
-                let cleared = self.d.db.lock().unwrap().clear_for_reset();
+                let cleared = self.d.db.lock().expect("mutex poisoned").clear_for_reset();
                 let cause = match cleared {
                     Ok(()) => ShutdownCause::IntentionalShutdownCause(
                         IntentionalShutdownReason::BackendIdMismatch,
@@ -884,7 +895,7 @@ impl Processor {
             let result = AssertUnwindSafe(async {
                 let cursor = db
                     .lock()
-                    .unwrap()
+                    .expect("mutex poisoned")
                     .cursor_info(upstream_head)
                     .map_err(UnknownError::new)?;
                 let cursor = cursor.map(|c| PullCursor {

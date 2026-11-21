@@ -1,4 +1,7 @@
 //! Prints the SQLite LiveStore connections get (after `configure_connection`) in the shape of `scripts/dump-wa-sqlite-build.ts` output (used by scripts/check-sqlite-build.sh).
+
+#![expect(clippy::print_stdout, reason = "the script reads this tool's stdout")]
+
 use rusqlite::{Connection, types::Value};
 use serde_json::{Map, Value as Json, json};
 

@@ -1,6 +1,8 @@
 //! Leader storage: eventlog DB, state DB (materialization, journal, rollback, rebuild) and
 //! `LeaderPersistence` (`packages/@livestore/common/src/leader-thread/*`).
 
+#![warn(clippy::unwrap_used)]
+
 pub mod db;
 pub mod eventlog;
 pub mod helper;
