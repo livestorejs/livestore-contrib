@@ -99,7 +99,7 @@ impl TestStore {
         false
     }
 
-    pub async fn shutdown(&self) {
+    pub async fn shutdown(self) {
         self.store.shutdown(None).await;
         self.leader.shutdown().await;
     }
