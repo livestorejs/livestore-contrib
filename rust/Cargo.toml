@@ -35,7 +35,6 @@ livestore = { path = "crates/livestore" }
 livestore-todomvc = { path = "crates/livestore-todomvc" }
 futures = "0.3.34"
 futures-util = "0.3.34"
-ratatui = "0.30"
 rusqlite = { version = "=0.37.0", features = ["bundled", "session"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

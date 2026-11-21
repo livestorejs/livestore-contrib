@@ -19,8 +19,7 @@ Draft.
 | [`04-sync-cf`](./04-sync-cf/spec.md) | sync-cf provider client (WebSocket, HTTP) | `livestore-sync-cf` |
 | [`05-store`](./05-store/spec.md) | client session, store, reactivity, in-process adapter | `livestore` |
 
-`livestore-todomvc` (example schema) and `todo-tui` (the `todo` CLI) consume the
-stack and own no contract.
+`livestore-todomvc` (example schema) consumes the stack and owns no contract.
 
 Dependency direction:
 

@@ -18,7 +18,6 @@ Porting references: [`contributor-docs/rust/`](../contributor-docs/rust).
 | `crates/livestore-sync-cf` | sync-cf WebSocket/HTTP transport and its `SyncBackend` (`make_ws_sync`) |
 | `crates/livestore` | Store: client session, commit, queries, reactivity |
 | `crates/livestore-todomvc` | TodoMVC schema on the DSL |
-| `crates/todo-tui` | Terminal TodoMVC app (`todo` binary) |
 
 ## Setup
 
@@ -77,34 +76,3 @@ rust/scripts/check-sqlite-build.sh               # compares SQLite behavior with
 
 `fixtures/wire/` holds real WebSocket captures; see
 [`sync-cf-wire-protocol.md`](../contributor-docs/rust/sync-cf-wire-protocol.md).
-
-## CLI
-
-```bash
-cd rust
-cargo run --bin todo -- --url ws://localhost:8787 --store my-store --data ./data [--token <authToken>]
-```
-
-Commands: `add <text>`, `done <n|id>`, `undo <n|id>`, `rm <n|id>`, `clear` (clear completed), `list`,
-`status`, `quit`. `<n>` is the number shown in the list; an id prefix works too. Remote changes print
-as they arrive. Local data lives in `<data>/<store>/` and survives restarts (offline commits are pushed
-on the next connect). The token defaults to the web example's `insecure-token-change-me`.
-
-### Together with the web app
-
-The web example lives in core. Run it from a core checkout:
-
-```bash
-# terminal 1 (core checkout): web app + its sync worker, port 60001
-cd examples/web-todomvc-sync-cf
-pnpm dev
-
-# browser: http://localhost:60001/?storeId=shared-demo
-
-# terminal 2 (contrib): Rust CLI on the same store; the sync endpoint is <origin>/sync
-cd rust
-cargo run --bin todo -- --url ws://localhost:60001/sync --store shared-demo --data ./data
-```
-
-Todos added in either place show up in the other. Without `?storeId=` the web app generates a random
-id and puts it in the URL; pass that id to `--store`.
