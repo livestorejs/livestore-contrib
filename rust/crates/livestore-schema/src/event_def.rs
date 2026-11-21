@@ -141,14 +141,22 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
         )
     }
 
+    /// The eventlog stores missing args as `{}` (core: `args ?? {}`), so `{}` also decodes as if it
+    /// were `null`. Core's `Schema.Void` accepts `{}` the same way.
+    ///
     /// # Errors
     ///
     /// Fails when `args` does not match the args type.
     pub fn decode(&self, args: &Value) -> Result<A, MaterializeError> {
-        serde_json::from_value(args.clone()).map_err(|e| MaterializeError::InvalidArgs {
-            event: self.name.clone(),
-            message: e.to_string(),
-        })
+        serde_json::from_value(args.clone())
+            .or_else(|e| match args.as_object() {
+                Some(map) if map.is_empty() => serde_json::from_value(Value::Null).map_err(|_| e),
+                _ => Err(e),
+            })
+            .map_err(|e| MaterializeError::InvalidArgs {
+                event: self.name.clone(),
+                message: e.to_string(),
+            })
     }
 }
 

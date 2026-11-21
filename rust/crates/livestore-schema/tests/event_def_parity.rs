@@ -166,3 +166,9 @@ fn logs_both_event_and_field_warnings() {
         2
     );
 }
+
+#[test]
+fn decodes_stored_empty_args_of_a_void_event() {
+    let def = EventDef::<()>::synced("emptyEventPayload");
+    assert!(def.decode(&json!({})).is_ok());
+}
