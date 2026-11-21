@@ -14,6 +14,7 @@ use crate::value_schema::{Annotation, Ast, Declaration, Val, ValueSchema};
 const DOMAIN: &str = "livestore/state-storage-fingerprint";
 
 /// The event `schemaHash`: the first four bytes of the SHA-256 of the schema description.
+#[must_use]
 pub fn schema_hash(schema: &ValueSchema) -> i32 {
     let digest = Sha256::digest(js_stringify(&describe(schema)).as_bytes());
     i32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]])
@@ -21,6 +22,7 @@ pub fn schema_hash(schema: &ValueSchema) -> i32 {
 
 /// A canonical JSON description of a schema. Annotations other than a declaration's `representation`
 /// are left out, so documentation does not change a hash.
+#[must_use]
 pub fn describe(schema: &ValueSchema) -> Value {
     describe_in(schema, &mut Vec::new())
 }
@@ -37,6 +39,7 @@ pub fn has_json_string_encoding(schema: &ValueSchema) -> bool {
 }
 
 /// `fingerprint(tableAst)`.
+#[must_use]
 pub fn table_fingerprint(table: &Table) -> String {
     digest(json!([DOMAIN, table_descriptor(table)]))
 }
@@ -58,11 +61,13 @@ pub fn db_fingerprint<'a>(tables: impl IntoIterator<Item = &'a Table>) -> String
 }
 
 /// `digestToFingerprint`.
+#[must_use]
 pub fn digest_to_fingerprint(bytes: &[u8]) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(bytes))
 }
 
 /// `JSON.stringify` for canonical values (integral floats print without a fraction).
+#[must_use]
 pub fn js_stringify(value: &Value) -> String {
     serde_json::to_string(&js_numbers(value)).expect("json values serialize")
 }
@@ -213,15 +218,16 @@ fn describe_in(schema: &ValueSchema, cycle: &mut Vec<&'static str>) -> Value {
                 }
             }
         }
-        Ast::Suspend(name, thunk) => match cycle.iter().position(|n| n == name) {
-            Some(depth) => json!(["recursive", depth]),
-            None => {
+        Ast::Suspend(name, thunk) => {
+            if let Some(depth) = cycle.iter().position(|n| n == name) {
+                json!(["recursive", depth])
+            } else {
                 cycle.push(name);
                 let inner = describe_in(&thunk(), cycle);
                 cycle.pop();
                 json!(["suspend", inner])
             }
-        },
+        }
         _ => json!([schema.tag()]),
     };
     json!([node, checks, encoding, schema.is_optional()])

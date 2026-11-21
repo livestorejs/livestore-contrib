@@ -21,6 +21,7 @@ impl SeqNum {
         rebase_generation: 0,
     };
 
+    #[must_use]
     pub fn new(global: i64, client: i64, rebase_generation: i64) -> Self {
         Self {
             global,
@@ -30,6 +31,7 @@ impl SeqNum {
     }
 
     /// Full ordering: global, then client, then rebaseGeneration.
+    #[must_use]
     pub fn compare(&self, other: &Self) -> Ordering {
         (self.global, self.client, self.rebase_generation).cmp(&(
             other.global,
@@ -39,16 +41,19 @@ impl SeqNum {
     }
 
     /// Ignores rebaseGeneration, like the TS `isGreaterThan`.
+    #[must_use]
     pub fn is_greater_than(&self, other: &Self) -> bool {
         (self.global, self.client) > (other.global, other.client)
     }
 
     /// Ignores rebaseGeneration, like the TS `isGreaterThanOrEqual`.
+    #[must_use]
     pub fn is_greater_than_or_equal(&self, other: &Self) -> bool {
         (self.global, self.client) >= (other.global, other.client)
     }
 
     /// Returns `self` only when strictly greater (ignoring rebaseGeneration), otherwise `other`.
+    #[must_use]
     pub fn max(self, other: Self) -> Self {
         if self.is_greater_than(&other) {
             self
@@ -58,6 +63,7 @@ impl SeqNum {
     }
 
     /// Returns `(seqNum, parentSeqNum)` for the event following `self`.
+    #[must_use]
     pub fn next_pair(
         &self,
         is_client_only: bool,

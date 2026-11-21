@@ -68,6 +68,7 @@ pub struct Column {
 pub struct TableDefError(pub String);
 
 impl ColumnType {
+    #[must_use]
     pub fn as_sql(self) -> &'static str {
         match self {
             ColumnType::Text => "text",
@@ -79,6 +80,7 @@ impl ColumnType {
 }
 
 impl ColumnDefault {
+    #[must_use]
     pub fn sql(sql: &str) -> Self {
         Self::Sql(sql.into())
     }
@@ -88,6 +90,7 @@ impl ColumnDefault {
     }
 
     /// `resolveColumnDefault`: evaluates thunks; `None` for SQL defaults.
+    #[must_use]
     pub fn resolve(&self) -> Option<Val> {
         match self {
             Self::Value(v) => Some(v.clone()),
@@ -99,6 +102,7 @@ impl ColumnDefault {
 
 impl Column {
     /// `SqliteDsl.column(type)` with that type's default schema.
+    #[must_use]
     pub fn new(name: &str, ty: ColumnType, kind: ColumnKind, base: ValueSchema) -> Self {
         Self {
             name: name.into(),
@@ -115,23 +119,28 @@ impl Column {
         }
     }
 
+    #[must_use]
     pub fn text(name: &str) -> Self {
         Self::new(name, ColumnType::Text, ColumnKind::Text, s::string())
     }
 
+    #[must_use]
     pub fn integer(name: &str) -> Self {
         Self::new(name, ColumnType::Integer, ColumnKind::Integer, s::finite())
     }
 
     /// `real()` defaults to `SqliteReal` (Infinity/NaN allowed).
+    #[must_use]
     pub fn real(name: &str) -> Self {
         Self::new(name, ColumnType::Real, ColumnKind::Real, s::number())
     }
 
+    #[must_use]
     pub fn blob(name: &str) -> Self {
         Self::new(name, ColumnType::Blob, ColumnKind::Blob, s::uint8array())
     }
 
+    #[must_use]
     pub fn boolean(name: &str) -> Self {
         Self::new(
             name,
@@ -142,6 +151,7 @@ impl Column {
     }
 
     /// `datetime()`: ISO string in a text column.
+    #[must_use]
     pub fn datetime(name: &str) -> Self {
         Self::new(
             name,
@@ -152,6 +162,7 @@ impl Column {
     }
 
     /// `datetimeInteger()`: epoch millis in an integer column.
+    #[must_use]
     pub fn datetime_millis(name: &str) -> Self {
         Self::new(
             name,
@@ -162,6 +173,7 @@ impl Column {
     }
 
     /// `json({ schema })`; the custom schema is wrapped in `fromJsonString`.
+    #[must_use]
     pub fn json(name: &str) -> Self {
         Self {
             wrap_custom: s::from_json_string,
@@ -174,22 +186,26 @@ impl Column {
         }
     }
 
+    #[must_use]
     pub fn schema(mut self, schema: ValueSchema) -> Self {
         self.base = (self.wrap_custom)(schema);
         self.custom = true;
         self.rebuild_schema()
     }
 
+    #[must_use]
     pub fn primary_key(mut self) -> Self {
         self.primary_key = true;
         self
     }
 
+    #[must_use]
     pub fn auto_increment(mut self) -> Self {
         self.auto_increment = true;
         self
     }
 
+    #[must_use]
     pub fn nullable(mut self) -> Self {
         self.nullable = true;
         self.rebuild_schema()
@@ -200,6 +216,7 @@ impl Column {
         self
     }
 
+    #[must_use]
     pub fn named(mut self, name: &str) -> Self {
         self.name = name.into();
         self
@@ -257,19 +274,23 @@ impl Column {
 }
 
 /// `withPrimaryKey`.
+#[must_use]
 pub fn with_primary_key(schema: &ValueSchema) -> ValueSchema {
     schema.annotate(PRIMARY_KEY_ID, Annotation::Bool(true))
 }
 
 /// `withColumnType` (compatibility validation is a TODO in TS too).
+#[must_use]
 pub fn with_column_type(schema: &ValueSchema, ty: ColumnType) -> ValueSchema {
     schema.annotate(COLUMN_TYPE, Annotation::Str(ty.as_sql().into()))
 }
 
+#[must_use]
 pub fn with_auto_increment(schema: &ValueSchema) -> ValueSchema {
     schema.annotate(AUTO_INCREMENT, Annotation::Bool(true))
 }
 
+#[must_use]
 pub fn with_unique(schema: &ValueSchema) -> ValueSchema {
     schema.annotate(UNIQUE, Annotation::Bool(true))
 }
@@ -279,6 +300,7 @@ pub fn with_default(schema: &ValueSchema, value: impl Into<ColumnDefault>) -> Va
 }
 
 /// `getColumnDefForSchema`: maps a value schema to a column, respecting column annotations. The column is unnamed.
+#[must_use]
 pub fn get_column_def_for_schema(schema: &ValueSchema) -> Column {
     column_def_for_schema(schema, false)
 }

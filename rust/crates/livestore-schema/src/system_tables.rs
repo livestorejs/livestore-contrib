@@ -11,6 +11,7 @@ pub const EVENTLOG_TABLE: &str = "eventlog";
 pub const SYNC_STATUS_TABLE: &str = "__livestore_sync_status";
 
 /// State DB system tables in creation order.
+#[must_use]
 pub fn state_tables() -> Vec<Table> {
     let seq = |t: Table| {
         t.column(Column::integer("seqNumGlobal"))
@@ -38,6 +39,7 @@ pub fn state_tables() -> Vec<Table> {
 }
 
 /// Eventlog DB system tables in creation order.
+#[must_use]
 pub fn eventlog_tables() -> Vec<Table> {
     let seq = ["seqNumGlobal", "seqNumClient", "seqNumRebaseGeneration"];
     let mut eventlog = Table::new(EVENTLOG_TABLE);

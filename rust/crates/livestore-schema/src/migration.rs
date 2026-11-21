@@ -13,6 +13,7 @@ pub enum MigrateBehaviour {
 
 /// Statements `migrateTable` runs; the `__livestore_schema` row carries the table fingerprint unless
 /// `skip_meta_table`.
+#[must_use]
 pub fn migrate_table(
     table: &Table,
     behaviour: MigrateBehaviour,

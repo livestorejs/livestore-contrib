@@ -137,15 +137,18 @@ impl ValueSchema {
     }
 
     /// Reference identity (`toBe` on schemas).
+    #[must_use]
     pub fn same(&self, other: &ValueSchema) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
+    #[must_use]
     pub fn ast(&self) -> &Ast {
         &self.0.ast
     }
 
     /// `ast._tag`.
+    #[must_use]
     pub fn tag(&self) -> &'static str {
         match &self.0.ast {
             Ast::String => "String",
@@ -169,19 +172,23 @@ impl ValueSchema {
         }
     }
 
+    #[must_use]
     pub fn checks(&self) -> &[Check] {
         &self.0.checks
     }
 
+    #[must_use]
     pub fn is_optional(&self) -> bool {
         self.0.optional
     }
 
+    #[must_use]
     pub fn has_encoding(&self) -> bool {
         !self.0.encoding.is_empty()
     }
 
     /// The most encoded schema this one decodes from (the last link's `to` in Effect terms).
+    #[must_use]
     pub fn encoding_from(&self) -> Option<&ValueSchema> {
         self.0.encoding.last().map(|l| &l.from)
     }
@@ -190,6 +197,7 @@ impl ValueSchema {
         &self.0.encoding
     }
 
+    #[must_use]
     pub fn annotations(&self) -> &IndexMap<String, Annotation> {
         &self.0.annotations
     }
@@ -203,29 +211,35 @@ impl ValueSchema {
         f(self)
     }
 
+    #[must_use]
     pub fn check(&self, check: Check) -> Self {
         self.map(|n| n.checks.push(check))
     }
 
+    #[must_use]
     pub fn annotate(&self, key: &str, value: Annotation) -> Self {
         self.map(|n| {
             n.annotations.insert(key.into(), value);
         })
     }
 
+    #[must_use]
     pub fn title(&self, title: &str) -> Self {
         self.annotate("title", Annotation::Str(title.into()))
     }
 
     /// The `expected` annotation Effect's built-ins carry.
+    #[must_use]
     pub fn expected(&self, expected: &str) -> Self {
         self.annotate("expected", Annotation::Str(expected.into()))
     }
 
+    #[must_use]
     pub fn identifier(&self, identifier: &str) -> Self {
         self.annotate("identifier", Annotation::Str(identifier.into()))
     }
 
+    #[must_use]
     pub fn annotation(&self, key: &str) -> Option<&Annotation> {
         self.0.annotations.get(key)
     }
@@ -234,6 +248,7 @@ impl ValueSchema {
         self.0.annotations.keys().map(String::as_str)
     }
 
+    #[must_use]
     pub fn annotation_str(&self, key: &str) -> Option<&str> {
         match self.annotation(key)? {
             Annotation::Str(s) => Some(s),
@@ -241,11 +256,13 @@ impl ValueSchema {
         }
     }
 
+    #[must_use]
     pub fn annotation_bool(&self, key: &str) -> bool {
         matches!(self.annotation(key), Some(Annotation::Bool(true)))
     }
 
     /// `representation.id` of built-in declarations (`Date`, `Uint8Array`).
+    #[must_use]
     pub fn representation(&self) -> Option<&'static str> {
         match &self.0.ast {
             Ast::Declaration(Declaration::Date) => Some(DATE_REPRESENTATION),
@@ -327,6 +344,7 @@ impl ValueSchema {
     }
 
     /// Property signatures of a struct (`Schema.getResolvedPropertySignatures`); empty for anything else.
+    #[must_use]
     pub fn fields(&self) -> Vec<(String, ValueSchema)> {
         match &self.0.ast {
             Ast::Objects(fields) => fields.clone(),
@@ -464,51 +482,63 @@ impl Check {
     }
 }
 
+#[must_use]
 pub fn string() -> ValueSchema {
     ValueSchema::new(Ast::String)
 }
 
 /// `Schema.Number` (allows `NaN`/`Infinity`, like `SqliteReal`).
+#[must_use]
 pub fn number() -> ValueSchema {
     ValueSchema::new(Ast::Number)
 }
 
+#[must_use]
 pub fn finite() -> ValueSchema {
     number().check(is_finite())
 }
 
+#[must_use]
 pub fn int() -> ValueSchema {
     number().check(is_int())
 }
 
+#[must_use]
 pub fn boolean() -> ValueSchema {
     ValueSchema::new(Ast::Boolean)
 }
 
+#[must_use]
 pub fn bigint() -> ValueSchema {
     ValueSchema::new(Ast::BigInt)
 }
 
+#[must_use]
 pub fn symbol() -> ValueSchema {
     ValueSchema::new(Ast::Symbol)
 }
 
+#[must_use]
 pub fn null() -> ValueSchema {
     ValueSchema::new(Ast::Null)
 }
 
+#[must_use]
 pub fn undefined() -> ValueSchema {
     ValueSchema::new(Ast::Undefined)
 }
 
+#[must_use]
 pub fn void() -> ValueSchema {
     ValueSchema::new(Ast::Void)
 }
 
+#[must_use]
 pub fn unknown() -> ValueSchema {
     ValueSchema::new(Ast::Unknown)
 }
 
+#[must_use]
 pub fn any() -> ValueSchema {
     ValueSchema::new(Ast::Any)
 }
@@ -535,20 +565,24 @@ pub fn union(members: impl IntoIterator<Item = ValueSchema>) -> ValueSchema {
     ValueSchema::new(Ast::Union(members.into_iter().collect()))
 }
 
+#[must_use]
 pub fn null_or(schema: ValueSchema) -> ValueSchema {
     union([schema, null()])
 }
 
+#[must_use]
 pub fn undefined_or(schema: ValueSchema) -> ValueSchema {
     union([schema, undefined()])
 }
 
 /// `Schema.optional(schema)`: `schema | undefined` behind an optional key.
+#[must_use]
 pub fn optional(schema: ValueSchema) -> ValueSchema {
     undefined_or(schema).map(|n| n.optional = true)
 }
 
 /// Marks a schema as an optional key without adding `undefined`.
+#[must_use]
 pub fn optional_key(schema: ValueSchema) -> ValueSchema {
     schema.map(|n| n.optional = true)
 }
@@ -566,6 +600,7 @@ pub fn tagged_struct(
     struct_([("_tag", literal(tag))].into_iter().chain(fields))
 }
 
+#[must_use]
 pub fn array(item: ValueSchema) -> ValueSchema {
     ValueSchema::new(Ast::Arrays {
         elements: vec![],
@@ -581,6 +616,7 @@ pub fn tuple(elements: impl IntoIterator<Item = ValueSchema>) -> ValueSchema {
 }
 
 /// `Schema.Record(Schema.String, value)`.
+#[must_use]
 pub fn record(value: ValueSchema) -> ValueSchema {
     ValueSchema::new(Ast::Record(value))
 }
@@ -606,6 +642,7 @@ pub fn class(name: &str, fields: ValueSchema) -> ValueSchema {
     )
 }
 
+#[must_use]
 pub fn date() -> ValueSchema {
     ValueSchema::new(Ast::Declaration(Declaration::Date))
         .annotate(
@@ -615,6 +652,7 @@ pub fn date() -> ValueSchema {
         .expected("a valid Date")
 }
 
+#[must_use]
 pub fn uint8array() -> ValueSchema {
     ValueSchema::new(Ast::Declaration(Declaration::Uint8Array))
         .annotate(
@@ -624,6 +662,7 @@ pub fn uint8array() -> ValueSchema {
         .expected("Uint8Array")
 }
 
+#[must_use]
 pub fn date_from_string() -> ValueSchema {
     date().decode_from(
         &string().expected("a string that will be decoded as a Date"),
@@ -645,6 +684,7 @@ pub fn date_from_string() -> ValueSchema {
 }
 
 /// `Schema.DateFromMillis`: integer epoch millis.
+#[must_use]
 pub fn date_from_millis() -> ValueSchema {
     date().decode_from(
         &int(),
@@ -659,6 +699,7 @@ pub fn date_from_millis() -> ValueSchema {
     )
 }
 
+#[must_use]
 pub fn uint8array_from_base64() -> ValueSchema {
     use base64::engine::general_purpose::STANDARD as engine;
     let from = string()
@@ -682,6 +723,7 @@ pub fn uint8array_from_base64() -> ValueSchema {
     )
 }
 
+#[must_use]
 pub fn finite_from_string() -> ValueSchema {
     finite().decode_from(
         &string().expected("a string that will be decoded as a finite number"),
@@ -698,6 +740,7 @@ pub fn finite_from_string() -> ValueSchema {
 }
 
 /// `Schema.BooleanFromBit`: `0 | 1` ↔ `boolean`.
+#[must_use]
 pub fn boolean_from_bit() -> ValueSchema {
     boolean().decode_from(
         &literals([0, 1]),
@@ -706,6 +749,7 @@ pub fn boolean_from_bit() -> ValueSchema {
     )
 }
 
+#[must_use]
 pub fn non_empty_string() -> ValueSchema {
     string().check(is_min_length(1))
 }
@@ -730,6 +774,7 @@ pub fn trim() -> ValueSchema {
 }
 
 /// `Schema.fromJsonString(schema)`.
+#[must_use]
 pub fn from_json_string(schema: ValueSchema) -> ValueSchema {
     schema.link(
         &string().expected("a string that will be decoded as JSON"),
@@ -744,6 +789,7 @@ pub fn from_json_string(schema: ValueSchema) -> ValueSchema {
     )
 }
 
+#[must_use]
 pub fn is_finite() -> Check {
     Check::new(
         "Expected a finite number",
@@ -759,6 +805,7 @@ pub fn is_finite() -> Check {
     )
 }
 
+#[must_use]
 pub fn is_int() -> Check {
     Check::new(
         "Expected an integer",
@@ -774,6 +821,7 @@ pub fn is_int() -> Check {
     )
 }
 
+#[must_use]
 pub fn is_greater_than_or_equal_to(min: f64) -> Check {
     Check::new(format!("Expected a value greater than or equal to {min}"), move |v| matches!(v, Val::Number(n) if *n >= min)).effect(
         "effect/schema/isGreaterThanOrEqualTo",
@@ -785,6 +833,7 @@ pub fn is_greater_than_or_equal_to(min: f64) -> Check {
     )
 }
 
+#[must_use]
 pub fn is_between(min: f64, max: f64) -> Check {
     Check::new(format!("Expected a value between {min} and {max}"), move |v| matches!(v, Val::Number(n) if *n >= min && *n <= max)).effect(
         "effect/schema/isBetween",
@@ -796,6 +845,7 @@ pub fn is_between(min: f64, max: f64) -> Check {
     )
 }
 
+#[must_use]
 pub fn is_min_length(min: usize) -> Check {
     Check::new(format!("Expected a value with a length of at least {min}"), move |v| match v {
         Val::String(s) => s.encode_utf16().count() >= min,
@@ -813,6 +863,7 @@ pub fn is_min_length(min: usize) -> Check {
     )
 }
 
+#[must_use]
 pub fn is_pattern(pattern: &str) -> Check {
     let re = regex::Regex::new(pattern).expect("valid pattern");
     Check::new(format!("Expected a string matching the RegExp {pattern}"), move |v| v.as_str().is_some_and(|s| re.is_match(s))).effect(
@@ -825,6 +876,7 @@ pub fn is_pattern(pattern: &str) -> Check {
     )
 }
 
+#[must_use]
 pub fn is_uuid() -> Check {
     const SOURCE: &str = "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$";
     regex_check(SOURCE, "a UUID").effect(
@@ -837,6 +889,7 @@ pub fn is_uuid() -> Check {
     )
 }
 
+#[must_use]
 pub fn is_ulid() -> Check {
     const SOURCE: &str = "^[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}$";
     let expected = format!("a string matching the RegExp {SOURCE}");
@@ -857,6 +910,7 @@ fn regex_check(source: &str, expected: &str) -> Check {
     })
 }
 
+#[must_use]
 pub fn is_greater_than_date(ms: f64) -> Check {
     let at = iso_string_from_millis(ms as i64);
     Check::new(format!("Expected a date after {at}"), move |v| matches!(v, Val::Date(d) if *d > ms)).effect(
@@ -882,6 +936,7 @@ impl Val {
         Val::Object(entries.into_iter().map(|(k, v)| (k.into(), v)).collect())
     }
 
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Val::String(s) => Some(s),
@@ -889,6 +944,7 @@ impl Val {
         }
     }
 
+    #[must_use]
     pub fn as_object(&self) -> Option<&IndexMap<String, Val>> {
         match self {
             Val::Object(o) => Some(o),
@@ -896,11 +952,13 @@ impl Val {
         }
     }
 
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&Val> {
         self.as_object()?.get(key)
     }
 
     /// JSON form of a JSON-compatible value (`undefined`, symbols and bigints become `null`).
+    #[must_use]
     pub fn to_json_value(&self) -> Value {
         self.to_json_string()
             .and_then(|s| serde_json::from_str(&s).ok())
@@ -915,6 +973,7 @@ impl Val {
     }
 
     /// `JSON.stringify`; `None` where JS returns `undefined`.
+    #[must_use]
     pub fn to_json_string(&self) -> Option<String> {
         Some(match self {
             Val::Undefined | Val::Symbol(_) => return None,

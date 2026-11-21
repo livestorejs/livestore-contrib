@@ -41,6 +41,7 @@ impl<A> Clone for EventDef<A> {
 }
 
 impl<A: Serialize + DeserializeOwned> EventDef<A> {
+    #[must_use]
     pub fn synced(name: &str) -> Self {
         Self {
             name: name.into(),
@@ -52,6 +53,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
         }
     }
 
+    #[must_use]
     pub fn client_only(name: &str) -> Self {
         Self {
             client_only: true,
@@ -59,28 +61,33 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
         }
     }
 
+    #[must_use]
     pub fn schema(mut self, schema: ValueSchema) -> Self {
         self.schema = Some(schema);
         self
     }
 
     /// `Schema.hash(eventDef.schema)`; without an args schema, that of `Schema.Any`.
+    #[must_use]
     pub fn schema_hash(&self) -> i32 {
         schema_hash(self.schema.as_ref().unwrap_or(&s::any()))
     }
 
+    #[must_use]
     pub fn deprecated(mut self, reason: &str) -> Self {
         self.deprecated = Some(reason.into());
         self
     }
 
     /// `deprecated(reason)` on one args field.
+    #[must_use]
     pub fn deprecated_field(mut self, field: &str, reason: &str) -> Self {
         self.deprecated_fields.push((field.into(), reason.into()));
         self
     }
 
     /// `getDeprecatedReason` for an args field.
+    #[must_use]
     pub fn field_deprecation(&self, field: &str) -> Option<&str> {
         self.deprecated_fields
             .iter()
@@ -89,6 +96,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     }
 
     /// `findDeprecatedFieldsWithValues`: deprecated fields present in the encoded args.
+    #[must_use]
     pub fn find_deprecated_fields_with_values(&self, args: &Value) -> Vec<(String, String)> {
         self.deprecated_fields
             .iter()
@@ -140,6 +148,7 @@ pub struct MaterializeContext<'a> {
 pub type QueryFn<'a> = dyn Fn(&str, &[SqlValue]) -> Result<Vec<Value>, MaterializeError> + 'a;
 
 impl<'a> MaterializeContext<'a> {
+    #[must_use]
     pub fn new(event: &'a Event) -> Self {
         Self { event, query: None }
     }

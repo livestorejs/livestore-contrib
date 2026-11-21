@@ -73,9 +73,9 @@ fn non_deprecated_schemas_return_false() {
 #[test]
 fn ignores_deprecated_fields_without_values() {
     let def = EventDef::<Value>::synced("Ev").deprecated_field("old", "x");
-    assert!(
-        def.find_deprecated_fields_with_values(&json!({ "id": "1" }))
-            .is_empty()
+    assert_eq!(
+        def.find_deprecated_fields_with_values(&json!({ "id": "1" })),
+        [] as [(std::string::String, std::string::String); 0]
     );
 }
 
@@ -138,10 +138,9 @@ fn deduplicates_field_warnings() {
 #[test]
 fn no_warning_for_non_deprecated_event() {
     let def = EventDef::<Value>::synced("Normal");
-    assert!(
-        DeprecationWarnings::default()
-            .log(&def, &json!({ "id": "1" }))
-            .is_empty()
+    assert_eq!(
+        DeprecationWarnings::default().log(&def, &json!({ "id": "1" })),
+        [] as [(&str, serde_json::Value); 0]
     );
 }
 
@@ -149,10 +148,9 @@ fn no_warning_for_non_deprecated_event() {
 fn no_warning_when_deprecated_field_is_undefined() {
     let def = EventDef::<Args>::synced("Unused").deprecated_field("old", "x");
     let encoded = serde_json::to_value(Args { old: None }).unwrap();
-    assert!(
-        DeprecationWarnings::default()
-            .log(&def, &encoded)
-            .is_empty()
+    assert_eq!(
+        DeprecationWarnings::default().log(&def, &encoded),
+        [] as [(&str, serde_json::Value); 0]
     );
 }
 

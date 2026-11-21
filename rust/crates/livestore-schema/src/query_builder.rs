@@ -32,6 +32,7 @@ pub enum Op {
 }
 
 impl Op {
+    #[must_use]
     pub fn as_sql(self) -> &'static str {
         match self {
             Op::Eq => "=",
@@ -181,6 +182,7 @@ pub trait Filter: Sized {
 
 impl Table {
     /// The table's query builder (`db.todos` in TS).
+    #[must_use]
     pub fn query(&self) -> Select<'_> {
         Select {
             table: self,
@@ -215,11 +217,13 @@ impl Filter for Select<'_> {
 
 impl<'t> Select<'t> {
     /// `select(...cols)`; a single column plucks its values.
+    #[must_use]
     pub fn select(mut self, columns: &[&str]) -> Self {
         self.columns = columns.iter().map(|c| (*c).into()).collect();
         self
     }
 
+    #[must_use]
     pub fn order_by(mut self, col: &str, direction: Direction) -> Self {
         self.order_by.push((col.into(), direction));
         self
@@ -235,22 +239,26 @@ impl<'t> Select<'t> {
         self
     }
 
+    #[must_use]
     pub fn limit(mut self, limit: i64) -> Self {
         self.limit = Some(limit);
         self
     }
 
+    #[must_use]
     pub fn offset(mut self, offset: i64) -> Self {
         self.offset = Some(offset);
         self
     }
 
     /// The queried table.
+    #[must_use]
     pub fn table(&self) -> &'t Table {
         self.table
     }
 
     /// The same query over another (structurally equal) table definition, e.g. an owned copy.
+    #[must_use]
     pub fn rebind<'u>(&self, table: &'u Table) -> Select<'u> {
         Select {
             table,
@@ -264,6 +272,7 @@ impl<'t> Select<'t> {
         }
     }
 
+    #[must_use]
     pub fn first(mut self, behaviour: First) -> Self {
         if self.limit.is_some() {
             self.invalid = Some(".first() can't be called after .limit()".into());
@@ -273,6 +282,7 @@ impl<'t> Select<'t> {
         self
     }
 
+    #[must_use]
     pub fn count(self) -> Count<'t> {
         Count {
             table: self.table,
@@ -301,6 +311,7 @@ impl<'t> Select<'t> {
     }
 
     /// `delete()`, keeping the WHERE clauses collected so far.
+    #[must_use]
     pub fn delete(self) -> Delete<'t> {
         Delete {
             table: self.table,
@@ -435,11 +446,13 @@ pub struct Insert<'t> {
 }
 
 impl Insert<'_> {
+    #[must_use]
     pub fn on_conflict(mut self, targets: &[&str], action: OnConflict) -> Self {
         self.on_conflict = Some((targets.iter().map(|t| (*t).into()).collect(), action));
         self
     }
 
+    #[must_use]
     pub fn returning(mut self, columns: &[&str]) -> Self {
         self.returning = columns.iter().map(|c| (*c).into()).collect();
         self
@@ -513,6 +526,7 @@ impl Filter for Update<'_> {
 }
 
 impl Update<'_> {
+    #[must_use]
     pub fn returning(mut self, columns: &[&str]) -> Self {
         self.returning = columns.iter().map(|c| (*c).into()).collect();
         self
@@ -564,6 +578,7 @@ impl Filter for Delete<'_> {
 }
 
 impl Delete<'_> {
+    #[must_use]
     pub fn returning(mut self, columns: &[&str]) -> Self {
         self.returning = columns.iter().map(|c| (*c).into()).collect();
         self

@@ -1,11 +1,13 @@
 //! Effect `Schema` codecs that materializers need (`DateFromString`, `DateFromMillis`).
 
 /// `Schema.DateFromString` decode + `Schema.DateFromMillis` encode: ISO string to epoch millis.
+#[must_use]
 pub fn date_from_iso_string(s: &str) -> Option<i64> {
     parse_iso_millis(s)
 }
 
 /// `Date.prototype.toISOString`.
+#[must_use]
 pub fn iso_string_from_millis(ms: i64) -> String {
     let (days, rem) = (ms.div_euclid(86_400_000), ms.rem_euclid(86_400_000));
     let (y, m, d) = civil_from_days(days);

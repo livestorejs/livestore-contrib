@@ -61,28 +61,34 @@ pub struct Schema {
 }
 
 impl Schema {
+    #[must_use]
     pub fn builder() -> SchemaBuilder {
         SchemaBuilder::default()
     }
 
     /// App tables in definition order (client document tables included).
+    #[must_use]
     pub fn tables(&self) -> &[Table] {
         &self.tables
     }
 
+    #[must_use]
     pub fn client_documents(&self) -> &[ClientDocument] {
         &self.client_documents
     }
 
+    #[must_use]
     pub fn events(&self) -> &[EventInfo] {
         &self.events
     }
 
+    #[must_use]
     pub fn event(&self, name: &str) -> Option<&EventInfo> {
         self.by_name.get(name).map(|i| &self.events[*i])
     }
 
     /// `eventsDefsMap.get(name)?.options.clientOnly ?? false`.
+    #[must_use]
     pub fn is_client_only(&self, name: &str) -> bool {
         self.event(name).is_some_and(|e| e.client_only)
     }
@@ -109,7 +115,7 @@ impl Schema {
         match &self.unknown_event_handling {
             UnknownEventHandling::Fail => return Err(UnknownEventError(context)),
             UnknownEventHandling::Warn => {
-                tracing::warn!(event = %event.name, ?reason, operation, "@livestore/common:schema:unknown-event")
+                tracing::warn!(event = %event.name, ?reason, operation, "@livestore/common:schema:unknown-event");
             }
             UnknownEventHandling::Ignore => {}
             UnknownEventHandling::Callback(f) => f(&context),
@@ -127,12 +133,14 @@ pub struct SchemaBuilder {
 }
 
 impl SchemaBuilder {
+    #[must_use]
     pub fn table(mut self, table: Table) -> Self {
         self.tables.push(table);
         self
     }
 
     /// Adds the document table and its derived `<name>Set` event with materializer.
+    #[must_use]
     pub fn client_document(mut self, doc: ClientDocument) -> Self {
         self.tables.push(doc.table());
         let schema_hash = schema_hash(&doc.set_event_schema());
@@ -172,6 +180,7 @@ impl SchemaBuilder {
     }
 
     /// An event without materializer (resolves as `MaterializerMissing`).
+    #[must_use]
     pub fn event_without_materializer<A: Serialize + DeserializeOwned>(
         mut self,
         def: &EventDef<A>,
@@ -185,11 +194,13 @@ impl SchemaBuilder {
         self
     }
 
+    #[must_use]
     pub fn unknown_event_handling(mut self, handling: UnknownEventHandling) -> Self {
         self.unknown_event_handling = handling;
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Arc<Schema> {
         let by_name = self
             .events

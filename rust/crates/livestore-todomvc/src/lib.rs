@@ -38,7 +38,9 @@ pub struct TodoClearedCompleted {
 }
 
 pub mod events {
-    use super::*;
+    use super::{
+        EventDef, LazyLock, TodoClearedCompleted, TodoCreated, TodoDeleted, TodoId, ValueSchema, s,
+    };
 
     pub static TODO_CREATED: LazyLock<EventDef<TodoCreated>> = LazyLock::new(|| {
         EventDef::synced("v1.TodoCreated")
@@ -73,6 +75,7 @@ pub static TODOS: LazyLock<Table> = LazyLock::new(|| {
         .column(Column::datetime_millis("deletedAt").nullable())
 });
 
+#[must_use]
 pub fn ui_state() -> ClientDocument {
     let value = s::struct_([
         ("newTodoText", s::string()),
@@ -85,6 +88,7 @@ pub fn ui_state() -> ClientDocument {
     )
 }
 
+#[must_use]
 pub fn schema() -> Arc<Schema> {
     let todos = &*TODOS;
     Schema::builder()
@@ -144,7 +148,7 @@ mod tests {
         let ddl: Vec<String> = super::schema()
             .tables()
             .iter()
-            .flat_map(|t| t.ddl())
+            .flat_map(livestore_schema::Table::ddl)
             .collect();
         assert_eq!(
             ddl,

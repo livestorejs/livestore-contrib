@@ -28,6 +28,7 @@ pub struct Table {
 }
 
 impl Table {
+    #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
             name: name.into(),
@@ -38,6 +39,7 @@ impl Table {
     }
 
     /// `table({ name, columns: <single column> })`: the column is named `value`.
+    #[must_use]
     pub fn single_column(name: &str, column: Column) -> Self {
         Self::new(name).column(column.named("value"))
     }
@@ -70,6 +72,7 @@ impl Table {
         })
     }
 
+    #[must_use]
     pub fn col(&self, name: &str) -> &Column {
         self.columns
             .iter()
@@ -78,6 +81,7 @@ impl Table {
     }
 
     /// `rowSchema`: struct of the column codecs.
+    #[must_use]
     pub fn row_schema(&self) -> ValueSchema {
         s::struct_(
             self.columns
@@ -88,6 +92,7 @@ impl Table {
     }
 
     /// `insertSchema`: nullable or defaulted columns are optional.
+    #[must_use]
     pub fn insert_schema(&self) -> ValueSchema {
         let field = |c: &Column| {
             if c.nullable || c.default.is_some() {
@@ -113,6 +118,7 @@ impl Table {
     }
 
     /// `getDefaultValuesEncoded`.
+    #[must_use]
     pub fn default_values_encoded(
         &self,
         fallback: &IndexMap<String, Val>,
@@ -121,6 +127,7 @@ impl Table {
     }
 
     /// `getDefaultValuesDecoded`.
+    #[must_use]
     pub fn default_values_decoded(
         &self,
         fallback: &IndexMap<String, Val>,
@@ -159,11 +166,13 @@ impl Table {
         out
     }
 
+    #[must_use]
     pub fn column(mut self, column: Column) -> Self {
         self.columns.push(column);
         self
     }
 
+    #[must_use]
     pub fn index(mut self, name: &str, columns: &[&str]) -> Self {
         self.indexes.push(Index {
             name: name.into(),
@@ -173,6 +182,7 @@ impl Table {
         self
     }
 
+    #[must_use]
     pub fn unique_index(mut self, name: &str, columns: &[&str]) -> Self {
         self.indexes.push(Index {
             name: name.into(),
@@ -183,6 +193,7 @@ impl Table {
     }
 
     /// `makeColumnSpec`.
+    #[must_use]
     pub fn column_spec(&self) -> String {
         let pks: Vec<&Column> = self.columns.iter().filter(|c| c.primary_key).collect();
         let single_pk = (pks.len() == 1).then(|| pks[0].name.as_str());
@@ -199,6 +210,7 @@ impl Table {
     }
 
     /// `create table if not exists` plus index statements, exactly as `migrateTable` runs them.
+    #[must_use]
     pub fn ddl(&self) -> Vec<String> {
         let mut out = vec![format!(
             "create table if not exists \"{}\" ({}) strict",
@@ -267,6 +279,7 @@ impl Update {
         )
     }
 
+    #[must_use]
     pub fn all(self) -> SqlStatement {
         SqlStatement::new(self.sql, self.binds)
     }
@@ -274,7 +287,7 @@ impl Update {
 
 /// `getSqlitePropertySignatures`: the encoded side decides which columns exist; a property the schema
 /// itself declares keeps its own codec (so `DateFromString` stores its encoded form), unless the
-/// encoded property carries a LiveStore column annotation.
+/// encoded property carries a `LiveStore` column annotation.
 fn sqlite_property_signatures(schema: &ValueSchema) -> Vec<(String, ValueSchema)> {
     let own = property_signatures(schema);
     property_signatures(&schema.to_encoded())

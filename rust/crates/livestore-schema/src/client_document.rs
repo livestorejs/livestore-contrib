@@ -33,11 +33,13 @@ impl ClientDocument {
         }
     }
 
+    #[must_use]
     pub fn default_id(mut self, id: &str) -> Self {
         self.default_id = Some(id.into());
         self
     }
 
+    #[must_use]
     pub fn partial_set(mut self, partial_set: bool) -> Self {
         self.partial_set = partial_set;
         self
@@ -48,6 +50,7 @@ impl ClientDocument {
     }
 
     /// The `(id, value)` table; the value column always decodes full documents optimistically.
+    #[must_use]
     pub fn table(&self) -> Table {
         let value = create_optimistic_event_schema(&self.value_schema, &self.default_value, false);
         let mut table = Table::new(&self.name)
@@ -57,15 +60,18 @@ impl ClientDocument {
         table
     }
 
+    #[must_use]
     pub fn row_schema(&self) -> ValueSchema {
         self.table().row_schema()
     }
 
+    #[must_use]
     pub fn set_event_name(&self) -> String {
         format!("{}Set", self.name)
     }
 
     /// Args schema of the `<name>Set` event as registered in the schema (what `Schema.hash` covers).
+    #[must_use]
     pub fn set_event_schema(&self) -> ValueSchema {
         let value = if self.can_partial_set() {
             partial_struct(&self.value_schema)
@@ -89,6 +95,7 @@ impl ClientDocument {
 
     /// Materializer over encoded JSON args: decodes the value optimistically, then [`Self::set_statement`].
     /// Args must already carry the real session id (TS replaces `SessionIdSymbol` before committing).
+    #[must_use]
     pub fn set_materializer(&self) -> Materializer {
         let doc = self.clone();
         let schema = create_optimistic_event_schema(
@@ -176,6 +183,7 @@ impl ClientDocument {
     }
 
     /// `getResultSchema(Doc.get(id))`: decodes the raw result rows to the first row's value.
+    #[must_use]
     pub fn get_result_schema(&self) -> ValueSchema {
         s::any().decode_from(
             &s::array(self.row_schema()),
@@ -233,30 +241,29 @@ pub fn create_optimistic_event_schema(
             if partial.is_empty() {
                 return encode_target.encode(Val::obj::<String>([]));
             }
-            return match encode_target.decode(Val::Object(partial)) {
-                Ok(decoded) => encode_target.encode(decoded),
-                Err(_) => {
-                    tracing::warn!(
-                        "Client document: Partial fields incompatible, returning empty partial"
-                    );
-                    encode_target.encode(Val::obj::<String>([]))
-                }
+            return if let Ok(decoded) = encode_target.decode(Val::Object(partial)) {
+                encode_target.encode(decoded)
+            } else {
+                tracing::warn!(
+                    "Client document: Partial fields incompatible, returning empty partial"
+                );
+                encode_target.encode(Val::obj::<String>([]))
             };
         }
         let mut merged = default_value.as_object().cloned().unwrap_or_default();
         merged.extend(entries.into_iter().filter(|(k, _)| known(k)));
-        match value_schema.decode(Val::Object(merged)) {
-            Ok(decoded) => encode_target.encode(decoded),
-            Err(_) => {
-                tracing::warn!("Client document: Could not preserve event data, using defaults");
-                encode_target.encode(default_value.clone())
-            }
+        if let Ok(decoded) = value_schema.decode(Val::Object(merged)) {
+            encode_target.encode(decoded)
+        } else {
+            tracing::warn!("Client document: Could not preserve event data, using defaults");
+            encode_target.encode(default_value.clone())
         }
     };
     target.decode_from(&s::unknown(), Arc::new(decode), Arc::new(Ok))
 }
 
 /// `mergeDefaultValues`: shallow merge where `null`/`undefined` explicit values fall back to defaults.
+#[must_use]
 pub fn merge_default_values(defaults: &Val, explicit: &Val) -> Val {
     let (Val::Object(defaults), Val::Object(explicit_obj)) = (defaults, explicit) else {
         return explicit.clone();

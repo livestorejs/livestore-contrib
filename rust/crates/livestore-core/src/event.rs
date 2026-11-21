@@ -19,6 +19,7 @@ pub struct Event {
 
 impl Event {
     /// Returns a copy moved to the position after `parent` (`LiveStoreEvent.Client.rebase`).
+    #[must_use]
     pub fn rebase(&self, parent: SeqNum, is_client_only: bool, rebase_generation: i64) -> Event {
         let (seq_num, parent_seq_num) = parent.next_pair(is_client_only, Some(rebase_generation));
         Event {
@@ -30,6 +31,7 @@ impl Event {
 }
 
 /// `LiveStoreEvent.Client.isEqualEncoded`; JSON args are already canonical.
+#[must_use]
 pub fn is_equal_encoded(a: &Event, b: &Event) -> bool {
     a.seq_num.global == b.seq_num.global
         && a.seq_num.client == b.seq_num.client
@@ -53,6 +55,7 @@ pub struct GlobalEvent {
 
 impl Event {
     /// `LiveStoreEvent.Client.toGlobal`.
+    #[must_use]
     pub fn to_global(&self) -> GlobalEvent {
         GlobalEvent {
             name: self.name.clone(),
