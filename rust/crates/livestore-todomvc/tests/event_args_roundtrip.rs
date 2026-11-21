@@ -1,11 +1,11 @@
 //! Event arguments cross clients as JSON, so Rust must read what TypeScript writes and write what TypeScript
 //! reads. The leader fixtures hold arguments that core's TypeScript leader encoded into its eventlog.
 
-use livestore_schema::EventDef;
+use livestore_schema::Event;
 use livestore_schema::value_schema::Val;
-use livestore_todomvc::events;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use livestore_todomvc::{
+    TodoClearedCompleted, TodoCompleted, TodoCreated, TodoDeleted, TodoUncompleted,
+};
 use serde_json::Value;
 
 #[test]
@@ -13,11 +13,11 @@ fn event_args_round_trip_with_typescript() {
     let mut checked = 0;
     for (name, args) in ts_encoded_args() {
         match name.as_str() {
-            "v1.TodoCreated" => round_trip(&events::TODO_CREATED, &args),
-            "v1.TodoCompleted" => round_trip(&events::TODO_COMPLETED, &args),
-            "v1.TodoUncompleted" => round_trip(&events::TODO_UNCOMPLETED, &args),
-            "v1.TodoDeleted" => round_trip(&events::TODO_DELETED, &args),
-            "v1.TodoClearedCompleted" => round_trip(&events::TODO_CLEARED_COMPLETED, &args),
+            "v1.TodoCreated" => round_trip::<TodoCreated>(&args),
+            "v1.TodoCompleted" => round_trip::<TodoCompleted>(&args),
+            "v1.TodoUncompleted" => round_trip::<TodoUncompleted>(&args),
+            "v1.TodoDeleted" => round_trip::<TodoDeleted>(&args),
+            "v1.TodoClearedCompleted" => round_trip::<TodoClearedCompleted>(&args),
             _ => continue,
         }
         checked += 1;
@@ -30,7 +30,8 @@ fn event_args_round_trip_with_typescript() {
 
 /// Decoding TypeScript's JSON and encoding it again gives the same value, through the Rust struct (what the
 /// client sends) and through the event schema.
-fn round_trip<A: Serialize + DeserializeOwned>(def: &EventDef<A>, ts_json: &str) {
+fn round_trip<E: Event>(ts_json: &str) {
+    let def = E::def();
     let expected: Value = serde_json::from_str(ts_json).unwrap();
 
     let decoded = def.decode_json(ts_json).unwrap();
