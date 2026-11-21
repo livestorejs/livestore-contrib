@@ -1,6 +1,8 @@
 //! sync-cf provider client: the WebSocket transport (`transport`) and a [`SyncBackend`] on top of it
 //! (`packages/@livestore/sync-cf/src/client`). Protocol reference: `contributor-docs/rust/sync-cf-wire-protocol.md`.
 
+#![warn(clippy::unwrap_used)]
+
 pub mod http;
 pub mod pull_policy;
 pub mod transport;

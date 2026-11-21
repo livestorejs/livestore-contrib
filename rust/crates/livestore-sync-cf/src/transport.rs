@@ -425,7 +425,7 @@ pub async fn connect_with(
             let Some(inner) = pinger.upgrade() else {
                 return;
             };
-            if inner.state.lock().unwrap().closed.is_some() {
+            if inner.state.lock().expect("mutex poisoned").closed.is_some() {
                 return;
             }
             let client = Client { inner };
@@ -496,7 +496,7 @@ impl Client {
     pub async fn ping(&self, timeout: Duration) -> Result<(), SyncError> {
         let (tx, rx) = oneshot::channel();
         {
-            let mut st = self.inner.state.lock().unwrap();
+            let mut st = self.inner.state.lock().expect("mutex poisoned");
             if let Some(r) = &st.closed {
                 return Err(SyncError::Socket(r.clone()));
             }
@@ -515,7 +515,12 @@ impl Client {
 
     /// `Some(reason)` once the socket is gone (closed, errored, or pong timeout).
     pub fn closed_reason(&self) -> Option<SocketError> {
-        self.inner.state.lock().unwrap().closed.clone()
+        self.inner
+            .state
+            .lock()
+            .expect("mutex poisoned")
+            .closed
+            .clone()
     }
 
     /// Flips to `false` when the socket goes away.
@@ -579,7 +584,7 @@ impl PullStream {
 
 impl Drop for PullStream {
     fn drop(&mut self) {
-        let mut st = self.inner.state.lock().unwrap();
+        let mut st = self.inner.state.lock().expect("mutex poisoned");
         if st.pending.remove(&self.id).is_some() && st.closed.is_none() {
             drop(st);
             let _ = self.interrupt();
@@ -621,7 +626,7 @@ impl Inner {
         let id = RequestId::Num(self.next_id.fetch_add(1, Ordering::Relaxed));
         let (tx, rx) = mpsc::unbounded_channel();
         {
-            let mut st = self.state.lock().unwrap();
+            let mut st = self.state.lock().expect("mutex poisoned");
             if let Some(r) = &st.closed {
                 return Err(SyncError::Socket(r.clone()));
             }
@@ -649,7 +654,7 @@ impl Inner {
     }
 
     fn disconnected(&self) -> SyncError {
-        let reason = self.state.lock().unwrap().closed.clone();
+        let reason = self.state.lock().expect("mutex poisoned").closed.clone();
         SyncError::Socket(reason.unwrap_or(SocketError {
             kind: SocketErrorKind::Close { code: 1006 },
             message: "socket closed".into(),
@@ -661,14 +666,14 @@ impl Inner {
             Ok(m) => m,
             Err(e) => {
                 let err = SyncError::Protocol(format!("undecodable server frame ({e}): {text}"));
-                let mut st = self.state.lock().unwrap();
+                let mut st = self.state.lock().expect("mutex poisoned");
                 for (_, tx) in st.pending.drain() {
                     let _ = tx.send(Routed::Error(err.clone()));
                 }
                 return;
             }
         };
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock().expect("mutex poisoned");
         match msg {
             ServerMessage::Pong => st.pong_waiters.drain(..).for_each(|w| {
                 let _ = w.send(());
@@ -692,7 +697,7 @@ impl Inner {
     }
 
     fn fail_all(&self, reason: SocketError) {
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock().expect("mutex poisoned");
         if st.closed.is_some() {
             return;
         }
