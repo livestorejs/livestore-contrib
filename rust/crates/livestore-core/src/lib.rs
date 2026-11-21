@@ -4,7 +4,6 @@
 #![warn(clippy::unwrap_used)]
 
 pub mod event;
-pub mod next;
 pub mod seqnum;
 pub mod syncstate;
 
