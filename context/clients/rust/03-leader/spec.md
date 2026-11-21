@@ -6,6 +6,14 @@ Builds on [requirements.md](./requirements.md).
 
 Draft.
 
+## Runtime
+
+The leader runs inside the app's process as tokio tasks on the app's runtime:
+one actor task for the sync processor, plus a push task and a pull task while
+a sync backend is set. The leader has no thread of its own and no worker
+process. Its two databases sit behind one mutex. Each store has its own leader,
+and each leader locks its data folder (see the SQLite spec).
+
 ## Surface
 
 `Leader::builder(schema).client_id(..).sync(SyncOptions { backend, live_pull, on_sync_error, on_backend_id_mismatch, initial_sync, backoff }).params(..).testing(..).random(..).boot()`.
