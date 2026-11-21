@@ -107,8 +107,7 @@ fn column_descriptor(column: &Column) -> Value {
             column
                 .schema
                 .encode(v.clone())
-                .map(|e| e.to_json_value())
-                .unwrap_or(Value::Null)
+                .map_or(Value::Null, |e| e.to_json_value())
         ]),
     };
     let schema = if has_json_string_encoding(&column.schema) {

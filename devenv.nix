@@ -691,6 +691,11 @@ in
     after = [ "mr:bootstrap" ];
     exec = "cd rust && cargo clippy --workspace --all-targets --locked -- -D warnings";
   };
+  tasks."rust:doc" = {
+    description = "Build the Rust client docs (warnings are errors)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps --locked";
+  };
   tasks."rust:test" = {
     description = "Run the Rust client tests (live tests skip without a backend)";
     after = [ "mr:bootstrap" ];
@@ -702,6 +707,7 @@ in
       "rust:fmt"
       "rust:check"
       "rust:clippy"
+      "rust:doc"
       "rust:test"
     ];
   };

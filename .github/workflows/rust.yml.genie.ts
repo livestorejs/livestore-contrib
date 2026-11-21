@@ -49,7 +49,7 @@ export default githubWorkflow({
             'restore-keys': 'cargo-${{ runner.os }}-',
           },
         },
-        { name: 'Check and lint', run: runDevenvTasksBefore('rust:fmt', 'rust:check', 'rust:clippy') },
+        { name: 'Check and lint', run: runDevenvTasksBefore('rust:fmt', 'rust:check', 'rust:clippy', 'rust:doc') },
         { name: 'Test', run: runDevenvTasksBefore('rust:test') },
         nixDiagnosticsArtifactStep(),
       ],

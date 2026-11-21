@@ -2,6 +2,8 @@
 //! event definitions, materializers and `makeSchema`. Materializers return SQL statements (like TS
 //! query builders), so this crate stays IO-free; `livestore-sqlite` executes them.
 
+#![warn(clippy::unwrap_used)]
+
 pub mod client_document;
 pub mod codec;
 pub mod column;

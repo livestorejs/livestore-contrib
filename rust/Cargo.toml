@@ -5,7 +5,23 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.0.0"
 edition = "2024"
+rust-version = "1.99"
 publish = false
+
+[workspace.lints.rust]
+future_incompatible = { level = "warn", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+allow_attributes = "warn"
+dbg_macro = "warn"
+map_unwrap_or = "warn"
+needless_collect = "warn"
+redundant_clone = "warn"
+unnecessary_wraps = "warn"
+todo = "warn"
+print_stdout = "warn"
 
 [workspace.dependencies]
 livestore-core = { path = "crates/livestore-core" }

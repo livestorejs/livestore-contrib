@@ -11,7 +11,7 @@ are `source-policy`, `pr/minimal-dev`, `pr/quality`, `pr/types`,
 
 ## `rust.yml`
 
-Validates the Rust client in `rust/`: `rust:check`, `rust:clippy`, and
+Validates the Rust client in `rust/`: `rust:check`, `rust:clippy`, `rust:doc`, and
 `rust:test`. It runs only
 when `rust/`, its own workflow files, the devenv files, or the megarepo pin
 change, and is not a required check.

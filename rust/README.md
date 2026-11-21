@@ -31,6 +31,7 @@ devenv tasks run pnpm:install --mode before     # only for live tests and the TS
 devenv tasks run check:rust --mode before   # all of the below
 devenv tasks run rust:check                 # cargo check
 devenv tasks run rust:clippy                # clippy, warnings are errors
+devenv tasks run rust:doc                   # cargo doc, warnings are errors
 devenv tasks run rust:test                  # unit, fixture, mock- and fake-backend tests; live tests skip
 ```
 

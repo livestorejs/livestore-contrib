@@ -56,7 +56,10 @@ fn number_literal_with_integer_column_type() {
 }
 
 #[test]
-#[allow(clippy::approx_constant)]
+#[expect(
+    clippy::approx_constant,
+    reason = "3.14 is the literal from the TypeScript test"
+)]
 fn number_literal_with_real_column_type() {
     accepts(&s::literal(3.14), ColumnType::Real);
 }

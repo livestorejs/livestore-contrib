@@ -1,5 +1,7 @@
 //! Port of `examples/web-todomvc-sync-cf/src/livestore/schema.ts` on the schema DSL.
 
+#![warn(clippy::unwrap_used)]
+
 use std::sync::{Arc, LazyLock};
 
 use livestore_schema::query_builder::{Filter, QueryBuilderError, SqlQuery};

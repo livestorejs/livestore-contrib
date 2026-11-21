@@ -3,6 +3,10 @@ name = "livestore-schema"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
 
 [dependencies]
 regex = "1"
