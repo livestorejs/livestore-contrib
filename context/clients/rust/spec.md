@@ -14,6 +14,8 @@ Draft.
 | Child | Owns | Crates |
 | --- | --- | --- |
 | [`01-schema`](./01-schema/spec.md) | schema DSL, DDL, client documents, events, materializers, query builder, schema hashes | `livestore-schema`, `livestore-core` |
+| [`02-sqlite`](./02-sqlite/spec.md) | SQLite setup and leader persistence (eventlog, state, rollback, rebuild) | `livestore-sqlite` |
+| [`03-leader`](./03-leader/spec.md) | leader sync processor, syncstate merge, backend contract | `livestore-sync`, `livestore-core` |
 
 `livestore-todomvc` (example schema) consumes the stack and owns no contract.
 
@@ -40,7 +42,12 @@ time. The full table and the test-control mapping are in
 | Deviation | Core contract | Where |
 | --- | --- | --- |
 | Single session, constant leadership | LS.SYS.RT-R04 | [.delta/DELTA-001](./.delta/DELTA-001-single-session.md) |
+| `SQLITE_THREADSAFE=2` (wa-sqlite: `0`) | LS.SYS.RT-R09 | [02-sqlite](./02-sqlite/spec.md#native-deviations) |
 | No devtools surface | LS-R13 | not realized |
+
+Not mirrored yet: `materializerHashes` on pull items, boot-status queue details,
+`stateRebuildBatchSize`, and observers that need every intermediate
+`syncState` value (`watch` coalesces; no ported test needs more).
 
 ## Verification
 

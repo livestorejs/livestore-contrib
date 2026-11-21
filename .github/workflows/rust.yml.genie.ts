@@ -51,6 +51,7 @@ export default githubWorkflow({
         },
         { name: 'Check and lint', run: runDevenvTasksBefore('rust:fmt', 'rust:check', 'rust:clippy', 'rust:doc') },
         { name: 'Test', run: runDevenvTasksBefore('rust:test') },
+        { name: 'SQLite matches core wa-sqlite', run: runDevenvTasksBefore('rust:sqlite-check') },
         nixDiagnosticsArtifactStep(),
       ],
     },
