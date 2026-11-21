@@ -1,5 +1,6 @@
 use livestore_core::{Event, SeqNum};
 use livestore_sqlite::{Error, LocalLeader, PulledEvent, state};
+use livestore_todomvc::TodoCreated;
 use serde_json::json;
 
 #[test]
@@ -18,13 +19,13 @@ fn restart_restores_pending_and_skips_rebuild_when_state_is_complete() {
 
     let mut leader = open();
     leader
-        .commit("v1.TodoCreated", json!({"id": "a", "text": "A"}))
+        .commit(TodoCreated {
+            id: "a".into(),
+            text: "A".into(),
+        })
         .unwrap();
     leader
-        .commit(
-            "uiStateSet",
-            json!({"id": "s", "value": {"filter": "active"}}),
-        )
+        .commit(livestore_todomvc::ui_state().set(json!({"filter": "active"}), Some("s")))
         .unwrap();
     leader
         .apply_upstream(&[remote(1, "v1.TodoCreated", json!({"id": "r", "text": "R"}))])

@@ -6,8 +6,7 @@ use std::sync::Arc;
 
 use livestore_core::syncstate::{self, MergeResult, Payload};
 use livestore_core::{Event, SyncState, is_equal_encoded};
-use livestore_schema::{Schema, Val};
-use serde_json::Value;
+use livestore_schema::{EventInput, Schema, Val};
 
 use crate::db::{LeaderDb, PulledEvent, UpstreamCommit};
 use crate::{Error, Result};
@@ -57,19 +56,21 @@ impl LocalLeader {
         })
     }
 
-    /// Numbers a new local event after the local head, materializes it and appends it to the eventlog.
+    /// `store.commit(event)`: numbers a new local event after the local head, materializes it and
+    /// appends it to the eventlog.
     ///
     /// # Errors
     ///
     /// Fails with [`Error::Merge`] or [`Error::Invariant`] when the local push does not advance, and as
     /// [`LeaderDb::persist_local`].
-    pub fn commit(&mut self, name: &str, args: Value) -> Result<Event> {
+    pub fn commit(&mut self, event: impl Into<EventInput>) -> Result<Event> {
+        let (name, args) = event.into().into_parts();
         let (seq_num, parent_seq_num) = self
             .sync_state
             .local_head
-            .next_pair(self.db.schema().is_client_only(name), None);
+            .next_pair(self.db.schema().is_client_only(&name), None);
         let event = Event {
-            name: name.into(),
+            name,
             args,
             seq_num,
             parent_seq_num,
@@ -97,12 +98,13 @@ impl LocalLeader {
         Ok(event)
     }
 
-    /// `store.commit(event)`: replaces top-level `SessionIdSymbol` args with this session's id on a copy, so the
-    /// caller's args stay untouched, then commits.
+    /// `store.commit(event)` with decoded args: top-level `SessionIdSymbol` args become this
+    /// session's id, on a copy, then commits. Only for tests that port core's untyped cases.
     ///
     /// # Errors
     ///
     /// Fails as [`Self::commit`].
+    #[cfg(feature = "testing")]
     pub fn commit_val(&mut self, name: &str, args: &Val) -> Result<Event> {
         let resolved = match args {
             Val::Object(fields) => Val::Object(
@@ -122,7 +124,7 @@ impl LocalLeader {
             ),
             other => other.clone(),
         };
-        self.commit(name, resolved.to_json_value())
+        self.commit(EventInput::raw(name, resolved.to_json_value()))
     }
 
     /// Merges a backend page (`upstream-advance`, client-only events ignored) and persists the result.

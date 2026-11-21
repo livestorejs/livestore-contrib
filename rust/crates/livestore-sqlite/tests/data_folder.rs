@@ -1,5 +1,6 @@
 mod common;
 
+use livestore_schema::EventInput;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -57,7 +58,9 @@ fn a_changed_table_rebuilds_the_state_from_the_eventlog() {
     let dir = data_folder("schema-change");
     let db = LeaderDb::open_folder(&dir, tasks_schema(false)).unwrap();
     let mut leader = LocalLeader::new(db, "client", "session").unwrap();
-    leader.commit("taskCreated", json!({"id": "a"})).unwrap();
+    leader
+        .commit(EventInput::raw("taskCreated", json!({"id": "a"})))
+        .unwrap();
     drop(leader);
 
     let db = LeaderDb::open_folder(&dir, tasks_schema(true)).unwrap();

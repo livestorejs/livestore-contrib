@@ -3,6 +3,7 @@
 //! so its hashes differ from TypeScript's by design.
 
 use livestore_core::{Event, SeqNum};
+use livestore_schema::EventInput;
 use livestore_sqlite::{LocalLeader, PulledEvent};
 use rusqlite::Connection;
 use serde_json::{Map, Value, json};
@@ -34,7 +35,10 @@ fn run_fixture(fixture: &Value) {
         let op = &step["op"];
         let result = match op["op"].as_str().unwrap() {
             "commit" => leader
-                .commit(op["name"].as_str().unwrap(), op["args"].clone())
+                .commit(EventInput::raw(
+                    op["name"].as_str().unwrap(),
+                    op["args"].clone(),
+                ))
                 .map(|_| ()),
             "pull" => leader
                 .apply_upstream(

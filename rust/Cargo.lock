@@ -396,6 +396,7 @@ dependencies = [
  "fallible-iterator",
  "livestore-core",
  "livestore-schema",
+ "livestore-sqlite",
  "livestore-todomvc",
  "rusqlite",
  "serde",

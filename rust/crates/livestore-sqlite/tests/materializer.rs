@@ -1,5 +1,6 @@
 mod common;
 
+use livestore_schema::EventInput;
 use std::sync::Arc;
 
 use livestore_schema::value_schema as s;
@@ -13,7 +14,9 @@ fn should_allow_queries_in_materializer() {
     for event in ["todoCreated", "todoCreatedRaw"] {
         let mut store = LocalLeader::open_in_memory(schema(), "client", "session").unwrap();
         for id in ["a", "b", "c"] {
-            store.commit(event, json!({"id": id, "text": id})).unwrap();
+            store
+                .commit(EventInput::raw(event, json!({"id": id, "text": id})))
+                .unwrap();
         }
         assert_eq!(
             query_table(&store, &todos()),
@@ -30,7 +33,9 @@ fn should_allow_queries_in_materializer() {
 #[test]
 fn should_allow_empty_event_payload() {
     let mut store = LocalLeader::open_in_memory(schema(), "client", "session").unwrap();
-    store.commit("emptyEventPayload", Value::Null).unwrap();
+    store
+        .commit(EventInput::raw("emptyEventPayload", Value::Null))
+        .unwrap();
 }
 
 #[test]
@@ -56,10 +61,10 @@ fn should_pass_full_event_with_client_id_to_materializer() {
     let mut store = LocalLeader::open_in_memory(schema, "test-client-123", "session").unwrap();
 
     store
-        .commit(
+        .commit(EventInput::raw(
             "messageCreated",
             json!({"id": "msg1", "content": "Hello world"}),
-        )
+        ))
         .unwrap();
 
     let rows = query_table(&store, &messages);
