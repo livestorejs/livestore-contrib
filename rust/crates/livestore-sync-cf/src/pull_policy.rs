@@ -43,6 +43,7 @@ pub enum Classified {
 }
 
 /// `classifyTransportFailure`: overload wins, then `retryable` (or an unflagged non-remote stream read).
+#[must_use]
 pub fn classify_transport_failure(failure: TransportFailure) -> Classified {
     let (cause, stream_read) = match failure {
         TransportFailure::Call(c) => (c, false),
@@ -58,6 +59,7 @@ pub fn classify_transport_failure(failure: TransportFailure) -> Classified {
 }
 
 impl Classified {
+    #[must_use]
     pub fn into_error<E: From<IsOfflineError> + From<UnknownError>>(self) -> E {
         match self {
             Classified::Offline(e) => e.into(),

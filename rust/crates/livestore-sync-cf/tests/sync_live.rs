@@ -25,13 +25,10 @@ async fn two_clients_converge_after_concurrent_offline_commits_and_restart() {
     )
     .await;
     a.commit("v1.TodoCreated", json!({"id": "t1", "text": "one"}))
-        .await
         .unwrap();
     a.commit("v1.TodoCreated", json!({"id": "t2", "text": "two"}))
-        .await
         .unwrap();
     b.commit("v1.TodoCreated", json!({"id": "t3", "text": "three"}))
-        .await
         .unwrap();
     converge(&[&a, &b], 3).await;
     a.shutdown().await;
@@ -116,7 +113,6 @@ async fn restart_from_disk_pushes_pending() {
     assert!(store.wait_synced(T).await, "{:?}", store.info());
     store
         .commit("v1.TodoCreated", json!({"id": "r2", "text": "online"}))
-        .await
         .unwrap();
     assert!(store.wait_synced(T).await);
     store.shutdown().await;

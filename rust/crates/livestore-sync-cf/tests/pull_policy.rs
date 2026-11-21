@@ -329,7 +329,7 @@ impl SyncBackend for FakeTransport {
         BackendMetadata {
             name: "fake-do-rpc".into(),
             description: String::new(),
-            extra: Default::default(),
+            extra: serde_json::Map::default(),
         }
     }
 

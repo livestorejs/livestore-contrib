@@ -21,12 +21,11 @@ pub async fn backend() -> Option<String> {
         .trim_start_matches("ws://")
         .trim_end_matches('/')
         .to_owned();
-    match tokio::net::TcpStream::connect(&addr).await {
-        Ok(_) => Some(url),
-        Err(_) => {
-            eprintln!("SKIP: no sync backend at {url}");
-            None
-        }
+    if tokio::net::TcpStream::connect(&addr).await.is_ok() {
+        Some(url)
+    } else {
+        eprintln!("SKIP: no sync backend at {url}");
+        None
     }
 }
 
@@ -61,7 +60,7 @@ pub struct Info {
 }
 
 impl TestStore {
-    pub async fn commit(&self, name: &str, args: Value) -> Result<(), livestore::StoreError> {
+    pub fn commit(&self, name: &str, args: Value) -> Result<(), livestore::StoreError> {
         self.store.commit([(name.to_owned(), args)])
     }
 
@@ -139,7 +138,7 @@ pub async fn start(db: LeaderDb, client_id: &str, o: Options) -> TestStore {
             None => b,
         })),
         on_leader: Some(std::sync::Arc::new(move |l| {
-            leader_slot.lock().unwrap().1 = Some(l.clone())
+            leader_slot.lock().unwrap().1 = Some(l.clone());
         })),
         ..InMemoryAdapter::default()
     };

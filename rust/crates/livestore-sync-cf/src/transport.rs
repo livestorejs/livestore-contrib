@@ -2,6 +2,7 @@
 //! Protocol reference: `contributor-docs/rust/sync-cf-wire-protocol.md`.
 
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -324,6 +325,11 @@ pub struct PullStream {
     done: bool,
 }
 
+/// Opens the WebSocket with default [`ClientOptions`].
+///
+/// # Errors
+///
+/// Same as [`connect_with`].
 pub async fn connect(
     url: &str,
     store_id: &str,
@@ -332,6 +338,16 @@ pub async fn connect(
     connect_with(url, store_id, payload, ClientOptions::default()).await
 }
 
+/// Opens the WebSocket and starts the reader, writer and ping tasks.
+///
+/// # Errors
+///
+/// [`SyncError::Socket`] with kind `Upgrade` when the server rejects the HTTP upgrade, or `Open`
+/// when the connection cannot be opened.
+///
+/// # Panics
+///
+/// The ping task panics if the client state mutex is poisoned.
 pub async fn connect_with(
     url: &str,
     store_id: &str,
@@ -376,7 +392,7 @@ pub async fn connect_with(
             }
             if let Err(e) = sink.send(Message::text(frame)).await {
                 if let Some(inner) = writer.upgrade() {
-                    inner.fail_all(SocketError {
+                    inner.fail_all(&SocketError {
                         kind: SocketErrorKind::Write,
                         message: e.to_string(),
                     });
@@ -416,7 +432,7 @@ pub async fn connect_with(
                 }
             }
         };
-        reader.fail_all(reason);
+        reader.fail_all(&reason);
     });
 
     let pinger = Arc::downgrade(&inner);
@@ -430,7 +446,7 @@ pub async fn connect_with(
             }
             let client = Client { inner };
             if client.ping(options.pong_timeout).await.is_err() {
-                client.inner.fail_all(SocketError {
+                client.inner.fail_all(&SocketError {
                     kind: SocketErrorKind::PongTimeout,
                     message: "pong timeout".into(),
                 });
@@ -445,11 +461,20 @@ pub async fn connect_with(
 }
 
 impl Client {
+    #[must_use]
     pub fn store_id(&self) -> &str {
         &self.inner.store_id
     }
 
     /// `cursor`: `(backend_id, last_seq_num)`; `None` pulls from the beginning.
+    ///
+    /// # Errors
+    ///
+    /// [`SyncError::Socket`] when the socket is already closed or the request cannot be sent.
+    ///
+    /// # Panics
+    ///
+    /// If the client state mutex is poisoned.
     pub fn pull(&self, cursor: Option<PullCursor>, live: bool) -> Result<PullStream, SyncError> {
         let req = PullRequest {
             store_id: self.inner.store_id.clone(),
@@ -466,6 +491,17 @@ impl Client {
         })
     }
 
+    /// Pushes one batch and waits for the server's exit.
+    ///
+    /// # Errors
+    ///
+    /// [`SyncError::Socket`] when the socket is closed or drops, the server's failure cause
+    /// (e.g. [`SyncError::Defect`]) when the push fails, and [`SyncError::Protocol`] when it is
+    /// interrupted.
+    ///
+    /// # Panics
+    ///
+    /// If the client state mutex is poisoned.
     pub async fn push(
         &self,
         batch: Vec<GlobalEvent>,
@@ -493,6 +529,14 @@ impl Client {
     }
 
     /// Sends the literal Ping and waits for Pong.
+    ///
+    /// # Errors
+    ///
+    /// [`SyncError::Socket`] when the socket is closed, drops, or no Pong arrives within `timeout`.
+    ///
+    /// # Panics
+    ///
+    /// If the client state mutex is poisoned.
     pub async fn ping(&self, timeout: Duration) -> Result<(), SyncError> {
         let (tx, rx) = oneshot::channel();
         {
@@ -514,6 +558,11 @@ impl Client {
     }
 
     /// `Some(reason)` once the socket is gone (closed, errored, or pong timeout).
+    ///
+    /// # Panics
+    ///
+    /// If the client state mutex is poisoned.
+    #[must_use]
     pub fn closed_reason(&self) -> Option<SocketError> {
         self.inner
             .state
@@ -524,12 +573,13 @@ impl Client {
     }
 
     /// Flips to `false` when the socket goes away.
+    #[must_use]
     pub fn open_state(&self) -> tokio::sync::watch::Receiver<bool> {
         self.inner.open.subscribe()
     }
 
     pub fn close(&self) {
-        self.inner.fail_all(SocketError {
+        self.inner.fail_all(&SocketError {
             kind: SocketErrorKind::ClosedByClient,
             message: "closed by client".into(),
         });
@@ -537,6 +587,7 @@ impl Client {
 }
 
 impl PullStream {
+    #[must_use]
     pub fn request_id(&self) -> &RequestId {
         &self.id
     }
@@ -575,6 +626,10 @@ impl PullStream {
     }
 
     /// Ends the pull; `next()` then yields `None` once the server confirms.
+    ///
+    /// # Errors
+    ///
+    /// [`SyncError::Socket`] when the socket is closed and the message cannot be sent.
     pub fn interrupt(&self) -> Result<(), SyncError> {
         self.inner.send_msg(&ClientMessage::Interrupt {
             request_id: self.id.clone(),
@@ -696,7 +751,7 @@ impl Inner {
         }
     }
 
-    fn fail_all(&self, reason: SocketError) {
+    fn fail_all(&self, reason: &SocketError) {
         let mut st = self.state.lock().expect("mutex poisoned");
         if st.closed.is_some() {
             return;
@@ -737,7 +792,7 @@ pub(crate) fn encode_uri_component(s: &str) -> String {
         if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b) {
             out.push(b as char);
         } else {
-            out.push_str(&format!("%{b:02X}"));
+            let _ = write!(out, "%{b:02X}");
         }
     }
     out

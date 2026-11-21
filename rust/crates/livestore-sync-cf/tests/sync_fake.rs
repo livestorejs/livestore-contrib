@@ -22,7 +22,11 @@ const T: Duration = Duration::from_secs(10);
 #[tokio::test]
 async fn server_ahead_waits_for_pull_then_pushes_rebased_events() {
     let fake = Fake::start().await;
-    fake.preload((1..=3).map(|n| other(n, &format!("o{n}"))).collect());
+    fake.preload(
+        &(1..=3)
+            .map(|n| other(n, &format!("o{n}")))
+            .collect::<Vec<_>>(),
+    );
     fake.set(|s| {
         s.pull_delay = Duration::from_millis(300);
         s.page_size = 1;
@@ -53,10 +57,9 @@ async fn reconnects_after_drop_and_resumes_from_cursor() {
     let pulls_before = fake.state().pull_cursors.len();
 
     fake.drop_connections();
-    fake.preload(vec![other(2, "o2")]);
+    fake.preload(&[other(2, "o2")]);
     store
         .commit("v1.TodoCreated", json!({"id": "b", "text": "b"}))
-        .await
         .unwrap();
 
     wait_until(|| fake.state().events.len() == 3 && store.info().pending == 0).await;
@@ -114,10 +117,9 @@ async fn ignores_live_pages_delivered_twice() {
     assert!(store.wait_synced(T).await);
     store
         .commit("v1.TodoCreated", json!({"id": "a", "text": "a"}))
-        .await
         .unwrap();
     wait_until(|| store.info().upstream_head.global == 1).await;
-    fake.preload(vec![other(2, "o2")]);
+    fake.preload(&[other(2, "o2")]);
     wait_until(|| store.info().upstream_head.global == 2).await;
     assert_eq!(store.info().stopped, None);
     assert_eq!(ids(&store), ["a", "o2"]);
@@ -236,10 +238,10 @@ impl Fake {
     }
 
     /// Appends events as if pushed by another client (broadcast to live pulls).
-    fn preload(&self, events: Vec<GlobalEvent>) {
+    fn preload(&self, events: &[GlobalEvent]) {
         let mut st = self.state();
         st.events.extend(events.iter().cloned());
-        broadcast(&mut st, &events);
+        broadcast(&mut st, events);
     }
 
     fn drop_connections(&self) {
@@ -279,7 +281,7 @@ impl Fake {
                     tokio::spawn(async move { fake.pull(&tx, req.id, pull).await });
                 }
                 "SyncWsRpc.Push" => {
-                    self.push(&tx, req.id, serde_json::from_value(req.payload).unwrap())
+                    self.push(&tx, &req.id, &serde_json::from_value(req.payload).unwrap());
                 }
                 other => panic!("unexpected request {other}"),
             }
@@ -300,7 +302,7 @@ impl Fake {
             && c.backend_id != st.backend_id
         {
             let error = json!({"_tag": "BackendIdMismatchError", "expected": st.backend_id, "received": c.backend_id});
-            let _ = tx.send(failure(&id, error));
+            let _ = tx.send(failure(&id, &error));
             return;
         }
         let from = cursor.map_or(0, |c| c.event_sequence_number);
@@ -321,13 +323,13 @@ impl Fake {
         st.live.push((tx.clone(), id));
     }
 
-    fn push(&self, tx: &mpsc::UnboundedSender<String>, id: RequestId, req: PushRequest) {
+    fn push(&self, tx: &mpsc::UnboundedSender<String>, id: &RequestId, req: &PushRequest) {
         let mut st = self.state();
         if st.fail_pushes > 0 {
             st.fail_pushes -= 1;
             let _ = tx.send(failure(
-                &id,
-                json!({"_tag": "UnknownError", "cause": "scripted"}),
+                id,
+                &json!({"_tag": "UnknownError", "cause": "scripted"}),
             ));
             return;
         }
@@ -336,7 +338,7 @@ impl Fake {
         if provided != expected {
             st.server_ahead_count += 1;
             let error = json!({"_tag": "ServerAheadError", "minimumExpectedNum": expected, "providedNum": provided});
-            let _ = tx.send(failure(&id, error));
+            let _ = tx.send(failure(id, &error));
             return;
         }
         st.events.extend(req.batch.iter().cloned());
@@ -369,7 +371,7 @@ fn chunk(id: &RequestId, backend_id: &str, events: &[GlobalEvent], remaining: us
     json!({"_tag": "Chunk", "requestId": id, "values": [response]}).to_string()
 }
 
-fn failure(id: &RequestId, error: Value) -> String {
+fn failure(id: &RequestId, error: &Value) -> String {
     json!({"_tag": "Exit", "requestId": id, "exit": {"_tag": "Failure", "cause": [{"_tag": "Fail", "error": error}]}})
         .to_string()
 }

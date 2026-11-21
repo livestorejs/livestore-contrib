@@ -1,4 +1,4 @@
-//! Cross-language: a real TypeScript LiveStore client (`scripts/ts-todo-client.ts`, in-memory adapter + sync-cf)
+//! Cross-language: a real TypeScript `LiveStore` client (`scripts/ts-todo-client.ts`, in-memory adapter + sync-cf)
 //! and the Rust client commit on the same store; both must end with identical `todos` rows.
 //! Run via `scripts/test-live.sh` (needs `bun`); skips when no backend is reachable.
 
@@ -23,10 +23,8 @@ async fn typescript_and_rust_clients_converge() {
     )
     .await;
     rust.commit("v1.TodoCreated", json!({"id": "r1", "text": "from rust 1"}))
-        .await
         .unwrap();
     rust.commit("v1.TodoCreated", json!({"id": "r2", "text": "from rust 2"}))
-        .await
         .unwrap();
     assert!(rust.wait_synced(T).await);
 
@@ -35,10 +33,8 @@ async fn typescript_and_rust_clients_converge() {
         .await;
     ts.call("commit v1.TodoCompleted {\"id\":\"r1\"}").await;
     rust.commit("v1.TodoCreated", json!({"id": "r3", "text": "from rust 3"}))
-        .await
         .unwrap();
     rust.commit("v1.TodoCompleted", json!({"id": "r2"}))
-        .await
         .unwrap();
     ts.call("commit v1.TodoDeleted {\"id\":\"r2\",\"deletedAt\":\"2026-05-06T07:08:09.010Z\"}")
         .await;
@@ -46,7 +42,6 @@ async fn typescript_and_rust_clients_converge() {
         "v1.TodoClearedCompleted",
         json!({"deletedAt": "2026-05-06T07:08:10.000Z"}),
     )
-    .await
     .unwrap();
 
     let deadline = tokio::time::Instant::now() + T;

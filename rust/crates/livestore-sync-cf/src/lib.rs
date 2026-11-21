@@ -30,6 +30,7 @@ pub const MAX_PUSH_EVENTS_PER_REQUEST: usize = 100;
 pub const MAX_TRANSPORT_PAYLOAD_BYTES: usize = 900_000;
 
 /// `makeWsSync({ url })`: a constructor for the leader builder.
+#[must_use]
 pub fn make_ws_sync(url: &str, options: ClientOptions) -> SyncBackendConstructor {
     let url = url.to_owned();
     constructor(move |args| {
@@ -144,8 +145,13 @@ impl SyncBackend for CfBackend {
             }
             let client = this.client().await.map_err(push_error)?;
             let backend_id = this.backend_id.get();
-            let chunks = split_batch(&this.store_id, &this.payload, &backend_id, batch)
-                .map_err(UnknownError::new)?;
+            let chunks = split_batch(
+                &this.store_id,
+                this.payload.as_ref(),
+                backend_id.as_ref(),
+                batch,
+            )
+            .map_err(UnknownError::new)?;
             for chunk in chunks {
                 client
                     .push(chunk, this.backend_id.get())
@@ -203,7 +209,7 @@ impl SyncBackend for CfBackend {
 }
 
 /// Stores the backend id and strips already-seen events (the DO can deliver a live page twice,
-/// seen after a ServerAheadError).
+/// seen after a `ServerAheadError`).
 pub(crate) fn res_item(
     res: transport::PullResponse,
     backend_id: &dyn BackendIdStore,
@@ -229,6 +235,7 @@ pub(crate) fn res_item(
 
 /// `mapRpcClientError`: only transport loss is retryable (offline); RPC defects and HTTP protocol
 /// failures stay terminal. Application errors are classified by the callers before this.
+#[must_use]
 pub fn map_rpc_client_error<E: From<IsOfflineError> + From<UnknownError>>(e: SyncError) -> E {
     match e {
         SyncError::Socket(s) => IsOfflineError {
@@ -272,16 +279,16 @@ pub(crate) fn push_error(e: SyncError) -> PushError {
 /// `splitArrayBySize`: ≤ 100 events and ≤ 900 kB encoded push payload per request.
 pub(crate) fn split_batch(
     store_id: &str,
-    payload: &Option<Value>,
-    backend_id: &Option<String>,
+    payload: Option<&Value>,
+    backend_id: Option<&String>,
     batch: Vec<GlobalEvent>,
 ) -> Result<Vec<Vec<GlobalEvent>>, String> {
     let size = |items: &[GlobalEvent]| {
         let req = transport::PushRequest {
             store_id: store_id.to_owned(),
-            payload: payload.clone(),
+            payload: payload.cloned(),
             batch: items.to_vec(),
-            backend_id: backend_id.clone().into(),
+            backend_id: backend_id.cloned().into(),
         };
         serde_json::to_vec(&req)
             .expect("push request serializes")
