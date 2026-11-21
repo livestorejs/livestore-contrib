@@ -17,10 +17,12 @@ impl Defect {
         Defect(Arc::new(Message(message.into())))
     }
 
+    #[must_use]
     pub fn message(&self) -> String {
         self.0.to_string()
     }
 
+    #[must_use]
     pub fn ptr_eq(&self, other: &Defect) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
@@ -67,6 +69,7 @@ pub enum StoreError {
 }
 
 impl StoreError {
+    #[must_use]
     pub fn tag(&self) -> &'static str {
         match self {
             StoreError::Materialize(_) => "MaterializeError",
@@ -81,6 +84,7 @@ impl StoreError {
     }
 
     /// `Cause.squash`: the defect itself, or the error.
+    #[must_use]
     pub fn as_defect(&self) -> Option<&Defect> {
         match self {
             StoreError::Defect(d) => Some(d),

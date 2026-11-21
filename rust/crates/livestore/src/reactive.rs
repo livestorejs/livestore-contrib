@@ -38,6 +38,7 @@ pub enum RefreshReason {
 }
 
 impl RefreshReason {
+    #[must_use]
     pub fn tagged(tag: &str) -> Self {
         RefreshReason::Other {
             tag: tag.into(),
@@ -56,6 +57,7 @@ impl RefreshReason {
         }
     }
 
+    #[must_use]
     pub fn tag(&self) -> &str {
         match self {
             RefreshReason::RunDeferredEffects { .. } => "runDeferredEffects",
@@ -153,6 +155,7 @@ impl<T> Default for RefOptions<T> {
 }
 
 impl<T> RefOptions<T> {
+    #[must_use]
     pub fn label(label: &str) -> Self {
         Self {
             label: Some(label.into()),
@@ -204,6 +207,7 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
         }
     }
 
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.shared.id
     }
@@ -212,6 +216,7 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
         self.shared.lock().context = Some(context);
     }
 
+    #[must_use]
     pub fn context(&self) -> Option<C> {
         self.shared.lock().context.clone()
     }
@@ -282,13 +287,15 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
             }
             if options.skip_refresh {
                 for effect in &effects {
-                    let entry = match s.deferred.iter_mut().position(|(e, _)| e == effect) {
-                        Some(i) => &mut s.deferred[i].1,
-                        None => {
+                    let i = s
+                        .deferred
+                        .iter()
+                        .position(|(e, _)| e == effect)
+                        .unwrap_or_else(|| {
                             s.deferred.push((*effect, vec![]));
-                            &mut s.deferred.last_mut().expect("pushed above").1
-                        }
-                    };
+                            s.deferred.len() - 1
+                        });
+                    let entry = &mut s.deferred[i].1;
                     if let Some(reason) = &options.debug_refresh_reason
                         && !entry.contains(reason)
                     {
@@ -299,14 +306,14 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
             }
         }
         self.run_effects(
-            effects,
-            options
+            &effects,
+            &options
                 .debug_refresh_reason
                 .unwrap_or(RefreshReason::Unknown),
         );
     }
 
-    pub fn run_deferred_effects(&self, manual_refresh_reason: Option<RefreshReason>) {
+    pub fn run_deferred_effects(&self, manual_refresh_reason: Option<&RefreshReason>) {
         let mut i = 0;
         loop {
             let Some((effect, reasons)) = self.shared.lock().deferred.get(i).cloned() else {
@@ -314,9 +321,9 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
             };
             let reason = RefreshReason::RunDeferredEffects {
                 original_refresh_reasons: reasons,
-                manual_refresh_reason: manual_refresh_reason.clone().map(Box::new),
+                manual_refresh_reason: manual_refresh_reason.cloned().map(Box::new),
             };
-            self.run_effects(vec![effect], reason);
+            self.run_effects(&[effect], &reason);
             i += 1;
         }
     }
@@ -364,10 +371,12 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
         move || shared.lock().callbacks.retain(|(k, _)| *k != key)
     }
 
+    #[must_use]
     pub fn snapshot(&self, include_results: bool) -> GraphSnapshot {
         self.shared.lock().snapshot(include_results)
     }
 
+    #[must_use]
     pub fn debug_refresh_infos(&self) -> Vec<RefreshDebugInfo> {
         self.shared.lock().infos.iter().cloned().collect()
     }
@@ -377,11 +386,13 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
     }
 
     /// `graph.atoms.size`.
+    #[must_use]
     pub fn atom_count(&self) -> usize {
         self.shared.lock().atoms.len()
     }
 
     /// Ids of all live atoms with their labels, in creation order.
+    #[must_use]
     pub fn atoms(&self) -> Vec<(NodeId, NodeKind, Option<String>)> {
         let s = self.shared.lock();
         s.atoms
@@ -421,16 +432,16 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
         drop(effect_fn);
     }
 
-    fn run_effects(&self, effects: Vec<usize>, reason: RefreshReason) {
+    fn run_effects(&self, effects: &[usize], reason: &RefreshReason) {
         let wrapper = self.shared.lock().effects_wrapper.clone();
         let mut run = || {
             let local = Arc::new(Mutex::new(Frame::new()));
             let previous = self.shared.lock().current.replace(local.clone());
             let restore = RestoreFrame {
                 shared: &self.shared,
-                previous: Some(previous),
+                previous,
             };
-            for effect in &effects {
+            for effect in effects {
                 self.shared.do_effect(*effect, Some(reason.clone()));
             }
             drop(restore);
@@ -510,7 +521,7 @@ macro_rules! handle_impls {
                 self.compute_result_with(None)
             }
             pub fn compute_result_with(&self, reason: Option<RefreshReason>) -> T {
-                downcast(self.graph.shared.compute_result(self.id, reason))
+                downcast(&self.graph.shared.compute_result(self.id, reason))
             }
             pub fn id(&self) -> NodeId {
                 NodeId(self.id)
@@ -532,12 +543,14 @@ handle_impls!(Ref);
 handle_impls!(Thunk);
 
 impl<T: GraphValue, C: Clone + Send + Sync + 'static> Ref<T, C> {
+    #[must_use]
     pub fn refreshes(&self) -> u64 {
         self.graph.shared.lock().node(self.id).counter
     }
 }
 
 impl<T: GraphValue, C: Clone + Send + Sync + 'static> Thunk<T, C> {
+    #[must_use]
     pub fn recomputations(&self) -> u64 {
         self.graph.shared.lock().node(self.id).counter
     }
@@ -568,14 +581,17 @@ impl<C: Clone + Send + Sync + 'static> Effect<C> {
         self.graph.shared.do_effect(self.id, reason);
     }
 
+    #[must_use]
     pub fn id(&self) -> NodeId {
         NodeId(self.id)
     }
 
+    #[must_use]
     pub fn invocations(&self) -> u64 {
         self.graph.shared.lock().node(self.id).counter
     }
 
+    #[must_use]
     pub fn is_destroyed(&self) -> bool {
         self.graph.shared.lock().node(self.id).destroyed
     }
@@ -598,12 +614,17 @@ impl<C: Clone + Send + Sync + 'static> Get<'_, C> {
     pub fn get_with<T: GraphValue>(&self, atom: &impl Atom<T>, reason: Option<RefreshReason>) -> T {
         self.shared.add_edge(self.owner, atom.node_id());
         downcast(
-            self.shared
+            &self
+                .shared
                 .compute_node(atom.node_id(), reason.or_else(|| self.reason.clone())),
         )
     }
 
     /// The graph context (thunks only; always set there).
+    ///
+    /// # Panics
+    ///
+    /// Panics when called outside a thunk, where no context is set.
     pub fn context(&self) -> &C {
         self.context
             .as_ref()
@@ -822,12 +843,11 @@ impl<C: Clone + Send + Sync + 'static> Shared<C> {
                 n.label.clone(),
             )
         };
-        if destroyed {
-            panic!(
-                "This should never happen: LiveStore Error: Attempted to compute destroyed {kind} (node-{id}): {}",
-                label.unwrap_or_default()
-            );
-        }
+        assert!(
+            !destroyed,
+            "This should never happen: LiveStore Error: Attempted to compute destroyed {kind} (node-{id}): {}",
+            label.unwrap_or_default()
+        );
         if !dirty {
             return value.expect("clean atoms hold a value");
         }
@@ -1019,22 +1039,20 @@ impl<C: Clone + Send + Sync + 'static> Shared<C> {
 /// Restores the outer debug frame even when an effect panics (`try/finally` in TS).
 struct RestoreFrame<'a, C> {
     shared: &'a Shared<C>,
-    previous: Option<Option<Arc<Mutex<Frame>>>>,
+    previous: Option<Arc<Mutex<Frame>>>,
 }
 
 impl<C> Drop for RestoreFrame<'_, C> {
     fn drop(&mut self) {
-        if let Some(previous) = self.previous.take() {
-            lock(&self.shared.state).current = previous;
-        }
+        lock(&self.shared.state).current = self.previous.take();
     }
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-fn downcast<T: GraphValue>(v: AnyVal) -> T {
+fn downcast<T: GraphValue>(v: &AnyVal) -> T {
     v.downcast_ref::<T>()
         .expect("atom read with its own value type")
         .clone()

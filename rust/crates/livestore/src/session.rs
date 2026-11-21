@@ -34,6 +34,7 @@ pub struct PullItem {
 
 impl PullItem {
     /// A pull item at the root global head without hashes (the TS tests' `pullItem` helper).
+    #[must_use]
     pub fn new(payload: Payload) -> Self {
         Self {
             payload,
@@ -53,7 +54,7 @@ impl From<SessionPullItem> for PullItem {
                 .into_iter()
                 .map(|h| MaterializerHash {
                     event_num: h.event_num,
-                    hash: h.hash.map(|v| v as i64),
+                    hash: h.hash.map(u64::cast_signed),
                 })
                 .collect(),
         }
@@ -181,5 +182,5 @@ where
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

@@ -199,7 +199,7 @@ async fn query_builder_subscription_basic_functionality() {
     let (spans, _guard) = capture();
     let store = make_todo_mvc().await;
     let (results, push) = collect();
-    let sub = store.subscribe(&uncompleted_first(), push, SubscribeOptions::default());
+    let sub = store.subscribe(&uncompleted_first(), push, &SubscribeOptions::default());
     assert_eq!(*results.lock().unwrap(), [default_todo()]);
     store
         .commit([todo_created("t1", "buy milk", false)])
@@ -225,7 +225,7 @@ async fn query_builder_subscription_skip_initial_run() {
     let sub = store.subscribe(
         &uncompleted_first(),
         push,
-        SubscribeOptions {
+        &SubscribeOptions {
             skip_initial_run: true,
             ..Default::default()
         },
@@ -253,8 +253,8 @@ async fn query_builder_subscription_unsubscribe_functionality() {
     let store = make_todo_mvc().await;
     let (results1, push1) = collect::<Value>();
     let (results2, push2) = collect::<Value>();
-    let sub1 = store.subscribe(&uncompleted_first(), push1, SubscribeOptions::default());
-    let sub2 = store.subscribe(&uncompleted_first(), push2, SubscribeOptions::default());
+    let sub1 = store.subscribe(&uncompleted_first(), push1, &SubscribeOptions::default());
+    let sub2 = store.subscribe(&uncompleted_first(), push2, &SubscribeOptions::default());
     assert_eq!(
         (
             results1.lock().unwrap().len(),
@@ -296,7 +296,7 @@ async fn query_builder_subscription_unsubscribe_functionality() {
 async fn query_builder_subscription_async_iterator() {
     let (spans, _guard) = capture();
     let store = make_todo_mvc().await;
-    let mut iterator = store.subscribe_stream(&uncompleted_first(), SubscribeOptions::default());
+    let mut iterator = store.subscribe_stream(&uncompleted_first(), &SubscribeOptions::default());
     assert_eq!(iterator.next().await, Some(default_todo()));
     store
         .commit([todo_created("t-async", "write tests", false)])
@@ -320,7 +320,7 @@ async fn query_builder_subscription_async_iterator_with_skip_initial_run() {
     let store = make_todo_mvc().await;
     let mut iterator = store.subscribe_stream(
         &uncompleted_first(),
-        SubscribeOptions {
+        &SubscribeOptions {
             skip_initial_run: true,
             ..Default::default()
         },
@@ -351,7 +351,7 @@ async fn query_builder_subscription_direct_table_subscription() {
     let (spans, _guard) = capture();
     let store = make_todo_mvc().await;
     let (results, push) = collect();
-    let sub = store.subscribe(&*TODOS, push, SubscribeOptions::default());
+    let sub = store.subscribe(&*TODOS, push, &SubscribeOptions::default());
     assert_eq!(*results.lock().unwrap(), [json!([])]);
     store
         .commit([todo_created("t5", "clean house", true)])

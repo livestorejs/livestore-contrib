@@ -55,12 +55,14 @@ impl Default for InMemoryAdapter {
 }
 
 impl InMemoryAdapter {
+    #[must_use]
     pub fn build(self) -> Adapter {
         let config = Arc::new(self);
         Arc::new(move |args| make_session(config.clone(), args).boxed())
     }
 }
 
+#[must_use]
 pub fn make_in_memory_adapter() -> Adapter {
     InMemoryAdapter::default().build()
 }
@@ -131,6 +133,7 @@ async fn make_session(
 }
 
 /// The proxy over an in-process leader.
+#[must_use]
 pub fn leader_proxy(leader: &Leader) -> LeaderThreadProxy {
     let (push_leader, pull_leader, stream_leader) =
         (leader.clone(), leader.clone(), leader.clone());

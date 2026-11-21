@@ -50,6 +50,9 @@ pub struct SqliteDbWrapper {
 }
 
 impl SqliteDbWrapper {
+    /// # Errors
+    ///
+    /// Fails when SQLite rejects the connection pragmas.
     pub fn new(conn: Connection) -> rusqlite::Result<Self> {
         livestore_sqlite::configure_connection(&conn)?;
         Ok(Self {
@@ -61,15 +64,26 @@ impl SqliteDbWrapper {
     }
 
     /// `configureSQLite`: run by the Store when it wraps the session DB.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite rejects one of the pragmas.
     pub fn configure(&self) -> rusqlite::Result<()> {
         self.execute(CONFIGURE_SQL)
     }
 
+    /// # Errors
+    ///
+    /// Fails when SQLite cannot open or configure the in-memory database.
     pub fn open_in_memory() -> rusqlite::Result<Self> {
         Self::new(Connection::open_in_memory()?)
     }
 
     /// A fresh in-memory DB holding the given `export()` bytes.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the bytes are not a valid SQLite database image.
     pub fn from_snapshot(bytes: &[u8]) -> rusqlite::Result<Self> {
         let mut conn = Connection::open_in_memory()?;
         conn.deserialize_read_exact(MAIN_DB, bytes, bytes.len(), false)?;
@@ -82,12 +96,20 @@ impl SqliteDbWrapper {
     }
 
     /// `execute`: one or more statements without binds.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite cannot prepare or run a statement.
     pub fn execute(&self, sql: &str) -> rusqlite::Result<()> {
         self.cached_execute(sql, &[], ExecuteOptions::default())
             .map(|_| ())
     }
 
     /// `cachedExecute`: returns the duration in ms.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite cannot prepare or run a statement.
     pub fn cached_execute(
         &self,
         sql: &str,
@@ -118,11 +140,19 @@ impl SqliteDbWrapper {
     }
 
     /// `select`: rows as JSON objects (column order kept).
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite cannot prepare or run the query.
     pub fn select(&self, sql: &str, binds: &[SqlValue]) -> rusqlite::Result<Vec<Row>> {
         self.cached_select(sql, binds, None)
     }
 
     /// `cachedSelect`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite cannot prepare or run the query.
     pub fn cached_select(
         &self,
         sql: &str,
@@ -183,6 +213,10 @@ impl SqliteDbWrapper {
     }
 
     /// `withChangeset`: records what `f` changes.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `f` fails, or when the SQLite session cannot be created or serialized.
     pub fn with_changeset<T, E: From<rusqlite::Error>>(
         &self,
         f: impl FnOnce() -> Result<T, E>,
@@ -201,6 +235,10 @@ impl SqliteDbWrapper {
     }
 
     /// `SAVEPOINT` with a unique name; finish with [`Self::release_savepoint`] or [`Self::rollback_savepoint`].
+    ///
+    /// # Errors
+    ///
+    /// Fails when SQLite rejects the `SAVEPOINT` statement.
     pub fn begin_savepoint(&self) -> rusqlite::Result<String> {
         let name = format!(
             "livestore_savepoint_{}",
@@ -212,10 +250,16 @@ impl SqliteDbWrapper {
         Ok(name)
     }
 
+    /// # Errors
+    ///
+    /// Fails when no savepoint with that name is open.
     pub fn release_savepoint(&self, name: &str) -> rusqlite::Result<()> {
         self.conn.lock().execute_batch(&format!("RELEASE {name}"))
     }
 
+    /// # Errors
+    ///
+    /// Fails when no savepoint with that name is open.
     pub fn rollback_savepoint(&self, name: &str) -> rusqlite::Result<()> {
         let result = self
             .conn
@@ -230,6 +274,9 @@ impl SqliteDbWrapper {
         *lock(&self.cache) = QueryCache::default();
     }
 
+    /// # Errors
+    ///
+    /// Fails when SQLite cannot serialize the database.
     pub fn export(&self) -> rusqlite::Result<Vec<u8>> {
         Ok(self.conn.lock().serialize(MAIN_DB)?.to_vec())
     }
@@ -254,6 +301,9 @@ pub struct Changeset<'a> {
 }
 
 impl Changeset<'_> {
+    /// # Errors
+    ///
+    /// Fails when the changeset bytes are malformed.
     pub fn invert(self) -> rusqlite::Result<Self> {
         let mut inverted = Vec::new();
         invert_strm(&mut self.data.as_slice(), &mut inverted)?;
@@ -263,6 +313,9 @@ impl Changeset<'_> {
         })
     }
 
+    /// # Errors
+    ///
+    /// Fails when the changeset bytes are malformed or SQLite cannot apply them.
     pub fn apply(self) -> rusqlite::Result<()> {
         let result = self.db.with_conn(|conn| {
             conn.apply_strm(
@@ -387,5 +440,5 @@ fn from_sql(v: ValueRef<'_>) -> Value {
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

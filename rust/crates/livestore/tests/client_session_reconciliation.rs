@@ -6,7 +6,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use common::harness::{Deferred, never};
 use common::session::{self, TODO_COMPLETED, TODOS, TodoId};
-use common::{journal_count, state_head};
+use common::{journal_count, state_head, to_i64};
 use futures::{FutureExt, StreamExt};
 use livestore::session::{LeaderThreadProxy, MaterializerHash, PullFn, PushFn, ensuring};
 use livestore::{
@@ -73,19 +73,19 @@ async fn aborts_remaining_pull_steps_when_the_active_push_fails_after_a_coherent
                     fail_push.done();
                 }
             },
-            SubscribeOptions::default(),
+            &SubscribeOptions::default(),
         )
     };
     // Confirm the in-flight local event so the pull can advance without cancelling that push first.
     let batch: Vec<Event> = std::iter::once(local)
-        .chain((0..2 * STEP - 1).map(|i| remote_created(i as i64 + 2)))
+        .chain((0..2 * STEP - 1).map(|i| remote_created(to_i64(i) + 2)))
         .collect();
     let _ = h.deliver(batch, DeliverOptions::default());
     assert!(h.failed.wait().await.is_err());
     assert_eq!(*observed.lock().unwrap(), [1, STEP]);
-    assert_eq!(state_head(&h.store).global, STEP as i64);
+    assert_eq!(state_head(&h.store).global, to_i64(STEP));
     assert_eq!(common::len(&h.store.query(&*TODOS)), STEP);
-    assert_eq!(journal_count(&h.store), STEP as i64);
+    assert_eq!(journal_count(&h.store), to_i64(STEP));
     assert_eq!(
         h.store.sync_processor().sync_state().local_head,
         state_head(&h.store)
@@ -189,7 +189,7 @@ async fn yields_with_coherent_rows_journal_and_heads_and_replays_a_concurrent_no
     let propagated = Arc::new(Mutex::new(Vec::<Event>::new()));
     let h = StoreHarness::new(recording_push(propagated.clone()), counter_schema()).await;
     let store = h.store.clone();
-    let total = 4 * STEP as i64;
+    let total = 4 * to_i64(STEP);
     // A task scheduled between pull steps commits against the applied prefix.
     let input = tokio::spawn({
         let (first_prefix, store) = (first_prefix.clone(), store.clone());
@@ -240,7 +240,7 @@ async fn yields_with_coherent_rows_journal_and_heads_and_replays_a_concurrent_no
                 }
                 first_prefix.done();
             },
-            SubscribeOptions::default(),
+            &SubscribeOptions::default(),
         )
     };
     h.deliver(counter_batch(total), DeliverOptions::default())
@@ -280,7 +280,7 @@ async fn rolls_back_a_failed_step_keeping_only_complete_prefixes_failure_at() {
         )
         .await;
         let mut batch: Vec<Event> = (0..2 * STEP)
-            .map(|i| remote_created(i as i64 + 1))
+            .map(|i| remote_created(to_i64(i) + 1))
             .collect();
         batch[failing_event - 1].args = batch[failing_event - 2].args.clone();
         let published = Arc::new(Mutex::new(Vec::<usize>::new()));
@@ -289,19 +289,19 @@ async fn rolls_back_a_failed_step_keeping_only_complete_prefixes_failure_at() {
             h.store.subscribe(
                 &*TODOS,
                 move |rows| published.lock().unwrap().push(common::len(&rows)),
-                SubscribeOptions::default(),
+                &SubscribeOptions::default(),
             )
         };
         let _ = h.deliver(batch, DeliverOptions::default());
         assert!(h.failed.wait().await.is_err());
         let prefix = if failing_event == 2 { 0 } else { STEP };
         assert_eq!(common::len(&h.store.query(&*TODOS)), prefix);
-        assert_eq!(state_head(&h.store).global, prefix as i64);
+        assert_eq!(state_head(&h.store).global, to_i64(prefix));
         assert_eq!(
             state_head(&h.store),
             h.store.sync_processor().sync_state().local_head
         );
-        assert_eq!(journal_count(&h.store), prefix as i64);
+        assert_eq!(journal_count(&h.store), to_i64(prefix));
         let expected: Vec<usize> = if prefix == 0 { vec![0] } else { vec![0, STEP] };
         assert_eq!(
             *published.lock().unwrap(),
@@ -372,7 +372,7 @@ async fn refreshes_tables_changed_only_by_rollback_and_applies_an_explicit_rebas
     )
     .await;
     let old: Vec<Event> = (0..2 * STEP)
-        .map(|i| remote_created(i as i64 + 1))
+        .map(|i| remote_created(to_i64(i) + 1))
         .collect();
     h.deliver(
         old.clone(),
@@ -389,11 +389,11 @@ async fn refreshes_tables_changed_only_by_rollback_and_applies_an_explicit_rebas
         h.store.subscribe(
             &*TODOS,
             move |rows| counts.lock().unwrap().push(common::len(&rows)),
-            SubscribeOptions::default(),
+            &SubscribeOptions::default(),
         )
     };
     // Unknown replacement events still advance durable history but don't touch the todos table.
-    let replacement: Vec<Event> = (0..3 * STEP as i64)
+    let replacement: Vec<Event> = (0..3 * to_i64(STEP))
         .map(|i| Event {
             name: "future-event".into(),
             seq_num: SeqNum::new(i + 1, 0, 1),
@@ -413,7 +413,7 @@ async fn refreshes_tables_changed_only_by_rollback_and_applies_an_explicit_rebas
     .await;
     assert_eq!(*counts.lock().unwrap(), [old.len(), 0]);
     assert_eq!(h.store.query(&*TODOS), json!([]));
-    assert_eq!(state_head(&h.store).global, n as i64);
+    assert_eq!(state_head(&h.store).global, to_i64(n));
     assert_eq!(journal_count(&h.store), 0);
     subscription.unsubscribe();
 }
@@ -428,11 +428,11 @@ async fn does_not_attach_a_future_leader_hash_to_intermediate_pending_replay() {
     let h = StoreHarness::new(push, session::schema()).await;
     h.store.commit([todo("local", "local")]).unwrap();
     let mut batch: Vec<Event> = (0..2 * STEP)
-        .map(|i| remote_created(i as i64 + 1))
+        .map(|i| remote_created(to_i64(i) + 1))
         .collect();
     // After the first prefix, the pending local event is rebased to e(STEP+1)r1. This unrelated future event has
     // that same key.
-    let key = SeqNum::new(STEP as i64 + 1, 0, 1);
+    let key = SeqNum::new(to_i64(STEP) + 1, 0, 1);
     batch[STEP].name = "future-event".into();
     batch[STEP].seq_num = key;
     let len = batch.len();
@@ -449,7 +449,7 @@ async fn does_not_attach_a_future_leader_hash_to_intermediate_pending_replay() {
     .wait()
     .await;
     assert_eq!(common::len(&h.store.query(&*TODOS)), len);
-    assert_eq!(state_head(&h.store).global, len as i64 + 1);
+    assert_eq!(state_head(&h.store).global, to_i64(len) + 1);
     assert_eq!(journal_count(&h.store), 1);
 }
 
@@ -463,7 +463,7 @@ async fn confirms_a_pending_event_acknowledged_by_a_later_prefix_instead_of_dupl
     h.store.commit([todo("local", "local")]).unwrap();
     let pending = h.store.sync_processor().sync_state().pending[0].clone();
     let mut batch: Vec<Event> = (0..2 * STEP)
-        .map(|i| remote_created(i as i64 + 1))
+        .map(|i| remote_created(to_i64(i) + 1))
         .collect();
     batch[STEP] = Event {
         seq_num: batch[STEP].seq_num,
@@ -472,9 +472,12 @@ async fn confirms_a_pending_event_acknowledged_by_a_later_prefix_instead_of_dupl
     };
     let len = batch.len();
     h.deliver(batch, DeliverOptions::default()).wait().await;
-    assert!(h.store.sync_processor().sync_state().pending.is_empty());
+    assert_eq!(
+        h.store.sync_processor().sync_state().pending,
+        [] as [Event; 0]
+    );
     assert_eq!(common::len(&h.store.query(&*TODOS)), len);
-    assert_eq!(state_head(&h.store).global, len as i64);
+    assert_eq!(state_head(&h.store).global, to_i64(len));
     assert_eq!(journal_count(&h.store), 0);
 }
 

@@ -113,7 +113,7 @@ async fn disposes_store_after_unused_cache_time_expires() {
     advance(25).await;
     let next = registry.get_or_load(&opts).await.unwrap();
     assert_ne!(next, store);
-    assert!(!next.client_session().debug_instance_id.is_empty());
+    assert_ne!(next.client_session().debug_instance_id, "");
 }
 
 #[tokio::test(start_paused = true)]
@@ -275,7 +275,7 @@ async fn applies_default_options_from_constructor() {
     let registry = with_ttl(100);
     let opts = options();
     let store = registry.get_or_load(&opts).await.unwrap();
-    assert!(!store.client_session().debug_instance_id.is_empty());
+    assert_ne!(store.client_session().debug_instance_id, "");
     advance(50).await;
     assert_eq!(registry.get_or_load(&opts).await.unwrap(), store);
 }

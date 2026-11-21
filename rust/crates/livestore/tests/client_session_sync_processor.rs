@@ -11,7 +11,7 @@ use common::session::{
     self, TODO_CREATED, TODO_DELETED_NON_PURE, TODOS, TodoCreated, TodoId, encoded,
     todo_created_args,
 };
-use common::state_head;
+use common::{state_head, to_i64};
 use futures::{FutureExt, StreamExt};
 use livestore::processor::{MaterializeOutput, RebaseBarrierPoint};
 use livestore::session::{LeaderThreadProxy, MaterializerHash, PullFn};
@@ -65,13 +65,13 @@ async fn recovers_a_rejection_received_between_prefixes_that_confirm_the_same_pe
         let reject_now = reject_now.clone();
         async move {
             while let Some(state) = changes.next().await {
-                if state.upstream_head.global < PULL_CHUNK_SIZE as i64 {
+                if state.upstream_head.global < to_i64(PULL_CHUNK_SIZE) {
                     continue;
                 }
-                if state.upstream_head.global == PULL_CHUNK_SIZE as i64 {
+                if state.upstream_head.global == to_i64(PULL_CHUNK_SIZE) {
                     reject_now.done();
                 }
-                if state.upstream_head.global == batch_size as i64 {
+                if state.upstream_head.global == to_i64(batch_size) {
                     break;
                 }
             }
@@ -107,13 +107,13 @@ async fn sizes_rebasing_pull_steps_by_the_pending_events_they_replay() {
         .unwrap();
     let remote_count = 2 * pending_count;
     let remote: Vec<Event> = (0..remote_count)
-        .map(|i| remote_event(&format!("remote-{i}"), "remote", i as i64 + 1))
+        .map(|i| remote_event(&format!("remote-{i}"), "remote", to_i64(i) + 1))
         .collect();
     materialized.store(0, Ordering::SeqCst);
     let mut changes = h.processor.sync_state_changes();
     pull_tx.send(advance(remote)).unwrap();
     wait_for_state(&mut changes, |s| {
-        s.upstream_head.global == remote_count as i64
+        s.upstream_head.global == to_i64(remote_count)
     })
     .await;
     // Two steps of `pending_count` incoming events, each replaying the pending events once. Steps of
@@ -237,10 +237,10 @@ async fn rolls_back_materialized_state_when_persisting_the_state_head_fails() {
         .commit(vec![todo_created_input("rolled-back")]);
 
     assert!(exit.is_err());
-    assert!(
+    assert_eq!(
         db.select(&TODOS.query().as_sql().unwrap().query, &[])
-            .unwrap()
-            .is_empty()
+            .unwrap(),
+        [] as [serde_json::Map<String, serde_json::Value>; 0]
     );
 }
 
@@ -330,7 +330,7 @@ async fn client_document_pending_events_confirm_after_upstream_advance() {
 
     let processor = store.sync_processor();
     let initial = processor.sync_state();
-    assert!(!initial.pending.is_empty());
+    assert_ne!(initial.pending, [] as [Event; 0]);
     assert!(initial.pending[0].seq_num.client > 0);
     assert_eq!(initial.pending[0].name, "app_configSet");
 
@@ -350,7 +350,7 @@ async fn client_document_pending_events_confirm_after_upstream_advance() {
     .expect("confirmed within 2 seconds");
 
     let fin = processor.sync_state();
-    assert!(fin.pending.is_empty());
+    assert_eq!(fin.pending, [] as [Event; 0]);
     assert_eq!(fin.local_head, fin.upstream_head);
 }
 
@@ -549,13 +549,15 @@ async fn preserves_event_order_and_batch_bounds_through_graceful_shutdown() {
     let mut seed: u64 = 0x5eed;
     let mut next = |n: u64| {
         seed = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
         (seed >> 33) % n
     };
     for _ in 0..50 {
-        let batch_size = next(5) as usize + 1;
-        let groups: Vec<usize> = (0..next(7)).map(|_| next(4) as usize + 1).collect();
+        let batch_size = usize::try_from(next(5)).expect("small modulus") + 1;
+        let groups: Vec<usize> = (0..next(7))
+            .map(|_| usize::try_from(next(4)).expect("small modulus") + 1)
+            .collect();
         let persisted = Arc::new(Mutex::new(Vec::<Vec<String>>::new()));
         let mut options = HarnessOptions::new({
             let persisted = persisted.clone();
