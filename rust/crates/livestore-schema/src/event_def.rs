@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use livestore_core::Event;
+use livestore_core::Event as LogEvent;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Value, json};
@@ -13,6 +13,14 @@ use crate::codec::{date_from_iso_string, iso_string_from_js_date};
 use crate::fingerprint::schema_hash;
 use crate::value::{SqlStatement, SqlValue};
 use crate::value_schema::{self as s, ValueSchema};
+
+/// An event, defined by its args type. Derive it with `#[derive(Event)]`.
+pub trait Event: Serialize + DeserializeOwned + Sized + 'static {
+    const NAME: &'static str;
+
+    /// The event definition: name, args schema and options.
+    fn def() -> &'static EventDef<Self>;
+}
 
 /// Typed event definition. `A` is the args type; its serde form is the encoded args JSON.
 pub struct EventDef<A> {
@@ -162,7 +170,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
 
 /// What a materializer sees besides its args (TS `{ event, query, currentFacts }`; no facts yet).
 pub struct MaterializeContext<'a> {
-    pub event: &'a Event,
+    pub event: &'a LogEvent,
     /// Reads the state DB inside the materialization (`ctx.query`); `None` where no DB is at hand.
     pub query: Option<&'a QueryFn<'a>>,
 }
@@ -172,7 +180,7 @@ pub type QueryFn<'a> = dyn Fn(&str, &[SqlValue]) -> Result<Vec<Value>, Materiali
 
 impl<'a> MaterializeContext<'a> {
     #[must_use]
-    pub fn new(event: &'a Event) -> Self {
+    pub fn new(event: &'a LogEvent) -> Self {
         Self { event, query: None }
     }
 

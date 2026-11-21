@@ -121,12 +121,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "livestore-macros"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "livestore-schema"
 version = "0.0.0"
 dependencies = [
  "base64",
  "indexmap",
  "livestore-core",
+ "livestore-macros",
  "regex",
  "serde",
  "serde_json",

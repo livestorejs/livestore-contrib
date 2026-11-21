@@ -1,0 +1,18 @@
+[package]
+name = "livestore-macros"
+description = "Derive macros for the LiveStore Rust client"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

@@ -12,6 +12,7 @@ Porting references: [`contributor-docs/rust/`](../contributor-docs/rust).
 |---|---|
 | `crates/livestore-core` | Sequence numbers and events |
 | `crates/livestore-schema` | Schema DSL: tables + DDL (byte-identical to TS), client documents, typed events, materializers, query builder |
+| `crates/livestore-macros` | `#[derive(Event)]`: an event defined once, from its args struct |
 | `crates/livestore-todomvc` | TodoMVC schema on the DSL |
 
 ## Setup

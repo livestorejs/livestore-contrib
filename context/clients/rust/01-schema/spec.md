@@ -8,8 +8,14 @@ Draft.
 
 ## Surface
 
-`Schema::builder().table(..).client_document(..).event(&EventDef::<Args>::synced(name), |args, ctx| Ok(stmt))`.
-Event args are serde types. Column kinds: `text`, `integer`, `real`, `blob`,
+An event is a serde struct with `#[derive(Event)]` (`livestore-macros`):
+`#[event(name = "v1.TodoCreated")]`, plus `client_only` and `deprecated = "..."`.
+The derive builds the `EventDef` once, with the args schema taken from the field
+types (`SchemaType`) and their serde names, so the name, the args type and the
+schema cannot drift apart. The schema registers it with
+`Schema::builder().table(..).client_document(..).materialize::<E, _>(|args, ctx| Ok(stmt))`.
+The lower-level `.event(&EventDef, ..)` stays for the ported core tests, whose
+events have dynamic names. Column kinds: `text`, `integer`, `real`, `blob`,
 `boolean`, `datetime`, `datetime_millis`, `json`, with primary keys,
 autoincrement, nullability, defaults, composite keys, and indexes. Unknown events
 follow `UnknownEventHandling::{Warn, Ignore, Fail, Callback}`. The query builder

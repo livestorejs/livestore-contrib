@@ -12,6 +12,7 @@ workspace = true
 regex = "1"
 indexmap = "2"
 livestore-core.workspace = true
+livestore-macros.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

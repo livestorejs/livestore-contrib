@@ -4,67 +4,52 @@
 
 use std::sync::{Arc, LazyLock};
 
+use livestore_schema::event_def::DateFromString;
 use livestore_schema::query_builder::{Filter, QueryBuilderError, SqlQuery};
-use livestore_schema::value_schema::{self as s, Val, ValueSchema};
+use livestore_schema::value_schema::{self as s, Val};
 use livestore_schema::{
-    ClientDocument, Column, EventDef, MaterializeError, Schema, SqlStatement, Table,
+    ClientDocument, Column, Event, MaterializeError, Schema, SqlStatement, Table,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// `v1.TodoCreated`.
+#[derive(Event, Serialize, Deserialize, Clone, Debug)]
+#[event(name = "v1.TodoCreated")]
 pub struct TodoCreated {
     pub id: String,
     pub text: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TodoId {
+/// `v1.TodoCompleted`.
+#[derive(Event, Serialize, Deserialize, Clone, Debug)]
+#[event(name = "v1.TodoCompleted")]
+pub struct TodoCompleted {
     pub id: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// `v1.TodoUncompleted`.
+#[derive(Event, Serialize, Deserialize, Clone, Debug)]
+#[event(name = "v1.TodoUncompleted")]
+pub struct TodoUncompleted {
+    pub id: String,
+}
+
+/// `v1.TodoDeleted`.
+#[derive(Event, Serialize, Deserialize, Clone, Debug)]
+#[event(name = "v1.TodoDeleted")]
 #[serde(rename_all = "camelCase")]
 pub struct TodoDeleted {
     pub id: String,
-    /// `Schema.DateFromString` encoded form.
-    pub deleted_at: String,
+    pub deleted_at: DateFromString,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// `v1.TodoClearedCompleted`.
+#[derive(Event, Serialize, Deserialize, Clone, Debug)]
+#[event(name = "v1.TodoClearedCompleted")]
 #[serde(rename_all = "camelCase")]
 pub struct TodoClearedCompleted {
-    pub deleted_at: String,
-}
-
-pub mod events {
-    use super::{
-        EventDef, LazyLock, TodoClearedCompleted, TodoCreated, TodoDeleted, TodoId, ValueSchema, s,
-    };
-
-    pub static TODO_CREATED: LazyLock<EventDef<TodoCreated>> = LazyLock::new(|| {
-        EventDef::synced("v1.TodoCreated")
-            .schema(s::struct_([("id", s::string()), ("text", s::string())]))
-    });
-    pub static TODO_COMPLETED: LazyLock<EventDef<TodoId>> =
-        LazyLock::new(|| EventDef::synced("v1.TodoCompleted").schema(todo_id()));
-    pub static TODO_UNCOMPLETED: LazyLock<EventDef<TodoId>> =
-        LazyLock::new(|| EventDef::synced("v1.TodoUncompleted").schema(todo_id()));
-    pub static TODO_DELETED: LazyLock<EventDef<TodoDeleted>> = LazyLock::new(|| {
-        EventDef::synced("v1.TodoDeleted").schema(s::struct_([
-            ("id", s::string()),
-            ("deletedAt", s::date_from_string()),
-        ]))
-    });
-    pub static TODO_CLEARED_COMPLETED: LazyLock<EventDef<TodoClearedCompleted>> =
-        LazyLock::new(|| {
-            EventDef::synced("v1.TodoClearedCompleted")
-                .schema(s::struct_([("deletedAt", s::date_from_string())]))
-        });
-
-    fn todo_id() -> ValueSchema {
-        s::struct_([("id", s::string())])
-    }
+    pub deleted_at: DateFromString,
 }
 
 pub static TODOS: LazyLock<Table> = LazyLock::new(|| {
@@ -94,7 +79,7 @@ pub fn schema() -> Arc<Schema> {
     Schema::builder()
         .table(todos.clone())
         .client_document(ui_state())
-        .event(&events::TODO_CREATED, move |a, _| {
+        .materialize::<TodoCreated, _>(move |a, _| {
             sql(todos
                 .query()
                 .insert([
@@ -104,28 +89,28 @@ pub fn schema() -> Arc<Schema> {
                 ])
                 .as_sql())
         })
-        .event(&events::TODO_COMPLETED, move |a, _| {
+        .materialize::<TodoCompleted, _>(move |a, _| {
             sql(todos
                 .query()
                 .update([("completed", json!(true))])
                 .where_all([("id", json!(a.id).into())])
                 .as_sql())
         })
-        .event(&events::TODO_UNCOMPLETED, move |a, _| {
+        .materialize::<TodoUncompleted, _>(move |a, _| {
             sql(todos
                 .query()
                 .update([("completed", json!(false))])
                 .where_all([("id", json!(a.id).into())])
                 .as_sql())
         })
-        .event(&events::TODO_DELETED, move |a, _| {
+        .materialize::<TodoDeleted, _>(move |a, _| {
             sql(todos
                 .query()
                 .update([("deletedAt", json!(a.deleted_at))])
                 .where_all([("id", json!(a.id).into())])
                 .as_sql())
         })
-        .event(&events::TODO_CLEARED_COMPLETED, move |a, _| {
+        .materialize::<TodoClearedCompleted, _>(move |a, _| {
             sql(todos
                 .query()
                 .update([("deletedAt", json!(a.deleted_at))])

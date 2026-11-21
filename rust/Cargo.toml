@@ -27,6 +27,7 @@ print_stdout = "warn"
 [workspace.dependencies]
 livestore-core = { path = "crates/livestore-core" }
 livestore-schema = { path = "crates/livestore-schema" }
+livestore-macros = { path = "crates/livestore-macros" }
 livestore-todomvc = { path = "crates/livestore-todomvc" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

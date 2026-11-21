@@ -159,6 +159,22 @@ impl SchemaBuilder {
         self
     }
 
+    /// Registers a derived event and its materializer (`State.SQLite.materializers`).
+    #[must_use]
+    pub fn materialize<E, R>(
+        self,
+        materialize: impl Fn(E, &MaterializeContext<'_>) -> Result<R, MaterializeError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self
+    where
+        E: crate::event_def::Event,
+        R: IntoStatements,
+    {
+        self.event(E::def(), materialize)
+    }
+
     /// Registers an event with a typed materializer (`State.SQLite.materializers`).
     #[must_use]
     pub fn event<A, R>(
