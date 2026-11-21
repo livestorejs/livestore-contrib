@@ -34,22 +34,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse()?;
     let dir = args.data.join(&args.store);
     std::fs::create_dir_all(&dir)?;
-    let (url, token, state, eventlog) = (
-        args.url.clone(),
-        args.token.clone(),
-        dir.join("state.db"),
-        dir.join("eventlog.db"),
-    );
+    let (url, token, folder) = (args.url.clone(), args.token.clone(), dir.clone());
     let adapter = InMemoryAdapter {
         client_id: client_id(&dir)?,
         session_id: random_id(),
         leader_builder: Some(Arc::new(move |builder| {
             builder
                 .sync_payload(json!({"authToken": token}))
-                .storage(Storage::Files {
-                    state: state.clone(),
-                    eventlog: eventlog.clone(),
-                })
+                .storage(Storage::Folder(folder.clone()))
                 .sync(SyncOptions {
                     backend: Some(make_ws_sync(&url, ClientOptions::default())),
                     ..SyncOptions::default()
