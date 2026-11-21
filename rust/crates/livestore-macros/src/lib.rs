@@ -80,7 +80,7 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                     attr.parse_nested_meta(|meta| {
                         if meta.path.is_ident("deprecated") {
                             let reason = meta.value()?.parse::<LitStr>()?;
-                            deprecated_fields.push(quote!(.deprecated_field(#wire, #reason)));
+                            deprecated_fields.push(quote!((#wire, #reason)));
                             Ok(())
                         } else {
                             Err(meta.error("expected `deprecated`"))
@@ -109,12 +109,10 @@ fn event_impl(
     schema: &proc_macro2::TokenStream,
     deprecated_fields: &[proc_macro2::TokenStream],
 ) -> proc_macro2::TokenStream {
-    let constructor = if client_only {
-        quote!(client_only)
-    } else {
-        quote!(synced)
-    };
-    let deprecated = deprecated.map(|r| quote!(.deprecated(#r)));
+    let deprecated = deprecated.map_or_else(
+        || quote!(::std::option::Option::None),
+        |reason| quote!(::std::option::Option::Some(#reason)),
+    );
     quote! {
         impl ::livestore_schema::Event for #ty {
             const NAME: &'static str = #name;
@@ -122,10 +120,13 @@ fn event_impl(
             fn def() -> &'static ::livestore_schema::EventDef<Self> {
                 static DEF: ::std::sync::LazyLock<::livestore_schema::EventDef<#ty>> =
                     ::std::sync::LazyLock::new(|| {
-                        ::livestore_schema::EventDef::#constructor(#name)
-                            .schema(#schema)
-                            #deprecated
-                            #(#deprecated_fields)*
+                        ::livestore_schema::EventDef::__derive(
+                            #name,
+                            #client_only,
+                            #schema,
+                            #deprecated,
+                            &[#(#deprecated_fields),*],
+                        )
                     });
                 &DEF
             }

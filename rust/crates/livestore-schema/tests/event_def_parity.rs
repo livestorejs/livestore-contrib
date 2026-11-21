@@ -26,7 +26,7 @@ fn occurred() -> EventDef<Occurred> {
 fn roundtrips_a_valid_date_through_json() {
     let event = occurred();
     let value = Occurred {
-        occurred_at: DateFromString(1_784_283_330_000.0),
+        occurred_at: DateFromString::from_millis(1_784_283_330_000).unwrap(),
     };
     let encoded = event.encode_json(&value).unwrap();
     assert_eq!(encoded, r#"{"occurredAt":"2026-07-17T10:15:30.000Z"}"#);
@@ -36,13 +36,7 @@ fn roundtrips_a_valid_date_through_json() {
 #[test]
 fn rejects_invalid_dates_on_encode_and_decode() {
     let event = occurred();
-    assert!(
-        event
-            .encode_json(&Occurred {
-                occurred_at: DateFromString(f64::NAN)
-            })
-            .is_err()
-    );
+    assert_eq!(DateFromString::from_millis(i64::MAX), None);
     assert!(event.decode_json(r#"{"occurredAt":"not-a-date"}"#).is_err());
 }
 

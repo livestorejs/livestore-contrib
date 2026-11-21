@@ -137,6 +137,7 @@ dependencies = [
  "indexmap",
  "livestore-core",
  "livestore-macros",
+ "livestore-schema",
  "regex",
  "serde",
  "serde_json",

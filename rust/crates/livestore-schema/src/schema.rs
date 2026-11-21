@@ -172,12 +172,28 @@ impl SchemaBuilder {
         E: crate::event_def::Event,
         R: IntoStatements,
     {
-        self.event(E::def(), materialize)
+        self.register(E::def(), materialize)
     }
 
     /// Registers an event with a typed materializer (`State.SQLite.materializers`).
     #[must_use]
+    #[cfg(feature = "testing")]
     pub fn event<A, R>(
+        self,
+        def: &EventDef<A>,
+        materialize: impl Fn(A, &MaterializeContext<'_>) -> Result<R, MaterializeError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self
+    where
+        A: Serialize + DeserializeOwned + 'static,
+        R: IntoStatements,
+    {
+        self.register(def, materialize)
+    }
+
+    fn register<A, R>(
         mut self,
         def: &EventDef<A>,
         materialize: impl Fn(A, &MaterializeContext<'_>) -> Result<R, MaterializeError>
@@ -203,6 +219,7 @@ impl SchemaBuilder {
 
     /// An event without materializer (resolves as `MaterializerMissing`).
     #[must_use]
+    #[cfg(feature = "testing")]
     pub fn event_without_materializer<A: Serialize + DeserializeOwned>(
         mut self,
         def: &EventDef<A>,

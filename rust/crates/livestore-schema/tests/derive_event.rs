@@ -67,7 +67,7 @@ fn a_unit_struct_is_a_client_only_event_without_args() {
 fn a_mixed_tuple_keeps_its_order() {
     let deleted = TodoDeleted {
         id: "a".into(),
-        deleted_at: DateFromString(0.0),
+        deleted_at: DateFromString::now(),
         reason: None,
     };
     let names: Vec<String> = (Reset, (deleted, vec![Reset]))

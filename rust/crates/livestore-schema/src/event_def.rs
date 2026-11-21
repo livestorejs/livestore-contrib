@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Value, json};
 
-use crate::codec::{date_from_iso_string, iso_string_from_js_date};
+use crate::codec::{date_from_iso_string, iso_string_from_millis};
 use crate::fingerprint::schema_hash;
 use crate::value::{SqlStatement, SqlValue};
 use crate::value_schema::{self as s, ValueSchema};
@@ -66,27 +66,13 @@ impl EventInput {
 
 /// # Panics
 ///
-/// Panics when the args do not serialize, for example a `DateFromString` holding an invalid date.
+/// Panics only when the args type has a hand-written `Serialize` that fails. Derived args with
+/// this crate's field types always serialize.
 impl<E: Event> From<E> for EventInput {
     fn from(event: E) -> Self {
-        let (name, args) = E::def().make(event);
-        Self { name, args }
-    }
-}
-
-#[cfg(feature = "testing")]
-impl From<(String, Value)> for EventInput {
-    fn from((name, args): (String, Value)) -> Self {
-        Self { name, args }
-    }
-}
-
-#[cfg(feature = "testing")]
-impl From<&LogEvent> for EventInput {
-    fn from(e: &LogEvent) -> Self {
         Self {
-            name: e.name.clone(),
-            args: e.args.clone(),
+            name: E::NAME.to_owned(),
+            args: serde_json::to_value(event).expect("event args serialize"),
         }
     }
 }
@@ -101,10 +87,12 @@ impl From<&LogEvent> for EventInput {
     note = "define the event as a struct with `#[derive(Event)]` and commit a value of it; a commit never takes a name or JSON"
 )]
 pub trait Events {
-    /// Appends the events in order.
+    /// Appends the events in order. Used by the store.
+    #[doc(hidden)]
     fn push_into(self, out: &mut Vec<EventInput>);
 
-    /// The events in order.
+    /// The events in order. Used by the store.
+    #[doc(hidden)]
     fn into_inputs(self) -> Vec<EventInput>
     where
         Self: Sized,
@@ -140,13 +128,6 @@ impl<T: Events, const N: usize> Events for [T; N] {
         for events in self {
             events.push_into(out);
         }
-    }
-}
-
-#[cfg(feature = "testing")]
-impl Events for (String, Value) {
-    fn push_into(self, out: &mut Vec<EventInput>) {
-        out.push(self.into());
     }
 }
 
@@ -201,7 +182,31 @@ impl<A> Clone for EventDef<A> {
 }
 
 impl<A: Serialize + DeserializeOwned> EventDef<A> {
+    /// Used by `#[derive(Event)]`; apps derive events instead of calling this.
+    #[doc(hidden)]
     #[must_use]
+    pub fn __derive(
+        name: &str,
+        client_only: bool,
+        schema: ValueSchema,
+        deprecated: Option<&str>,
+        deprecated_fields: &[(&str, &str)],
+    ) -> Self {
+        Self {
+            name: name.into(),
+            client_only,
+            deprecated: deprecated.map(Into::into),
+            deprecated_fields: deprecated_fields
+                .iter()
+                .map(|(f, r)| ((*f).into(), (*r).into()))
+                .collect(),
+            schema: Some(schema),
+            _args: PhantomData,
+        }
+    }
+
+    #[must_use]
+    #[cfg(feature = "testing")]
     pub fn synced(name: &str) -> Self {
         Self {
             name: name.into(),
@@ -214,6 +219,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     }
 
     #[must_use]
+    #[cfg(feature = "testing")]
     pub fn client_only(name: &str) -> Self {
         Self {
             client_only: true,
@@ -222,6 +228,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     }
 
     #[must_use]
+    #[cfg(feature = "testing")]
     pub fn schema(mut self, schema: ValueSchema) -> Self {
         self.schema = Some(schema);
         self
@@ -234,6 +241,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     }
 
     #[must_use]
+    #[cfg(feature = "testing")]
     pub fn deprecated(mut self, reason: &str) -> Self {
         self.deprecated = Some(reason.into());
         self
@@ -241,6 +249,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
 
     /// `deprecated(reason)` on one args field.
     #[must_use]
+    #[cfg(feature = "testing")]
     pub fn deprecated_field(mut self, field: &str, reason: &str) -> Self {
         self.deprecated_fields.push((field.into(), reason.into()));
         self
@@ -294,6 +303,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     /// # Panics
     ///
     /// Panics when the args do not serialize, for example a `DateFromString` holding an invalid date.
+    #[cfg(feature = "testing")]
     pub fn make(&self, args: A) -> (String, Value) {
         (
             self.name.clone(),
@@ -429,28 +439,60 @@ impl DeprecationWarnings {
     }
 }
 
-/// `Schema.DateFromString`: a `Date` (epoch millis, possibly NaN) encoded as an ISO string.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct DateFromString(pub f64);
+/// `Schema.DateFromString`: a valid `Date`, encoded as an ISO string.
+///
+/// It always holds a date that JavaScript can represent, so encoding never fails.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DateFromString(i64);
+
+impl DateFromString {
+    /// JavaScript's `Date` range: ±100,000,000 days from 1970.
+    const MAX_MILLIS: i64 = 8_640_000_000_000_000;
+
+    /// The date at `millis` after 1970, or `None` outside JavaScript's `Date` range.
+    #[must_use]
+    pub fn from_millis(millis: i64) -> Option<Self> {
+        (-Self::MAX_MILLIS..=Self::MAX_MILLIS)
+            .contains(&millis)
+            .then_some(Self(millis))
+    }
+
+    /// `new Date()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the system clock is outside JavaScript's `Date` range.
+    #[must_use]
+    pub fn now() -> Self {
+        let millis = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(after) => i64::try_from(after.as_millis()).ok(),
+            Err(before) => i64::try_from(before.duration().as_millis())
+                .ok()
+                .map(|ms| -ms),
+        };
+        millis
+            .and_then(Self::from_millis)
+            .expect("the system clock is within JavaScript's Date range")
+    }
+
+    /// Milliseconds after 1970.
+    #[must_use]
+    pub fn millis(self) -> i64 {
+        self.0
+    }
+}
 
 impl Serialize for DateFromString {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if !self.0.is_finite() {
-            return Err(serde::ser::Error::custom("Invalid Date"));
-        }
-        serializer.serialize_str(&iso_string_from_js_date(self.0))
+        serializer.serialize_str(&iso_string_from_millis(self.0))
     }
 }
 
 impl<'de> Deserialize<'de> for DateFromString {
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "epoch millis become a JS Date number"
-    )]
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         date_from_iso_string(&s)
-            .map(|ms| DateFromString(ms as f64))
+            .and_then(Self::from_millis)
             .ok_or_else(|| serde::de::Error::custom(format!("Invalid Date: {s}")))
     }
 }
