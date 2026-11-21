@@ -249,6 +249,10 @@ async fn resumes_after_the_last_applied_event_when_a_pull_stream_breaks() {
 }
 
 #[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "ports one TypeScript test line for line"
+)]
 async fn a_push_parked_on_server_ahead_error_resumes_once_a_retryable_pull_failure_recovers() {
     let Some(url) = backend().await else { return };
     let store_id = unique("recovery-parked");

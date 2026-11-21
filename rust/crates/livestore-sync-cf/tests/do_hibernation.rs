@@ -400,14 +400,14 @@ async fn send_and_collect(
     messages
 }
 
-fn pull_request(store_id: &str, id: &str, live: bool, cursor: Value) -> String {
+fn pull_request(store_id: &str, id: &str, live: bool, cursor: &Value) -> String {
     json!({"_tag": "Request", "id": id, "tag": "SyncWsRpc.Pull", "payload": {"storeId": store_id, "live": live, "cursor": cursor}, "headers": []}).to_string()
 }
 
 async fn start_live_pull(ws: &mut Ws, store_id: &str, id: &str) {
     send_and_wait(
         ws,
-        pull_request(store_id, id, true, json!({"_tag": "None"})),
+        pull_request(store_id, id, true, &json!({"_tag": "None"})),
         |m| m["_tag"] == "Chunk" && m["requestId"] == id,
         |_| None,
     )
@@ -428,7 +428,7 @@ async fn run_pull_to_exit(
 ) -> Value {
     send_and_wait(
         ws,
-        pull_request(store_id, id, live, cursor),
+        pull_request(store_id, id, live, &cursor),
         |m| m["_tag"] == "Exit" && m["requestId"] == id,
         |m| {
             (m["_tag"] == "Chunk" && m["requestId"] == id)

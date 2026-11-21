@@ -18,12 +18,11 @@ async fn backend() -> Option<String> {
         .trim_start_matches("wss://")
         .trim_end_matches('/')
         .to_owned();
-    match tokio::net::TcpStream::connect(&addr).await {
-        Ok(_) => Some(url),
-        Err(_) => {
-            eprintln!("SKIP: no sync backend at {url}");
-            None
-        }
+    if tokio::net::TcpStream::connect(&addr).await.is_ok() {
+        Some(url)
+    } else {
+        eprintln!("SKIP: no sync backend at {url}");
+        None
     }
 }
 
@@ -81,7 +80,7 @@ async fn empty_pull() {
     };
     let rs = pull_all(&c, None).await;
     assert_eq!(rs.len(), 1);
-    assert!(rs[0].batch.is_empty());
+    assert_eq!(rs[0].batch.len(), 0);
     assert_eq!(rs[0].page_info, PageInfo::NoMore);
     assert_eq!(rs[0].backend_id.len(), 21);
 }
@@ -134,12 +133,12 @@ async fn paged_history_is_acked() {
     assert_eq!(seqs, (1..=310).collect::<Vec<_>>());
     let mut seen: i64 = 0;
     for (i, r) in rs.iter().enumerate() {
-        seen += r.batch.len() as i64;
+        seen += i64::try_from(r.batch.len()).unwrap();
         let expected = if i + 1 == rs.len() {
             PageInfo::NoMore
         } else {
             PageInfo::MoreKnown {
-                remaining: 310 - seen as u64,
+                remaining: u64::try_from(310 - seen).unwrap(),
             }
         };
         assert_eq!(r.page_info, expected);

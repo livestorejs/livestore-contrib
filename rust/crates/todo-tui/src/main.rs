@@ -1,4 +1,4 @@
-//! Terminal TodoMVC client (TUI) that syncs with the sync-cf backend (same events as `examples/web-todomvc-sync-cf`).
+//! Terminal `TodoMVC` client (TUI) that syncs with the sync-cf backend (same events as `examples/web-todomvc-sync-cf`).
 //!
 //! ```text
 //! todo --url ws://localhost:8787 --store <id> --data <dir> [--token <authToken>]
@@ -87,7 +87,7 @@ async fn run(
     let _todos_changed = store.subscribe(
         &todos_query(),
         move |_| _ = changes_tx.send(()),
-        SubscribeOptions::default(),
+        &SubscribeOptions::default(),
     );
     let mut ticker = tokio::time::interval(Duration::from_millis(500));
     let mut app = App {
@@ -102,7 +102,7 @@ async fn run(
             Some(ev) = keys.recv() => {
                 if let Event::Key(key) = ev && key.kind == KeyEventKind::Press {
                     app.error = None;
-                    match handle(&mut app, store, key.code, key.modifiers).await {
+                    match handle(&mut app, store, key.code, key.modifiers) {
                         Ok(Flow::Quit) => return Ok(()),
                         Ok(Flow::Continue) => {}
                         Err(e) => app.error = Some(e.to_string()),
@@ -178,7 +178,7 @@ enum Flow {
     Quit,
 }
 
-async fn handle(
+fn handle(
     app: &mut App,
     store: &Store,
     code: KeyCode,
@@ -213,7 +213,7 @@ async fn handle(
     }
     match code {
         KeyCode::Char('q') => return Ok(Flow::Quit),
-        KeyCode::Char('i') | KeyCode::Char('n') => app.focus = Focus::Input,
+        KeyCode::Char('i' | 'n') => app.focus = Focus::Input,
         KeyCode::Up | KeyCode::Char('k') => {
             if app.list.selected() == Some(0) {
                 app.focus = Focus::Input;
@@ -236,7 +236,7 @@ async fn handle(
                 store.commit([(name.to_owned(), json!({"id": id}))])?;
             }
         }
-        KeyCode::Char('d') | KeyCode::Char('x') | KeyCode::Delete | KeyCode::Backspace => {
+        KeyCode::Char('d' | 'x') | KeyCode::Delete | KeyCode::Backspace => {
             if let Some(id) = app.selected_id() {
                 store.commit([(
                     "v1.TodoDeleted".to_owned(),
@@ -258,6 +258,10 @@ async fn handle(
     Ok(Flow::Continue)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the whole screen layout reads best in one place"
+)]
 fn draw(f: &mut Frame, app: &mut App, store: &Store) {
     let [title, input, list, footer, status, help] = Layout::vertical([
         Constraint::Length(1),
@@ -293,7 +297,8 @@ fn draw(f: &mut Frame, app: &mut App, store: &Store) {
         input,
     );
     if input_focused {
-        f.set_cursor_position((input.x + 1 + app.input.chars().count() as u16, input.y + 1));
+        let typed = u16::try_from(app.input.chars().count()).unwrap_or(u16::MAX);
+        f.set_cursor_position((input.x.saturating_add(1).saturating_add(typed), input.y + 1));
     }
 
     let items: Vec<ListItem> = app
@@ -435,13 +440,12 @@ fn todos_query() -> livestore::DbQueryDef<Vec<Row>> {
 /// Stable per data dir, like the TS client id kept in storage.
 fn client_id(dir: &Path) -> std::io::Result<String> {
     let path = dir.join("client-id");
-    match std::fs::read_to_string(&path) {
-        Ok(id) => Ok(id.trim().to_owned()),
-        Err(_) => {
-            let id = random_id()[..8].to_owned();
-            std::fs::write(&path, &id)?;
-            Ok(id)
-        }
+    if let Ok(id) = std::fs::read_to_string(&path) {
+        Ok(id.trim().to_owned())
+    } else {
+        let id = random_id()[..8].to_owned();
+        std::fs::write(&path, &id)?;
+        Ok(id)
     }
 }
 
@@ -469,7 +473,9 @@ fn now_iso() -> Value {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("the system clock is after 1970")
-            .as_millis() as i64,
+            .as_millis()
+            .try_into()
+            .expect("milliseconds since 1970 fit in i64"),
     )
     .into()
 }

@@ -67,7 +67,7 @@ async fn first_non_empty(b: Arc<dyn SyncBackend>) -> PullResItem {
 async fn can_create_sync_backend() {
     each("can-create", |_, b| async move {
         assert!(b.supports().pull_live);
-        assert!(!b.metadata().name.is_empty());
+        assert_ne!(b.metadata().name, "");
     })
     .await;
 }
@@ -195,6 +195,10 @@ async fn serialized_admission_serializes_concurrent_pushes_that_share_the_same_p
 }
 
 #[tokio::test]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the seed only needs the low bits of the clock and of each shifted byte"
+)]
 async fn large_batches_handling_streams_batch_variations_over_provider_payload_limits() {
     // `Vitest.live.prop(..., { arbitrary: { runs: 1 } })`: one scenario drawn from the schema bounds.
     let seed = (std::time::SystemTime::now()
@@ -240,13 +244,13 @@ async fn batch_scenario(test: &str, scenario: (&'static str, usize, usize, usize
     each(test, |p, b| async move {
         let (variant, event_count, payload_size, push_batch_size) = scenario;
         assert!(event_count * payload_size >= 1_000_000);
-        let text = "x".repeat(payload_size);
+        let filler = "x".repeat(payload_size);
         let mut f = EventFactory::new(ClientIdentity::with_session(
             &format!("{variant}-client"),
             &format!("{variant}-session"),
         ));
         let events: Vec<_> = (0..event_count)
-            .map(|i| todo(&mut f, &format!("{variant}-{i}"), &text))
+            .map(|i| todo(&mut f, &format!("{variant}-{i}"), &filler))
             .collect();
         for chunk in events.chunks(push_batch_size) {
             b.push(chunk.to_vec()).await.unwrap();
@@ -269,6 +273,10 @@ async fn batch_scenario(test: &str, scenario: (&'static str, usize, usize, usize
 /// cf-ws-do only: the worker closes the sockets and refuses upgrades for 20 s; a leader must reconnect
 /// with bounded retries and apply an event pushed meanwhile soon after reconnecting.
 #[tokio::test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "ports one TypeScript test line for line"
+)]
 async fn live_pull_resumes_pulling_events_pushed_after_a_socket_drop() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let Some(url) = backend().await else { return };
@@ -316,7 +324,7 @@ async fn live_pull_resumes_pulling_events_pushed_after_a_socket_drop() {
                         .inspect(move |r| match r {
                             Ok(_) => _ = sub.send_replace(true),
                             Err(livestore_sync::PullError::IsOffline(_)) => {
-                                _ = off.send_replace(true)
+                                _ = off.send_replace(true);
                             }
                             Err(_) => {}
                         })
@@ -455,7 +463,7 @@ async fn remaining_field_works_correctly() {
         for i in 0..5 {
             b.push(vec![f.next("todoCreated", json!({"id": format!("remaining-test-{i}"), "text": format!("Event {i}"), "completed": false}))]).await.unwrap();
         }
-        assert!(!collect(&b, None).await.is_empty());
+        assert_ne!(collect(&b, None).await.len(), 0);
     })
     .await;
 }
@@ -494,9 +502,9 @@ async fn large_batch_pagination() {
         if !all.is_empty() {
             assert!(all.len() >= 100);
         }
-        if all.len() == TOTAL as usize {
+        if all.len() == usize::try_from(TOTAL).unwrap() {
             for (i, item) in all.iter().take(100).enumerate() {
-                assert_eq!(item.event_encoded.seq_num, START + i as i64);
+                assert_eq!(item.event_encoded.seq_num, START + i64::try_from(i).unwrap());
             }
         }
         if all.len() >= 500 {

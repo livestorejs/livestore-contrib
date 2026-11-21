@@ -49,6 +49,7 @@ impl Default for HttpSyncOptions {
 }
 
 /// `makeHttpSync({ url, ... })`.
+#[must_use]
 pub fn make_http_sync(url: &str, options: HttpSyncOptions) -> SyncBackendConstructor {
     let url = url.to_owned();
     constructor(move |args| {
@@ -154,8 +155,13 @@ impl SyncBackend for HttpBackend {
             }
             let _permit = this.push_lock.lock().await;
             let backend_id = this.backend_id.get();
-            let chunks = split_batch(&this.store_id, &this.payload, &backend_id, batch)
-                .map_err(livestore_sync::UnknownError::new)?;
+            let chunks = split_batch(
+                &this.store_id,
+                this.payload.as_ref(),
+                backend_id.as_ref(),
+                batch,
+            )
+            .map_err(livestore_sync::UnknownError::new)?;
             for chunk in chunks {
                 let req = PushRequest {
                     store_id: this.store_id.clone(),
@@ -266,7 +272,7 @@ impl Inner {
             sampled: None,
         };
         let body = serde_json::to_vec(&transport::ClientMessage::Request(request))
-            .map_err(|e| http_error(HttpErrorKind::Encode, e))?;
+            .map_err(|e| http_error(HttpErrorKind::Encode, &e))?;
         let mut builder = self
             .http
             .post(&self.endpoint)
@@ -281,20 +287,20 @@ impl Inner {
             } else {
                 HttpErrorKind::Transport
             };
-            http_error(kind, e)
+            http_error(kind, &e)
         })?;
         if !response.status().is_success() {
-            return Err(http_error(HttpErrorKind::StatusCode, response.status()));
+            return Err(http_error(HttpErrorKind::StatusCode, &response.status()));
         }
         let bytes = response
             .bytes()
             .await
-            .map_err(|e| http_error(HttpErrorKind::Transport, e))?;
+            .map_err(|e| http_error(HttpErrorKind::Transport, &e))?;
         if bytes.is_empty() {
-            return Err(http_error(HttpErrorKind::EmptyBody, "empty body"));
+            return Err(http_error(HttpErrorKind::EmptyBody, &"empty body"));
         }
         let messages: Vec<ServerMessage> =
-            serde_json::from_slice(&bytes).map_err(|e| http_error(HttpErrorKind::Decode, e))?;
+            serde_json::from_slice(&bytes).map_err(|e| http_error(HttpErrorKind::Decode, &e))?;
         let mut values = vec![];
         for message in messages {
             match message {
@@ -338,7 +344,7 @@ fn strip_null_payload(mut v: Value) -> Value {
     v
 }
 
-fn http_error(kind: HttpErrorKind, e: impl ToString) -> SyncError {
+fn http_error(kind: HttpErrorKind, e: &impl ToString) -> SyncError {
     SyncError::Http {
         kind,
         message: e.to_string(),
