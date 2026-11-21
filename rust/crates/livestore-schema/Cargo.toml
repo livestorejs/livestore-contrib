@@ -1,0 +1,20 @@
+[package]
+name = "livestore-schema"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+regex = "1"
+indexmap = "2"
+livestore-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+base64 = "0.22.1"
+sha2 = "0.10.9"

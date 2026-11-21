@@ -9,6 +9,13 @@ Primary pull request validation for the contrib workspace. The stable checks
 are `source-policy`, `pr/minimal-dev`, `pr/quality`, `pr/types`,
 `pr/packages`, `pr/examples-build`, `pr/node`, and `release-surface`.
 
+## `rust.yml`
+
+Validates the Rust client in `rust/`: `rust:check`, `rust:clippy`, `rust:doc`, and
+`rust:test`. It runs only
+when `rust/`, its own workflow files, the devenv files, or the megarepo pin
+change, and is not a required check.
+
 ## `release.yml`
 
 Release workflow surface for contrib packages. It validates that contrib can
