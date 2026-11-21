@@ -194,10 +194,10 @@ fn handle(
     if app.focus == Focus::Input {
         match code {
             KeyCode::Enter if !app.input.trim().is_empty() => {
-                store.commit([TodoCreated {
+                store.commit(TodoCreated {
                     id: random_id(),
                     text: app.input.trim().to_owned(),
-                }])?;
+                })?;
                 app.input.clear();
             }
             KeyCode::Char(c) => app.input.push(c),
@@ -229,18 +229,18 @@ fn handle(
                 } else {
                     EventInput::from(TodoCompleted { id })
                 };
-                store.commit([event])?;
+                store.commit(event)?;
             }
         }
         KeyCode::Char('d' | 'x') | KeyCode::Delete | KeyCode::Backspace => {
             if let Some(id) = app.selected_id() {
-                store.commit([TodoDeleted {
+                store.commit(TodoDeleted {
                     id,
                     deleted_at: now(),
-                }])?;
+                })?;
             }
         }
-        KeyCode::Char('c') => store.commit([TodoClearedCompleted { deleted_at: now() }])?,
+        KeyCode::Char('c') => store.commit(TodoClearedCompleted { deleted_at: now() })?,
         KeyCode::Char('1') => app.filter = Filter::All,
         KeyCode::Char('2') => app.filter = Filter::Active,
         KeyCode::Char('3') => app.filter = Filter::Completed,

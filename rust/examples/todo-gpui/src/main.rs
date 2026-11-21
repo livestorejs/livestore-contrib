@@ -21,8 +21,8 @@ use gpui::{
     prelude::*, px, rgb, size,
 };
 use livestore::{
-    EventInput, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, Subscription,
-    create_store, query_db,
+    EventInput, Events, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions,
+    Subscription, create_store, query_db,
 };
 use livestore_schema::event_def::DateFromString;
 use livestore_sqlite::Row;
@@ -196,12 +196,8 @@ impl TodoView {
         }
     }
 
-    fn commit(&mut self, event: impl Into<EventInput>, cx: &mut Context<Self>) {
-        self.error = self
-            .store
-            .commit([event.into()])
-            .err()
-            .map(|e| e.to_string());
+    fn commit(&mut self, event: impl Events, cx: &mut Context<Self>) {
+        self.error = self.store.commit(event).err().map(|e| e.to_string());
         cx.notify();
     }
 

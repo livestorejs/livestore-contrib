@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use livestore::{
-    EventInput, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, create_store,
-    query_db,
+    EventInput, Events, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions,
+    create_store, query_db,
 };
 use livestore_schema::event_def::DateFromString;
 use livestore_sqlite::Row;
@@ -153,9 +153,9 @@ impl Default for State {
 }
 
 impl State {
-    fn commit(&mut self, event: impl Into<EventInput>) {
+    fn commit(&mut self, event: impl Events) {
         let Some(store) = &self.store else { return };
-        self.error = store.commit([event.into()]).err().map(|e| e.to_string());
+        self.error = store.commit(event).err().map(|e| e.to_string());
     }
 }
 
