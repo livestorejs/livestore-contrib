@@ -20,6 +20,9 @@ pub struct LocalLeader {
 }
 
 impl LocalLeader {
+    /// # Errors
+    ///
+    /// Fails as [`LeaderDb::open`] and [`Self::new`].
     pub fn open(
         state: impl AsRef<Path>,
         eventlog: impl AsRef<Path>,
@@ -34,10 +37,16 @@ impl LocalLeader {
         )
     }
 
+    /// # Errors
+    ///
+    /// Fails as [`LeaderDb::open_in_memory`] and [`Self::new`].
     pub fn open_in_memory(schema: Arc<Schema>, client_id: &str, session_id: &str) -> Result<Self> {
         Self::new(LeaderDb::open_in_memory(schema)?, client_id, session_id)
     }
 
+    /// # Errors
+    ///
+    /// Fails as [`LeaderDb::initial_sync_state`].
     pub fn new(db: LeaderDb, client_id: &str, session_id: &str) -> Result<Self> {
         let sync_state = db.initial_sync_state()?;
         Ok(Self {
@@ -49,6 +58,11 @@ impl LocalLeader {
     }
 
     /// Numbers a new local event after the local head, materializes it and appends it to the eventlog.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Merge`] or [`Error::Invariant`] when the local push does not advance, and as
+    /// [`LeaderDb::persist_local`].
     pub fn commit(&mut self, name: &str, args: Value) -> Result<Event> {
         let (seq_num, parent_seq_num) = self
             .sync_state
@@ -85,6 +99,10 @@ impl LocalLeader {
 
     /// `store.commit(event)`: replaces top-level `SessionIdSymbol` args with this session's id on a copy, so the
     /// caller's args stay untouched, then commits.
+    ///
+    /// # Errors
+    ///
+    /// Fails as [`Self::commit`].
     pub fn commit_val(&mut self, name: &str, args: &Val) -> Result<Event> {
         let resolved = match args {
             Val::Object(fields) => Val::Object(
@@ -108,7 +126,12 @@ impl LocalLeader {
     }
 
     /// Merges a backend page (`upstream-advance`, client-only events ignored) and persists the result.
-    pub fn apply_upstream(&mut self, pulled: Vec<PulledEvent>) -> Result<MergeResult> {
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Merge`] when the merge fails, with [`Error::Invariant`] when the batch is rejected or
+    /// empty, and as [`LeaderDb::persist_upstream`].
+    pub fn apply_upstream(&mut self, pulled: &[PulledEvent]) -> Result<MergeResult> {
         let new_events = pulled.iter().map(|p| p.event.clone()).collect();
         let merge = self.merge(&Payload::UpstreamAdvance { new_events }, true)?;
         let (new_sync_state, events, rollback_events, confirmed_events) = match &merge {
@@ -132,8 +155,8 @@ impl LocalLeader {
             .last()
             .map(|p| p.event.seq_num)
             .ok_or_else(|| Error::Invariant("upstream batch has no head".into()))?;
-        self.db.persist_upstream(UpstreamCommit {
-            pulled_events: &pulled,
+        self.db.persist_upstream(&UpstreamCommit {
+            pulled_events: pulled,
             events,
             rollback_events,
             confirmed_events,
@@ -143,6 +166,9 @@ impl LocalLeader {
         Ok(merge)
     }
 
+    /// # Errors
+    ///
+    /// Fails as [`LeaderDb::rebuild_state`].
     pub fn rebuild_state(&mut self) -> Result<()> {
         self.db.rebuild_state()
     }
@@ -182,6 +208,7 @@ impl LocalLeader {
 }
 
 /// `SessionIdSymbol`: stands for the committing session's id in event args.
+#[must_use]
 pub fn session_id_symbol() -> Val {
     Val::Symbol("SessionIdSymbol".into())
 }

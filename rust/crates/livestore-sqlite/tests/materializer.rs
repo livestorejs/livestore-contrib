@@ -103,7 +103,7 @@ fn schema() -> Arc<Schema> {
                 let sql = select.as_sql().map_err(other)?;
                 let rows = ctx.query(&sql.query, &sql.bind_values)?;
                 let previous_ids = select.decode_result(&Value::Array(rows)).map_err(other)?;
-                Ok(insert(&t1, a, previous_ids))
+                Ok(insert(&t1, a, &previous_ids))
             },
         )
         .event(
@@ -111,16 +111,16 @@ fn schema() -> Arc<Schema> {
             move |a, ctx| {
                 let rows = ctx.query("SELECT id FROM todos", &[])?;
                 let previous_ids = rows.into_iter().map(|r| r["id"].clone()).collect();
-                Ok(insert(&t2, a, previous_ids))
+                Ok(insert(&t2, a, &previous_ids))
             },
         )
-        .event(&EventDef::<()>::synced("emptyEventPayload"), |_, _| {
+        .event(&EventDef::<()>::synced("emptyEventPayload"), |(), _| {
             Ok(Vec::<SqlStatement>::new())
         })
         .build()
 }
 
-fn insert(table: &Table, a: TodoCreated, previous_ids: Value) -> SqlStatement {
+fn insert(table: &Table, a: TodoCreated, previous_ids: &Value) -> SqlStatement {
     table.insert([
         ("id", a.id.into()),
         ("text", a.text.into()),

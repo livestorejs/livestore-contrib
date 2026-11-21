@@ -27,11 +27,7 @@ fn restart_restores_pending_and_skips_rebuild_when_state_is_complete() {
         )
         .unwrap();
     leader
-        .apply_upstream(vec![remote(
-            1,
-            "v1.TodoCreated",
-            json!({"id": "r", "text": "R"}),
-        )])
+        .apply_upstream(&[remote(1, "v1.TodoCreated", json!({"id": "r", "text": "R"}))])
         .unwrap();
     let before = leader.sync_state().clone();
     drop(leader);

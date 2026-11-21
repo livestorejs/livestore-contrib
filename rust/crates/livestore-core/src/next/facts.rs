@@ -16,22 +16,27 @@ pub type FactValue = Option<Value>;
 pub struct Facts(Vec<(String, FactValue)>);
 
 impl Facts {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    #[must_use]
     pub fn has(&self, key: &str) -> bool {
         self.0.iter().any(|(k, _)| k == key)
     }
 
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&FactValue> {
         self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
@@ -117,6 +122,7 @@ pub enum FactValidationResult {
     },
 }
 
+#[must_use]
 pub fn facts_snapshot_for_events(events: &[HistoryDagNode], end: SeqNum) -> Facts {
     let mut facts = Facts::new();
     for event in events {
@@ -128,6 +134,7 @@ pub fn facts_snapshot_for_events(events: &[HistoryDagNode], end: SeqNum) -> Fact
     facts
 }
 
+#[must_use]
 pub fn facts_snapshot_for_dag(dag: &HistoryDag, end: Option<SeqNum>) -> Facts {
     let mut facts = Facts::new();
     for id in dag.topological_node_ids() {
@@ -142,6 +149,7 @@ pub fn facts_snapshot_for_dag(dag: &HistoryDag, end: Option<SeqNum>) -> Facts {
     facts
 }
 
+#[must_use]
 pub fn validate_facts(
     fact_groups: &[&FactsGroup],
     initial_snapshot: &Facts,
@@ -189,6 +197,7 @@ pub fn apply_fact_group(group: &FactsGroup, snapshot: &mut Facts) {
 }
 
 /// Whether `a` depends on `b`.
+#[must_use]
 pub fn depends_on(a: &FactsGroup, b: &FactsGroup) -> bool {
     facts_intersect(&a.dep_read, &b.mod_set)
         || facts_intersect(&a.dep_read, &b.mod_unset)
@@ -196,6 +205,7 @@ pub fn depends_on(a: &FactsGroup, b: &FactsGroup) -> bool {
         || facts_intersect(&a.dep_require, &b.mod_unset)
 }
 
+#[must_use]
 pub fn replaces_facts(a: &FactsGroup, b: &FactsGroup) -> bool {
     let replaces =
         |x: &Facts, y: &Facts| !x.is_empty() && !y.is_empty() && is_same_map_by_key(x, y);
@@ -207,10 +217,12 @@ pub fn replaces_facts(a: &FactsGroup, b: &FactsGroup) -> bool {
         || (replaces(&a.mod_unset, &b.mod_unset) && none_or_same(&a.mod_set, &b.mod_set))
 }
 
+#[must_use]
 pub fn is_same_map_by_key(a: &Facts, b: &Facts) -> bool {
     a.len() == b.len() && a.keys().all(|k| b.has(k))
 }
 
+#[must_use]
 pub fn facts_to_string(facts: &Facts) -> String {
     facts
         .iter()
@@ -223,6 +235,7 @@ pub fn facts_to_string(facts: &Facts) -> String {
 }
 
 /// JS template-literal rendering of a fact value (strings unquoted).
+#[must_use]
 pub fn fact_value_to_string(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
@@ -230,10 +243,12 @@ pub fn fact_value_to_string(value: &Value) -> String {
     }
 }
 
+#[must_use]
 pub fn facts_intersect(a: &Facts, b: &Facts) -> bool {
     a.keys().any(|k| b.has(k))
 }
 
+#[must_use]
 pub fn get_facts_group_for_event_args(
     callback: Option<&FactsCallback>,
     args: &Value,
@@ -257,6 +272,7 @@ pub fn get_facts_group_for_event_args(
     }
 }
 
+#[must_use]
 pub fn compare_event_sequence_numbers(a: &SeqNum, b: &SeqNum) -> Ordering {
     (a.global, a.client).cmp(&(b.global, b.client))
 }

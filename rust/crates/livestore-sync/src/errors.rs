@@ -30,6 +30,10 @@ pub struct UnknownError {
 }
 
 impl UnknownError {
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "takes owned errors, like `UnknownError.make({ cause })`; callers in upper layers pass them by value"
+    )]
     pub fn new(cause: impl ToString) -> Self {
         Self {
             cause: cause.to_string(),
@@ -37,6 +41,10 @@ impl UnknownError {
         }
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "takes owned errors, like `UnknownError.make({ cause })`; callers in upper layers pass them by value"
+    )]
     pub fn with_note(cause: impl ToString, note: &str) -> Self {
         Self {
             cause: cause.to_string(),
@@ -130,6 +138,7 @@ pub enum RejectedPushError {
 }
 
 impl RejectedPushError {
+    #[must_use]
     pub fn tag(&self) -> &'static str {
         match self {
             Self::LeaderAhead { .. } => "LeaderAheadError",
@@ -174,6 +183,7 @@ pub enum ShutdownCause {
 }
 
 impl ShutdownCause {
+    #[must_use]
     pub fn tag(&self) -> &'static str {
         match self {
             Self::IntentionalShutdownCause(_) => "IntentionalShutdownCause",

@@ -54,42 +54,50 @@ pub struct LeaderBuilder {
 }
 
 impl LeaderBuilder {
+    #[must_use]
     pub fn store_id(mut self, store_id: &str) -> Self {
         self.store_id = store_id.into();
         self
     }
 
+    #[must_use]
     pub fn client_id(mut self, client_id: &str) -> Self {
         self.client_id = client_id.into();
         self
     }
 
     /// `syncPayload`, handed to the backend constructor.
+    #[must_use]
     pub fn sync_payload(mut self, payload: serde_json::Value) -> Self {
         self.payload = Some(payload);
         self
     }
 
+    #[must_use]
     pub fn storage(mut self, storage: Storage) -> Self {
         self.storage = storage;
         self
     }
 
+    #[must_use]
     pub fn sync(mut self, options: SyncOptions) -> Self {
         self.sync = options;
         self
     }
 
+    #[must_use]
     pub fn params(mut self, params: Params) -> Self {
         self.params = params;
         self
     }
 
+    #[must_use]
     pub fn testing(mut self, testing: Testing) -> Self {
         self.testing = testing;
         self
     }
 
+    #[must_use]
     pub fn random(mut self, random: Arc<dyn Random>) -> Self {
         self.random = random;
         self
@@ -97,6 +105,10 @@ impl LeaderBuilder {
 
     /// Opens the databases (rebuilding incomplete state), makes the backend, starts the sync processor
     /// and, with `InitialSyncOptions::Blocking`, waits for the first pull to finish or time out.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`UnknownError`] when opening or booting the databases fails or the backend constructor fails.
     pub async fn boot(self) -> Result<Leader, UnknownError> {
         let span =
             tracing::info_span!("@livestore/common:leader-thread:boot", store_id = %self.store_id);
@@ -231,6 +243,7 @@ impl Drop for Inner {
 }
 
 impl Leader {
+    #[must_use]
     pub fn builder(schema: Arc<Schema>) -> LeaderBuilder {
         LeaderBuilder {
             schema,
@@ -246,6 +259,11 @@ impl Leader {
     }
 
     /// `LeaderSyncProcessor.push`: resolves after the batch is durable, published and scheduled for the backend.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`LeaderPushError::Rejected`] when the batch does not fit after the local head and must be rebased, and with
+    /// [`LeaderPushError::Interrupted`] when the leader stops before the batch is handled.
     pub async fn push(&self, events: Vec<Event>) -> Result<(), LeaderPushError> {
         if events.is_empty() {
             return Ok(());
@@ -266,20 +284,24 @@ impl Leader {
     }
 
     /// `pullQueue({ cursor })`: published payloads after `cursor`, then live ones.
+    #[must_use]
     pub fn pull_queue(&self, cursor: SeqNum) -> PullQueue {
         self.inner.sessions.make_queue(cursor)
     }
 
     /// `syncState` subscribable: `borrow()` = get, `changed()` = changes.
+    #[must_use]
     pub fn sync_state(&self) -> watch::Receiver<SyncState> {
         self.inner.sync_state.subscribe()
     }
 
     /// The shutdown channel: set once when the leader stops with a cause.
+    #[must_use]
     pub fn shutdown_cause(&self) -> watch::Receiver<Option<ShutdownCause>> {
         self.inner.shutdown.subscribe()
     }
 
+    #[must_use]
     pub fn boot_status(&self) -> watch::Receiver<BootStatus> {
         self.inner.boot_status.subscribe()
     }
@@ -301,6 +323,7 @@ impl Leader {
     }
 
     /// Network status (`isConnected` of the backend; `false` without one).
+    #[must_use]
     pub fn is_connected(&self) -> watch::Receiver<bool> {
         match &self.inner.backend {
             Some(b) => b.is_connected(),
@@ -308,32 +331,50 @@ impl Leader {
         }
     }
 
+    /// Runs a read query on the state DB.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`livestore_sqlite::Error::Sqlite`] when `sql` does not prepare or run.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the database mutex is poisoned.
     pub fn query(&self, sql: &str) -> Result<Vec<Row>, livestore_sqlite::Error> {
         self.inner.db.lock().expect("mutex poisoned").query(sql)
     }
 
     /// Direct access to the databases (tests, devtools-like inspection).
+    #[must_use]
     pub fn db(&self) -> &Arc<Mutex<LeaderDb>> {
         &self.inner.db
     }
 
+    #[must_use]
     pub fn schema(&self) -> &Arc<Schema> {
         &self.inner.schema
     }
 
+    #[must_use]
     pub fn store_id(&self) -> &str {
         &self.inner.store_id
     }
 
+    #[must_use]
     pub fn client_id(&self) -> &str {
         &self.inner.client_id
     }
 
+    #[must_use]
     pub fn sync_backend(&self) -> Option<&Arc<dyn SyncBackend>> {
         self.inner.backend.as_ref()
     }
 
     /// Stops the processor (scope close) and waits for it.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the actor mutex is poisoned.
     pub async fn shutdown(&self) {
         let _ = self.inner.mailbox.send(Msg::ShutdownRequested);
         let actor = self.inner.actor.lock().expect("mutex poisoned").take();
@@ -362,7 +403,9 @@ impl InitialSync {
         if p.2 == -1
             && let PageInfo::MoreKnown { remaining } = page_info
         {
-            p.2 = *remaining as i64 + processed as i64;
+            p.2 = i64::try_from(*remaining)
+                .unwrap_or(i64::MAX)
+                .saturating_add(i64::try_from(processed).unwrap_or(i64::MAX));
         }
         p.1 += processed;
         self.boot_status.send_replace(BootStatus::Syncing {

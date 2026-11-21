@@ -274,9 +274,9 @@ fn preserves_parallel_edge_order_and_removes_incident_edges_with_a_node() {
 
     dag.drop_node("b");
 
-    assert!(dag.edges("a", "b").is_empty());
-    assert!(dag.outbound_edge_entries("a").is_empty());
-    assert!(dag.outbound_edge_entries("c").is_empty());
+    assert_eq!(dag.edges("a", "b"), Vec::<EdgeIndex>::new());
+    assert_eq!(dag.outbound_edge_entries("a"), Vec::<EdgeEntry>::new());
+    assert_eq!(dag.outbound_edge_entries("c"), Vec::<EdgeEntry>::new());
 }
 
 #[test]
@@ -298,7 +298,7 @@ fn keeps_the_adjacency_indexes_consistent_for_self_loops() {
     dag.drop_node("a");
 
     assert_eq!(dag.size(), 0);
-    assert!(dag.edges("a", "a").is_empty());
+    assert_eq!(dag.edges("a", "a"), Vec::<EdgeIndex>::new());
 }
 
 #[test]

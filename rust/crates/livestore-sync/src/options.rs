@@ -50,6 +50,7 @@ impl Default for Backoff {
 }
 
 impl Backoff {
+    #[must_use]
     pub fn delay(&self, attempt: u32) -> Duration {
         let factor = 2u32.saturating_pow(attempt.saturating_sub(1));
         self.base.saturating_mul(factor).min(self.max)
@@ -106,6 +107,7 @@ pub struct Testing {
 }
 
 impl Testing {
+    #[must_use]
     pub fn with_local_push_processing(
         mut self,
         delay: impl Future<Output = ()> + Send + 'static,
@@ -135,6 +137,10 @@ pub trait Random: Send + Sync {
 pub struct StdRandom;
 
 impl Random for StdRandom {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "both values fit in f64's 53-bit mantissa"
+    )]
     fn next_between(&self, low: f64, high: f64) -> f64 {
         let unit = (RandomState::new().hash_one(0u8) >> 11) as f64 / (1u64 << 53) as f64;
         low + unit * (high - low)
@@ -146,6 +152,6 @@ pub struct FixedRandom;
 
 impl Random for FixedRandom {
     fn next_between(&self, low: f64, high: f64) -> f64 {
-        (low + high) / 2.0
+        f64::midpoint(low, high)
     }
 }

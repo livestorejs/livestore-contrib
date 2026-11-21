@@ -60,6 +60,7 @@ struct State {
 }
 
 impl MockSyncBackend {
+    #[must_use]
     pub fn new(options: MockSyncBackendOptions) -> Self {
         let (pushed_tx, pushed_rx) = mpsc::unbounded_channel();
         Self {
@@ -95,16 +96,28 @@ impl MockSyncBackend {
     }
 
     /// Fails the next `count` pushes with `error(batch)` or an `UnknownError`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the failure mutex is poisoned.
     pub fn fail_next_pushes(&self, count: usize, error: Option<PushFailure>) {
         *self.shared.fail_push.lock().expect("mutex poisoned") = (count, error);
     }
 
     /// Fails the next `count` pulls with `error()` or an `UnknownError`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the failure mutex is poisoned.
     pub fn fail_next_pulls(&self, count: usize, error: Option<PullFailure>) {
         *self.shared.fail_pull.lock().expect("mutex poisoned") = (count, error);
     }
 
     /// Next event accepted by a push (`pushedEvents` stream).
+    ///
+    /// # Panics
+    ///
+    /// Panics when the mock backend was dropped.
     pub async fn next_pushed(&self) -> GlobalEvent {
         self.shared
             .pushed_rx
@@ -143,6 +156,7 @@ impl MockSyncBackend {
         })
     }
 
+    #[must_use]
     pub fn constructor(&self) -> SyncBackendConstructor {
         let mock = self.clone();
         constructor(move |_| {
@@ -286,7 +300,7 @@ impl SyncBackend for MockClient {
         BackendMetadata {
             name: "@livestore/mock-sync".into(),
             description: "Just a mock sync backend".into(),
-            extra: Default::default(),
+            extra: serde_json::Map::default(),
         }
     }
 
@@ -306,6 +320,10 @@ fn item(event_encoded: GlobalEvent) -> PullItem {
 }
 
 /// Consumes one scripted failure: `Some(custom)` when one should fire.
+#[expect(
+    clippy::option_option,
+    reason = "`None` = no failure scheduled, `Some(None)` = default failure"
+)]
 fn consume<F: Clone>(failure: &Mutex<(usize, Option<F>)>) -> Option<Option<F>> {
     let mut f = failure.lock().expect("mutex poisoned");
     if f.0 == 0 {

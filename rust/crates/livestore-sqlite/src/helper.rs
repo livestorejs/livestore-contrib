@@ -9,6 +9,10 @@ use crate::Error;
 /// `withSavepoint`: runs `f` inside a uniquely named savepoint, releasing it on success and rolling back to it on
 /// failure or panic. Composes with an outer transaction. Savepoint statement failures surface as
 /// [`Error::SqliteQuery`] carrying the failing statement.
+///
+/// # Errors
+///
+/// Returns the error of `f`, or [`Error::SqliteQuery`] when a savepoint statement fails.
 pub fn with_savepoint<T, E: From<Error>>(
     conn: &Connection,
     f: impl FnOnce() -> Result<T, E>,

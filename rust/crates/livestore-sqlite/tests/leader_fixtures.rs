@@ -38,12 +38,12 @@ fn run_fixture(fixture: &Value) {
                 .map(|_| ()),
             "pull" => leader
                 .apply_upstream(
-                    op["events"]
+                    &op["events"]
                         .as_array()
                         .unwrap()
                         .iter()
                         .map(pulled)
-                        .collect(),
+                        .collect::<Vec<_>>(),
                 )
                 .map(|_| ()),
             "rebuild" => leader.rebuild_state(),
@@ -110,7 +110,11 @@ fn snapshot(leader: &LocalLeader) -> Value {
 
 fn rows(conn: &Connection, sql: &str) -> Value {
     let mut stmt = conn.prepare(sql).unwrap();
-    let names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
+    let names: Vec<String> = stmt
+        .column_names()
+        .iter()
+        .map(std::string::ToString::to_string)
+        .collect();
     let out = stmt
         .query_map([], |row| {
             let mut obj = Map::new();

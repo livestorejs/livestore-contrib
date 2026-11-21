@@ -1,4 +1,4 @@
-//! Shared helpers for the ports of LiveStore's wa-sqlite tests.
+//! Shared helpers for the ports of `LiveStore`'s wa-sqlite tests.
 #![allow(dead_code)]
 
 use std::path::PathBuf;

@@ -19,7 +19,11 @@ use rusqlite::Connection;
 use rusqlite::config::DbConfig;
 
 /// Runtime settings that make rusqlite's bundled SQLite behave like core's wa-sqlite build
-/// (`SQLITE_DQS=0`, no `SQLITE_DEFAULT_FOREIGN_KEYS`). Applied to every connection LiveStore opens.
+/// (`SQLITE_DQS=0`, no `SQLITE_DEFAULT_FOREIGN_KEYS`). Applied to every connection `LiveStore` opens.
+///
+/// # Errors
+///
+/// Fails when SQLite rejects a `DbConfig` setting.
 pub fn configure_connection(conn: &Connection) -> rusqlite::Result<()> {
     conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DQS_DML, false)?;
     conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DQS_DDL, false)?;

@@ -9,6 +9,11 @@ use livestore_sqlite::eventlog::STREAM_EVENTS_BATCH_SIZE_DEFAULT;
 use livestore_sqlite::{EventQuery, LeaderDb};
 use tokio::sync::watch;
 
+/// Streams the events matching `query`, one page per upstream head advance, until `query.until` or the end.
+///
+/// # Panics
+///
+/// Polling the stream panics when the database mutex is poisoned.
 pub fn stream_events(
     db: Arc<Mutex<LeaderDb>>,
     sync_state: watch::Receiver<SyncState>,
@@ -37,10 +42,13 @@ pub fn stream_events(
                 None if wait => return None,
                 None => s.head,
             };
-            let batch = query.batch_size.unwrap_or(STREAM_EVENTS_BATCH_SIZE_DEFAULT) as i64;
+            let batch = i64::try_from(query.batch_size.unwrap_or(STREAM_EVENTS_BATCH_SIZE_DEFAULT))
+                .unwrap_or(i64::MAX);
             let hard_stop = query.until.map_or(i64::MAX, |u| u.global);
             let target = SeqNum::new(
-                hard_stop.min(s.cursor.global + batch).min(next_head.global),
+                hard_stop
+                    .min(s.cursor.global.saturating_add(batch))
+                    .min(next_head.global),
                 0,
                 0,
             );

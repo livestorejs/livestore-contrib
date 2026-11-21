@@ -63,6 +63,7 @@ pub struct HistoryDag {
 }
 
 impl HistoryDag {
+    #[must_use]
     pub fn create(options: HistoryDagOptions) -> Self {
         Self {
             options,
@@ -70,6 +71,7 @@ impl HistoryDag {
         }
     }
 
+    #[must_use]
     pub fn copy(&self) -> HistoryDag {
         let mut clone = HistoryDag::create(self.options);
         for slot in self.nodes.iter().flatten() {
@@ -86,6 +88,11 @@ impl HistoryDag {
     }
 
     /// Kahn's algorithm with a FIFO queue seeded in node order, like Effect's `Graph.topo`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the graph has a cycle.
+    #[must_use]
     pub fn topological_node_ids(&self) -> Vec<String> {
         let mut in_degree: HashMap<usize, usize> = self
             .live_nodes()
@@ -118,6 +125,9 @@ impl HistoryDag {
         out
     }
 
+    /// # Panics
+    ///
+    /// Panics when a node with `id` already exists.
     pub fn add_node(&mut self, id: &str, node: HistoryDagNode) {
         assert!(!self.has_node(id), "HistoryDag node {id} already exists");
         self.id_to_index.insert(id.to_owned(), self.nodes.len());
@@ -129,10 +139,12 @@ impl HistoryDag {
         }));
     }
 
+    #[must_use]
     pub fn has_node(&self, id: &str) -> bool {
         self.id_to_index.contains_key(id)
     }
 
+    #[must_use]
     pub fn get_node_attributes(&self, id: &str) -> &HistoryDagNode {
         &self.slot(self.index(id)).node
     }
@@ -142,6 +154,7 @@ impl HistoryDag {
         &mut self.slot_mut(index).node
     }
 
+    #[must_use]
     pub fn nodes(&self) -> Vec<String> {
         self.live_nodes().map(|(_, s)| s.id.clone()).collect()
     }
@@ -150,6 +163,9 @@ impl HistoryDag {
         self.live_nodes().map(|(_, s)| (s.id.as_str(), &s.node))
     }
 
+    /// # Panics
+    ///
+    /// Panics when `source` or `target` is unknown, or on a self-loop when self-loops are disabled.
     pub fn add_edge(
         &mut self,
         source: &str,
@@ -160,9 +176,9 @@ impl HistoryDag {
             self.options.allow_self_loops || source != target,
             "HistoryDag self-loops are disabled"
         );
-        let (s, t) = match (self.id_to_index.get(source), self.id_to_index.get(target)) {
-            (Some(&s), Some(&t)) => (s, t),
-            _ => panic!("HistoryDag edge references unknown nodes: {source} -> {target}"),
+        let (Some(&s), Some(&t)) = (self.id_to_index.get(source), self.id_to_index.get(target))
+        else {
+            panic!("HistoryDag edge references unknown nodes: {source} -> {target}");
         };
         let e = self.edges.len();
         self.edges.push(Some(Edge {
@@ -175,6 +191,7 @@ impl HistoryDag {
         e
     }
 
+    #[must_use]
     pub fn edges(&self, source: &str, target: &str) -> Vec<EdgeIndex> {
         let (Some(&s), Some(&t)) = (self.id_to_index.get(source), self.id_to_index.get(target))
         else {
@@ -206,18 +223,24 @@ impl HistoryDag {
             .map_or_else(Vec::new, |&i| self.entries(&self.slot(i).incoming))
     }
 
+    #[must_use]
     pub fn get_edge_attributes(&self, edge: EdgeIndex) -> ConnectionType {
         self.edge(edge).connection
     }
 
+    #[must_use]
     pub fn source(&self, edge: EdgeIndex) -> String {
         self.id_at(self.edge(edge).source)
     }
 
+    #[must_use]
     pub fn target(&self, edge: EdgeIndex) -> String {
         self.id_at(self.edge(edge).target)
     }
 
+    /// # Panics
+    ///
+    /// Panics when the id index points at a dropped node (an internal invariant).
     pub fn drop_node(&mut self, id: &str) {
         let Some(index) = self.id_to_index.remove(id) else {
             return;
@@ -242,6 +265,7 @@ impl HistoryDag {
         }
     }
 
+    #[must_use]
     pub fn size(&self) -> usize {
         self.id_to_index.len()
     }
@@ -295,6 +319,7 @@ impl HistoryDag {
     }
 }
 
+#[must_use]
 pub fn empty_history_dag() -> HistoryDag {
     HistoryDag::create(HistoryDagOptions {
         allow_self_loops: false,
@@ -307,12 +332,13 @@ pub const ROOT_PARENT_NUM: SeqNum = SeqNum {
     rebase_generation: 0,
 };
 
+#[must_use]
 pub fn root_event_node() -> HistoryDagNode {
     HistoryDagNode {
         seq_num: SeqNum::ROOT,
         parent_seq_num: ROOT_PARENT_NUM,
         name: "__Root__".into(),
-        args: Value::Object(Default::default()),
+        args: Value::Object(serde_json::Map::default()),
         facts_group: FactsGroup::default(),
         meta: None,
         client_id: "root".into(),
@@ -321,6 +347,10 @@ pub fn root_event_node() -> HistoryDagNode {
 }
 
 /// `historyDagFromNodes`; the error string matches the TS thrown message.
+///
+/// # Errors
+///
+/// Fails when the nodes' facts do not validate (unless `skip_facts_check`).
 pub fn history_dag_from_nodes(
     nodes: &[HistoryDagNode],
     skip_facts_check: bool,

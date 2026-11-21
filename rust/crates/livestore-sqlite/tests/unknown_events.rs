@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use livestore_core::{Event, SeqNum};
 use livestore_schema::{EventDef, Schema, UnknownEventHandling, UnknownEventReason};
 use livestore_sqlite::eventlog::UNKNOWN_EVENT_SCHEMA_HASH;
+use livestore_sqlite::state::RebuildOptions;
 use livestore_sqlite::{Error, LeaderDb, materialize_event, state};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -98,7 +99,7 @@ fn rematerialization_advances_the_state_head_over_unknown_no_op_events() {
         &rematerialized,
         db.eventlog_conn(),
         db.schema(),
-        &Default::default(),
+        &RebuildOptions::default(),
     )
     .unwrap();
 

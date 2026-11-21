@@ -78,6 +78,10 @@ pub fn leader_db(schema: Arc<Schema>) -> LeaderDb {
 }
 
 /// `getJournalChangeset`: `None` without a row, `Some(None)` for a recorded no-op.
+#[expect(
+    clippy::option_option,
+    reason = "distinguishes a missing journal row from a recorded no-op"
+)]
 pub fn journal_changeset(conn: &Connection, key: SeqNum) -> Option<Option<Vec<u8>>> {
     conn.query_row(
         "SELECT changeset FROM __livestore_materialization_journal WHERE seqNumGlobal = ? AND seqNumClient = ? AND seqNumRebaseGeneration = ? LIMIT 1",

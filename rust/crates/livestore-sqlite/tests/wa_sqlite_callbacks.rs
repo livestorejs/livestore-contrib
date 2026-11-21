@@ -136,7 +136,7 @@ impl Aggregate<(), Value> for Product {
     fn init(&self, _: &mut Context<'_>) -> rusqlite::Result<()> {
         Ok(())
     }
-    fn step(&self, ctx: &mut Context<'_>, _: &mut ()) -> rusqlite::Result<()> {
+    fn step(&self, ctx: &mut Context<'_>, (): &mut ()) -> rusqlite::Result<()> {
         *self.0.lock().unwrap() *= ctx.get::<f64>(0)?;
         Ok(())
     }
@@ -235,12 +235,12 @@ fn should_call_update_hook() {
 
     db.execute_batch(
         "CREATE TABLE t(i integer primary key, x);
-        INSERT INTO t VALUES (1, 'foo'), (2, 'bar'), (12345678987654321, 'baz');",
+        INSERT INTO t VALUES (1, 'foo'), (2, 'bar'), (12_345_678_987_654_321, 'baz');",
     )
     .unwrap();
     assert_eq!(
         take(),
-        vec![row(18, 1), row(18, 2), row(18, 12345678987654321)]
+        vec![row(18, 1), row(18, 2), row(18, 12_345_678_987_654_321)]
     );
 
     db.execute_batch("DELETE FROM t WHERE i = 2").unwrap();
@@ -341,7 +341,7 @@ fn does_not_overwrite_update_hook() {
     let updates = Arc::new(Mutex::new(0));
     let seen = updates.clone();
     db.update_hook(Some(move |_: Action, _: &str, _: &str, _: i64| {
-        *seen.lock().unwrap() += 1
+        *seen.lock().unwrap() += 1;
     }));
     let commits = Arc::new(Mutex::new(0));
     counting_commit_hook(&db, &commits);

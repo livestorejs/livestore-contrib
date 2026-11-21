@@ -79,6 +79,10 @@ fn publishes_rebuild_completion_only_after_an_async_post_hook_finishes_1605() {
     );
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "ports one TS test case line for line"
+)]
 fn rebuilds_surviving_partial_state_after(failure: &'static str) {
     let dir = std::env::temp_dir().join(format!(
         "livestore-recreate-db-{failure}-{}",
@@ -91,7 +95,7 @@ fn rebuilds_surviving_partial_state_after(failure: &'static str) {
         let eventlog_db = Connection::open(dir.join("eventlog.db")).unwrap();
         eventlog::init(&eventlog_db).unwrap();
         for (i, id) in event_ids.iter().enumerate() {
-            let global = i as i64 + 1;
+            let global = i64::try_from(i).unwrap() + 1;
             let event = common::event(
                 "created",
                 json!({"id": id}),
@@ -171,7 +175,7 @@ fn rebuilds_surviving_partial_state_after(failure: &'static str) {
             );
             assert_eq!(
                 state::head(&partial).unwrap().global,
-                committed as i64,
+                i64::try_from(committed).unwrap(),
                 "{failure}"
             );
         }
@@ -270,9 +274,10 @@ fn make_hooks(
         post: Some(Arc::new(move |db: &Connection| {
             exec(db, "INSERT INTO scratch VALUES (3)")?;
             f3("post")?;
-            if should_fail.load(Ordering::SeqCst) && failure == "interrupt" {
-                panic!("interrupted inside the post hook");
-            }
+            assert!(
+                !(should_fail.load(Ordering::SeqCst) && failure == "interrupt"),
+                "interrupted inside the post hook"
+            );
             exec(db, "INSERT INTO rebuild_todos (id) VALUES ('post-hook')")
         })),
     }
