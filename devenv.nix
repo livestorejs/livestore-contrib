@@ -145,6 +145,8 @@ in
     MEGAREPO_SKIP_MEMBERS = "effect-utils,livestore";
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     PUPPETEER_SKIP_DOWNLOAD = "1";
+    # rusqlite's `session` feature generates SQLite bindings with bindgen, which needs libclang.
+    LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
   };
 
   tasks."lint:check".after = lib.mkForce [
