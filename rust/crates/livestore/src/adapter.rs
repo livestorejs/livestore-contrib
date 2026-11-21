@@ -96,7 +96,7 @@ async fn make_session(
         None => leader
             .db()
             .lock()
-            .unwrap()
+            .expect("mutex poisoned")
             .state_conn()
             .serialize(MAIN_DB)
             .map(|d| d.to_vec())?,
@@ -112,7 +112,7 @@ async fn make_session(
     }
 
     forward_leader_shutdown(&leader, args.shutdown.clone());
-    let finalizer_leader = leader.clone();
+    let finalizer_leader = leader;
     args.lifetime
         .add_finalizer(async move { finalizer_leader.shutdown().await }.boxed());
 

@@ -1,7 +1,7 @@
 //! `ClientSessionSyncProcessor`: one synchronous owner for local commits, pulled state and propagation
 //! decisions, plus an asynchronous runner that does the waiting (leader pushes, pull steps, shutdown).
 //!
-//! `commit`, each pull step and every message run through [`Processor::owned`]: the body holds the model
+//! `commit`, each pull step and every message run through `Processor::owned`: the body holds the model
 //! lock, never awaits, and queues its notifications and jobs in an outbox that is delivered only after
 //! the lock is released (and dropped if the body fails).
 
@@ -208,8 +208,7 @@ impl ClientSessionSyncProcessor {
             requested?;
             done.wait_for(Option::is_some)
                 .await
-                .map(|v| v.clone().expect("checked"))
-                .unwrap_or(Ok(()))
+                .map_or(Ok(()), |v| v.clone().expect("checked"))
         }
     }
 

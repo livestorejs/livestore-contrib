@@ -19,7 +19,6 @@ trait NotQueryable {
 
 impl<T> NotQueryable for Probe<T> {}
 
-#[allow(dead_code)]
 impl<T: Queryable> Probe<T> {
     const IS: bool = true;
 }

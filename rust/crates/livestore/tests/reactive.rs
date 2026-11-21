@@ -472,7 +472,6 @@ fn trivial_with_undefined_has_the_right_initial_values() {
     let a = graph.make_ref(1i64, RefOptions::default());
     let b = graph.make_ref(None::<i64>, RefOptions::default());
     let c = {
-        let (a, b) = (a.clone(), b.clone());
         graph.make_thunk(
             move |get| get.get(&a) + get.get(&b).unwrap_or(0),
             RefOptions::default(),
@@ -480,7 +479,7 @@ fn trivial_with_undefined_has_the_right_initial_values() {
     };
     let d = graph.make_ref(3i64, RefOptions::default());
     let e = {
-        let (c, d) = (c.clone(), d.clone());
+        let c = c.clone();
         graph.make_thunk(move |get| get.get(&c) + get.get(&d), RefOptions::default())
     };
     assert_eq!(graph.atom_count(), 5);
@@ -607,7 +606,6 @@ fn handles_nested_run_effects_from_effect_calling_set_ref() {
             .do_effect();
     }
     {
-        let b = b.clone();
         graph
             .make_effect(
                 move |get| {

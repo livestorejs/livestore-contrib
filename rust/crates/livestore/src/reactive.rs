@@ -286,7 +286,7 @@ impl<C: Clone + Send + Sync + 'static> ReactiveGraph<C> {
                         Some(i) => &mut s.deferred[i].1,
                         None => {
                             s.deferred.push((*effect, vec![]));
-                            &mut s.deferred.last_mut().unwrap().1
+                            &mut s.deferred.last_mut().expect("pushed above").1
                         }
                     };
                     if let Some(reason) = &options.debug_refresh_reason
