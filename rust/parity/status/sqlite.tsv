@@ -1,0 +1,167 @@
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should leave an accessible file	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should delete on close	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should create a file	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should create a database file	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should not create a file	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should open an existing file	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should create an anonymous file	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should signal short read	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/AccessHandlePoolVFS.test.js :: should round-trip data	n/a: exercises the JS AccessHandlePoolVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should upgrade v5	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should leave an accessible file	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should delete on close	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should create a file	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should create a database file	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should not create a file	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should open an existing file	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should create an anonymous file	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should signal short read	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBBatchAtomicVFS.test.js :: should round-trip data	n/a: exercises the JS IDBBatchAtomicVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should leave an accessible file	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should delete on close	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should create a file	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should create a database file	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should not create a file	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should open an existing file	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should create an anonymous file	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should signal short read	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/IDBMirrorVFS.test.js :: should round-trip data	n/a: exercises the JS IDBMirrorVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should leave an accessible file	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should delete on close	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should create a file	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should create a database file	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should not create a file	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should open an existing file	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should create an anonymous file	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should signal short read	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryAsyncVFS.test.js :: should round-trip data	n/a: exercises the JS MemoryAsyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should leave an accessible file	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should delete on close	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should create a file	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should create a database file	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should not create a file	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should open an existing file	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should create an anonymous file	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should signal short read	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/MemoryVFS.test.js :: should round-trip data	n/a: exercises the JS MemoryVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should leave an accessible file	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should delete on close	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should create a file	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should create a database file	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should not create a file	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should open an existing file	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should create an anonymous file	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should signal short read	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAdaptiveVFS.test.js :: should round-trip data	n/a: exercises the JS OPFSAdaptiveVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should leave an accessible file	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should delete on close	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should create a file	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should create a database file	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should not create a file	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should open an existing file	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should create an anonymous file	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should signal short read	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSAnyContextVFS.test.js :: should round-trip data	n/a: exercises the JS OPFSAnyContextVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should leave an accessible file	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should delete on close	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should create a file	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should create a database file	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should not create a file	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should open an existing file	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should create an anonymous file	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should signal short read	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSCoopSyncVFS.test.js :: should round-trip data	n/a: exercises the JS OPFSCoopSyncVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should leave an accessible file	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should delete on close	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should create a file	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should create a database file	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should not create a file	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should open an existing file	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should create an anonymous file	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should signal short read	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/OPFSPermutedVFS.test.js :: should round-trip data	n/a: exercises the JS OPFSPermutedVFS (browser storage VFS); the native client uses SQLite's built-in VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should make normal lock transitions	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should make recovery lock transitions	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should ignore repeated state requests	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should block multiple SHARED connections	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should timeout	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should allow multiple SHARED connections	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should allow SHARED and RESERVED connections	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should return BUSY on RESERVED deadlock	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should block EXCLUSIVE until SHARED connections are released	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should block SHARED until EXCLUSIVE connection is released	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should timeout on SHARED	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should timeout on EXCLUSIVE	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/WebLocksMixin.test.js :: should not deadlock with hint	n/a: tests wa-sqlite's Web Locks VFS mixin (browser navigator.locks); native SQLite uses the OS file locks of its built-in unix VFS
+packages/@livestore/wa-sqlite/test/api.test.js :: should execute a query	ported: livestore-sqlite::wa_sqlite_api::should_execute_a_query
+packages/@livestore/wa-sqlite/test/api.test.js :: should execute multiple queries	ported: livestore-sqlite::wa_sqlite_api::should_execute_multiple_queries
+packages/@livestore/wa-sqlite/test/api.test.js :: should return query results via callback	ported: livestore-sqlite::wa_sqlite_api::should_return_query_results_via_callback
+packages/@livestore/wa-sqlite/test/api.test.js :: should allow a transaction to span multiple calls	ported: livestore-sqlite::wa_sqlite_api::should_allow_a_transaction_to_span_multiple_calls
+packages/@livestore/wa-sqlite/test/api.test.js :: should return the library version	ported: livestore-sqlite::wa_sqlite_api::should_return_the_library_version
+packages/@livestore/wa-sqlite/test/api.test.js :: should constrain usage	ported: livestore-sqlite::wa_sqlite_api::should_constrain_usage
+packages/@livestore/wa-sqlite/test/api.test.js :: should iterate	ported: livestore-sqlite::wa_sqlite_api::should_iterate
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind blob	ported: livestore-sqlite::wa_sqlite_api::should_bind_blob
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind double	ported: livestore-sqlite::wa_sqlite_api::should_bind_double
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind int	ported: livestore-sqlite::wa_sqlite_api::should_bind_int
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind int64	ported: livestore-sqlite::wa_sqlite_api::should_bind_int64
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind null	ported: livestore-sqlite::wa_sqlite_api::should_bind_null
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind text	ported: livestore-sqlite::wa_sqlite_api::should_bind_text
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind boolean	ported: livestore-sqlite::wa_sqlite_api::should_bind_boolean
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind collection array	ported: livestore-sqlite::wa_sqlite_api::should_bind_collection_array
+packages/@livestore/wa-sqlite/test/api.test.js :: should bind collection object	ported: livestore-sqlite::wa_sqlite_api::should_bind_collection_object
+packages/@livestore/wa-sqlite/test/api.test.js :: should allow unscoped lifetime	ported: livestore-sqlite::wa_sqlite_api::should_allow_unscoped_lifetime
+packages/@livestore/wa-sqlite/test/api.test.js :: should clear bindings	ported: livestore-sqlite::wa_sqlite_api::should_clear_bindings
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should return an int	ported: livestore-sqlite::wa_sqlite_callbacks::should_return_an_int
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should return an int64	ported: livestore-sqlite::wa_sqlite_callbacks::should_return_an_int64
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should return a double	ported: livestore-sqlite::wa_sqlite_callbacks::should_return_a_double
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should return a string	ported: livestore-sqlite::wa_sqlite_callbacks::should_return_a_string
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should return a blob	ported: livestore-sqlite::wa_sqlite_callbacks::should_return_a_blob
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should return null	ported: livestore-sqlite::wa_sqlite_callbacks::should_return_null
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should pass a fixed number of arguments	ported: livestore-sqlite::wa_sqlite_callbacks::should_pass_a_fixed_number_of_arguments
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should pass a variable number of arguments	ported: livestore-sqlite::wa_sqlite_callbacks::should_pass_a_variable_number_of_arguments
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should create an aggregate function	ported: livestore-sqlite::wa_sqlite_callbacks::should_create_an_aggregate_function
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should return asynchronously	n/a: JS async (Promise-returning) UDF via Asyncify/JSPI; native callbacks are synchronous
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should call progress handler	ported: livestore-sqlite::wa_sqlite_callbacks::should_call_progress_handler
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should call asynchronous progress handler	n/a: JS async progress handler via Asyncify/JSPI; the sync handler is ported (should_call_progress_handler)
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should call authorizer	ported: livestore-sqlite::wa_sqlite_callbacks::should_call_authorizer
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should deny authorization	ported: livestore-sqlite::wa_sqlite_callbacks::should_deny_authorization
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should call async authorizer	n/a: JS async authorizer via Asyncify/JSPI; the sync authorizer is ported (should_call_authorizer)
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should call update hook	ported: livestore-sqlite::wa_sqlite_callbacks::should_call_update_hook
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: should call commit hook	ported: livestore-sqlite::wa_sqlite_callbacks::should_call_commit_hook
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: can change commit hook	ported: livestore-sqlite::wa_sqlite_callbacks::can_change_commit_hook
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: can rollback based on return value	ported: livestore-sqlite::wa_sqlite_callbacks::can_rollback_based_on_return_value
+packages/@livestore/wa-sqlite/test/callbacks.test.js :: does not overwrite update_hook	ported: livestore-sqlite::wa_sqlite_callbacks::does_not_overwrite_update_hook
+packages/@livestore/wa-sqlite/test/sql.test.js :: should rollback a transaction	ported: livestore-sqlite::wa_sqlite_sql::should_rollback_a_transaction
+packages/@livestore/wa-sqlite/test/sql.test.js :: should vacuum to minimize page count	ported: livestore-sqlite::wa_sqlite_sql::should_vacuum_to_minimize_page_count
+packages/@livestore/wa-sqlite/test/sql.test.js :: should vacuum to decrease page size	ported: livestore-sqlite::wa_sqlite_sql::should_vacuum_to_decrease_page_size
+packages/@livestore/wa-sqlite/test/sql.test.js :: should vacuum to increase page size	ported: livestore-sqlite::wa_sqlite_sql::should_vacuum_to_increase_page_size
+packages/@livestore/wa-sqlite/test/sql.test.js :: should recover after crash	ported: livestore-sqlite::wa_sqlite_sql::should_recover_after_crash (TS skips these for the default config; a native file DB is persistent and multi-connection, so they run; crash = child process exits mid-transaction)
+packages/@livestore/wa-sqlite/test/sql.test.js :: should transact atomically	ported: livestore-sqlite::wa_sqlite_sql::should_transact_atomically (TS skips these for the default config; a native file DB is persistent and multi-connection, so they run; crash = child process exits mid-transaction)
+tests/wa-sqlite/test/unit/basic-sqlite-api.test.ts :: should create and execute basic SQL statements	ported: livestore-sqlite::wa_sqlite_basic_sqlite_api::should_create_and_execute_basic_sql_statements
+tests/wa-sqlite/test/unit/basic-sqlite-api.test.ts :: should handle prepared statements	ported: livestore-sqlite::wa_sqlite_basic_sqlite_api::should_handle_prepared_statements
+tests/wa-sqlite/test/unit/basic-sqlite-api.test.ts :: should handle transactions	ported: livestore-sqlite::wa_sqlite_basic_sqlite_api::should_handle_transactions
+tests/wa-sqlite/test/unit/basic-sqlite-api.test.ts :: should handle named parameters	ported: livestore-sqlite::wa_sqlite_basic_sqlite_api::should_handle_named_parameters
+tests/wa-sqlite/test/unit/basic-sqlite-api.test.ts :: should handle different data types	ported: livestore-sqlite::wa_sqlite_basic_sqlite_api::should_handle_different_data_types
+tests/wa-sqlite/test/unit/basic-sqlite-api.test.ts :: should handle database export	ported: livestore-sqlite::wa_sqlite_basic_sqlite_api::should_handle_database_export
+tests/wa-sqlite/test/unit/basic-sqlite-api.test.ts :: should track row changes	ported: livestore-sqlite::wa_sqlite_basic_sqlite_api::should_track_row_changes
+tests/wa-sqlite/test/unit/serialize-deserialize.test.ts :: should handle single export correctly (baseline)	ported: livestore-sqlite::wa_sqlite_serialize_deserialize::should_handle_single_export_correctly_baseline
+tests/wa-sqlite/test/unit/serialize-deserialize.test.ts :: should fix corruption with 2 exports on first database	ported: livestore-sqlite::wa_sqlite_serialize_deserialize::should_fix_corruption_with_2_exports_on_first_database
+tests/wa-sqlite/test/unit/serialize-deserialize.test.ts :: should handle reasonable numbers of sequential exports	ported: livestore-sqlite::wa_sqlite_serialize_deserialize::should_handle_reasonable_numbers_of_sequential_exports
+tests/wa-sqlite/test/unit/serialize-deserialize.test.ts :: should prevent memory leaks with immediate buffer cleanup	ported: livestore-sqlite::wa_sqlite_serialize_deserialize::should_prevent_memory_leaks_with_immediate_buffer_cleanup
+tests/wa-sqlite/test/unit/serialize-deserialize.test.ts :: should maintain data integrity across exports	ported: livestore-sqlite::wa_sqlite_serialize_deserialize::should_maintain_data_integrity_across_exports
+tests/wa-sqlite/test/unit/serialize-deserialize.test.ts :: should handle large database (500MB+) import/export with timing	ported: livestore-sqlite::wa_sqlite_serialize_deserialize::should_handle_large_database_500mb_import_export_with_timing (skips like TS when tests/wa-sqlite/test/fixtures/large_test.db is absent; generate it with that package's test/setup/database-setup.ts)
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should create and manage session objects	ported: livestore-sqlite::wa_sqlite_session_extension::should_create_and_manage_session_objects
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should track changes when session is enabled	ported: livestore-sqlite::wa_sqlite_session_extension::should_track_changes_when_session_is_enabled
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should not track changes when session is disabled	ported: livestore-sqlite::wa_sqlite_session_extension::should_not_track_changes_when_session_is_disabled
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should apply changeset to revert changes	ported: livestore-sqlite::wa_sqlite_session_extension::should_apply_changeset_to_revert_changes
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should handle multiple independent sessions	ported: livestore-sqlite::wa_sqlite_session_extension::should_handle_multiple_independent_sessions
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should track specific table changes when attached to specific table	ported: livestore-sqlite::wa_sqlite_session_extension::should_track_specific_table_changes_when_attached_to_specific_table
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should handle session lifecycle properly	ported: livestore-sqlite::wa_sqlite_session_extension::should_handle_session_lifecycle_properly
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should invoke xConflict callback on DATA conflict	ported: livestore-sqlite::wa_sqlite_session_extension::should_invoke_xconflict_callback_on_data_conflict
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should invoke xConflict callback on CONFLICT (insert with existing PK)	ported: livestore-sqlite::wa_sqlite_session_extension::should_invoke_xconflict_callback_on_conflict_insert_with_existing_pk
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should invoke xConflict callback on NOTFOUND	ported: livestore-sqlite::wa_sqlite_session_extension::should_invoke_xconflict_callback_on_notfound
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should support xConflict returning OMIT to skip conflicting changes	ported: livestore-sqlite::wa_sqlite_session_extension::should_support_xconflict_returning_omit_to_skip_conflicting_changes
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should support xFilter to exclude tables from changeset application	ported: livestore-sqlite::wa_sqlite_session_extension::should_support_xfilter_to_exclude_tables_from_changeset_application
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should return SQLITE_OK when changeset applies without conflicts	ported: livestore-sqlite::wa_sqlite_session_extension::should_return_sqlite_ok_when_changeset_applies_without_conflicts
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should throw SQLITE_ABORT when xConflict returns ABORT	ported: livestore-sqlite::wa_sqlite_session_extension::should_throw_sqlite_abort_when_xconflict_returns_abort
+tests/wa-sqlite/test/unit/session-extension.test.ts :: should handle complex changeset operations	ported: livestore-sqlite::wa_sqlite_session_extension::should_handle_complex_changeset_operations

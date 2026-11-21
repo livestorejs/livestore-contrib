@@ -1,0 +1,576 @@
+[
+  {
+    "t": 245,
+    "dir": "open",
+    "url": "http://localhost:8787?storeId=capture-1&payload=%257B%2522authToken%2522%253A%2522insecure-token%2522%257D&transport=ws"
+  },
+  {
+    "t": 269,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ping\"}",
+    "json": {
+      "_tag": "Ping"
+    }
+  },
+  {
+    "t": 270,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Pong\"}",
+    "json": {
+      "_tag": "Pong"
+    }
+  },
+  {
+    "t": 273,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":0,\"tag\":\"SyncWsRpc.Pull\",\"payload\":{\"storeId\":\"capture-1\",\"payload\":{\"authToken\":\"insecure-token\"},\"live\":false,\"cursor\":{\"_tag\":\"None\"}},\"traceId\":\"0b0be9e4380b507debf306825731fb49\",\"spanId\":\"1d40f1643b37092a\",\"sampled\":true,\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 0,
+      "tag": "SyncWsRpc.Pull",
+      "payload": {
+        "storeId": "capture-1",
+        "payload": {
+          "authToken": "insecure-token"
+        },
+        "live": false,
+        "cursor": {
+          "_tag": "None"
+        }
+      },
+      "traceId": "0b0be9e4380b507debf306825731fb49",
+      "spanId": "1d40f1643b37092a",
+      "sampled": true,
+      "headers": []
+    }
+  },
+  {
+    "t": 293,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Chunk\",\"requestId\":0,\"values\":[{\"batch\":[],\"pageInfo\":{\"_tag\":\"NoMore\"},\"backendId\":\"dyxIUOkAmn4JgAiK7Szry\"}]}",
+    "json": {
+      "_tag": "Chunk",
+      "requestId": 0,
+      "values": [
+        {
+          "batch": [],
+          "pageInfo": {
+            "_tag": "NoMore"
+          },
+          "backendId": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      ]
+    }
+  },
+  {
+    "t": 294,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ack\",\"requestId\":0}",
+    "json": {
+      "_tag": "Ack",
+      "requestId": 0
+    }
+  },
+  {
+    "t": 295,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":0,\"exit\":{\"_tag\":\"Success\",\"value\":null}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 0,
+      "exit": {
+        "_tag": "Success",
+        "value": null
+      }
+    }
+  },
+  {
+    "t": 296,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":1,\"tag\":\"SyncWsRpc.Pull\",\"payload\":{\"storeId\":\"capture-1\",\"payload\":{\"authToken\":\"insecure-token\"},\"live\":true,\"cursor\":{\"_tag\":\"None\"}},\"traceId\":\"e085d99262e51482c1120373cf335912\",\"spanId\":\"8cc6c6ff4597d92f\",\"sampled\":true,\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 1,
+      "tag": "SyncWsRpc.Pull",
+      "payload": {
+        "storeId": "capture-1",
+        "payload": {
+          "authToken": "insecure-token"
+        },
+        "live": true,
+        "cursor": {
+          "_tag": "None"
+        }
+      },
+      "traceId": "e085d99262e51482c1120373cf335912",
+      "spanId": "8cc6c6ff4597d92f",
+      "sampled": true,
+      "headers": []
+    }
+  },
+  {
+    "t": 298,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Chunk\",\"requestId\":1,\"values\":[{\"batch\":[],\"pageInfo\":{\"_tag\":\"NoMore\"},\"backendId\":\"dyxIUOkAmn4JgAiK7Szry\"}]}",
+    "json": {
+      "_tag": "Chunk",
+      "requestId": 1,
+      "values": [
+        {
+          "batch": [],
+          "pageInfo": {
+            "_tag": "NoMore"
+          },
+          "backendId": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      ]
+    }
+  },
+  {
+    "t": 298,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ack\",\"requestId\":1}",
+    "json": {
+      "_tag": "Ack",
+      "requestId": 1
+    }
+  },
+  {
+    "t": 599,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":2,\"tag\":\"SyncWsRpc.Push\",\"payload\":{\"storeId\":\"capture-1\",\"payload\":{\"authToken\":\"insecure-token\"},\"batch\":[{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-1\",\"text\":\"Todo 1\"},\"seqNum\":1,\"parentSeqNum\":0,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"},{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-2\",\"text\":\"Todo 2\"},\"seqNum\":2,\"parentSeqNum\":1,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"}],\"backendId\":{\"_tag\":\"Some\",\"value\":\"dyxIUOkAmn4JgAiK7Szry\"}},\"traceId\":\"fbb7089929c06f2846ebe32db0479ac4\",\"spanId\":\"8b2ac5bb04cb0f6b\",\"sampled\":true,\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 2,
+      "tag": "SyncWsRpc.Push",
+      "payload": {
+        "storeId": "capture-1",
+        "payload": {
+          "authToken": "insecure-token"
+        },
+        "batch": [
+          {
+            "name": "todoCreated-v1",
+            "args": {
+              "id": "todo-1",
+              "text": "Todo 1"
+            },
+            "seqNum": 1,
+            "parentSeqNum": 0,
+            "clientId": "ts-client",
+            "sessionId": "ts-session"
+          },
+          {
+            "name": "todoCreated-v1",
+            "args": {
+              "id": "todo-2",
+              "text": "Todo 2"
+            },
+            "seqNum": 2,
+            "parentSeqNum": 1,
+            "clientId": "ts-client",
+            "sessionId": "ts-session"
+          }
+        ],
+        "backendId": {
+          "_tag": "Some",
+          "value": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      },
+      "traceId": "fbb7089929c06f2846ebe32db0479ac4",
+      "spanId": "8b2ac5bb04cb0f6b",
+      "sampled": true,
+      "headers": []
+    }
+  },
+  {
+    "t": 603,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Chunk\",\"requestId\":1,\"values\":[{\"batch\":[{\"eventEncoded\":{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-1\",\"text\":\"Todo 1\"},\"seqNum\":1,\"parentSeqNum\":0,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"},\"metadata\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"SyncMessage.SyncMetadata\",\"createdAt\":\"2026-11-20T09:04:24.154Z\"}}},{\"eventEncoded\":{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-2\",\"text\":\"Todo 2\"},\"seqNum\":2,\"parentSeqNum\":1,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"},\"metadata\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"SyncMessage.SyncMetadata\",\"createdAt\":\"2026-11-20T09:04:24.154Z\"}}}],\"pageInfo\":{\"_tag\":\"NoMore\"},\"backendId\":\"dyxIUOkAmn4JgAiK7Szry\"}]}",
+    "json": {
+      "_tag": "Chunk",
+      "requestId": 1,
+      "values": [
+        {
+          "batch": [
+            {
+              "eventEncoded": {
+                "name": "todoCreated-v1",
+                "args": {
+                  "id": "todo-1",
+                  "text": "Todo 1"
+                },
+                "seqNum": 1,
+                "parentSeqNum": 0,
+                "clientId": "ts-client",
+                "sessionId": "ts-session"
+              },
+              "metadata": {
+                "_tag": "Some",
+                "value": {
+                  "_tag": "SyncMessage.SyncMetadata",
+                  "createdAt": "2026-11-20T09:04:24.154Z"
+                }
+              }
+            },
+            {
+              "eventEncoded": {
+                "name": "todoCreated-v1",
+                "args": {
+                  "id": "todo-2",
+                  "text": "Todo 2"
+                },
+                "seqNum": 2,
+                "parentSeqNum": 1,
+                "clientId": "ts-client",
+                "sessionId": "ts-session"
+              },
+              "metadata": {
+                "_tag": "Some",
+                "value": {
+                  "_tag": "SyncMessage.SyncMetadata",
+                  "createdAt": "2026-11-20T09:04:24.154Z"
+                }
+              }
+            }
+          ],
+          "pageInfo": {
+            "_tag": "NoMore"
+          },
+          "backendId": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      ]
+    }
+  },
+  {
+    "t": 603,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ack\",\"requestId\":1}",
+    "json": {
+      "_tag": "Ack",
+      "requestId": 1
+    }
+  },
+  {
+    "t": 604,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":2,\"exit\":{\"_tag\":\"Success\",\"value\":{}}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 2,
+      "exit": {
+        "_tag": "Success",
+        "value": {}
+      }
+    }
+  },
+  {
+    "t": 604,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":3,\"tag\":\"SyncWsRpc.Push\",\"payload\":{\"storeId\":\"capture-1\",\"payload\":{\"authToken\":\"insecure-token\"},\"batch\":[{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-3\",\"text\":\"Todo 3\"},\"seqNum\":3,\"parentSeqNum\":2,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"}],\"backendId\":{\"_tag\":\"Some\",\"value\":\"dyxIUOkAmn4JgAiK7Szry\"}},\"traceId\":\"a8d9ff5cddae8473c38da761888855bb\",\"spanId\":\"7d69046df169b417\",\"sampled\":true,\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 3,
+      "tag": "SyncWsRpc.Push",
+      "payload": {
+        "storeId": "capture-1",
+        "payload": {
+          "authToken": "insecure-token"
+        },
+        "batch": [
+          {
+            "name": "todoCreated-v1",
+            "args": {
+              "id": "todo-3",
+              "text": "Todo 3"
+            },
+            "seqNum": 3,
+            "parentSeqNum": 2,
+            "clientId": "ts-client",
+            "sessionId": "ts-session"
+          }
+        ],
+        "backendId": {
+          "_tag": "Some",
+          "value": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      },
+      "traceId": "a8d9ff5cddae8473c38da761888855bb",
+      "spanId": "7d69046df169b417",
+      "sampled": true,
+      "headers": []
+    }
+  },
+  {
+    "t": 605,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Chunk\",\"requestId\":1,\"values\":[{\"batch\":[{\"eventEncoded\":{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-3\",\"text\":\"Todo 3\"},\"seqNum\":3,\"parentSeqNum\":2,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"},\"metadata\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"SyncMessage.SyncMetadata\",\"createdAt\":\"2026-11-20T09:04:24.158Z\"}}}],\"pageInfo\":{\"_tag\":\"NoMore\"},\"backendId\":\"dyxIUOkAmn4JgAiK7Szry\"}]}",
+    "json": {
+      "_tag": "Chunk",
+      "requestId": 1,
+      "values": [
+        {
+          "batch": [
+            {
+              "eventEncoded": {
+                "name": "todoCreated-v1",
+                "args": {
+                  "id": "todo-3",
+                  "text": "Todo 3"
+                },
+                "seqNum": 3,
+                "parentSeqNum": 2,
+                "clientId": "ts-client",
+                "sessionId": "ts-session"
+              },
+              "metadata": {
+                "_tag": "Some",
+                "value": {
+                  "_tag": "SyncMessage.SyncMetadata",
+                  "createdAt": "2026-11-20T09:04:24.158Z"
+                }
+              }
+            }
+          ],
+          "pageInfo": {
+            "_tag": "NoMore"
+          },
+          "backendId": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      ]
+    }
+  },
+  {
+    "t": 605,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ack\",\"requestId\":1}",
+    "json": {
+      "_tag": "Ack",
+      "requestId": 1
+    }
+  },
+  {
+    "t": 606,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Interrupt\",\"requestId\":1}",
+    "json": {
+      "_tag": "Interrupt",
+      "requestId": 1
+    }
+  },
+  {
+    "t": 606,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":3,\"exit\":{\"_tag\":\"Success\",\"value\":{}}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 3,
+      "exit": {
+        "_tag": "Success",
+        "value": {}
+      }
+    }
+  },
+  {
+    "t": 606,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":4,\"tag\":\"SyncWsRpc.Pull\",\"payload\":{\"storeId\":\"capture-1\",\"payload\":{\"authToken\":\"insecure-token\"},\"live\":false,\"cursor\":{\"_tag\":\"Some\",\"value\":{\"backendId\":\"dyxIUOkAmn4JgAiK7Szry\",\"eventSequenceNumber\":1}}},\"traceId\":\"be1bad6ce43cb1b0f246f77743286a61\",\"spanId\":\"3f0bcb1f3a41c87f\",\"sampled\":true,\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 4,
+      "tag": "SyncWsRpc.Pull",
+      "payload": {
+        "storeId": "capture-1",
+        "payload": {
+          "authToken": "insecure-token"
+        },
+        "live": false,
+        "cursor": {
+          "_tag": "Some",
+          "value": {
+            "backendId": "dyxIUOkAmn4JgAiK7Szry",
+            "eventSequenceNumber": 1
+          }
+        }
+      },
+      "traceId": "be1bad6ce43cb1b0f246f77743286a61",
+      "spanId": "3f0bcb1f3a41c87f",
+      "sampled": true,
+      "headers": []
+    }
+  },
+  {
+    "t": 607,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":1,\"exit\":{\"_tag\":\"Failure\",\"cause\":[{\"_tag\":\"Interrupt\",\"fiberId\":18}]}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 1,
+      "exit": {
+        "_tag": "Failure",
+        "cause": [
+          {
+            "_tag": "Interrupt",
+            "fiberId": 18
+          }
+        ]
+      }
+    }
+  },
+  {
+    "t": 608,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Chunk\",\"requestId\":4,\"values\":[{\"batch\":[{\"eventEncoded\":{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-2\",\"text\":\"Todo 2\"},\"seqNum\":2,\"parentSeqNum\":1,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"},\"metadata\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"SyncMessage.SyncMetadata\",\"createdAt\":\"2026-11-20T09:04:24.154Z\"}}},{\"eventEncoded\":{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-3\",\"text\":\"Todo 3\"},\"seqNum\":3,\"parentSeqNum\":2,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"},\"metadata\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"SyncMessage.SyncMetadata\",\"createdAt\":\"2026-11-20T09:04:24.158Z\"}}}],\"pageInfo\":{\"_tag\":\"NoMore\"},\"backendId\":\"dyxIUOkAmn4JgAiK7Szry\"}]}",
+    "json": {
+      "_tag": "Chunk",
+      "requestId": 4,
+      "values": [
+        {
+          "batch": [
+            {
+              "eventEncoded": {
+                "name": "todoCreated-v1",
+                "args": {
+                  "id": "todo-2",
+                  "text": "Todo 2"
+                },
+                "seqNum": 2,
+                "parentSeqNum": 1,
+                "clientId": "ts-client",
+                "sessionId": "ts-session"
+              },
+              "metadata": {
+                "_tag": "Some",
+                "value": {
+                  "_tag": "SyncMessage.SyncMetadata",
+                  "createdAt": "2026-11-20T09:04:24.154Z"
+                }
+              }
+            },
+            {
+              "eventEncoded": {
+                "name": "todoCreated-v1",
+                "args": {
+                  "id": "todo-3",
+                  "text": "Todo 3"
+                },
+                "seqNum": 3,
+                "parentSeqNum": 2,
+                "clientId": "ts-client",
+                "sessionId": "ts-session"
+              },
+              "metadata": {
+                "_tag": "Some",
+                "value": {
+                  "_tag": "SyncMessage.SyncMetadata",
+                  "createdAt": "2026-11-20T09:04:24.158Z"
+                }
+              }
+            }
+          ],
+          "pageInfo": {
+            "_tag": "NoMore"
+          },
+          "backendId": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      ]
+    }
+  },
+  {
+    "t": 608,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ack\",\"requestId\":4}",
+    "json": {
+      "_tag": "Ack",
+      "requestId": 4
+    }
+  },
+  {
+    "t": 608,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":4,\"exit\":{\"_tag\":\"Success\",\"value\":null}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 4,
+      "exit": {
+        "_tag": "Success",
+        "value": null
+      }
+    }
+  },
+  {
+    "t": 609,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":5,\"tag\":\"SyncWsRpc.Push\",\"payload\":{\"storeId\":\"capture-1\",\"payload\":{\"authToken\":\"insecure-token\"},\"batch\":[{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-2\",\"text\":\"Todo 99\"},\"seqNum\":2,\"parentSeqNum\":1,\"clientId\":\"ts-client\",\"sessionId\":\"ts-session\"}],\"backendId\":{\"_tag\":\"Some\",\"value\":\"dyxIUOkAmn4JgAiK7Szry\"}},\"traceId\":\"6d12a51b07f51e8d001be515986bb6c0\",\"spanId\":\"7614a1c448399112\",\"sampled\":true,\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 5,
+      "tag": "SyncWsRpc.Push",
+      "payload": {
+        "storeId": "capture-1",
+        "payload": {
+          "authToken": "insecure-token"
+        },
+        "batch": [
+          {
+            "name": "todoCreated-v1",
+            "args": {
+              "id": "todo-2",
+              "text": "Todo 99"
+            },
+            "seqNum": 2,
+            "parentSeqNum": 1,
+            "clientId": "ts-client",
+            "sessionId": "ts-session"
+          }
+        ],
+        "backendId": {
+          "_tag": "Some",
+          "value": "dyxIUOkAmn4JgAiK7Szry"
+        }
+      },
+      "traceId": "6d12a51b07f51e8d001be515986bb6c0",
+      "spanId": "7614a1c448399112",
+      "sampled": true,
+      "headers": []
+    }
+  },
+  {
+    "t": 611,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":5,\"exit\":{\"_tag\":\"Failure\",\"cause\":[{\"_tag\":\"Fail\",\"error\":{\"_tag\":\"ServerAheadError\",\"minimumExpectedNum\":3,\"providedNum\":1}}]}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 5,
+      "exit": {
+        "_tag": "Failure",
+        "cause": [
+          {
+            "_tag": "Fail",
+            "error": {
+              "_tag": "ServerAheadError",
+              "minimumExpectedNum": 3,
+              "providedNum": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "t": 10271,
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Ping\"}",
+    "json": {
+      "_tag": "Ping"
+    }
+  },
+  {
+    "t": 10271,
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Pong\"}",
+    "json": {
+      "_tag": "Pong"
+    }
+  }
+]

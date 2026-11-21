@@ -708,6 +708,11 @@ in
     after = [ "pnpm:install" ];
     exec = "DEVENV_TASK_PASSTHROUGH=1 rust/scripts/check-sqlite-build.sh";
   };
+  tasks."rust:test-live" = {
+    description = "Run the Rust client live tests against the pinned core sync-cf worker";
+    after = [ "pnpm:install" ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 rust/scripts/test-live.sh";
+  };
   tasks."check:rust" = {
     description = "All Rust client checks (kept out of check:all)";
     after = [
@@ -717,6 +722,7 @@ in
       "rust:doc"
       "rust:test"
       "rust:sqlite-check"
+      "rust:test-live"
     ];
   };
   tasks."workspace:shape-check" = {
