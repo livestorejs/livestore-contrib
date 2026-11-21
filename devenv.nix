@@ -714,9 +714,9 @@ in
     exec = "DEVENV_TASK_PASSTHROUGH=1 rust/scripts/test-live.sh";
   };
   tasks."rust:examples" = {
-    description = "Format-check, lint and build the Rust example apps (separate workspace: rust/examples)";
+    description = "Format-check, lint and build each Rust example app (each is its own workspace in rust/examples)";
     after = [ "mr:bootstrap" ];
-    exec = "cd rust/examples && cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings";
+    exec = "set -e; for d in rust/examples/*/; do (cd \"$d\" && cargo fmt --all --check && cargo clippy --all-targets --locked -- -D warnings); done";
   };
   tasks."check:rust" = {
     description = "All Rust client checks (kept out of check:all)";

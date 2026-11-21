@@ -67,8 +67,8 @@ export default githubWorkflow({
           name: 'Restore cargo cache',
           uses: 'actions/cache@v4',
           with: {
-            path: '~/.cargo/registry\n~/.cargo/git\nrust/examples/target',
-            key: "cargo-examples-${{ runner.os }}-${{ hashFiles('rust/examples/Cargo.lock', 'devenv.lock') }}",
+            path: '~/.cargo/registry\n~/.cargo/git\nrust/examples/*/target',
+            key: "cargo-examples-${{ runner.os }}-${{ hashFiles('rust/examples/*/Cargo.lock', 'devenv.lock') }}",
             'restore-keys': 'cargo-examples-${{ runner.os }}-',
           },
         },

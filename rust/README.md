@@ -77,4 +77,4 @@ rust/scripts/check-sqlite-build.sh               # compares SQLite behavior with
 `fixtures/wire/` holds real WebSocket captures; see
 [`sync-cf-wire-protocol.md`](../contributor-docs/rust/sync-cf-wire-protocol.md).
 
-Example apps live in [`examples/`](./examples/), in a separate Cargo workspace.
+Example apps live in [`examples/`](./examples/), each in its own Cargo workspace.

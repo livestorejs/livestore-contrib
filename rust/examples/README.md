@@ -1,14 +1,29 @@
 # Rust client examples
 
-Apps built on the Rust client. This folder is a separate Cargo workspace with its own
-`Cargo.lock`, so the examples' UI dependencies never enter the client's build. The examples
-use the client crates through path dependencies (`../crates/*`).
+Apps built on the Rust client. Each example is its own Cargo workspace with its own
+`Cargo.lock`, so UI dependencies never enter the client's build and examples cannot
+conflict with each other. They use the client crates through path dependencies
+(`../../crates/*`).
 
 | Example | UI | Shows |
 |---|---|---|
 | `todo-tui` | ratatui (terminal) | An app that already runs tokio |
+| `todo-gpui` | GPUI | An app without tokio; Cmd-N opens a second window on the same store |
+| `todo-rune` | rune | An Elm-style app whose UI thread must not block; results arrive through `AppHandle::update` |
 
-Checks: `devenv tasks run rust:examples` (format, clippy, build).
+All three are TodoMVC on the `livestore-todomvc` schema, so they sync with core's web TodoMVC.
+
+## Try them together
+
+1. In a core checkout, start the web TodoMVC with its sync server:
+   `cd examples/web-todomvc-sync-cf && pnpm dev`, then open
+   http://localhost:60001/?storeId=rust-demo.
+2. Here, start any of `./run-tui.sh`, `./run-gpui.sh` and `./run-rune.sh`. They default to
+   the store `rust-demo` and the sync server at `ws://localhost:60001/sync`. Each keeps its
+   data in `.data/<app>`. Override with `STORE`, `URL`, `DATA` or `CLIENT` (a second client
+   of the same app, for example `CLIENT=2 ./run-tui.sh`).
+
+Checks: `devenv tasks run rust:examples` (format and clippy for each example).
 
 ## `todo-tui`: terminal TodoMVC
 

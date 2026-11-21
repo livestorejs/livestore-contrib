@@ -20,7 +20,7 @@ Draft.
 | [`05-store`](./05-store/spec.md) | client session, store, reactivity, in-process adapter | `livestore` |
 
 `livestore-todomvc` (example schema) consumes the stack and owns no contract.
-Example apps live in `rust/examples/`, a separate Cargo workspace, so their UI
+Example apps live in `rust/examples/`, each in its own Cargo workspace, so their UI
 dependencies never enter the client's build.
 
 Dependency direction:

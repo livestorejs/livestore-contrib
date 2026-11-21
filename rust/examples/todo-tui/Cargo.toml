@@ -1,24 +1,42 @@
+# Own workspace: each example keeps its UI dependencies and lockfile to itself.
+[workspace]
+
 [package]
 name = "todo-tui"
-version.workspace = true
-edition.workspace = true
-publish.workspace = true
-rust-version.workspace = true
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
 
-[lints]
-workspace = true
 
 [[bin]]
 name = "todo"
 path = "src/main.rs"
 
 [dependencies]
-livestore.workspace = true
-livestore-schema.workspace = true
-livestore-sqlite.workspace = true
-livestore-sync.workspace = true
-livestore-sync-cf.workspace = true
-livestore-todomvc.workspace = true
-ratatui.workspace = true
-serde_json.workspace = true
-tokio.workspace = true
+livestore = { path = "../../crates/livestore" }
+livestore-schema = { path = "../../crates/livestore-schema" }
+livestore-sqlite = { path = "../../crates/livestore-sqlite" }
+livestore-sync = { path = "../../crates/livestore-sync" }
+livestore-sync-cf = { path = "../../crates/livestore-sync-cf" }
+livestore-todomvc = { path = "../../crates/livestore-todomvc" }
+ratatui = "0.30"
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1.47", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-std", "io-util", "process"] }
+
+[lints.rust]
+future_incompatible = { level = "warn", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+allow_attributes = "warn"
+dbg_macro = "warn"
+map_unwrap_or = "warn"
+needless_collect = "warn"
+redundant_clone = "warn"
+unnecessary_wraps = "warn"
+todo = "warn"
+print_stdout = "warn"
+

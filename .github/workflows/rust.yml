@@ -273,8 +273,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/examples/target
-          key: "cargo-examples-${{ runner.os }}-${{ hashFiles('rust/examples/Cargo.lock', 'devenv.lock') }}"
+            rust/examples/*/target
+          key: "cargo-examples-${{ runner.os }}-${{ hashFiles('rust/examples/*/Cargo.lock', 'devenv.lock') }}"
           restore-keys: 'cargo-examples-${{ runner.os }}-'
       - name: Check, lint and build the examples
         run: |
