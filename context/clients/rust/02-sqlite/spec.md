@@ -58,6 +58,13 @@ its allow-list.
 `LeaderPersistence`): `persist_local`, `persist_upstream`, rollback in reverse
 journal order, and `rebuild`. `LocalLeader` is a sync-less helper for fixtures.
 
+## Data Folder
+
+`LeaderDb::open_folder` (the leader's `Storage::Folder`) keeps a store in one
+folder, like core's adapters: `eventlog.db` and `state<state hash>.db`. A schema
+change that changes the state hash opens a new, empty state file, and boot
+rebuilds it from the eventlog. Boot deletes the state files of older schemas.
+
 ## One Leader per Data Folder
 
 `LeaderDb::open` takes an exclusive OS lock (`File::try_lock`) on

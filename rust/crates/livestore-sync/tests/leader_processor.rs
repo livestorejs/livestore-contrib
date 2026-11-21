@@ -31,10 +31,7 @@ async fn pushes_events_pending_across_a_restart_exactly_once_when_the_first_page
         Leader::builder(fixture_schema())
             .store_id("boot-race")
             .client_id("local")
-            .storage(Storage::Files {
-                state: dir.join("state.db"),
-                eventlog: dir.join("eventlog.db"),
-            })
+            .storage(Storage::Folder(dir.clone()))
             .sync(SyncOptions {
                 backend: Some(mock.constructor()),
                 live_pull: Some(true),

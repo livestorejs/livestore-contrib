@@ -25,10 +25,8 @@ use crate::stream_events::stream_events;
 )]
 pub enum Storage {
     InMemory,
-    Files {
-        state: PathBuf,
-        eventlog: PathBuf,
-    },
+    /// A data folder: `eventlog.db` and `state<state hash>.db` ([`LeaderDb::open_folder`]).
+    Folder(PathBuf),
     /// An already opened database (lets tests inspect or pre-seed it).
     Db(LeaderDb),
 }
@@ -118,9 +116,7 @@ impl LeaderBuilder {
     async fn boot_inner(self) -> Result<Leader, UnknownError> {
         let db = match self.storage {
             Storage::InMemory => LeaderDb::open_in_memory(self.schema.clone()),
-            Storage::Files { state, eventlog } => {
-                LeaderDb::open(state, eventlog, self.schema.clone())
-            }
+            Storage::Folder(dir) => LeaderDb::open_folder(dir, self.schema.clone()),
             Storage::Db(db) => Ok(db),
         }
         .map_err(UnknownError::new)?;
@@ -140,6 +136,9 @@ impl LeaderBuilder {
             }
         };
         let cancel = CancellationToken::new();
+        // Until the `Leader` owns `cancel`, dropping this boot future (a cancelled boot) must stop the
+        // tasks below, or they keep the data folder locked.
+        let mut boot_guard = CancelOnDrop(Some(cancel.clone()));
         if let Some(backend) = &backend {
             // Connect concurrently to speed up the first pull/push.
             let connect = backend.connect();
@@ -194,6 +193,7 @@ impl LeaderBuilder {
             let _ = tokio::time::timeout(timeout, blocking_rx.wait_for(|done| *done)).await;
         }
         boot_status.send_replace(BootStatus::Done);
+        boot_guard.0 = None;
 
         Ok(Leader {
             inner: Arc::new(Inner {
@@ -234,6 +234,16 @@ struct Inner {
     sessions: Arc<PullQueueSet>,
     cancel: CancellationToken,
     actor: Mutex<Option<JoinHandle<()>>>,
+}
+
+struct CancelOnDrop(Option<CancellationToken>);
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        if let Some(token) = &self.0 {
+            token.cancel();
+        }
+    }
 }
 
 impl Drop for Inner {

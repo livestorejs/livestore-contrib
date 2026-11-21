@@ -80,6 +80,26 @@ impl LeaderDb {
         Ok(db)
     }
 
+    /// Opens the databases in a data folder, like core's adapters: `eventlog.db` and
+    /// `state<state hash>.db`. A schema change that changes the state hash opens a new, empty state
+    /// file, which boot rebuilds from the eventlog. Older state files are deleted.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`Error::Unknown`] when the folder cannot be created, and otherwise as [`Self::open`].
+    pub fn open_folder(dir: impl AsRef<Path>, schema: Arc<Schema>) -> Result<Self> {
+        let dir = dir.as_ref();
+        std::fs::create_dir_all(dir)
+            .map_err(|e| Error::Unknown(format!("cannot create {}: {e}", dir.display())))?;
+        let state_name = format!(
+            "state{}.db",
+            livestore_schema::migration::state_hash(schema.tables())
+        );
+        let db = Self::open(dir.join(&state_name), dir.join("eventlog.db"), schema)?;
+        remove_old_state_files(dir, &state_name);
+        Ok(db)
+    }
+
     /// # Errors
     ///
     /// Fails as [`Self::boot_with`].
@@ -419,5 +439,24 @@ fn lock_file(eventlog_path: &Path) -> Result<File> {
             "cannot lock {}: {e}",
             path.display()
         ))),
+    }
+}
+
+/// Deletes `state*.db` files (and their SQLite side files) of earlier schemas. Best effort.
+fn remove_old_state_files(dir: &Path, current: &str) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let base = name
+            .trim_end_matches("-journal")
+            .trim_end_matches("-wal")
+            .trim_end_matches("-shm");
+        let is_state_db = Path::new(base).extension().is_some_and(|ext| ext == "db");
+        if base.starts_with("state") && is_state_db && base != current {
+            let _ = std::fs::remove_file(entry.path());
+        }
     }
 }
