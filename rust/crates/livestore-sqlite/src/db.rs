@@ -1,7 +1,8 @@
 //! `LeaderPersistence` over the two leader databases: boot, durable local and upstream commits.
 //! Holds no sync state; the sync processor (or [`crate::LocalLeader`]) owns it.
 
-use std::path::Path;
+use std::fs::{File, TryLockError};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use livestore_core::{Event, SeqNum, SyncState};
@@ -55,22 +56,28 @@ pub struct LeaderDb {
     eventlog: Connection,
     schema: Arc<Schema>,
     rebuild: RebuildOptions,
+    /// Held while open: only one leader may use these files.
+    lock: Option<File>,
 }
 
 impl LeaderDb {
     /// # Errors
     ///
-    /// Fails with [`Error::Sqlite`] when a database file cannot be opened, and otherwise as [`Self::boot_with`].
+    /// Fails with [`Error::Locked`] when another leader, in this or another process, has the eventlog open, with
+    /// [`Error::Sqlite`] when a database file cannot be opened, and otherwise as [`Self::boot_with`].
     pub fn open(
         state_path: impl AsRef<Path>,
         eventlog_path: impl AsRef<Path>,
         schema: Arc<Schema>,
     ) -> Result<Self> {
-        Self::boot(
+        let lock = lock_file(eventlog_path.as_ref())?;
+        let mut db = Self::boot(
             Connection::open(state_path)?,
             Connection::open(eventlog_path)?,
             schema,
-        )
+        )?;
+        db.lock = Some(lock);
+        Ok(db)
     }
 
     /// # Errors
@@ -117,6 +124,7 @@ impl LeaderDb {
             eventlog,
             schema,
             rebuild: options.rebuild,
+            lock: None,
         })
     }
 
@@ -391,4 +399,25 @@ pub fn query_rows_with(
         },
     )?;
     Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Takes an exclusive OS lock on `<eventlog>.lock`. The OS releases it when the process exits, even on a crash.
+fn lock_file(eventlog_path: &Path) -> Result<File> {
+    let mut path = eventlog_path.as_os_str().to_owned();
+    path.push(".lock");
+    let path = PathBuf::from(path);
+    let file = File::options()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&path)
+        .map_err(|e| Error::Unknown(format!("cannot open {}: {e}", path.display())))?;
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(TryLockError::WouldBlock) => Err(Error::Locked(path)),
+        Err(TryLockError::Error(e)) => Err(Error::Unknown(format!(
+            "cannot lock {}: {e}",
+            path.display()
+        ))),
+    }
 }

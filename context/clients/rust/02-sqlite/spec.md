@@ -57,3 +57,12 @@ its allow-list.
 `livestore-sqlite` holds the eventlog and state databases (`LeaderDb` =
 `LeaderPersistence`): `persist_local`, `persist_upstream`, rollback in reverse
 journal order, and `rebuild`. `LocalLeader` is a sync-less helper for fixtures.
+
+## One Leader per Data Folder
+
+`LeaderDb::open` takes an exclusive OS lock (`File::try_lock`) on
+`<eventlog>.lock` and holds it while the databases are open. A second leader on
+the same files, in the same or another process, fails with `Error::Locked`. The
+OS releases the lock when the process exits, also on a crash. Processes never
+share a data folder: a separate process uses its own folder and syncs through
+the backend like any other client.

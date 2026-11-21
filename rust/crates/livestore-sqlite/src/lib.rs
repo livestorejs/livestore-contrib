@@ -50,6 +50,8 @@ pub enum Error {
     Merge(#[from] MergeError),
     #[error("{0}")]
     Invariant(String),
+    #[error("data folder in use: another process holds {}", .0.display())]
+    Locked(std::path::PathBuf),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
