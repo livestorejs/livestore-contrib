@@ -95,6 +95,11 @@ impl From<&LogEvent> for EventInput {
 ///
 /// Each item is checked on its own, so a batch can mix event types and still cannot hold an
 /// unknown event or raw JSON.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a LiveStore event",
+    label = "expected a `#[derive(Event)]` struct, a tuple or a list of them",
+    note = "define the event as a struct with `#[derive(Event)]` and commit a value of it; a commit never takes a name or JSON"
+)]
 pub trait Events {
     /// Appends the events in order.
     fn push_into(self, out: &mut Vec<EventInput>);
