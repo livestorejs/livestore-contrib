@@ -9,6 +9,7 @@ use std::time::Duration;
 use futures::future::{BoxFuture, FutureExt, Shared};
 use futures::stream::{BoxStream, StreamExt};
 use livestore_core::{Event, SeqNum};
+use livestore_schema::EventInput;
 use livestore_schema::system_tables::state_tables;
 use livestore_schema::{MaterializeContext, Schema, SqlStatement, SqlValue};
 use livestore_sqlite::EventQuery;
@@ -19,7 +20,7 @@ use tracing::{Instrument, Span};
 use crate::errors::{Defect, Exit, MaterializeCause, StoreError};
 use crate::live_queries::{Ctx, Queryable, RcEntry, SignalDef};
 use crate::processor::{
-    ClientSessionSyncProcessor, EventInput, MaterializeOutput, ProcessorArgs, ProcessorParams,
+    ClientSessionSyncProcessor, MaterializeOutput, ProcessorArgs, ProcessorParams,
     SESSION_ID_SYMBOL, StateServices,
 };
 use crate::reactive::{
@@ -408,7 +409,7 @@ impl Store {
         options: &CommitOptions,
         events: Vec<EventInput>,
     ) -> Result<(), StoreError> {
-        let names: Vec<&str> = events.iter().map(|e| e.name.as_str()).collect();
+        let names: Vec<&str> = events.iter().map(EventInput::name).collect();
         let span = tracing::info_span!(
             parent: None,
             "LiveStore:commit",
@@ -421,7 +422,7 @@ impl Store {
         if events.is_empty() {
             return Ok(());
         }
-        let names: Vec<String> = events.iter().map(|e| e.name.clone()).collect();
+        let names: Vec<String> = events.iter().map(|e| e.name().to_owned()).collect();
         let write_tables = match self.inner.processor.commit(events) {
             Ok(tables) => tables,
             Err(e) => {

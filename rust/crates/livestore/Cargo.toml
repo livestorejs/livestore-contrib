@@ -24,6 +24,7 @@ tokio-util.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+livestore-schema = { workspace = true, features = ["testing"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
 livestore-sync = { workspace = true, features = ["testing"] }
 tokio = { workspace = true, features = ["test-util"] }

@@ -13,6 +13,14 @@ same process, seeds the session database from the leader's state snapshot, and
 wires the leader proxy (`session.rs`). There is exactly one session per store
 (LSC.CLIENT.RUST-R03).
 
+## Commit
+
+`store.commit([..])` takes `EventInput`s, and only a derived event
+(`#[derive(Event)]`) or a client document's `set` builds one. An app cannot
+commit an event by a string name or with JSON args. The ported core tests need
+untyped events; they use `EventInput::raw`, which exists only with the
+`testing` feature of `livestore-schema`.
+
 ## Process and Threads
 
 A Rust app runs LiveStore inside its own process. Windows, views and stores in

@@ -325,8 +325,9 @@ async fn client_document_pending_events_confirm_after_upstream_advance() {
         "static-session-id",
     ));
     let store = ctx.make_store(ctx.adapter(), None).await;
-    let (name, args) = session::app_config().set(json!({ "theme": "dark" }), Some("session-a"));
-    store.commit([(name, args.to_json_value())]).unwrap();
+    store
+        .commit([session::app_config().set(json!({ "theme": "dark" }), Some("session-a"))])
+        .unwrap();
 
     let processor = store.sync_processor();
     let initial = processor.sync_state();

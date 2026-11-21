@@ -12,7 +12,7 @@ use std::thread::ThreadId;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use livestore_core::{Event, MergeResult, Payload, SeqNum, SyncState, is_equal_encoded, merge};
-use livestore_schema::Schema;
+use livestore_schema::{EventInput, Schema};
 use livestore_sync::RejectedPushError;
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -32,28 +32,6 @@ pub const PULL_CHUNK_SIZE: usize = 32;
 pub const SESSION_ID_SYMBOL: &str = "__livestore_session_id__";
 
 const REENTRANT_OWNER_MESSAGE: &str = "Reentrant session transition from materialization";
-
-/// `{ name, args }` of an event to commit (`LiveStoreEvent.Input`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct EventInput {
-    pub name: String,
-    pub args: Value,
-}
-
-impl From<(String, Value)> for EventInput {
-    fn from((name, args): (String, Value)) -> Self {
-        EventInput { name, args }
-    }
-}
-
-impl From<&Event> for EventInput {
-    fn from(e: &Event) -> Self {
-        EventInput {
-            name: e.name.clone(),
-            args: e.args.clone(),
-        }
-    }
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct MaterializeOutput {
@@ -1185,7 +1163,8 @@ impl Owner<'_> {
         let session = &self.p.session;
         events
             .into_iter()
-            .map(|EventInput { name, args }| {
+            .map(|event| {
+                let (name, args) = event.into_parts();
                 let def = self.p.schema.event(&name).ok_or_else(|| {
                     StoreError::defect(format!("Unknown event definition: {name}"))
                 })?;

@@ -585,12 +585,12 @@ pub fn client_document_get(doc: &ClientDocument, id: Option<&str>) -> DbQueryDef
             return;
         }
         // Commit without refresh: this may run inside a computation.
-        let (name, args) = default_doc.set(Val::Undefined, Some(&id));
+        let event = default_doc.set(Val::Undefined, Some(&id));
         let options = crate::store::CommitOptions {
             label: Some(format!("{}.set:{id}", default_doc.name)),
             skip_refresh: true,
         };
-        let _ = store.commit_with(options, [(name, args.to_json_value())]);
+        let _ = store.commit_with(options, [event]);
     });
     let label = format!(
         "{}.get:{}",

@@ -75,6 +75,5 @@ async fn open(doc: &ClientDocument, store_id: &str, import_snapshot: Option<Vec<
 }
 
 fn commit_set(store: &Store, doc: &ClientDocument, value: Value) {
-    let (name, args) = doc.set(Val::from(value), None);
-    store.commit([(name, args.to_json_value())]).unwrap();
+    store.commit([doc.set(Val::from(value), None)]).unwrap();
 }

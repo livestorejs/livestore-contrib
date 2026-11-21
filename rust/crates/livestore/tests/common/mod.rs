@@ -17,10 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 pub fn ev(name: &str, args: Value) -> EventInput {
-    EventInput {
-        name: name.into(),
-        args,
-    }
+    EventInput::raw(name, args)
 }
 
 /// The todomvc fixture of the livestore package tests.

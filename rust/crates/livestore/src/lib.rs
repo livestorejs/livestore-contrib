@@ -21,7 +21,8 @@ pub use live_queries::{
     ComputedDef, DbQueryDef, LiveQuery, QueryGet, QueryInput, Queryable, SignalDef,
     client_document_get, computed, query_db, query_db_fn, signal,
 };
-pub use processor::{ClientSessionSyncProcessor, EventInput, PULL_CHUNK_SIZE, SESSION_ID_SYMBOL};
+pub use livestore_schema::{Event, EventInput};
+pub use processor::{ClientSessionSyncProcessor, PULL_CHUNK_SIZE, SESSION_ID_SYMBOL};
 pub use registry::{RegistryDefaults, RegistryStoreOptions, StoreOrLoading, StoreRegistry};
 pub use session::{ClientSession, LeaderPushFailure, LeaderThreadProxy, PullItem};
 pub use store::{

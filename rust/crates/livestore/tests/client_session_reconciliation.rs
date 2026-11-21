@@ -232,10 +232,7 @@ async fn yields_with_coherent_rows_journal_and_heads_and_replays_a_concurrent_no
                 // The owner is released before callbacks, so a subscriber can commit against the durable prefix.
                 if !std::mem::replace(&mut *subscriber_committed.lock().unwrap(), true) {
                     store
-                        .commit([EventInput {
-                            name: "increment".into(),
-                            args: json!({}),
-                        }])
+                        .commit([EventInput::raw("increment", json!({}))])
                         .unwrap();
                 }
                 first_prefix.done();
@@ -577,10 +574,7 @@ impl StoreHarness {
 }
 
 fn todo(id: &str, text: &str) -> EventInput {
-    EventInput {
-        name: "todoCreated".into(),
-        args: json!({ "id": id, "text": text }),
-    }
+    EventInput::raw("todoCreated", json!({ "id": id, "text": text }))
 }
 
 fn remote_created(global: i64) -> Event {
@@ -632,10 +626,7 @@ fn counter_schema() -> Arc<Schema> {
 }
 
 fn multiply(factor: i64) -> EventInput {
-    EventInput {
-        name: "multiply".into(),
-        args: json!({ "factor": factor }),
-    }
+    EventInput::raw("multiply", json!({ "factor": factor }))
 }
 
 fn counter_value(store: &Store) -> i64 {
