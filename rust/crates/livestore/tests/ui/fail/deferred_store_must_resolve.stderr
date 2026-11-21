@@ -1,0 +1,5 @@
+error[E0599]: no method named `commit` found for opaque type `impl Future<Output = Result<livestore::Store, StoreError>>` in the current scope
+ --> tests/ui/fail/deferred_store_must_resolve.rs:8:22
+  |
+8 |     let _ = deferred.commit(Vec::<(String, serde_json::Value)>::new());
+  |                      ^^^^^^ method not found in `impl Future<Output = Result<livestore::Store, StoreError>>`
