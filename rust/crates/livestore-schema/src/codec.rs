@@ -31,6 +31,10 @@ pub(crate) fn iso_string_from_js_date(ms: f64) -> String {
 
 /// Parses `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM[:SS[.fff]](Z|±HH:MM)` to epoch millis.
 fn parse_iso_millis(s: &str) -> Option<i64> {
+    // Valid ISO dates are ASCII, so the byte offsets below always fall on character boundaries.
+    if !s.is_ascii() {
+        return None;
+    }
     let num = |r: std::ops::Range<usize>| {
         s.get(r)
             .filter(|t| t.bytes().all(|b| b.is_ascii_digit()))

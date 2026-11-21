@@ -136,18 +136,23 @@ fn column_descriptor(column: &Column) -> Value {
     ])
 }
 
+/// 2^63: whole floats below this magnitude convert to `i64` without saturating.
+const I64_EXACT_LIMIT: f64 = 9_223_372_036_854_775_808.0;
+
 fn sort_canonical(values: &mut [Value]) {
     values.sort_by_cached_key(js_stringify);
 }
 
 #[expect(
     clippy::cast_possible_truncation,
-    reason = "JSON.stringify prints integral floats as integers"
+    reason = "JSON.stringify prints integral floats as integers; the range check keeps the cast exact"
 )]
 pub(crate) fn js_numbers(value: &Value) -> Value {
     match value {
         Value::Number(n) => match n.as_f64() {
-            Some(f) if n.is_f64() && f.fract() == 0.0 && f.abs() < 1e21 => json!(f as i64),
+            Some(f) if n.is_f64() && f.fract() == 0.0 && f.abs() < I64_EXACT_LIMIT => {
+                json!(f as i64)
+            }
             _ => value.clone(),
         },
         Value::Array(items) => Value::Array(items.iter().map(js_numbers).collect()),
