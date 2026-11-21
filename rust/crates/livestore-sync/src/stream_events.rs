@@ -49,7 +49,7 @@ pub fn stream_events(
                 until: Some(target),
                 ..query.clone()
             };
-            let events = db.lock().unwrap().query_events(&page);
+            let events = db.lock().expect("mutex poisoned").query_events(&page);
             let reached_until = query
                 .until
                 .is_some_and(|until| target.is_greater_than_or_equal(&until));

@@ -38,7 +38,7 @@ struct Inner {
 impl PullQueueSet {
     pub fn make_queue(&self, cursor: SeqNum) -> PullQueue {
         let (tx, rx) = mpsc::unbounded_channel();
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().expect("mutex poisoned");
         let mut since: Vec<&(SeqNum, SessionPullItem)> = inner
             .cache
             .iter()
@@ -72,12 +72,12 @@ impl PullQueueSet {
     }
 
     pub fn offer(&self, leader_head: SeqNum, item: SessionPullItem) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().expect("mutex poisoned");
         inner.cache.push((leader_head, item.clone()));
         inner.queues.retain(|q| q.send(item.clone()).is_ok());
     }
 
     pub fn close(&self) {
-        self.inner.lock().unwrap().queues.clear();
+        self.inner.lock().expect("mutex poisoned").queues.clear();
     }
 }

@@ -145,7 +145,10 @@ pub fn merge(
                 )));
             }
 
-            let new_upstream_head = new_events.last().unwrap().seq_num;
+            let new_upstream_head = new_events
+                .last()
+                .expect("empty new_events returned above")
+                .seq_num;
             let divergent_pending_index = find_divergence_point(
                 &sync_state.pending,
                 new_events,
@@ -216,7 +219,10 @@ pub fn merge(
 
                     MergeResult::Rebase {
                         new_sync_state: SyncState {
-                            local_head: rebased_pending.last().unwrap().seq_num,
+                            local_head: rebased_pending
+                                .last()
+                                .expect("the divergent pending slice is never empty")
+                                .seq_num,
                             pending: rebased_pending.clone(),
                             upstream_head: new_upstream_head,
                         },

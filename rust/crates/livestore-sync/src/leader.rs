@@ -19,7 +19,10 @@ use crate::processor::{Config, Deps, Msg, Processor};
 use crate::pull_queue::{PullQueue, PullQueueSet};
 use crate::stream_events::stream_events;
 
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "built once per leader; boxing the open database buys nothing"
+)]
 pub enum Storage {
     InMemory,
     Files {
@@ -306,7 +309,7 @@ impl Leader {
     }
 
     pub fn query(&self, sql: &str) -> Result<Vec<Row>, livestore_sqlite::Error> {
-        self.inner.db.lock().unwrap().query(sql)
+        self.inner.db.lock().expect("mutex poisoned").query(sql)
     }
 
     /// Direct access to the databases (tests, devtools-like inspection).
@@ -333,7 +336,7 @@ impl Leader {
     /// Stops the processor (scope close) and waits for it.
     pub async fn shutdown(&self) {
         let _ = self.inner.mailbox.send(Msg::ShutdownRequested);
-        let actor = self.inner.actor.lock().unwrap().take();
+        let actor = self.inner.actor.lock().expect("mutex poisoned").take();
         if let Some(actor) = actor {
             let _ = actor.await;
         }
@@ -352,7 +355,7 @@ pub(crate) struct InitialSync {
 
 impl InitialSync {
     pub fn update(&self, processed: usize, page_info: &PageInfo) {
-        let mut p = self.progress.lock().unwrap();
+        let mut p = self.progress.lock().expect("mutex poisoned");
         if p.0 {
             return;
         }
@@ -379,11 +382,21 @@ struct DbBackendId(Arc<Mutex<LeaderDb>>);
 
 impl BackendIdStore for DbBackendId {
     fn get(&self) -> Option<String> {
-        self.0.lock().unwrap().backend_id().ok().flatten()
+        self.0
+            .lock()
+            .expect("mutex poisoned")
+            .backend_id()
+            .ok()
+            .flatten()
     }
 
     fn set(&self, backend_id: &str) {
-        if let Err(e) = self.0.lock().unwrap().set_backend_id(backend_id) {
+        if let Err(e) = self
+            .0
+            .lock()
+            .expect("mutex poisoned")
+            .set_backend_id(backend_id)
+        {
             tracing::warn!(%e, "failed to store backend id");
         }
     }

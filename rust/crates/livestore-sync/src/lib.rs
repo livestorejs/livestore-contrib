@@ -2,6 +2,7 @@
 //! builder (`makeLeaderThreadLayer`) and `streamEventsWithSyncState`. With the `testing` feature it
 //! also provides `MockSyncBackend` and `EventFactory`.
 
+#![warn(clippy::unwrap_used)]
 // Errors carry full TS fields (sequence numbers, session ids); boxing them would only hurt matching.
 #![allow(clippy::result_large_err)]
 
