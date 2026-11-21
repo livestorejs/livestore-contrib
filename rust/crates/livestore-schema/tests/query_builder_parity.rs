@@ -994,3 +994,30 @@ fn rejects_nested_insert_values_because_flat_columns_are_required() {
     );
     assert!(err.to_string().contains("contactFirstName"));
 }
+
+/// Columns with their own schema encode query values and decode rows through it (`Schema.encodeSync(colDef.schema)`).
+#[test]
+fn encodes_and_decodes_custom_column_schemas() {
+    let prices = Table::new("prices")
+        .column(Column::text("id").primary_key())
+        .column(Column::text("amount").schema(s::finite_from_string()));
+    assert_eq!(
+        prices
+            .query()
+            .where_all([("amount", json!(3.5).into())])
+            .as_sql()
+            .unwrap(),
+        sql(
+            "SELECT * FROM 'prices' WHERE \"amount\" = ?",
+            [t("3.5")],
+            "prices"
+        )
+    );
+    assert_eq!(
+        prices
+            .query()
+            .decode_result(&json!([{ "id": "a", "amount": "3.5" }]))
+            .unwrap(),
+        json!([{ "id": "a", "amount": 3.5 }])
+    );
+}

@@ -57,6 +57,8 @@ pub struct Column {
     pub nullable: bool,
     pub primary_key: bool,
     pub auto_increment: bool,
+    /// Set by [`Column::schema`]: queries then encode and decode through `schema` instead of `kind`.
+    pub(crate) custom: bool,
     base: ValueSchema,
     wrap_custom: fn(ValueSchema) -> ValueSchema,
 }
@@ -107,6 +109,7 @@ impl Column {
             nullable: false,
             primary_key: false,
             auto_increment: false,
+            custom: false,
             base,
             wrap_custom: |schema| schema,
         }
@@ -173,6 +176,7 @@ impl Column {
 
     pub fn schema(mut self, schema: ValueSchema) -> Self {
         self.base = (self.wrap_custom)(schema);
+        self.custom = true;
         self.rebuild_schema()
     }
 

@@ -9,8 +9,9 @@ use std::collections::BTreeSet;
 use serde_json::{Map, Value};
 
 use crate::codec::{date_from_iso_string, iso_string_from_millis};
-use crate::table::{Column, ColumnKind, Table};
+use crate::table::{Column, ColumnKind, ColumnType, Table};
 use crate::value::{SqlStatement, SqlValue};
+use crate::value_schema::Val;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
@@ -721,6 +722,13 @@ fn encode(col: &Column, value: &Value) -> Result<SqlValue> {
             Err(fail("a non-null value"))
         };
     }
+    if col.custom {
+        let encoded = col
+            .schema
+            .encode(Val::from(value.clone()))
+            .map_err(|_| fail("a value the column schema accepts"))?;
+        return sql_value(col, encoded).ok_or_else(|| fail("a value SQLite can store"));
+    }
     Ok(match col.kind {
         ColumnKind::Text => SqlValue::Text(value.as_str().ok_or_else(|| fail("a string"))?.into()),
         ColumnKind::Integer => SqlValue::Integer(value.as_i64().ok_or_else(|| fail("an integer"))?),
@@ -780,6 +788,22 @@ fn decode(col: &Column, raw: &Value) -> Result<Value> {
             Err(fail("a non-null value"))
         };
     }
+    if col.custom {
+        let stored = match raw {
+            Value::Array(bytes) if col.ty == ColumnType::Blob => Val::Bytes(
+                bytes
+                    .iter()
+                    .filter_map(|b| b.as_u64().and_then(|b| u8::try_from(b).ok()))
+                    .collect(),
+            ),
+            other => Val::from(other.clone()),
+        };
+        let decoded = col.schema.decode(stored).map_err(|e| fail(&e.0))?;
+        return Ok(match decoded {
+            Val::Bytes(bytes) => Value::from(bytes),
+            other => other.to_json_value(),
+        });
+    }
     Ok(match col.kind {
         ColumnKind::Text | ColumnKind::Datetime if raw.is_string() => raw.clone(),
         ColumnKind::Integer | ColumnKind::Real if raw.is_number() => raw.clone(),
@@ -809,4 +833,19 @@ fn decode_write_result(table: &Table, returning: &[String], result: &Value) -> R
             .map(|r| decode_row(table, r, returning))
             .collect::<Result<_>>()?,
     ))
+}
+
+/// An encoded value as SQLite stores it; numbers become integers in integer columns.
+fn sql_value(col: &Column, encoded: Val) -> Option<SqlValue> {
+    Some(match encoded {
+        Val::Null => SqlValue::Null,
+        Val::Bool(b) => SqlValue::from(b),
+        Val::Number(n) if col.ty == ColumnType::Integer && n.fract() == 0.0 => {
+            SqlValue::Integer(n as i64)
+        }
+        Val::Number(n) => SqlValue::Real(n),
+        Val::String(s) => SqlValue::Text(s),
+        Val::Bytes(b) => SqlValue::Blob(b),
+        _ => return None,
+    })
 }
