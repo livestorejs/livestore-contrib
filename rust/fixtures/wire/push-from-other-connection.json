@@ -1,0 +1,48 @@
+[
+  {
+    "dir": "open",
+    "url": "ws://localhost:8787/?storeId=raw-1795165521892-big&transport=ws"
+  },
+  {
+    "dir": "client->server",
+    "raw": "{\"_tag\":\"Request\",\"id\":1,\"tag\":\"SyncWsRpc.Push\",\"payload\":{\"storeId\":\"raw-1795165521892-big\",\"batch\":[{\"name\":\"todoCreated-v1\",\"args\":{\"id\":\"todo-251\",\"text\":\"Todo 251\"},\"seqNum\":251,\"parentSeqNum\":250,\"clientId\":\"rust-client\",\"sessionId\":\"rust-session\"}],\"backendId\":{\"_tag\":\"Some\",\"value\":\"X4N6Uj254zU5hjTO272QD\"}},\"headers\":[]}",
+    "json": {
+      "_tag": "Request",
+      "id": 1,
+      "tag": "SyncWsRpc.Push",
+      "payload": {
+        "storeId": "raw-1795165521892-big",
+        "batch": [
+          {
+            "name": "todoCreated-v1",
+            "args": {
+              "id": "todo-251",
+              "text": "Todo 251"
+            },
+            "seqNum": 251,
+            "parentSeqNum": 250,
+            "clientId": "rust-client",
+            "sessionId": "rust-session"
+          }
+        ],
+        "backendId": {
+          "_tag": "Some",
+          "value": "X4N6Uj254zU5hjTO272QD"
+        }
+      },
+      "headers": []
+    }
+  },
+  {
+    "dir": "server->client",
+    "raw": "{\"_tag\":\"Exit\",\"requestId\":1,\"exit\":{\"_tag\":\"Success\",\"value\":{}}}",
+    "json": {
+      "_tag": "Exit",
+      "requestId": 1,
+      "exit": {
+        "_tag": "Success",
+        "value": {}
+      }
+    }
+  }
+]
