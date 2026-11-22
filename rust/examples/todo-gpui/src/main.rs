@@ -13,7 +13,7 @@ use std::collections::hash_map::RandomState;
 use std::hash::BuildHasher;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use gpui::{
     App, Application, Bounds, ClickEvent, Context, Div, FocusHandle, KeyBinding, KeyDownEvent,
@@ -298,7 +298,7 @@ impl TodoView {
                         this.commit(
                             TodoDeleted {
                                 id: delete_id.clone(),
-                                deleted_at: now(),
+                                deleted_at: DateFromString::now(),
                             },
                             cx,
                         );
@@ -426,7 +426,12 @@ impl Render for TodoView {
                                     .cursor_pointer()
                                     .child("Clear completed")
                                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                        this.commit(TodoClearedCompleted { deleted_at: now() }, cx);
+                                        this.commit(
+                                            TodoClearedCompleted {
+                                                deleted_at: DateFromString::now(),
+                                            },
+                                            cx,
+                                        );
                                     })),
                             ),
                     ),
@@ -529,16 +534,5 @@ fn random_id() -> String {
         a & 0xffff,
         b >> 48,
         b & 0xffff_ffff_ffff
-    )
-}
-
-/// `new Date()`.
-fn now() -> DateFromString {
-    DateFromString(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("the system clock is after 1970")
-            .as_secs_f64()
-            * 1000.0,
     )
 }

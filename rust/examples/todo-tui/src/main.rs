@@ -10,7 +10,7 @@ use std::collections::hash_map::RandomState;
 use std::hash::BuildHasher;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use livestore::{
     EventInput, InMemoryAdapter, QueryInput, Store, StoreOptions, SubscribeOptions, create_store,
@@ -236,11 +236,13 @@ fn handle(
             if let Some(id) = app.selected_id() {
                 store.commit(TodoDeleted {
                     id,
-                    deleted_at: now(),
+                    deleted_at: DateFromString::now(),
                 })?;
             }
         }
-        KeyCode::Char('c') => store.commit(TodoClearedCompleted { deleted_at: now() })?,
+        KeyCode::Char('c') => store.commit(TodoClearedCompleted {
+            deleted_at: DateFromString::now(),
+        })?,
         KeyCode::Char('1') => app.filter = Filter::All,
         KeyCode::Char('2') => app.filter = Filter::Active,
         KeyCode::Char('3') => app.filter = Filter::Completed,
@@ -457,16 +459,5 @@ fn random_id() -> String {
         a & 0xffff,
         b >> 48,
         b & 0xffff_ffff_ffff
-    )
-}
-
-/// `new Date()`.
-fn now() -> DateFromString {
-    DateFromString(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("the system clock is after 1970")
-            .as_secs_f64()
-            * 1000.0,
     )
 }
