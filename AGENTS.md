@@ -66,6 +66,12 @@ devenv tasks run release:surface:check --mode before
 mr status -o json
 ```
 
+Rust client (`rust/`, a Cargo workspace outside every JS tool):
+
+```bash
+devenv tasks run check:rust --mode before
+```
+
 ## GitHub Issues And Pull Requests
 
 - Describe PRs in terms of the problem, approach, validation, trade-offs, and follow-ups.

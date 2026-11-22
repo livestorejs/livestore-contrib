@@ -124,7 +124,22 @@ in
     effectUtilsPackages.megarepo
     pkgs.tsgolint
     pkgs.jq
-  ];
+  ]
+  ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+
+  # Rust client (`rust/`): toolchain pinned here; macOS linking needs libiconv.
+  languages.rust = {
+    enable = true;
+    channel = "stable";
+    version = "1.99.1";
+    components = [
+      "rustc"
+      "cargo"
+      "clippy"
+      "rustfmt"
+      "rust-std"
+    ];
+  };
 
   env = {
     MEGAREPO_SKIP_MEMBERS = "effect-utils,livestore";
@@ -661,6 +676,40 @@ in
       "pnpm:install"
     ];
     exec = "DEVENV_TASK_PASSTHROUGH=1 TEST_SYNC_PROVIDER=s2 pnpm --dir tests/sync-provider exec vitest run src/sync-provider.test.ts src/s2-specific.test.ts";
+  };
+  tasks."rust:check" = {
+    description = "Type-check the Rust client workspace (rust/)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && cargo check --workspace --all-targets --locked";
+  };
+  tasks."rust:fmt" = {
+    description = "Check Rust client formatting";
+    exec = "cd rust && cargo fmt --all --check";
+  };
+  tasks."rust:clippy" = {
+    description = "Lint the Rust client workspace with clippy (warnings are errors)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && cargo clippy --workspace --all-targets --locked -- -D warnings";
+  };
+  tasks."rust:doc" = {
+    description = "Build the Rust client docs (warnings are errors)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps --locked";
+  };
+  tasks."rust:test" = {
+    description = "Run the Rust client tests (live tests skip without a backend)";
+    after = [ "mr:bootstrap" ];
+    exec = "cd rust && DEVENV_TASK_PASSTHROUGH=1 cargo test --workspace --locked";
+  };
+  tasks."check:rust" = {
+    description = "All Rust client checks (kept out of check:all)";
+    after = [
+      "rust:fmt"
+      "rust:check"
+      "rust:clippy"
+      "rust:doc"
+      "rust:test"
+    ];
   };
   tasks."workspace:shape-check" = {
     description = "Validate the contrib workspace shape";

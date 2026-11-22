@@ -30,6 +30,9 @@ context/
   verification/    realize core 02-system/09-verification/
     scenarios/     private scenario runner/viewer realization
   cli/             standalone tool; realizes no core dimension
+  clients/         native clients in other languages; realize core 02-system/ end to end
+    rust/
+      01-schema/
   applications/    independently deployed applications
     discord-bot/
       01-runtime/  02-threading/  03-docs-assistant/  04-operations/  05-cli/
@@ -37,7 +40,9 @@ context/
 ```
 
 Every contrib package has a node. `cli` realizes no core dimension and lives at
-the top level. `applications/discord-bot/` is a composite application node, not
+the top level. `clients/rust/` is a composite node for the Rust client (`rust/`, not a pnpm
+package): it realizes several core dimensions at once, so its numbered children
+split it by part rather than by dimension. `applications/discord-bot/` is a composite application node, not
 a package realization or a second intent-layer root; its numbered children own
 runtime, feature, and operational contracts. `release/` is not a package: it describes how contrib realizes
 the core delivery contract for snapshot publishing, which spans every
@@ -64,6 +69,8 @@ IDs with links (see below).
 | `LSC.DT.EXPO-*`       | `devtools/expo/`          |
 | `LSC.VER.SCEN-*`      | `verification/scenarios/` |
 | `LSC.CLI-*`           | `cli/`                    |
+| `LSC.CLIENT.RUST-*`   | `clients/rust/`           |
+| `LSC.CLIENT.RUST.SCHEMA-*` | `clients/rust/01-schema/` |
 | `LSC.APP.DISCORD-*`   | `applications/discord-bot/` |
 | `LSC.APP.DISCORD.RT-*` | `applications/discord-bot/01-runtime/` |
 | `LSC.APP.DISCORD.THREAD-*` | `applications/discord-bot/02-threading/` |
