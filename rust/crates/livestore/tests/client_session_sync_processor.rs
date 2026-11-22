@@ -1197,9 +1197,7 @@ async fn should_fail_when_the_leader_confirms_a_local_event_with_a_different_mat
     let store = ctx.make_store(ctx.adapter(), None).await;
 
     store
-        .commit([EventInput::from(
-            TODO_DELETED_NON_PURE.make(TodoId { id: "1".into() }),
-        )])
+        .commit([TODO_DELETED_NON_PURE.make(TodoId { id: "1".into() })])
         .unwrap();
 
     let error = ctx.shutdown_exit().await.expect_err("failed shutdown");
@@ -1367,13 +1365,11 @@ async fn push_fiber_triggers_shutdown_on_non_rejected_push_error() {
 use livestore::EventInput;
 
 fn todo_created_input(id: &str) -> EventInput {
-    TODO_CREATED
-        .make(TodoCreated {
-            id: id.into(),
-            text: id.into(),
-            completed: Some(false),
-        })
-        .into()
+    TODO_CREATED.make(TodoCreated {
+        id: id.into(),
+        text: id.into(),
+        completed: Some(false),
+    })
 }
 
 fn ids_of(events: &Arc<Mutex<Vec<Event>>>) -> Vec<String> {

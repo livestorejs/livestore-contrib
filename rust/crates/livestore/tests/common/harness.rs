@@ -267,13 +267,11 @@ impl Harness {
 }
 
 pub fn todo(id: &str) -> EventInput {
-    session::TODO_CREATED
-        .make(session::TodoCreated {
-            id: id.into(),
-            text: id.into(),
-            completed: Some(false),
-        })
-        .into()
+    session::TODO_CREATED.make(session::TodoCreated {
+        id: id.into(),
+        text: id.into(),
+        completed: Some(false),
+    })
 }
 
 /// `StateHead.layerTest` and a journal that records nothing, over real savepoints.

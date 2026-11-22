@@ -151,7 +151,7 @@ async fn preserves_rows_and_durable_head_during_cancellation(update_same_row: bo
         h.store.sync_processor().sync_state().local_head
     );
     let concurrent = if update_same_row {
-        EventInput::from(TODO_COMPLETED.make(TodoId { id: "local".into() }))
+        TODO_COMPLETED.make(TodoId { id: "local".into() })
     } else {
         todo("concurrent", "concurrent")
     };

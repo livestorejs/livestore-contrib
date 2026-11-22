@@ -61,17 +61,15 @@ pub mod todomvc {
     }
 
     pub fn todo_created(id: &str, text: &str, completed: bool) -> EventInput {
-        TODO_CREATED
-            .make(TodoCreated {
-                id: id.into(),
-                text: text.into(),
-                completed,
-            })
-            .into()
+        TODO_CREATED.make(TodoCreated {
+            id: id.into(),
+            text: text.into(),
+            completed,
+        })
     }
 
     pub fn todo_completed(id: &str) -> EventInput {
-        TODO_COMPLETED.make(TodoId { id: id.into() }).into()
+        TODO_COMPLETED.make(TodoId { id: id.into() })
     }
 
     pub fn schema() -> Arc<Schema> {
@@ -191,13 +189,11 @@ pub mod session {
     }
 
     pub fn todo_created(id: &str, text: &str) -> EventInput {
-        TODO_CREATED
-            .make(TodoCreated {
-                id: id.into(),
-                text: text.into(),
-                completed: Some(false),
-            })
-            .into()
+        TODO_CREATED.make(TodoCreated {
+            id: id.into(),
+            text: text.into(),
+            completed: Some(false),
+        })
     }
 
     pub fn todo_created_args(id: &str, text: &str) -> Value {

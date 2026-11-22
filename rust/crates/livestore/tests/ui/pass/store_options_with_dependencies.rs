@@ -5,7 +5,7 @@ use livestore_schema::Schema;
 
 async fn _store(schema: Arc<Schema>, adapter: Adapter) {
     let store = create_store(StoreOptions::new(schema, adapter, "main")).await.unwrap();
-    let _ = store.commit(Vec::<(String, serde_json::Value)>::new());
+    let _ = store.commit(Vec::<livestore::EventInput>::new());
 }
 
 fn main() {}
