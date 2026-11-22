@@ -1,0 +1,53 @@
+error[E0277]: `&str` is not a LiveStore event
+ --> tests/ui/fail/commit_rejects_untyped_events.rs:5:26
+  |
+5 |     let _ = store.commit("v1.TodoCreated");
+  |                   ------ ^^^^^^^^^^^^^^^^ expected a `#[derive(Event)]` struct, a tuple or a list of them
+  |                   |
+  |                   required by a bound introduced by this call
+  |
+  = help: the trait `Event` is not implemented for `&str`
+  = note: define the event as a struct with `#[derive(Event)]` and commit a value of it; a commit never takes a name or JSON
+  = help: the following other types implement trait `Events`:
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+            (A, B, C, D, E, F, G, H, I)
+          and $N others
+  = note: required for `&str` to implement `Events`
+note: required by a bound in `livestore::Store::commit`
+ --> src/store.rs
+  |
+  |     pub fn commit(&self, events: impl Events) -> Result<(), StoreError> {
+  |                                       ^^^^^^ required by this bound in `Store::commit`
+
+error[E0277]: `Value` is not a LiveStore event
+ --> tests/ui/fail/commit_rejects_untyped_events.rs:6:26
+  |
+6 |     let _ = store.commit(json!({ "id": "1", "text": "Make coffee" }));
+  |                   ------ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected a `#[derive(Event)]` struct, a tuple or a list of them
+  |                   |
+  |                   required by a bound introduced by this call
+  |
+  = help: the trait `Event` is not implemented for `Value`
+  = note: define the event as a struct with `#[derive(Event)]` and commit a value of it; a commit never takes a name or JSON
+  = help: the following other types implement trait `Events`:
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+            (A, B, C, D, E, F, G, H, I)
+          and $N others
+  = note: required for `Value` to implement `Events`
+note: required by a bound in `livestore::Store::commit`
+ --> src/store.rs
+  |
+  |     pub fn commit(&self, events: impl Events) -> Result<(), StoreError> {
+  |                                       ^^^^^^ required by this bound in `Store::commit`

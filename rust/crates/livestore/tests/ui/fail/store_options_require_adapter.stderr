@@ -1,0 +1,15 @@
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+ --> tests/ui/fail/store_options_require_adapter.rs:7:5
+  |
+7 |     StoreOptions::new(schema, "main")
+  |     ^^^^^^^^^^^^^^^^^         ------ argument #2 of type `Arc<(dyn Fn(AdapterArgs) -> Pin<Box<(dyn Future<Output = Result<ClientSession, StoreError>> + Send + 'static)>> + Send + Sync + 'static)>` is missing
+  |
+note: associated function defined here
+ --> src/store.rs
+  |
+  |     pub fn new(schema: Arc<Schema>, adapter: Adapter, store_id: &str) -> Self {
+  |            ^^^
+help: provide the argument
+  |
+7 |     StoreOptions::new(schema, /* Arc<dyn Fn(AdapterArgs) -> Pin<Box<dyn Future<Output = Result<ClientSession, StoreError>> + Send>> + Send + Sync> */, "main")
+  |                               ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
