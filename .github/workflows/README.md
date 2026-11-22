@@ -14,7 +14,9 @@ are `source-policy`, `pr/minimal-dev`, `pr/quality`, `pr/types`,
 Validates the Rust client in `rust/`: `rust:check`, `rust:clippy`, `rust:doc`,
 `rust:test`, and `rust:test-live` (against the pinned core's sync-cf worker). It runs only
 when `rust/`, its own workflow files, the devenv files, or the megarepo pin
-change, and is not a required check.
+change, and is not a required check. A second job, `rust/examples`, runs
+`rust:examples` on the example workspaces in `rust/examples/`, so the
+examples' UI dependencies stay out of the client job.
 
 ## `release.yml`
 
