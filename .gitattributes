@@ -21,3 +21,6 @@ pnpm-workspace.yaml linguist-generated=true
 **/*.lockb linguist-generated=true
 pnpm-lock.yaml linguist-generated=true
 **/pnpm-lock.yaml linguist-generated=true
+
+# Rust test fixtures generated from core by rust/scripts/gen-*-fixtures.ts
+rust/fixtures/** linguist-generated=true

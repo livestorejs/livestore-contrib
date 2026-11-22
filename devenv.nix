@@ -145,6 +145,8 @@ in
     MEGAREPO_SKIP_MEMBERS = "effect-utils,livestore";
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     PUPPETEER_SKIP_DOWNLOAD = "1";
+    # rusqlite's `session` feature generates SQLite bindings with bindgen, which needs libclang.
+    LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
   };
 
   tasks."lint:check".after = lib.mkForce [
@@ -701,6 +703,11 @@ in
     after = [ "mr:bootstrap" ];
     exec = "cd rust && DEVENV_TASK_PASSTHROUGH=1 cargo test --workspace --locked";
   };
+  tasks."rust:sqlite-check" = {
+    description = "Fail if the Rust client's SQLite build drifts from the pinned core wa-sqlite build";
+    after = [ "pnpm:install" ];
+    exec = "DEVENV_TASK_PASSTHROUGH=1 rust/scripts/check-sqlite-build.sh";
+  };
   tasks."check:rust" = {
     description = "All Rust client checks (kept out of check:all)";
     after = [
@@ -709,6 +716,7 @@ in
       "rust:clippy"
       "rust:doc"
       "rust:test"
+      "rust:sqlite-check"
     ];
   };
   tasks."workspace:shape-check" = {

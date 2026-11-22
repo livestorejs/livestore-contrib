@@ -34,3 +34,9 @@ Effect's internal JSON. Its hashes stay the same from run to run but differ from
 TypeScript's. Table fingerprints keep core's descriptor, so tables without JSON
 columns hash exactly like core. Recursive schemas (`suspend`) are described once
 and then referenced.
+
+## Syncstate
+
+`livestore-core` ports `sync/syncstate.ts` (`merge`) and is checked against
+fixtures from `rust/scripts/gen-syncstate-fixtures.ts`; the leader in
+[03-leader](../03-leader/spec.md) uses it.

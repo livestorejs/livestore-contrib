@@ -1,0 +1,29 @@
+[package]
+name = "livestore-sqlite"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# `LocalLeader::commit_val`, for tests that port core's untyped cases.
+testing = ["livestore-schema/testing"]
+
+[dependencies]
+livestore-core.workspace = true
+livestore-schema.workspace = true
+rusqlite = { workspace = true, features = ["serialize"] }
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+livestore-schema = { workspace = true, features = ["testing"] }
+livestore-sqlite = { path = ".", features = ["testing"] }
+livestore-todomvc.workspace = true
+rusqlite = { workspace = true, features = ["hooks", "functions", "limits", "backup"] }
+serde.workspace = true
+fallible-iterator = "0.3"

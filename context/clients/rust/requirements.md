@@ -39,3 +39,10 @@ deviations.
 ## Open Design Questions
 
 None open.
+
+(LSC.CLIENT.RUST-DQ1 Vendored SQLite was resolved 2026-11-20: the client uses
+rusqlite's bundled SQLite with runtime settings matching wa-sqlite, and
+`rust:sqlite-check` fails CI on any behavior difference outside a known list; see
+[02-sqlite](./02-sqlite/spec.md). LSC.CLIENT.RUST-DQ2 Parity
+baseline vs megarepo pin was resolved 2026-11-20: the megarepo pin moved to the
+parity baseline.)
