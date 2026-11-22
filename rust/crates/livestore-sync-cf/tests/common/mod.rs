@@ -173,8 +173,9 @@ pub fn open(dir: &Path, client_id: &str) -> LocalLeader {
 
 /// A `DateFromString` from an ISO string.
 pub fn date(iso: &str) -> DateFromString {
-    #[expect(clippy::cast_precision_loss, reason = "epoch millis fit in f64")]
-    DateFromString(date_from_iso_string(iso).expect("valid ISO date") as f64)
+    date_from_iso_string(iso)
+        .and_then(DateFromString::from_millis)
+        .expect("valid ISO date")
 }
 
 pub fn unique(prefix: &str) -> String {
