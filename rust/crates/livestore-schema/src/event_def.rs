@@ -278,7 +278,7 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
     ///
     /// # Errors
     ///
-    /// Fails when the args do not serialize, for example a `DateFromString` holding an invalid date.
+    /// Fails when the args do not serialize.
     pub fn encode_json(&self, args: &A) -> Result<String, MaterializeError> {
         serde_json::to_string(args).map_err(|e| MaterializeError::InvalidArgs {
             event: self.name.clone(),
@@ -298,17 +298,17 @@ impl<A: Serialize + DeserializeOwned> EventDef<A> {
         })
     }
 
-    /// `eventDef(args)`: name plus encoded args, ready to commit.
+    /// `eventDef(args)` for a hand-written definition. Only for tests.
     ///
     /// # Panics
     ///
-    /// Panics when the args do not serialize, for example a `DateFromString` holding an invalid date.
+    /// Panics when the args do not serialize.
     #[cfg(feature = "testing")]
-    pub fn make(&self, args: A) -> (String, Value) {
-        (
-            self.name.clone(),
-            serde_json::to_value(args).expect("event args serialize"),
-        )
+    pub fn make(&self, args: A) -> EventInput {
+        EventInput {
+            name: self.name.clone(),
+            args: serde_json::to_value(args).expect("event args serialize"),
+        }
     }
 
     /// The eventlog stores missing args as `{}` (core: `args ?? {}`), so `{}` also decodes as if it
