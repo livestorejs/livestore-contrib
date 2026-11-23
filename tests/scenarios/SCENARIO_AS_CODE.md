@@ -18,7 +18,6 @@ instruction/oracle IDs are not authored.
 ## Basic shape
 
 ```ts
-import { todo } from '../../../applications/todo.ts'
 import {
   alias,
   client,
@@ -28,6 +27,7 @@ import {
   reconnect,
   Scenario,
 } from '../../../../scenario.ts'
+import { todo } from '../../../applications/todo.ts'
 
 const clientA = client('client-a').withSessions('session-a')
 const clientB = client('client-b').withSessions('session-b')

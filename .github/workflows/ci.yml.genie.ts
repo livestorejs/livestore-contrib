@@ -5,12 +5,11 @@ import {
   githubWorkflow,
   livestoreContribSetupSteps,
   livestoreContribSetupStepsAfterCheckout,
-  livestoreDefaultRefPolicyJob,
   namespaceRunner,
   nixDiagnosticsArtifactStep,
   runDevenvTasksBefore,
 } from '../../genie/repo.ts'
-import { prSnapshotPackJob } from '../../repos/effect-utils/genie/ci-workflow.ts'
+import { defaultRefPolicyCheckJob, prSnapshotPackJob } from '../../repos/effect-utils/genie/ci-workflow.ts'
 
 const withNixDiagnosticsOnFailure = (steps: unknown[]) => [...steps, nixDiagnosticsArtifactStep()]
 
@@ -44,7 +43,12 @@ export default githubWorkflow({
   },
 
   jobs: {
-    'source-policy': livestoreDefaultRefPolicyJob,
+    'source-policy': defaultRefPolicyCheckJob({
+      runsOn: namespaceRunner('${{ github.run_id }}'),
+      firstPartyOwners: ['overengineeringstudio'],
+      normalizeGitBranchRefs: true,
+      verifyReachable: true,
+    }),
 
     'pr-minimal-dev': {
       name: 'pr/minimal-dev',

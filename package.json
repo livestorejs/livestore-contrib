@@ -65,7 +65,7 @@
     "tests/scenarios",
     "tests/sync-provider"
   ],
-  "packageManager": "pnpm@12.15.0",
+  "packageManager": "pnpm@12.17.0",
   "scripts": {
     "format": "oxfmt .",
     "lint": "oxlint --import-plugin"

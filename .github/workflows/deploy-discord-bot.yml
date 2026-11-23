@@ -51,7 +51,8 @@ jobs:
       CF_BOT_STATE_NAMESPACE_ID: ${{ vars.CF_BOT_STATE_NAMESPACE_ID }}
       CF_WORKER_URL: ${{ vars.CF_WORKER_URL }}
     steps:
-      - uses: actions/checkout@v6
+      - # v6.1.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
@@ -181,7 +182,8 @@ jobs:
       CF_BOT_STATE_NAMESPACE_ID: ${{ vars.CF_BOT_STATE_NAMESPACE_ID }}
       CF_WORKER_URL: ${{ vars.CF_WORKER_URL }}
     steps:
-      - uses: actions/checkout@v6
+      - # v6.1.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
@@ -189,14 +191,18 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@v3
+      - # v3.24.1
+        name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@92957199488000b908fdad19f63711000965d8f3
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           extra-conf: |
             experimental-features = nix-command flakes
             accept-flake-config = true
+            connect-timeout = 10
+            stalled-download-timeout = 60
+            download-attempts = 3
             extra-substituters = 
             extra-trusted-public-keys = 
             access-tokens = github.com=${{ github.token }}
@@ -372,9 +378,10 @@ jobs:
             cd apps/discord-bot
             node --experimental-strip-types cf/scripts/commands-sync.ts "$STAGE"
           '
-      - name: Upload Nix diagnostics artifact
+      - # v4.6.2
+        name: Upload Nix diagnostics artifact
         if: failure() && env.NIX_STORE_DIAGNOSTICS_DIR != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: 'nix-store-diagnostics-${{ github.job }}-${{ runner.os }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}'
           path: ${{ env.NIX_STORE_DIAGNOSTICS_DIR }}
