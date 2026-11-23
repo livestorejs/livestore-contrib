@@ -1,5 +1,6 @@
 import {
   catalog,
+  getUtilsPeerDeps,
   livestorePackageDefaults,
   packageJson,
   repoPnpmOnlyBuiltDependencies,
@@ -26,9 +27,7 @@ const runtimeDeps = catalog.compose({
     external: catalog.pick('@types/node', 'typescript', 'vitest'),
   },
   peerDependencies: {
-    // Public packages must propagate workspace peers. Keep these exact too,
-    // so consumers cannot resolve a second, incompatible Effect cohort.
-    external: catalog.pick(...utilsEffectPeerDeps),
+    external: getUtilsPeerDeps(),
   },
 })
 

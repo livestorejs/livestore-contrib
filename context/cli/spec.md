@@ -25,10 +25,11 @@ three subcommands (`src/cli.ts:7`–`:9`):
 | `mcp`    | `server`           | `src/commands/mcp.ts:98`, `:77`                     |
 
 The standalone executable owns exact runtime dependencies for the entire Effect
-cohort from the composed catalog (currently 4.1.4, matching core 0.5.1). Public
-workspace composition also requires propagating the adapter's peers; those peer
-declarations use the same exact versions, not floating ranges. This prevents
-installing a newer platform adapter against an older Effect core.
+cohort from the composed catalog (currently 4.1.4, matching core 0.5.1). Every
+Effect peer is also an owned runtime dependency in that cohort. Public workspace
+composition propagates the adapter's normal peer ranges; each exact runtime
+dependency must satisfy its peer range. Owning the platform packages prevents a
+floating-only peer from introducing a newer adapter against an older Effect core.
 
 The release runner installs the packed cohort independently with Bun (fresh
 cache, 24-hour minimum release age) and pnpm, then executes
