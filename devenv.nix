@@ -51,6 +51,7 @@ in
       let
         lint =
           (taskModules.lint-oxc {
+          inherit pnpmPkg;
           lintPaths = [
             "apps"
             "packages"
@@ -77,19 +78,6 @@ in
             { inherit lib pkgs config; };
       in
       lint
-      // {
-        tasks = lint.tasks // {
-          # Same workaround as core: the pinned lint-oxc lockfile check calls `pnpm` while its PATH only
-          # carries the cli guard. Keep the guard first and append the pinned pnpm behind it.
-          # Remove once effect-utils#2228 (3b661131) reaches published-effect-4.0.
-          "lint:check:lockfile" = lint.tasks."lint:check:lockfile" // {
-            exec = ''
-              export PATH="$PATH:${pnpmPkg}/bin"
-            ''
-            + lint.tasks."lint:check:lockfile".exec;
-          };
-        };
-      }
     )
     (taskModules.check {
       hasTests = false;
