@@ -44,11 +44,19 @@
   "dependencies": {
     "@effect/ai-openai": "4.1.4",
     "@effect/opentelemetry": "4.1.4",
+    "@effect/platform-browser": "4.1.4",
+    "@effect/platform-bun": "4.1.4",
+    "@effect/platform-node": "4.1.4",
+    "@effect/platform-node-shared": "4.1.4",
+    "@effect/vitest": "4.1.4",
     "@livestore/adapter-node": "workspace:^",
     "@livestore/common": "link:../../../repos/livestore/packages/@livestore/common",
     "@livestore/livestore": "link:../../../repos/livestore/packages/@livestore/livestore",
     "@livestore/peer-deps": "link:../../../repos/livestore/packages/@livestore/peer-deps",
     "@livestore/utils": "link:../../../repos/livestore/packages/@livestore/utils",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/resources": "2.2.0",
+    "@standard-schema/spec": "1.1.0",
     "effect": "4.1.4"
   },
   "devDependencies": {

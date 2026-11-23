@@ -24,6 +24,19 @@ three subcommands (`src/cli.ts:7`–`:9`):
 | `sync`   | `export`, `import` | `src/commands/import-export.ts:280`, `:171`, `:218` |
 | `mcp`    | `server`           | `src/commands/mcp.ts:98`, `:77`                     |
 
+The standalone executable owns exact runtime dependencies for the entire Effect
+cohort from the composed catalog (currently 4.1.4, matching core 0.5.1). Public
+workspace composition also requires propagating the adapter's peers; those peer
+declarations use the same exact versions, not floating ranges. This prevents
+installing a newer platform adapter against an older Effect core.
+
+The release runner installs the packed cohort independently with Bun (fresh
+cache, 24-hour minimum release age) and pnpm, then executes
+`create --example tutorial-starter --help` through `bunx --no-install` and Node
+respectively (`release/smoke-cli.mjs`). This offline startup check imports the
+complete command tree and catches missing runtime modules before argument
+parsing; it does not exercise GitHub downloads or scaffold project files.
+
 ## `create` — Project Scaffolding
 
 Options: `--example` (optional; bypasses the prompt), `--ref` (aliases
