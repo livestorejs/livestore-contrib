@@ -278,15 +278,12 @@ export const makeSqliteDoThreadActionJournal = (
    * durability by platform contract — the pragmas the node journal negotiated
    * at runtime are guarantees here, so only the schema version is verified.
    */
-  inspectStorage: Effect.map(
-    readMetaVersion(client),
-    (rows): JournalStorageSettings => ({
-      busyTimeoutMs: 0,
-      journalMode: 'wal',
-      synchronous: 'full',
-      schemaVersion: readUserVersion(rows),
-    }),
-  ).pipe(
+  inspectStorage: Effect.map(readMetaVersion(client), (rows): JournalStorageSettings => ({
+    busyTimeoutMs: 0,
+    journalMode: 'wal',
+    synchronous: 'full',
+    schemaVersion: readUserVersion(rows),
+  })).pipe(
     Effect.catchIf(isSqlError, (cause) => unavailable('inspectStorage', cause)),
     Effect.withSpan('discord.journal.inspectStorage'),
   ),

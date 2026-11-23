@@ -654,13 +654,11 @@ const buildRuntime = (
           now: Date.now(),
         }).pipe(
           Effect.map((result) => reconcileOutcome(applied, result)),
-          Effect.mapError(
-            (): AdminOperationOutcome => ({
-              ok: false,
-              status: 500,
-              body: { _tag: 'ControlApplicationFailure', message: 'Thread reconciliation failed' },
-            }),
-          ),
+          Effect.mapError((): AdminOperationOutcome => ({
+            ok: false,
+            status: 500,
+            body: { _tag: 'ControlApplicationFailure', message: 'Thread reconciliation failed' },
+          })),
           Effect.catchIf(
             (error): error is AdminOperationOutcome => true,
             (error) => Effect.succeed<AdminOperationOutcome>(error),

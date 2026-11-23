@@ -521,14 +521,11 @@ const runJournalMaintenance = (
     if (result.truncated === true) yield* Effect.logWarning('Discord journal recovery batch was truncated')
   }).pipe(
     Effect.tapError(() =>
-      Ref.update(
-        health,
-        (current): RuntimeHealthState => ({
-          ...current,
-          journal: false,
-          state: 'starting',
-        }),
-      ),
+      Ref.update(health, (current): RuntimeHealthState => ({
+        ...current,
+        journal: false,
+        state: 'starting',
+      })),
     ),
     Effect.withSpan('runtime.journal.maintenance'),
     Effect.orDie,

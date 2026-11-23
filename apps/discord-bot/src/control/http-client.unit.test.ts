@@ -174,8 +174,7 @@ describe('HTTPS bot control client', () => {
           ]
           for (const args of commands) {
             const code = yield* runCli(args, client, io)
-            if (args[0] === 'runtime')
-              expect(code).toBe(4) // No runtime snapshot is wired into this router.
+            if (args[0] === 'runtime') expect(code).toBe(4) // No runtime snapshot is wired into this router.
             else expect(code).toBe(0)
           }
           return output
