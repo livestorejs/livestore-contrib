@@ -76,6 +76,6 @@ LS.SYS.RT-R05`
   unlike private-browsing on web), but whether Expo needs a storage-mode surface
   at all is not captured.
 - **LSC.ADAPT.EXPO-DQ3 Snapshot import from a file.** The SQLite `import`
-  implementation only accepts a raw byte snapshot and throws for an existing
-  database handle ("importing from an existing database is not yet supported in
-  expo"); whether/how import-from-file should work is open.
+  implementation accepts a raw byte snapshot or another `SqliteDb` made by this
+  adapter, and throws for any other database handle; whether/how
+  import-from-file should work is open.

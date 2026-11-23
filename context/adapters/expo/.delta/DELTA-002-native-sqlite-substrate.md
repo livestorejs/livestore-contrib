@@ -18,7 +18,7 @@ cross-platform materialization identity a _construction guarantee_. Under this
 delta it becomes an _assumption_: identity between Expo and the WASM-based
 adapters rests on the two SQLite builds agreeing (functions, collations,
 serialization format used by `serializeSync` / `deserializeDatabaseSync`,
-`src/make-sqlite-db.ts:121`, `:157`), which is not verified.
+`src/make-sqlite-db.ts:128`, `:176`), which is not verified.
 
 Close condition: either the (unbuilt) shared adapter conformance suite (core
 LS.SYS.VER.CONF-R03) exercises Expo against the reference and confirms

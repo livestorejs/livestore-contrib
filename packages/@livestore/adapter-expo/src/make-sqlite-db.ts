@@ -62,6 +62,13 @@ export const makeSqliteDb: MakeExpoSqliteDb = (input: ExpoDatabaseInput) =>
     }
   })
 
+/**
+ * The native `expo-sqlite` handle behind each `SqliteDb` made here, so `import` can copy from
+ * another `SqliteDb` (core clears a state db that needs rebuilding by importing an empty
+ * in-memory one into it).
+ */
+const nativeDbs = new WeakMap<SqliteDb<any>, SQLite.SQLiteDatabase>()
+
 const makeSqliteDb_ = <TMetadata extends Metadata>({
   db,
   metadata,
@@ -150,7 +157,19 @@ const makeSqliteDb_ = <TMetadata extends Metadata>({
     },
     import: (data) => {
       if (!(data instanceof Uint8Array)) {
-        throw new TypeError('importing from an existing database is not yet supported in expo')
+        const sourceDatabase = nativeDbs.get(data)
+        if (sourceDatabase === undefined) {
+          throw new TypeError('importing from a database not created by the expo adapter is not supported')
+        }
+        try {
+          SQLite.backupDatabaseSync({ sourceDatabase, destDatabase: db })
+        } catch (cause) {
+          throw new SqliteError({
+            cause,
+            note: `Error importing database ${metadata.input._tag === 'file' ? metadata.input.databaseName : 'in-memory'}`,
+          })
+        }
+        return
       }
 
       try {
@@ -168,7 +187,11 @@ const makeSqliteDb_ = <TMetadata extends Metadata>({
       const session = db.createSessionSync()
       session.attachSync(null)
       return {
-        changeset: () => ensureUint8ArrayBuffer(session.createChangesetSync()),
+        // expo-sqlite returns null or an empty buffer when the session recorded no changes
+        changeset: () => {
+          const changeset = session.createChangesetSync()
+          return changeset != null && changeset.byteLength > 0 ? ensureUint8ArrayBuffer(changeset) : null
+        },
         finish: () => session.closeSync(),
       }
     },
@@ -188,5 +211,6 @@ const makeSqliteDb_ = <TMetadata extends Metadata>({
     },
   } satisfies SqliteDb
 
+  nativeDbs.set(sqliteDb, db)
   return sqliteDb
 }
