@@ -4,6 +4,7 @@ import {
   livestorePackageDefaults,
   packageJson,
   repoPnpmOnlyBuiltDependencies,
+  utilsEffectPeerDeps,
   workspaceMember,
 } from '../../../genie/repo.ts'
 import commonPkg from '../../../repos/livestore/packages/@livestore/common/package.json.genie.ts'
@@ -17,16 +18,16 @@ const runtimeDeps = catalog.compose({
   workspace: workspaceMember('packages/@livestore/cli'),
   dependencies: {
     workspace: [adapterNodePkg, commonPkg, livestorePkg, peerDepsPkg, utilsPkg],
-    external: catalog.pick('@effect/ai-openai', '@effect/opentelemetry', 'effect'),
+    // The executable owns its runtime cohort; floating peers can install a newer
+    // platform adapter beside an older, exactly pinned Effect core.
+    external: catalog.pick(...utilsEffectPeerDeps, '@effect/ai-openai'),
   },
   devDependencies: {
     workspace: [utilsDevPkg],
     external: catalog.pick('@types/node', 'typescript', 'vitest'),
   },
   peerDependencies: {
-    external: {
-      ...getUtilsPeerDeps(),
-    },
+    external: getUtilsPeerDeps(),
   },
 })
 

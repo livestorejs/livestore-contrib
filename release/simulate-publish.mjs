@@ -17,6 +17,7 @@ import { basename, dirname, isAbsolute, join, relative } from 'node:path'
 
 import { publishCohort } from './publish-cohort.mjs'
 import { cleanupPackedRun } from './simulate-publish-cleanup.mjs'
+import { smokeCli } from './smoke-cli.mjs'
 import { PendingRegistryVerification, verifyProvenance, waitForRegistryVerification } from './verify-provenance.mjs'
 
 const rootDir = process.cwd()
@@ -462,27 +463,48 @@ const verifyRequiredCorePackages = () => {
 const smokeInstallPackedTarballs = (packed) => {
   if (verifyCore === false) return
 
-  const smokeDir = mkdtempSync(join(tmpdir(), 'livestore-contrib-install-smoke-'))
-  try {
-    const smokeManifest = {
-      private: true,
-      dependencies: Object.fromEntries(packed.map(({ pkg, tarballPath }) => [pkg.name, `file:${tarballPath}`])),
-    }
-    writeFileSync(join(smokeDir, 'package.json'), `${JSON.stringify(smokeManifest, null, 2)}\n`)
-    writeFileSync(
-      join(smokeDir, 'pnpm-workspace.yaml'),
-      `packages: []\noverrides:\n${packed.map(({ pkg, tarballPath }) => `  ${JSON.stringify(pkg.name)}: ${JSON.stringify(`file:${tarballPath}`)}`).join('\n')}\n`,
-    )
-    run('pnpm', ['install', '--ignore-scripts'], { cwd: smokeDir, captureOnFailure: true })
-
-    for (const { pkg } of packed) {
-      const installedManifest = join(smokeDir, 'node_modules', ...pkg.name.split('/'), 'package.json')
-      if (existsSync(installedManifest) === false) {
-        throw new Error(`Install smoke did not materialize ${pkg.name}`)
+  for (const packageManager of ['bun', 'pnpm']) {
+    const smokeDir = mkdtempSync(join(tmpdir(), `livestore-contrib-${packageManager}-smoke-`))
+    try {
+      const tarballDependencies = Object.fromEntries(
+        packed.map(({ pkg, tarballPath }) => [pkg.name, `file:${tarballPath}`]),
+      )
+      const smokeManifest = {
+        private: true,
+        dependencies:
+          packageManager === 'bun' ? { '@livestore/cli': tarballDependencies['@livestore/cli'] } : tarballDependencies,
+        ...(packageManager === 'bun' ? { overrides: tarballDependencies } : {}),
       }
+      writeFileSync(join(smokeDir, 'package.json'), `${JSON.stringify(smokeManifest, null, 2)}\n`)
+      if (packageManager === 'pnpm') {
+        writeFileSync(
+          join(smokeDir, 'pnpm-workspace.yaml'),
+          `packages: []\noverrides:\n${packed.map(({ pkg, tarballPath }) => `  ${JSON.stringify(pkg.name)}: ${JSON.stringify(`file:${tarballPath}`)}`).join('\n')}\n`,
+        )
+      }
+      run(
+        packageManager,
+        packageManager === 'bun'
+          ? ['install', '--ignore-scripts', '--minimum-release-age', '86400']
+          : ['install', '--ignore-scripts'],
+        {
+          cwd: smokeDir,
+          env: { ...process.env, BUN_INSTALL_CACHE_DIR: join(smokeDir, 'bun-cache') },
+          captureOnFailure: true,
+        },
+      )
+
+      for (const packageName of Object.keys(smokeManifest.dependencies)) {
+        const installedManifest = join(smokeDir, 'node_modules', ...packageName.split('/'), 'package.json')
+        if (existsSync(installedManifest) === false) {
+          throw new Error(`Install smoke did not materialize ${packageName}`)
+        }
+      }
+
+      smokeCli(smokeDir, { bunx: packageManager === 'bun' })
+    } finally {
+      rmSync(smokeDir, { recursive: true, force: true })
     }
-  } finally {
-    rmSync(smokeDir, { recursive: true, force: true })
   }
 }
 
