@@ -19,6 +19,9 @@ const paths = [
   'megarepo.lock',
 ]
 
+// Cached build scripts embed Nix runtime paths; even fallback restores must use the same toolchain.
+const toolchainHash = "${{ hashFiles('devenv.nix', 'devenv.yaml', 'devenv.lock', 'megarepo.lock') }}"
+
 export default githubWorkflow({
   name: 'rust',
   actionlint: defaultActionlintConfig,
@@ -45,8 +48,8 @@ export default githubWorkflow({
           uses: 'actions/cache@v4',
           with: {
             path: '~/.cargo/registry\n~/.cargo/git\nrust/target',
-            key: "cargo-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'devenv.lock') }}",
-            'restore-keys': 'cargo-${{ runner.os }}-',
+            key: `cargo-\${{ runner.os }}-${toolchainHash}-\${{ hashFiles('rust/Cargo.lock') }}`,
+            'restore-keys': `cargo-\${{ runner.os }}-${toolchainHash}-`,
           },
         },
         { name: 'Check and lint', run: runDevenvTasksBefore('rust:fmt', 'rust:check', 'rust:clippy', 'rust:doc') },
@@ -68,8 +71,8 @@ export default githubWorkflow({
           uses: 'actions/cache@v4',
           with: {
             path: '~/.cargo/registry\n~/.cargo/git\nrust/examples/*/target',
-            key: "cargo-examples-${{ runner.os }}-${{ hashFiles('rust/examples/*/Cargo.lock', 'devenv.lock') }}",
-            'restore-keys': 'cargo-examples-${{ runner.os }}-',
+            key: `cargo-examples-\${{ runner.os }}-${toolchainHash}-\${{ hashFiles('rust/examples/*/Cargo.lock') }}`,
+            'restore-keys': `cargo-examples-\${{ runner.os }}-${toolchainHash}-`,
           },
         },
         { name: 'Check, lint and build the examples', run: runDevenvTasksBefore('rust:examples') },

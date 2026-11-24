@@ -146,8 +146,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: "cargo-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'devenv.lock') }}"
-          restore-keys: 'cargo-${{ runner.os }}-'
+          key: "cargo-${{ runner.os }}-${{ hashFiles('devenv.nix', 'devenv.yaml', 'devenv.lock', 'megarepo.lock') }}-${{ hashFiles('rust/Cargo.lock') }}"
+          restore-keys: "cargo-${{ runner.os }}-${{ hashFiles('devenv.nix', 'devenv.yaml', 'devenv.lock', 'megarepo.lock') }}-"
       - name: Check and lint
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/composition-state/ci-runtime/run-with-nix-gc-race-retry.sh'
@@ -285,8 +285,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/examples/*/target
-          key: "cargo-examples-${{ runner.os }}-${{ hashFiles('rust/examples/*/Cargo.lock', 'devenv.lock') }}"
-          restore-keys: 'cargo-examples-${{ runner.os }}-'
+          key: "cargo-examples-${{ runner.os }}-${{ hashFiles('devenv.nix', 'devenv.yaml', 'devenv.lock', 'megarepo.lock') }}-${{ hashFiles('rust/examples/*/Cargo.lock') }}"
+          restore-keys: "cargo-examples-${{ runner.os }}-${{ hashFiles('devenv.nix', 'devenv.yaml', 'devenv.lock', 'megarepo.lock') }}-"
       - name: Check, lint and build the examples
         run: |
           __genie_ci_retry_script='${{ runner.temp }}/composition-state/ci-runtime/run-with-nix-gc-race-retry.sh'
