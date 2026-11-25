@@ -74,7 +74,7 @@ const isMirroredRelease =
   requestedCoreReleaseVersion !== undefined &&
   mirroredVersionPattern.test(requestedCoreReleaseVersion)
 
-export const contribCoreReleaseVersion = isMirroredRelease === true ? requestedCoreReleaseVersion : '0.5.0-dev.0'
+export const contribCoreReleaseVersion = isMirroredRelease === true ? requestedCoreReleaseVersion : '0.5.1'
 
 export const contribConsumedCoreArtifacts = {
   '@livestore/devtools-vite': contribCoreReleaseVersion,

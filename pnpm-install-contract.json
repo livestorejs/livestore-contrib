@@ -35,17 +35,7 @@
   "installPolicy": {
     "dedupePeerDependents": true,
     "ignoreScripts": true,
-    "minimumReleaseAgeExclude": [
-      "@types/node",
-      "@livestore/adapter-web@0.5.0-dev.0",
-      "@livestore/common-cf@0.5.0-dev.0",
-      "@livestore/common@0.5.0-dev.0",
-      "@livestore/devtools-vite@0.5.0-dev.0",
-      "@livestore/sqlite-wasm@0.5.0-dev.0",
-      "@livestore/utils@0.5.0-dev.0",
-      "@livestore/wa-sqlite@0.5.0-dev.0",
-      "@livestore/webmesh@0.5.0-dev.0"
-    ],
+    "minimumReleaseAgeExclude": ["@types/node"],
     "optimisticRepeatInstall": false,
     "packageImportMethod": {
       "live": {

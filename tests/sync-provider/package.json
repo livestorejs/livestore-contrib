@@ -47,7 +47,7 @@
     "@effect/platform-node": "4.1.4",
     "@effect/platform-node-shared": "4.1.4",
     "@effect/vitest": "4.1.4",
-    "@livestore/devtools-vite": "0.5.0-dev.0",
+    "@livestore/devtools-vite": "0.5.1",
     "@livestore/utils-dev": "link:../../repos/livestore/packages/@livestore/utils-dev",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/resources": "2.2.0",

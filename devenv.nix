@@ -307,6 +307,11 @@ in
         exit 1
       fi
 
+      DEVENV_TASK_PASSTHROUGH=1 \
+        LIVESTORE_RELEASE_VERSION="$core_version" \
+        LIVESTORE_CORE_RELEASE_VERSION="$core_version" \
+        genie --check
+
       node --test release/*.unit.test.mjs
       node release/simulate-publish.mjs
 
