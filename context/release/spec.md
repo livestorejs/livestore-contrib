@@ -79,6 +79,12 @@ npm OIDC trusted publishing with provenance; token authentication is refused.
 The same digest, dist-tag, dependency and provenance checks as the dev path
 apply. Review the uploaded stable release manifest and job summary.
 
+Before publication, `release:surface:check` runs Genie's release-mode no-diff and
+catalog validation against the committed lockfile, using the pinned core release
+version for both version inputs. Ordinary generation consumes the reviewed,
+published DevTools artifact for that cohort, so CI checks the same dependency
+graph as stable publication rather than an older prerelease fallback.
+
 For a hypothetical release that is not on npm yet, run:
 
 ```sh

@@ -80,10 +80,10 @@ const contribPeerDependencyRules = {
   allowedVersions: {
     ioredis: '>=5.6.1',
     /**
-     * The shared catalog moved to Vite 8 while two consumers still declare Vite 7 peer ranges:
-     * `@livestore/devtools-vite` at the pinned core snapshot, and `@sveltejs/vite-plugin-svelte`.
-     * Neither is resolvable from here — the first ships with core, the second is upstream — so the
-     * conflict is suppressed rather than fixed, and clears once both accept Vite 8.
+     * The catalog and existing examples pin Vite 7.3.1, while published DevTools 0.5.1
+     * requires Vite ^8.2.2. Keep both dependency trees rather than claiming the catalog
+     * satisfies that peer. This acknowledges the catalog validator's mismatch only;
+     * the examples-build CI lane verifies the actual consuming applications.
      */
     vite: '>=7.3.1',
     /**
@@ -145,7 +145,7 @@ const contribCatalogDuplicateExceptions = [
     package: '@livestore/devtools-vite',
     versions: [contribCoreReleaseVersion, '0.4.0-dev.25'],
     reason:
-      'Generated publishable packages deliberately consume the new core dev cohort while static examples remain on the previous devtools cohort.',
+      'Generated packages consume the reviewed core release artifact while static examples retain their separately pinned previous DevTools cohort.',
   },
   {
     package: '@testing-library/jest-dom',
@@ -233,14 +233,15 @@ const contribCatalogDuplicateExceptions = [
   },
   {
     package: 'vite',
-    versions: ['8.0.16', '7.3.1'],
-    reason: 'Transitive duplicate in the examples closure; example apps pull a newer Vite than the catalog pins.',
+    versions: ['8.3.8', '7.3.1'],
+    reason:
+      'Published DevTools 0.5.1 requires Vite ^8.2.2 and resolves to 8.3.8; catalog consumers and examples pin 7.3.1, so these major-version requirements cannot dedupe.',
   },
   {
     package: 'nanoid',
-    versions: ['5.0.9', '3.3.12', '3.3.8'],
+    versions: ['5.0.9', '3.3.20', '3.3.8'],
     reason:
-      'Transitive duplicate in the examples closure. The catalog already pins the newest version; the v3 lines arrive through example dependency trees that have not moved to v5.',
+      'The catalog pins nanoid 5.0.9; PostCSS and other v3 consumers dedupe to 3.3.20, while eas-cli 16.32.0 pins 3.3.8 exactly.',
   },
   {
     package: 'esbuild',
@@ -256,7 +257,10 @@ export default pnpmWorkspaceYaml.root({
   extraMembers: rootWorkspaceExtraMembers,
   catalogVersions: catalog,
   ...contribPnpmPolicySettings,
-  minimumReleaseAgeExclude: [...contribPnpmPolicySettings.minimumReleaseAgeExclude, ...coreDevReleaseCohort],
+  minimumReleaseAgeExclude: [
+    ...contribPnpmPolicySettings.minimumReleaseAgeExclude,
+    ...(contribCoreReleaseVersion.includes('-dev.') === true ? coreDevReleaseCohort : []),
+  ],
   peerDependencyRules: contribPeerDependencyRules,
   injectWorkspacePackages: false,
   allowBuilds: repoPnpmAllowBuilds,
