@@ -57,10 +57,12 @@ The **client-session** database is always in-memory (`src/index.ts:180`) and
 hydrated by importing the leader's exported snapshot
 (`src/index.ts:183`; the snapshot is `db.export()`, `src/index.ts:339`). Import
 deserializes the bytes into a temp db and `backupDatabaseSync` into the target
-(`src/make-sqlite-db.ts:157`); importing from an existing db handle throws
-("not yet supported in expo", `src/make-sqlite-db.ts:153`) — see
-LSC.ADAPT.EXPO-DQ3. Changesets/sessions use `expo-sqlite`'s native session API
-(`src/make-sqlite-db.ts:167`).
+(`src/make-sqlite-db.ts:176`). Importing from another `SqliteDb` made by this
+adapter (as core's leader does to clear a state db that needs rebuilding) backs
+up its native handle into the target directly; a handle from elsewhere throws
+(`src/make-sqlite-db.ts:160`) — see LSC.ADAPT.EXPO-DQ3. Changesets/sessions use
+`expo-sqlite`'s native session API (`src/make-sqlite-db.ts:187`); a session that
+recorded no changes yields `null`.
 
 `resetPersistence` broadcasts an `adapter-reset` shutdown first
 (`src/index.ts:148`) then `SQLite.deleteDatabaseSync` for both the state and
